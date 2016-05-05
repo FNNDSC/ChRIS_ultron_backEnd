@@ -20,4 +20,3 @@ urlpatterns += [
     url(r'^v1/auth/', include('rest_framework.urls',  namespace='rest_framework')),
 ]
 
-print('lolo')
