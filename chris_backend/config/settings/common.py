@@ -36,6 +36,11 @@ INSTALLED_APPS = [
     'plugins.apps.PluginsConfig',
 ]
 
+# Pagination
+REST_FRAMEWORK = {
+    'PAGE_SIZE': 15
+}
+
 MIDDLEWARE_CLASSES = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

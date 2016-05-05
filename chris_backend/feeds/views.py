@@ -13,7 +13,7 @@ from .permissions import IsOwnerOrReadOnly
 class FeedList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -22,7 +22,7 @@ class FeedList(generics.ListCreateAPIView):
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly,)
 
 
 class UserList(generics.ListAPIView):
