@@ -40,5 +40,5 @@ class UserDetail(generics.RetrieveAPIView):
 def api_root(request, format=None):
     return Response({
         'users': reverse('user-list', request=request, format=format),
-        'snippets': reverse('feed-list', request=request, format=format)
+        'feeds': reverse('feed-list', request=request, format=format)
     })
