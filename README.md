@@ -45,6 +45,21 @@ To deactivate chris_env:
 deactivate
 ````
 
+### Development database:
+When creating your local database on MySQL's shell use:
+
+````
+CREATE DATABASE chris_dev CHARACTER SET utf8;
+````
+
+This ensures all tables and columns will use UTF-8 by default
+
+Grant all privileges to user chris on the database:
+
+````
+GRANT ALL ON chris_dev.* TO 'chris'@'localhost';
+````
+
 ### Dependencies:
 This project uses requirement files to install dependencies in chris_env through pip:
 
