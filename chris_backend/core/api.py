@@ -7,7 +7,7 @@ from feeds import views
 
 # API v1 endpoints
 urlpatterns = format_suffix_patterns([
-    url(r'^v1/$', views.api_root),
+    url(r'^v1/$', views.api_root, name='api-root'),
     url(r'^v1/feeds/$', views.FeedList.as_view(), name='feed-list'),
     url(r'^v1/feeds/(?P<pk>[0-9]+)/$',
         views.FeedDetail.as_view(), name='feed-detail'),

@@ -38,7 +38,12 @@ INSTALLED_APPS = [
 
 # Pagination
 REST_FRAMEWORK = {
-    'PAGE_SIZE': 15
+    'PAGE_SIZE': 10,
+    'DEFAULT_RENDERER_CLASSES': (
+    'core.renderers.CollectionJsonRenderer',
+    'rest_framework.renderers.JSONRenderer',
+    'rest_framework.renderers.BrowsableAPIRenderer',
+    )
 }
 
 MIDDLEWARE_CLASSES = [
