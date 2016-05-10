@@ -6,7 +6,7 @@ class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100)
-    owner = models.ForeignKey('auth.User', related_name='feeds')
+    owner = models.ForeignKey('auth.User', related_name='feed')
     #tags = models.ManyToManyField(Tag)
 
     class Meta:

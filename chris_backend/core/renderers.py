@@ -1,10 +1,7 @@
-from rest_framework.relations import (
-    HyperlinkedRelatedField,
-    HyperlinkedIdentityField,
-)
-from rest_framework.serializers import HyperlinkedModelSerializer
+from rest_framework.serializers import HyperlinkedRelatedField, HyperlinkedIdentityField
+from rest_framework.serializers import HyperlinkedModelSerializer, ManyRelatedField
 from rest_framework.renderers import JSONRenderer
-
+from rest_framework.reverse import reverse
 from rest_framework.fields import SerializerMethodField
 
 
@@ -36,7 +33,12 @@ class CollectionJsonRenderer(JSONRenderer):
                 if k != id_field
                 and (isinstance(v, HyperlinkedRelatedField)
                 or isinstance(v, HyperlinkedIdentityField)
-                or isinstance(v, LinkField))]
+                or isinstance(v, LinkField)
+                or (isinstance(v, ManyRelatedField)
+                    and isinstance(v.child_relation, HyperlinkedRelatedField)))]
+
+    def _make_link(self, rel, href):
+        return {'rel': rel, 'href': href}
 
     def _get_item_field_links(self, field_name, item):
         data = item[field_name]
@@ -52,6 +54,8 @@ class CollectionJsonRenderer(JSONRenderer):
         fields = serializer.fields.items()
         id_field = self._get_id_field(serializer)
         related_fields = self._get_related_fields(fields, id_field)
+
+        #import pdb; pdb.set_trace()
 
         data = [self._transform_field(k, item[k])
                 for k in item.keys()
@@ -97,9 +101,6 @@ class CollectionJsonRenderer(JSONRenderer):
     def _get_items_from_paginated_data(self, data):
         return data.get('results')
 
-    def _make_link(self, rel, href):
-        return {'rel': rel, 'href': href}
-
     def _get_error(self, data):
         return {
             'error': {
@@ -122,18 +123,21 @@ class CollectionJsonRenderer(JSONRenderer):
             if self._is_paginated(data):
                 links.extend(self._get_pagination_links(data))
                 data = self._get_items_from_paginated_data(data)
-
+            
             items = self._transform_items(view, data)
 
         return {
             'items': items,
             'links': links,
         }
+    
+    def get_href(self, request):
+        return request.build_absolute_uri()
 
     def _transform_data(self, request, response, view, data):
         collection = {
             "version": "1.0",
-            "href": self.get_href(request),
+            "href": reverse('feed-list', request=request),
         }
 
         if response.exception:
@@ -142,9 +146,6 @@ class CollectionJsonRenderer(JSONRenderer):
             collection.update(self._get_items_and_links(view, data))
 
         return {'collection': collection}
-
-    def get_href(self, request):
-        return request.build_absolute_uri()
 
     def render(self, data, media_type=None, renderer_context=None):
         request = renderer_context['request']
