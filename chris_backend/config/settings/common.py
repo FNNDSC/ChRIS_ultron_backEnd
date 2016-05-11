@@ -43,6 +43,12 @@ REST_FRAMEWORK = {
     'core.renderers.CollectionJsonRenderer',
     'rest_framework.renderers.JSONRenderer',
     'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
+    'DEFAULT_PARSER_CLASSES': (
+    'core.parsers.CollectionJsonParser',
+    'rest_framework.parsers.JSONParser',
+    'rest_framework.parsers.FormParser',
+    'rest_framework.parsers.MultiPartParser',
     )
 }
 
