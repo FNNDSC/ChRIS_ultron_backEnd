@@ -2,9 +2,28 @@ from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
 
-from .models import Feed
-from .serializers import FeedSerializer, UserSerializer
+from .models import Note, Tag, Feed, Comment
+from .serializers import UserSerializer
+from .serializers import NoteSerializer, TagSerializer, FeedSerializer, CommentSerializer 
 from .permissions import IsOwnerOrChris
+
+
+class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Note.objects.all()
+    serializer_class = NoteSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+
+
+class TagList(generics.ListCreateAPIView):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class TagDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
 
 class FeedList(generics.ListCreateAPIView):
@@ -28,6 +47,21 @@ class FeedList(generics.ListCreateAPIView):
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+
+
+class CommentList(generics.ListCreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+
+class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
 
