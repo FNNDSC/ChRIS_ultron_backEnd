@@ -1,17 +1,17 @@
 from django.contrib.auth.models import User
 
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 
 from .models import Note, Tag, Feed, Comment
 from .serializers import UserSerializer
 from .serializers import NoteSerializer, TagSerializer, FeedSerializer, CommentSerializer 
-from .permissions import IsOwnerOrChris
+from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly 
+from .permissions import IsRelatedFeedOwnerOrChris 
 
-
-class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
+class NoteDetail(generics.RetrieveUpdateAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
 
 
 class TagList(generics.ListCreateAPIView):
