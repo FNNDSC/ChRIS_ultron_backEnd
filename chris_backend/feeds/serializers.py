@@ -23,13 +23,13 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
-    tag = serializers.HyperlinkedRelatedField(many=True, view_name='tag-detail', read_only=True)
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
+    tag = serializers.HyperlinkedRelatedField(many=True, view_name='tag-detail', read_only=True)
     comment = serializers.HyperlinkedRelatedField(many=True, view_name='comment-detail', read_only=True)
 
     class Meta:
         model = Feed
-        fields = ('url', 'owner', 'name', 'tag', 'note', 'comment')
+        fields = ('url', 'owner', 'name', 'note', 'tag', 'comment')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):

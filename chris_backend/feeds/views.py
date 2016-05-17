@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions
 
 from .models import Note, Tag, Feed, Comment
 from .serializers import UserSerializer
@@ -23,7 +23,7 @@ class TagList(generics.ListCreateAPIView):
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class FeedList(generics.ListCreateAPIView):
