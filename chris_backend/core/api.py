@@ -16,16 +16,16 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/note(?P<pk>[0-9]+)/$',
         views.NoteDetail.as_view(), name='note-detail'),
     
-    url(r'^v1/tags/$',
+    url(r'^v1/(?P<pk>[0-9]+)/tags/$',
         views.TagList.as_view(), name='tag-list'),
-    
-    url(r'^v1/tags/(?P<tag_id>[0-9]+)/$',
+
+    url(r'^v1/tags/(?P<pk>[0-9]+)/$',
         views.TagDetail.as_view(), name='tag-detail'),
     
-    url(r'^v1/comments/$',
+    url(r'^v1/(?P<pk>[0-9]+)/comments/$',
         views.CommentList.as_view(), name='comment-list'),
     
-    url(r'^v1/comments/(?P<comment_id>[0-9]+)/$',
+    url(r'^v1/comments/(?P<pk>[0-9]+)/$',
         views.CommentDetail.as_view(), name='comment-detail'),
 ])
 

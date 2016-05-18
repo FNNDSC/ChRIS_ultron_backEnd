@@ -131,13 +131,19 @@ class CollectionJsonRenderer(JSONRenderer):
             'links': links,
         }
     
-    def get_href(self, request):
-        return request.build_absolute_uri()
+    def get_href(self, request, view):
+        url = request.build_absolute_uri()
+        #try to always make this url a pointer to a collection list
+        vname = view.get_view_name()
+        if 'detail' in vname.lower():
+            last = url[:-1].rindex('/')
+            url = url[0:last+1]
+        return url
 
     def _transform_data(self, request, response, view, data):
         collection = {
             "version": "1.0",
-            "href": reverse('feed-list', request=request),
+            "href": self.get_href(request, view),
         }
 
         if response.exception:

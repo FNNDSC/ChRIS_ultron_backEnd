@@ -6,6 +6,7 @@ from .models import Note, Tag, Feed, Comment
 from core.renderers import LinkField
 
 
+
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
 
@@ -19,17 +20,18 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Tag
-        fields = ('url', 'name', 'color', 'feed')        
+        fields = ('url', 'name', 'color', 'feed')
+        
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
-    tag = serializers.HyperlinkedRelatedField(many=True, view_name='tag-detail', read_only=True)
-    comment = serializers.HyperlinkedRelatedField(many=True, view_name='comment-detail', read_only=True)
+    tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
+    comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
 
     class Meta:
         model = Feed
-        fields = ('url', 'owner', 'name', 'note', 'tag', 'comment')
+        fields = ('url', 'owner', 'name', 'note', 'tags', 'comments')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):
@@ -38,7 +40,7 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('url', 'title', 'content', 'feed')
+        fields = ('url', 'owner', 'title', 'content', 'feed')
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

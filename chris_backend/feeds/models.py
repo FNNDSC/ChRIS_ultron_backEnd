@@ -41,7 +41,7 @@ class Feed(models.Model):
 class Tag(models.Model):
     name = models.CharField(max_length=100, blank=True, default='')
     color = models.CharField(max_length=20)
-    feeds = models.ManyToManyField(Feed, related_name='tag')
+    feed = models.ManyToManyField(Feed, related_name='tags')
 
     def __str__(self):
         return self.name
@@ -51,8 +51,8 @@ class Comment(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     title = models.CharField(max_length=100, blank=True, default='')
     content = models.TextField(blank=True, default='')
-    owner = models.ForeignKey('auth.User', related_name='comment')
-    feed = models.ForeignKey(Feed, related_name='comment')
+    owner = models.ForeignKey('auth.User')
+    feed = models.ForeignKey(Feed, related_name='comments')
 
     class Meta:
         ordering = ('creation_date',)
