@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from .models import Note, Tag, Feed, Comment
 from .serializers import UserSerializer
 from .serializers import NoteSerializer, TagSerializer, FeedSerializer, CommentSerializer
-from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly 
+from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
+from .permissions import IsObjOwnerOrChris, IsObjOwnerOrChrisOrReadOnly 
 from .permissions import IsFeedOwnerOrChris, IsRelatedFeedOwnerOrChris 
 
 
@@ -16,14 +17,29 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
     
 
-class TagList(generics.GenericAPIView):
+class TagList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = TagSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChris)
 
-    def get(self, request, *args, **kwargs):
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user, feed=[self.get_object()])
+
+    def list(self, request, *args, **kwargs):
+        """
+        This view should return a list of the tags for the queried
+        feed that are owned by the currently authenticated user.
+        """
         feed = self.get_object()
-        serializer = TagSerializer(feed.tags, context={'request': request}, many=True)
+        tags = [tag for tag in feed.tags.all() if tag.owner==request.user]
+        queryset = self.filter_queryset(tags)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
 
@@ -38,6 +54,7 @@ class FeedList(generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
 
     def perform_create(self, serializer):
+        # we set a list of owners when creating a new feed
         serializer.save(owner=[self.request.user])
 
     def get_queryset(self):
@@ -48,6 +65,7 @@ class FeedList(generics.ListCreateAPIView):
         user = self.request.user
         if (user.username == 'chris'):
             return Feed.objects.all()
+        import pdb; pdb.set_trace()
         return Feed.objects.filter(owner=user)
 
 
@@ -57,21 +75,34 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
 
 
-class CommentList(generics.GenericAPIView):
+class CommentList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChrisOrReadOnly,)
 
-    def get(self, request, *args, **kwargs):
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user, feed=self.get_object())
+
+    def list(self, request, *args, **kwargs):
+        """
+        This view should return a list of the comments for the queried feed.
+        """
         feed = self.get_object()
-        serializer = CommentSerializer(feed.comments, context={'request': request}, many=True)
+        queryset = self.filter_queryset(feed.comments.all())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
 
 class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChrisOrReadOnly,)
 
 
 class UserList(generics.ListAPIView):

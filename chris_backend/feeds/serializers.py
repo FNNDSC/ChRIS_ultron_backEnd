@@ -12,7 +12,7 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Note
         fields = ('url', 'title', 'content', 'feed')
-
+        
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
@@ -20,7 +20,7 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Tag
-        fields = ('url', 'name', 'color', 'feed')
+        fields = ('url', 'name', 'owner', 'color', 'feed')
         
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
@@ -40,7 +40,7 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('url', 'owner', 'title', 'content', 'feed')
+        fields = ('url', 'title', 'owner', 'content', 'feed')
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
