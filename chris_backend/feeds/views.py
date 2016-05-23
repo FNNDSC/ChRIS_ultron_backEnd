@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
@@ -54,7 +55,7 @@ class FeedList(generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
 
     def perform_create(self, serializer):
-        # we set a list of owners when creating a new feed
+        # set a list of owners when creating a new feed
         serializer.save(owner=[self.request.user])
 
     def get_queryset(self):
@@ -65,7 +66,6 @@ class FeedList(generics.ListCreateAPIView):
         user = self.request.user
         if (user.username == 'chris'):
             return Feed.objects.all()
-        import pdb; pdb.set_trace()
         return Feed.objects.filter(owner=user)
 
 
@@ -73,6 +73,25 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
+
+    def perform_update(self, serializer):
+        # check system registered owners when updating feed's owners
+        feed = self.get_object()
+        currentOwners = feed.owner.values('username')
+        newOwners = []
+        if 'owners' in self.request.data: 
+            usernames = self.request.data.pop('owners')
+            for usern in usernames:
+                if {'username': usern} not in currentOwners:
+                    try:
+                        owner = User.objects.get(username=usern)
+                    except ObjectDoesNotExist:
+                        pass
+                    else:
+                        newOwners.append(owner)
+        if newOwners:
+            currentOwners = [owner for owner in feed.owner.all()]
+            serializer.save(owner=currentOwners+newOwners)
 
 
 class CommentList(generics.ListCreateAPIView):

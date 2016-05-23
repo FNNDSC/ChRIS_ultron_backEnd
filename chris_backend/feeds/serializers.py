@@ -7,7 +7,7 @@ from core.renderers import LinkField
 
         
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
 
     class Meta:
         model = Note

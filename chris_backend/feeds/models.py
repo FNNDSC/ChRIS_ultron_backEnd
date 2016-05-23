@@ -19,7 +19,7 @@ class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, blank=True, default='')
-    note = models.ForeignKey(Note, related_name='feed')
+    note = models.OneToOneField(Note, related_name='feed')
     owner = models.ManyToManyField('auth.User', related_name='feed')
     
     class Meta:

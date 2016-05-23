@@ -78,9 +78,8 @@ class IsRelatedFeedOwnerOrChris(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
-        for feed in obj.feed.all():
-            if request.user in feed.owner.all():
-                return True     
+        if request.user in obj.feed.owner.all():
+            return True     
         return request.user.username == 'chris'
 
 
