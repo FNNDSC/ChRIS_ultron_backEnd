@@ -8,8 +8,7 @@ from .models import Note, Tag, Feed, Comment
 from .serializers import UserSerializer
 from .serializers import NoteSerializer, TagSerializer, FeedSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
-from .permissions import IsObjOwnerOrChris, IsObjOwnerOrChrisOrReadOnly 
-from .permissions import IsFeedOwnerOrChris, IsRelatedFeedOwnerOrChris 
+from .permissions import IsRelatedFeedOwnerOrChris 
 
 
 class NoteDetail(generics.RetrieveUpdateAPIView):
@@ -21,7 +20,7 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
 class TagList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = TagSerializer
-    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChris)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, feed=[self.get_object()])
@@ -52,7 +51,7 @@ class TagDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class FeedList(generics.ListCreateAPIView):
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_create(self, serializer):
         # set a list of owners when creating a new feed
@@ -72,7 +71,7 @@ class FeedList(generics.ListCreateAPIView):
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated, IsFeedOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_update(self, serializer):
         # check system registered owners when updating feed's owners
@@ -97,7 +96,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
 class CommentList(generics.ListCreateAPIView):
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, feed=self.get_object())
@@ -121,7 +120,7 @@ class CommentList(generics.ListCreateAPIView):
 class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsObjOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
 
 class UserList(generics.ListAPIView):
