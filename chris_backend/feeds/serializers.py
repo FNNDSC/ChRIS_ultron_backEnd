@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Note, Tag, Feed, Comment
-from core.renderers import LinkField
 
         
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
@@ -41,6 +40,14 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Comment
         fields = ('url', 'title', 'owner', 'content', 'feed')
+
+
+class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
+    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+
+    class Meta:
+        model = FeedFile
+        fields = ('url', 'file', 'feed')
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

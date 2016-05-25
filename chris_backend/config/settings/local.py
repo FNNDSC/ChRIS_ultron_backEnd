@@ -25,6 +25,9 @@ DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
 
+# Feed file storage
+MEDIA_ROOT = '~/users/'
+
 # Mail settings
 # ------------------------------------------------------------------------------
 EMAIL_HOST = 'localhost'

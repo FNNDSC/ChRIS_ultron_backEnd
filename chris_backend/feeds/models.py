@@ -59,3 +59,22 @@ class Comment(models.Model):
 
     def __str__(self):
         return self.title
+
+
+def user_directory_path(instance, filename):
+    # file will be stored to:
+    # MEDIA_ROOT/<username>/<year>_<month>_<day>/feed_<id><filename>
+    username = instance.user.username
+    feed_id = instance.feed.id
+    return '{0}/%Y_%m_%d/feed_{1}/{2}'.format(username, feed_id, filename)
+
+
+class FeedFile(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(upload_to=user_directory_path, max_length=200)
+    feed = models.ManyToManyField(Feed, related_name='files')
+
+    def __str__(self):
+        return self.file.name
+
+    

@@ -13,7 +13,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 # JSON-based secrets module
 with open("secrets.json") as f:
-secrets = json.loads(f.read())
+    secrets = json.loads(f.read())
 
 def get_secret(setting, secrets=secrets):
     """Get the secret variable or return explicit exception."""
@@ -47,6 +47,9 @@ DATABASES['default']['USER'] = get_secret('DATABASE_USER')
 DATABASES['default']['PASSWORD'] = get_secret('DATABASE_PASSWORD')
 DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
+
+# FEED FILE STORAGE
+MEDIA_ROOT = get_secret('MEDIA_ROOT')
 
 
 # LOGGING CONFIGURATION

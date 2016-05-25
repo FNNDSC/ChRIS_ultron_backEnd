@@ -123,6 +123,37 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
 
+class FeedFileList(generics.ListCreateAPIView):
+    queryset = Feed.objects.all()
+    serializer_class = FeedFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+
+    def perform_create(self, serializer):
+        serializer.save(feed=[self.get_object()])
+
+    def list(self, request, *args, **kwargs):
+        """
+        This view should return a list of the tags for the queried
+        feed that are owned by the currently authenticated user.
+        """
+        feed = self.get_object()
+        queryset = self.filter_queryset(feed.files.all())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class FeedFileDetail(generics.RetrieveDestroyAPIView):
+    queryset = FeedFile.objects.all()
+    serializer_class = FeedFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+
 class UserList(generics.ListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
