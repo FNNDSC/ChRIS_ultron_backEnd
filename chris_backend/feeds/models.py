@@ -1,5 +1,6 @@
 from django.db import models
 
+
 # Create your models here.
 
 class Feed(models.Model):
@@ -64,17 +65,21 @@ class Comment(models.Model):
 def user_directory_path(instance, filename):
     # file will be stored to:
     # MEDIA_ROOT/<username>/<year>_<month>_<day>/feed_<id><filename>
-    username = instance.user.username
+    #import pdb; pdb.set_trace()
+    username = instance.feed.user.username
     feed_id = instance.feed.id
-    return '{0}/%Y_%m_%d/feed_{1}/{2}'.format(username, feed_id, filename)
+    t = timezone.now()
+    return '{0}/{1}_{2}_{3}/feed_{4}/{5}'.format(username, t.year,
+                                                 t.month, t.day, feed_id, filename)
 
 
 class FeedFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    file = models.FileField(upload_to=user_directory_path, max_length=200)
+    file = models.FileField(max_length=200)
     feed = models.ManyToManyField(Feed, related_name='files')
 
     def __str__(self):
         return self.file.name
-
     
+
+

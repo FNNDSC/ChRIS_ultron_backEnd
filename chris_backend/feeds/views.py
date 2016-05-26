@@ -4,11 +4,25 @@ from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 
-from .models import Note, Tag, Feed, Comment
-from .serializers import UserSerializer
-from .serializers import NoteSerializer, TagSerializer, FeedSerializer, CommentSerializer
+from .models import Note, Tag, Feed, Comment, FeedFile
+from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
+from .serializers import NoteSerializer, TagSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
+
+
+def get_list_response(view_instance, queryset):
+    """
+    Convenience method to get an HTTP response with a list of objects
+    from a view instance and a queryset
+    """
+    page = view_instance.paginate_queryset(queryset)
+    if page is not None:
+        serializer = view_instance.get_serializer(page, many=True)
+        return view_instance.get_paginated_response(serializer.data)
+
+    serializer = view_instance.get_serializer(queryset, many=True)
+    return Response(serializer.data)
 
 
 class NoteDetail(generics.RetrieveUpdateAPIView):
@@ -33,15 +47,8 @@ class TagList(generics.ListCreateAPIView):
         feed = self.get_object()
         tags = [tag for tag in feed.tags.all() if tag.owner==request.user]
         queryset = self.filter_queryset(tags)
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
+        return get_list_response(self, queryset)
+        
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Tag.objects.all()
@@ -107,14 +114,7 @@ class CommentList(generics.ListCreateAPIView):
         """
         feed = self.get_object()
         queryset = self.filter_queryset(feed.comments.all())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return get_list_response(self, queryset)
 
 
 class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -128,7 +128,7 @@ class FeedFileList(generics.ListCreateAPIView):
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer):      
         serializer.save(feed=[self.get_object()])
 
     def list(self, request, *args, **kwargs):
@@ -138,17 +138,10 @@ class FeedFileList(generics.ListCreateAPIView):
         """
         feed = self.get_object()
         queryset = self.filter_queryset(feed.files.all())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return get_list_response(self, queryset)
 
 
-class FeedFileDetail(generics.RetrieveDestroyAPIView):
+class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)

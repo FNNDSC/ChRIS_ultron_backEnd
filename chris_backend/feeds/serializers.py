@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from .models import Note, Tag, Feed, Comment
+from .models import Note, Tag, Feed, Comment, FeedFile
 
         
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
@@ -26,11 +26,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
     tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
+    files = serializers.HyperlinkedIdentityField(view_name='file-list')
     owners = serializers.ListField(child=serializers.CharField(), source='owner.all', read_only=True)
     
     class Meta:
         model = Feed
-        fields = ('url', 'name', 'owners', 'note', 'tags', 'comments')
+        fields = ('url', 'name', 'owners', 'note', 'tags', 'comments', 'files')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):

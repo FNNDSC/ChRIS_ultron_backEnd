@@ -27,6 +27,12 @@ urlpatterns = format_suffix_patterns([
     
     url(r'^v1/comments/(?P<pk>[0-9]+)/$',
         views.CommentDetail.as_view(), name='comment-detail'),
+    
+    url(r'^v1/(?P<pk>[0-9]+)/files/$',
+        views.FeedFileList.as_view(), name='file-list'),
+
+    url(r'^v1/files/(?P<pk>[0-9]+)/$',
+        views.FeedFileDetail.as_view(), name='file-detail'),
 ])
 
 # Login and logout views for Djangos' browsable API

@@ -55,8 +55,6 @@ class CollectionJsonRenderer(JSONRenderer):
         id_field = self._get_id_field(serializer)
         related_fields = self._get_related_fields(fields, id_field)
 
-        #import pdb; pdb.set_trace()
-
         data = [self._transform_field(k, item[k])
                 for k in item.keys()
                 if k != id_field and k not in related_fields]
