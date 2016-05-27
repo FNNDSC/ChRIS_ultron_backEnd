@@ -68,6 +68,6 @@ class FeedFile(models.Model):
     feed = models.ManyToManyField(Feed, related_name='files')
 
     def __str__(self):
-        return self.file.name    
+        return self.file.name   
 
 
