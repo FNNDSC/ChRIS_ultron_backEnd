@@ -128,13 +128,12 @@ class FeedFileList(generics.ListCreateAPIView):
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
-    def perform_create(self, serializer):      
+    def perform_create(self, serializer):
         serializer.save(feed=[self.get_object()])
 
     def list(self, request, *args, **kwargs):
         """
-        This view should return a list of the tags for the queried
-        feed that are owned by the currently authenticated user.
+        This view should return a list of the files for the queried feed.
         """
         feed = self.get_object()
         queryset = self.filter_queryset(feed.files.all())

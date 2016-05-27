@@ -42,9 +42,18 @@ class IsRelatedFeedOwnerOrChris(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
-        if request.user in obj.feed.owner.all():
-            return True     
-        return request.user.username == 'chris'
+        #import pdb; pdb.set_trace()
+        if request.user.username == 'chris':
+            return True
+        if hasattr(obj.feed, 'all'):
+            owner_lists = [feed.owner.all() for feed in obj.feed.all()]
+            for owner_list in owner_lists:
+                if request.user in owner_list:
+                    return True
+        elif request.user in obj.feed.owner.all():
+            return True
+        return False
+
 
 
 

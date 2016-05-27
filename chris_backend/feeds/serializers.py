@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
+from core.renderers import LinkField
 from .models import Note, Tag, Feed, Comment, FeedFile
 
         
@@ -26,7 +27,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
     tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
-    files = serializers.HyperlinkedIdentityField(view_name='file-list')
+    files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
     owners = serializers.ListField(child=serializers.CharField(), source='owner.all', read_only=True)
     
     class Meta:
@@ -45,10 +46,15 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
 class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+    fname = serializers.ReadOnlyField(source='file.name')
+    file_resource = LinkField('get_file_link')
 
     class Meta:
         model = FeedFile
-        fields = ('url', 'file', 'feed')
+        fields = ('url', 'fname', 'file_resource', 'feed')
+
+    def get_file_link(self, obj):
+        return obj.file.url
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

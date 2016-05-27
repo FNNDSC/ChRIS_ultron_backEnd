@@ -26,7 +26,7 @@ DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
 
 # Feed file storage
-MEDIA_ROOT = '~/users/'
+MEDIA_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))) + '/users'
 
 # Mail settings
 # ------------------------------------------------------------------------------
