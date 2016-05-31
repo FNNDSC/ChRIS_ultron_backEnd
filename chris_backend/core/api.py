@@ -34,6 +34,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/files/(?P<pk>[0-9]+)/$',
         views.FeedFileDetail.as_view(), name='feedfile-detail'),
 
+    url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
+        views.FileResource.as_view(), name='file-resource'), 
+
 ])
 
 # Login and logout views for Djangos' browsable API

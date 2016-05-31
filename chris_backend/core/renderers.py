@@ -1,7 +1,7 @@
 from rest_framework.serializers import HyperlinkedRelatedField, HyperlinkedIdentityField
 from rest_framework.serializers import HyperlinkedModelSerializer, ManyRelatedField
-from rest_framework.renderers import JSONRenderer
-from rest_framework.reverse import reverse
+from rest_framework.serializers import FileField
+from rest_framework.renderers import JSONRenderer, BaseRenderer
 from rest_framework.fields import SerializerMethodField
 
 
@@ -33,6 +33,7 @@ class CollectionJsonRenderer(JSONRenderer):
                 if k != id_field
                 and (isinstance(v, HyperlinkedRelatedField)
                 or isinstance(v, HyperlinkedIdentityField)
+                or isinstance(v, FileField)     
                 or isinstance(v, LinkField)
                 or (isinstance(v, ManyRelatedField)
                     and isinstance(v.child_relation, HyperlinkedRelatedField)))]
@@ -161,3 +162,12 @@ class CollectionJsonRenderer(JSONRenderer):
 
         return super(CollectionJsonRenderer, self).render(data, media_type,
                                                           renderer_context)
+
+
+class BinaryFileRenderer(BaseRenderer):
+    media_type = '*/*'
+    charset = None
+    render_style = 'binary'
+
+    def render(self, data, media_type=None, renderer_context=None):
+        return data    

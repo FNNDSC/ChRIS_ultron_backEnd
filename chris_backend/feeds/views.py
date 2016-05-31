@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 
+from core.renderers import BinaryFileRenderer
 from .models import Note, Tag, Feed, Comment, FeedFile
 from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
@@ -144,6 +145,18 @@ class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+
+class FileResource(generics.GenericAPIView):
+    queryset = FeedFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+
+    def get(self, request, *args, **kwargs):
+        """
+        This view returns an actual file resource.
+        """
+        feed_file = self.get_object()
+        return Response(feed_file.file)
 
 
 class UserList(generics.ListAPIView):

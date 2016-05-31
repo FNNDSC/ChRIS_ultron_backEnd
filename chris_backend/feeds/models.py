@@ -64,6 +64,7 @@ class Comment(models.Model):
 
 class FeedFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=200)
     file = models.FileField(max_length=200)
     feed = models.ManyToManyField(Feed, related_name='files')
 

@@ -47,14 +47,10 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
     file = serializers.FileField(use_url=False)
-    resource = LinkField('get_file_link')
 
     class Meta:
         model = FeedFile
-        fields = ('url', 'resource', 'file', 'feed')
-
-    def get_file_link(self, obj):
-        return obj.file.url
+        fields = ('url', 'name', 'file', 'feed')
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
