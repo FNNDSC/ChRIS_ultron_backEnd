@@ -1,6 +1,5 @@
 from rest_framework.serializers import HyperlinkedRelatedField, HyperlinkedIdentityField
 from rest_framework.serializers import HyperlinkedModelSerializer, ManyRelatedField
-from rest_framework.serializers import FileField
 from rest_framework.renderers import JSONRenderer, BaseRenderer
 from rest_framework.fields import SerializerMethodField
 
@@ -32,8 +31,7 @@ class CollectionJsonRenderer(JSONRenderer):
         return [k for (k, v) in fields
                 if k != id_field
                 and (isinstance(v, HyperlinkedRelatedField)
-                or isinstance(v, HyperlinkedIdentityField)
-                or isinstance(v, FileField)     
+                or isinstance(v, HyperlinkedIdentityField)   
                 or isinstance(v, LinkField)
                 or (isinstance(v, ManyRelatedField)
                     and isinstance(v.child_relation, HyperlinkedRelatedField)))]

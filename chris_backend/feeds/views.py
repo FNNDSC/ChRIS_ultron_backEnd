@@ -156,7 +156,7 @@ class FileResource(generics.GenericAPIView):
         This view returns an actual file resource.
         """
         feed_file = self.get_object()
-        return Response(feed_file.file)
+        return Response(feed_file.fname)
 
 
 class UserList(generics.ListAPIView):
