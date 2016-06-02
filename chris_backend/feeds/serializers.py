@@ -18,7 +18,8 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
+                                               read_only=True)
 
     class Meta:
         model = Tag
@@ -30,11 +31,13 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
-    owners = serializers.ListField(child=serializers.CharField(), source='owner.all', read_only=True)
+    owners = serializers.ListField(child=serializers.CharField(), source='owner.all',
+                                   read_only=True)
     
     class Meta:
         model = Feed
-        fields = ('url', 'name', 'owners', 'note', 'tags', 'comments', 'files')
+        fields = ('url', 'name', 'owners', 'note', 'tags', 'comments',
+                  'files', 'plugin')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):
@@ -47,13 +50,14 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
+                                               read_only=True)
     fname = serializers.FileField(use_url=False)
     file = LinkField('get_file_link')
 
     class Meta:
         model = FeedFile
-        fields = ('url', 'fname', 'file', 'feed')
+        fields = ('url', 'fname', 'file', 'feed', 'plugin')
 
     def get_file_link(self, obj):
         fields = self.fields.items()
@@ -66,7 +70,8 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
+                                               read_only=True)
 
     class Meta:
         model = User

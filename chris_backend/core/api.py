@@ -3,6 +3,7 @@ from django.conf.urls import url, include
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from feeds import views
+from plugins.views import PluginList, PluginDetail
 
 
 # API v1 endpoints
@@ -35,7 +36,12 @@ urlpatterns = format_suffix_patterns([
         views.FeedFileDetail.as_view(), name='feedfile-detail'),
 
     url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
-        views.FileResource.as_view(), name='file-resource'), 
+        views.FileResource.as_view(), name='file-resource'),
+
+    url(r'^v1/plugins/$', PluginList.as_view(), name='plugin-list'),
+    
+    url(r'^v1/plugins/(?P<pk>[0-9]+)/$',
+        PluginDetail.as_view(), name='plugin-detail'),
 
 ])
 
