@@ -8,4 +8,4 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = Plugin
-        fields = ('url', 'name', 'type')
+        fields = ('url', 'id', 'name', 'type')

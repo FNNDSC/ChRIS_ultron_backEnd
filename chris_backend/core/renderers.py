@@ -112,11 +112,16 @@ class CollectionJsonRenderer(JSONRenderer):
         # router, we would still need to handle
         # custom routers. Works okay for now.
         # ------------------------------------------
+
+        links = []
+        if 'links' in data:
+            l = data.pop('links')
+            links = [self._make_link(key, l[key]) for key in l.keys()]
+            
         if view.get_view_name() == 'Api Root':
-            links = [self._make_link(key, data[key]) for key in data.keys()]
+            links = links.extend([self._make_link(key, data[key]) for key in data.keys()])
             items = []
         else:
-            links = []
             if self._is_paginated(data):
                 links.extend(self._get_pagination_links(data))
                 data = self._get_items_from_paginated_data(data)

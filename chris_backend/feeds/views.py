@@ -1,10 +1,14 @@
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.exceptions import ParseError
 
 from core.renderers import BinaryFileRenderer
+from plugins.models import Plugin
 from .models import Note, Tag, Feed, Comment, FeedFile
 from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
@@ -62,8 +66,13 @@ class FeedList(generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_create(self, serializer):
-        # set a list of owners when creating a new feed
-        serializer.save(owner=[self.request.user])
+        # set a list of owners and creator plugin when creating a new feed
+        plugin_id = serializer.context['request'].data['plugin']
+        plugin = Plugin.objects.get(pk=plugin_id)
+        if plugin.type == 'ds':
+            detail = "Could not create feed. Plugin %s is of type 'ds'!" % plugin.name
+            raise ParseError(detail=detail)
+        serializer.save(owner=[self.request.user], plugin=plugin)
 
     def get_queryset(self):
         """
@@ -74,6 +83,11 @@ class FeedList(generics.ListCreateAPIView):
         if (user.username == 'chris'):
             return Feed.objects.all()
         return Feed.objects.filter(owner=user)
+
+    def list(self, request, *args, **kwargs):
+        response = super(FeedList, self).list(request, *args, **kwargs)
+        response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
+        return response
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -130,7 +144,9 @@ class FeedFileList(generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
     def perform_create(self, serializer):
-        serializer.save(feed=[self.get_object()])
+        # set the file's feed and creator plugin when creating a new file
+        plugin_id = serializer.context['request'].data['plugin']
+        serializer.save(feed=[self.get_object()], plugin=Plugin.objects.get(pk=plugin_id))
 
     def list(self, request, *args, **kwargs):
         """
@@ -138,7 +154,9 @@ class FeedFileList(generics.ListCreateAPIView):
         """
         feed = self.get_object()
         queryset = self.filter_queryset(feed.files.all())
-        return get_list_response(self, queryset)
+        response = get_list_response(self, queryset)
+        response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
+        return response
 
 
 class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):

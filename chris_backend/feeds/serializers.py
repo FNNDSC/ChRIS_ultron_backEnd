@@ -31,6 +31,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
+    plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
     owners = serializers.ListField(child=serializers.CharField(), source='owner.all',
                                    read_only=True)
     
@@ -54,6 +55,7 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
                                                read_only=True)
     fname = serializers.FileField(use_url=False)
     file = LinkField('get_file_link')
+    plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
 
     class Meta:
         model = FeedFile
