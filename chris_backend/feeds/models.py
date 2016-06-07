@@ -18,14 +18,22 @@ class Feed(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        """
+        Overriden to save a new note to the DB the first time the feed is saved
+        """
         super(Feed, self).save(*args, **kwargs)
-        # save a new note the first time the feed is saved
         if not hasattr(self, 'note'):
-            note = Note()
-            note.feed = self;
-            note.save()
+            self.save_note()
             
-
+    def save_note(self):
+        """
+        Custom method to create and save a new note to the DB
+        """
+        note = Note()
+        note.feed = self;
+        note.save()
+        
+            
 class Note(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)

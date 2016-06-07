@@ -30,42 +30,76 @@ def get_list_response(view_instance, queryset):
     return Response(serializer.data)
 
 
+def append_plugins_link(request, response):
+    """
+    Convenience method to append to a response object a link to the plugin list 
+    """
+    response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
+    return response
+
+
 class NoteDetail(generics.RetrieveUpdateAPIView):
+    """
+    A note view.
+    """
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
     
 
 class TagList(generics.ListCreateAPIView):
+    """
+    A view for the collection of tags.
+    """
     queryset = Feed.objects.all()
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
     def perform_create(self, serializer):
+        """
+        Overriden to associate an owner and feed list with the tag
+        before first saving to the DB.
+        """
         serializer.save(owner=self.request.user, feed=[self.get_object()])
 
     def list(self, request, *args, **kwargs):
         """
-        This view should return a list of the tags for the queried
+        Overriden to return a list of the tags for the queried
         feed that are owned by the currently authenticated user.
+        """
+        queryset = self.get_tags_queryset()
+        return get_list_response(self, queryset)
+
+    def get_tags_queryset(self):
+        """
+        Custom method to get the actual tags' queryset
         """
         feed = self.get_object()
         tags = [tag for tag in feed.tags.all() if tag.owner==request.user]
-        queryset = self.filter_queryset(tags)
-        return get_list_response(self, queryset)
+        return self.filter_queryset(tags)
         
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A tag view.
+    """
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
 
 class FeedList(generics.ListCreateAPIView):
+    """
+    A view for the collection of feeds.
+    """
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_create(self, serializer):
+        """
+        Overriden to associate an owner list and plugin with the feed
+        before first saving to the DB.
+        """
         # set a list of owners and creator plugin when creating a new feed
         plugin_id = serializer.context['request'].data['plugin']
         plugin = Plugin.objects.get(pk=plugin_id)
@@ -76,69 +110,105 @@ class FeedList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         """
-        This view should return a list of all the feeds
-        for the currently authenticated user.
+        Overriden to return a custom queryset that is only comprised by the feeds 
+        owned by the currently authenticated user.
         """
         user = self.request.user
+        # if the user is chris then return all the feeds in the system
         if (user.username == 'chris'):
             return Feed.objects.all()
         return Feed.objects.filter(owner=user)
 
     def list(self, request, *args, **kwargs):
+        """
+        Overriden to append a link relation pointing to the list of plugins.
+        """
         response = super(FeedList, self).list(request, *args, **kwargs)
-        response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
+        response = append_plugins_link(request, response)
         return response
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A feed view.
+    """
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_update(self, serializer):
-        # check system registered owners when updating feed's owners
-        feed = self.get_object()
+        """
+        Overriden to update feed's owners if requested by a PUT request.
+        """
+        if 'owners' in self.request.data:
+            self.update_owners(serializer)
+
+    def update_owners(self, serializer):
+        """
+        Custom method to update the feed's owners. Checks whether new owners
+        are system registered users
+        """
+        feed = self.get_object() 
         currentOwners = feed.owner.values('username')
+        usernames = self.request.data.pop('owners')
         newOwners = []
-        if 'owners' in self.request.data: 
-            usernames = self.request.data.pop('owners')
-            for usern in usernames:
-                if {'username': usern} not in currentOwners:
-                    try:
-                        owner = User.objects.get(username=usern)
-                    except ObjectDoesNotExist:
-                        pass
-                    else:
-                        newOwners.append(owner)
+        for usern in usernames:
+            if {'username': usern} not in currentOwners:
+                try:
+                    # check if user is a system registered user
+                    owner = User.objects.get(username=usern)
+                except ObjectDoesNotExist:
+                    pass
+                else:
+                    newOwners.append(owner)
         if newOwners:
             currentOwners = [owner for owner in feed.owner.all()]
             serializer.save(owner=currentOwners+newOwners)
 
 
 class CommentList(generics.ListCreateAPIView):
+    """
+    A view for the collection of comments.
+    """
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
     def perform_create(self, serializer):
+        """
+        Overriden to associate an owner and feed with the comment
+        before first saving to the DB.
+        """
         serializer.save(owner=self.request.user, feed=self.get_object())
 
     def list(self, request, *args, **kwargs):
         """
-        This view should return a list of the comments for the queried feed.
+        Overriden to return a list of the comments for the queried feed.
+        """
+        queryset = self.get_comments_queryset()
+        return get_list_response(self, queryset)
+
+    def get_comments_queryset(self):
+        """
+        Custom method to get the actual comments' queryset
         """
         feed = self.get_object()
-        queryset = self.filter_queryset(feed.comments.all())
-        return get_list_response(self, queryset)
+        return self.filter_queryset(feed.comments.all())
 
 
 class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A comment view.
+    """
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
 
 class FeedFileList(generics.ListCreateAPIView):
+    """
+    A view for the collection of feeds' files.
+    """
     queryset = Feed.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -150,28 +220,41 @@ class FeedFileList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        This view should return a list of the files for the queried feed.
+        Overriden to return a list of the files for the queried feed and
+        append a link relation pointing to the list of plugins.
+        """
+        queryset = self.get_feedfiles_queryset()
+        response = get_list_response(self, queryset)
+        response = append_plugins_link(request, response)
+        return response
+
+    def get_feedfiles_queryset(self):
+        """
+        Custom method to get the actual feedfiles' queryset
         """
         feed = self.get_object()
-        queryset = self.filter_queryset(feed.files.all())
-        response = get_list_response(self, queryset)
-        response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
-        return response
+        return self.filter_queryset(feed.files.all())
 
 
 class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A feed's file view.
+    """
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
 
 
 class FileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource .
+    """
     queryset = FeedFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
 
     def get(self, request, *args, **kwargs):
         """
-        This view returns an actual file resource.
+        Overriden to be able to make a GET request to an actual file resource.
         """
         feed_file = self.get_object()
         return Response(feed_file.fname)
