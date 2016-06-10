@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from core.renderers import LinkField
+from collectionjson.fields import LinkField
 from .models import Note, Tag, Feed, Comment, FeedFile
 
         

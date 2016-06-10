@@ -34,18 +34,19 @@ INSTALLED_APPS = [
     'rest_framework',
     'feeds.apps.FeedsConfig',
     'plugins.apps.PluginsConfig',
+    'collectionjson.apps.CollectionjsonConfig',
 ]
 
 # Pagination
 REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'DEFAULT_RENDERER_CLASSES': (
-    'core.renderers.CollectionJsonRenderer',
+    'collectionjson.renderers.CollectionJsonRenderer',
     'rest_framework.renderers.JSONRenderer',
     'rest_framework.renderers.BrowsableAPIRenderer',
     ),
     'DEFAULT_PARSER_CLASSES': (
-    'core.parsers.CollectionJsonParser',
+    'collectionjson.parsers.CollectionJsonParser',
     'rest_framework.parsers.JSONParser',
     'rest_framework.parsers.FormParser',
     'rest_framework.parsers.MultiPartParser',
