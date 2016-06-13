@@ -57,7 +57,7 @@ This ensures all tables and columns will use UTF-8 by default
 Grant all privileges to user chris on the database:
 
 ````
-GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFY BY 'Chris1234';
+GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';
 ````
 
 ### Dependencies:
@@ -75,7 +75,7 @@ pip freeze --local
 
 ### Testing:
 ````
-python -Wall manage.py test
+python manage.py test
 ````
 If errors are gotten because of user chris not having enough database privilages then
 just give it all privilages in mysql:

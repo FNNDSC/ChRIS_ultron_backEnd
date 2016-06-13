@@ -16,17 +16,17 @@ from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
 
 
-def get_list_response(view_instance, queryset):
+def get_list_response(list_view_instance, queryset):
     """
     Convenience method to get an HTTP response with a list of objects
-    from a view instance and a queryset
+    from a list view instance and a queryset
     """
-    page = view_instance.paginate_queryset(queryset)
+    page = list_view_instance.paginate_queryset(queryset)
     if page is not None:
-        serializer = view_instance.get_serializer(page, many=True)
-        return view_instance.get_paginated_response(serializer.data)
+        serializer = list_view_instance.get_serializer(page, many=True)
+        return list_view_instance.get_paginated_response(serializer.data)
 
-    serializer = view_instance.get_serializer(queryset, many=True)
+    serializer = list_view_instance.get_serializer(queryset, many=True)
     return Response(serializer.data)
 
 

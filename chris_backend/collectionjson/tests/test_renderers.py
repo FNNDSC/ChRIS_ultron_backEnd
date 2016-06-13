@@ -54,7 +54,7 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_the_dummy_item_has_an_href(self):
         href = self.get_dummy().href
-        self.assertNotEqual(href.find('http://testserver/rest-api/dummy/'), -1)
+        self.assertTrue(href.startswith('http://testserver/rest-api/dummy/'))
 
     def test_the_dummy_item_contains_name(self):
         name = self.get_dummy().data.find('name')[0].value
@@ -66,7 +66,7 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_the_dummy_item_links_to_child_elements(self):
         href = self.get_dummy().links.find(rel='moron')[0].href
-        self.assertNotEqual(href.find('http://testserver/rest-api/moron/'), -1)
+        self.assertTrue(href.startswith('http://testserver/rest-api/moron/'))
 
     def test_link_fields_are_rendered_as_links(self):
         href = self.get_dummy().links.find(rel='other_stuff')[0].href
@@ -82,8 +82,8 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_many_to_many_relationships_are_rendered_as_links(self):
         idiots = self.get_dummy().links.find(rel='idiots')
-        self.assertNotEqual(idiots[0].href.find('http://testserver/rest-api/idiot/'), -1)
-        self.assertNotEqual(idiots[1].href.find('http://testserver/rest-api/idiot/'), -1)
+        self.assertTrue(idiots[0].href.startswith('http://testserver/rest-api/idiot/'))
+        self.assertTrue(idiots[1].href.startswith('http://testserver/rest-api/idiot/'))
 
 
 class TestNoSerializerViews(SimpleGetTest):
