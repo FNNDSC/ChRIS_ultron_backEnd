@@ -1,3 +1,4 @@
+from six.moves.urllib.parse import urljoin
 
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -72,7 +73,7 @@ class ParseErrorView(APIView):
 
 
 class UrlRewriteRenderer(CollectionJsonRenderer):
-    def get_href(self, request):
+    def get_href(self, request, view):
         return urljoin('http://rewritten.com', request.path)
     
 

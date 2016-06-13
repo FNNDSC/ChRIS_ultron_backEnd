@@ -20,12 +20,12 @@ class IdiotHyperlinkedModelSerializer(HyperlinkedModelSerializer):
 
 class DummyHyperlinkedModelSerializer(HyperlinkedModelSerializer):
     other_stuff = LinkField('get_other_link')
-    empty_link = LinkField('get_empty_link')
+    empty = LinkField('get_empty_link')
     some_link = HyperlinkedIdentityField(view_name='moron-detail')
 
     class Meta(object):
         model = Dummy
-        fields = ('url', 'name', 'moron', 'idiots', 'other_stuff', 'some_link', 'empty_link')
+        fields = ('url', 'name', 'moron', 'idiots', 'other_stuff', 'some_link', 'empty')
 
     def get_other_link(self, obj):
         return 'http://other-stuff.com/'

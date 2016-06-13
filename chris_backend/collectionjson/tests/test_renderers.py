@@ -1,12 +1,6 @@
 
-from six.moves.urllib.parse import urljoin
-
-import django
-if django.VERSION[0] == 1 and django.VERSION[1] == 3:
-    from django.conf.urls.defaults import patterns, include
-else:
-    from django.conf.urls import patterns, include
-
+from django.conf.urls import url, include
+from django.test.utils import override_settings
 from django.test import TestCase
 
 from collection_json import Collection
@@ -25,9 +19,8 @@ def create_models():
     dummy.idiots.add(Idiot.objects.create(name='frick'))
     dummy.idiots.add(Idiot.objects.create(name='frack'))   
 
-
+@override_settings(ROOT_URLCONF='collectionjson.tests.test_renderers')
 class SimpleGetTest(TestCase):
-    urls = 'collectionjson.tests.test_renderers'
     endpoint = ''
 
     def setUp(self):
@@ -61,7 +54,7 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_the_dummy_item_has_an_href(self):
         href = self.get_dummy().href
-        self.assertEqual(href, 'http://testserver/rest-api/dummy/1/')
+        self.assertNotEqual(href.find('http://testserver/rest-api/dummy/'), -1)
 
     def test_the_dummy_item_contains_name(self):
         name = self.get_dummy().data.find('name')[0].value
@@ -73,7 +66,7 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_the_dummy_item_links_to_child_elements(self):
         href = self.get_dummy().links.find(rel='moron')[0].href
-        self.assertEqual(href, 'http://testserver/rest-api/moron/1/')
+        self.assertNotEqual(href.find('http://testserver/rest-api/moron/'), -1)
 
     def test_link_fields_are_rendered_as_links(self):
         href = self.get_dummy().links.find(rel='other_stuff')[0].href
@@ -89,8 +82,8 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_many_to_many_relationships_are_rendered_as_links(self):
         idiots = self.get_dummy().links.find(rel='idiots')
-        self.assertEqual(idiots[0].href, 'http://testserver/rest-api/idiot/1/')
-        self.assertEqual(idiots[1].href, 'http://testserver/rest-api/idiot/2/')
+        self.assertNotEqual(idiots[0].href.find('http://testserver/rest-api/idiot/'), -1)
+        self.assertNotEqual(idiots[1].href.find('http://testserver/rest-api/idiot/'), -1)
 
 
 class TestNoSerializerViews(SimpleGetTest):
@@ -157,9 +150,8 @@ class TestUrlRewrite(SimpleGetTest):
         rewritten_url = "http://rewritten.com/rest-api/url-rewrite/"
         self.assertEqual(self.collection.href, rewritten_url)
 
-
+@override_settings(ROOT_URLCONF='collectionjson.tests.test_renderers')
 class TestEmpty(TestCase):
-    urls = 'collectionjson.tests.test_renderers'
 
     def test_empty_content_works(self):
         response = self.client.get('/rest-api/empty/')
@@ -172,14 +164,13 @@ router.register('dummy', views.DummyReadOnlyModelViewSet)
 router.register('moron', views.MoronReadOnlyModelViewSet)
 router.register('idiot', views.IdiotReadOnlyModelViewSet)
 router.register('normal-model', views.SimpleViewSet)
-urlpatterns = patterns(
-    '',
-    (r'^rest-api/', include(router.urls)),
-    (r'^rest-api/no-serializer/', views.NoSerializerView.as_view()),
-    (r'^rest-api/paginated/', views.PaginatedDataView.as_view()),
-    (r'^rest-api/none-paginated/', views.NonePaginatedDataView.as_view()),
-    (r'^rest-api/parse-error/', views.ParseErrorView.as_view()),
-    (r'^rest-api/url-rewrite/', views.UrlRewriteView.as_view()),
-    (r'^rest-api/empty/', views.EmptyView.as_view()),
-)
+urlpatterns = [
+    url(r'^rest-api/', include(router.urls)),
+    url(r'^rest-api/no-serializer/', views.NoSerializerView.as_view()),
+    url(r'^rest-api/paginated/', views.PaginatedDataView.as_view()),
+    url(r'^rest-api/none-paginated/', views.NonePaginatedDataView.as_view()),
+    url(r'^rest-api/parse-error/', views.ParseErrorView.as_view()),
+    url(r'^rest-api/url-rewrite/', views.UrlRewriteView.as_view()),
+    url(r'^rest-api/empty/', views.EmptyView.as_view()),
+]
 
