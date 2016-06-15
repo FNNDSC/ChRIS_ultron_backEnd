@@ -141,8 +141,9 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to update feed's owners if requested by a PUT request.
         """
         if 'owners' in self.request.data:
-            self.update_owners(serializer)
-
+            self.update_owners(serializer)          
+        super(FeedDetail, self).perform_update(serializer)
+        
     def update_owners(self, serializer):
         """
         Custom method to update the feed's owners. Checks whether new owners
