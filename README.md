@@ -85,6 +85,9 @@ GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
 ````
 
 ### Documentation
+
+Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
+
 Install Sphinx and the http extension (useful to document the REST API)
 ```
 pip install Sphinx
