@@ -189,7 +189,7 @@ class FeedDetailViewTests(ViewTests):
         
         self.read_update_delete_url = reverse("feed-detail", kwargs={"pk": feed.id})
         self.put = json.dumps({
-            "template": {"data": [{"name": "name", "value": "Feed4"},
+            "template": {"data": [{"name": "name", "value": "Updated"},
                                   {"name": "owners", "value": [self.other_username]}]}})
           
     def test_feed_detail_success(self):
@@ -210,7 +210,7 @@ class FeedDetailViewTests(ViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
-        self.assertContains(response, "Feed4")
+        self.assertContains(response, "Updated")
         self.assertCountEqual(response.data["owners"],
                               [self.username, self.other_username])
 
@@ -235,7 +235,7 @@ class FeedDetailViewTests(ViewTests):
     def test_feed_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, 204)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEquals(Feed.objects.count(), 0)
 
     def test_feed_delete_failure_unauthenticated(self):
@@ -250,43 +250,198 @@ class FeedDetailViewTests(ViewTests):
 
 class CommentListViewTests(ViewTests):
     """
-    Test the feed-list view
+    Test the comment-list view
     """
 
     def setUp(self):
         super(CommentListViewTests, self).setUp()
         feed = Feed.objects.get(name=self.feedname)
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
         self.create_read_url = reverse("comment-list", kwargs={"pk": feed.id})
         self.post = json.dumps(
             {"template": {"data": [{"name": "title", "value": "Comment1"}]}})
 
-    def test_comment_create_success(self):
+        # create two comments
+        user = User.objects.get(username=self.username)
+        Comment.objects.get_or_create(title="Comment2",feed=feed, owner=user)
+        Comment.objects.get_or_create(title="Comment3",feed=feed, owner=user)
+
+    def test_comment_create_success_related_feed_owner(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["title"], "Comment1")
-        self.assertEqual(Comment.objects.get(title="Comment1").feed.name,
-                         self.feedname)
-"""
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+
+    def test_comment_create_success_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["title"], "Comment1")
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+
     def test_comment_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_comment_list_success(self):
+    def test_comment_list_success_related_feed_owner(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "Feed1")
-        self.assertContains(response, "Feed3")
+        self.assertContains(response, "Comment2")
+        self.assertContains(response, "Comment3")
+
+    def test_comment_list_success_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, "Comment2")
+        self.assertContains(response, "Comment3")
 
     def test_comment_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_comment_list_from_other_users_not_listed(self):
+
+class CommentDetailViewTests(ViewTests):
+    """
+    Test the feed-detail view
+    """
+
+    def setUp(self):
+        super(CommentDetailViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+
+        # create a comment
+        user = User.objects.get(username=self.username)
+        (comment, tf) = Comment.objects.get_or_create(title="Comment1",
+                                                      feed=feed, owner=user)
+
+        self.read_update_delete_url = reverse("comment-detail", kwargs={"pk": comment.id})       
+        self.put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Updated"}]}})
+          
+    def test_comment_detail_success_related_feed_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "Comment1")
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+
+    def test_comment_detail_success_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "Comment1")
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+
+    def test_comment_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_comment_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "Updated")
+
+    def test_comment_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_comment_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_comment_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEquals(Comment.objects.count(), 0)
+
+    def test_comment_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_comment_delete_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class TagListViewTests(ViewTests):
+    """
+    Test the comment-list view
+    """
+
+    def setUp(self):
+        super(TagListViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+        self.create_read_url = reverse("tag-list", kwargs={"pk": feed.id})
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "name", "value": "Tag1"},
+                                   {"name": "color", "value": "Black"}]}})
+
+        # create two tags
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
+        tag.feed = [feed]
+        tag.save()
+        (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
+        tag.feed = [feed]
+        tag.save()
+
+    def test_tag_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["name"], "Tag1")
+        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+
+    def test_tag_create_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, "Tag2")
+        self.assertContains(response, "Tag3")
+
+    def test_tag_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.create_read_url)
-        self.assertNotContains(response, "Feed1")
-        self.assertNotContains(response, "Feed3")
-"""
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+    def test_tag_list_from_other_feed_owners_not_listed(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        feed = Feed.objects.get(name=self.feedname)
+        owner = User.objects.get(username=self.username)
+        new_owner = User.objects.get(username=self.other_username)
+        # make new_owner an owner of the feed together with the feed's current owner
+        feed.owner = [owner, new_owner]
+        feed.save()
+        response = self.client.get(self.create_read_url)
+        self.assertNotContains(response, "Tag2")
+        self.assertNotContains(response, "Tag3")
+      
+
+
+
+        

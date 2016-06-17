@@ -67,15 +67,15 @@ class TagList(generics.ListCreateAPIView):
         Overriden to return a list of the tags for the queried
         feed that are owned by the currently authenticated user.
         """
-        queryset = self.get_tags_queryset()
+        queryset = self.get_tags_queryset(request.user)
         return get_list_response(self, queryset)
 
-    def get_tags_queryset(self):
+    def get_tags_queryset(self, user):
         """
-        Custom method to get the actual tags' queryset
+        Custom method to get the actual tags' queryset for the feed and user
         """
         feed = self.get_object()
-        tags = [tag for tag in feed.tags.all() if tag.owner==request.user]
+        tags = [tag for tag in feed.tags.all() if tag.owner==user]
         return self.filter_queryset(tags)
         
 
@@ -173,7 +173,7 @@ class CommentList(generics.ListCreateAPIView):
     """
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def perform_create(self, serializer):
         """
