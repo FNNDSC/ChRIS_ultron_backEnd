@@ -1,9 +1,10 @@
 
-import json
+import os, json
 
 from django.test import TestCase
 from django.core.urlresolvers import reverse
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from rest_framework import status
 
@@ -306,7 +307,7 @@ class CommentListViewTests(ViewTests):
 
 class CommentDetailViewTests(ViewTests):
     """
-    Test the feed-detail view
+    Test the comment-detail view
     """
 
     def setUp(self):
@@ -374,7 +375,7 @@ class CommentDetailViewTests(ViewTests):
 
 class TagListViewTests(ViewTests):
     """
-    Test the comment-list view
+    Test the tag-list view
     """
 
     def setUp(self):
@@ -442,6 +443,153 @@ class TagListViewTests(ViewTests):
         self.assertNotContains(response, "Tag3")
       
 
+class TagDetailViewTests(ViewTests):
+    """
+    Test the tag-detail view
+    """
+
+    def setUp(self):
+        super(TagDetailViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+
+        # create a tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag1", color="blue", owner=user)
+        tag.feed = [feed]
+        tag.save()
+
+        self.read_update_delete_url = reverse("tag-detail", kwargs={"pk": tag.id})       
+        self.put = json.dumps({
+            "template": {"data": [{"name": "name", "value": "Updated"},
+                                  {"name": "color", "value": "black"}]}})
+          
+    def test_tag_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "Tag1")
+        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+
+    def test_tag_detail_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_detail_failure_not_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        feed = Feed.objects.get(name=self.feedname)
+        owner = User.objects.get(username=self.username)
+        new_owner = User.objects.get(username=self.other_username)
+        # make new_owner an owner of the feed together with the feed's current owner
+        feed.owner = [owner, new_owner]
+        feed.save()
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "Updated")
+
+    def test_tag_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEquals(Tag.objects.count(), 0)
+
+    def test_tag_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_delete_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class FeedFileListViewTests(ViewTests):
+    """
+    Test the feedfile-list view
+    """
+
+    def setUp(self):
+        super(FeedFileListViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+        self.create_read_url = reverse("feedfile-list", kwargs={"pk": feed.id})
+
+        # create a test file to be uploaded
+        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        os.mkdir(test_file_path)
+        self.test_file = test_file_path + '/file1.txt'
+        file = open(self.test_file, "w")
+        file.write("test file")
+        file.close()
+
+        # create two files in the DB "already uploaded" to the server
+
+    def test_feedfile_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        plugin = Plugin.objects.get(name="pacspull")
+        # POST request using multipart/form-data to be able to upload file         
+        with open(self.test_file) as f:
+            post = {"fname": f, "plugin": plugin.id}
+            response = self.client.post(self.create_read_url, data=post)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["fname"].startswith("./file1"))
+        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+"""
+    def test_tag_create_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, "Tag2")
+        self.assertContains(response, "Tag3")
+
+    def test_tag_list_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tag_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
+    def test_tag_list_from_other_feed_owners_not_listed(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        feed = Feed.objects.get(name=self.feedname)
+        owner = User.objects.get(username=self.username)
+        new_owner = User.objects.get(username=self.other_username)
+        # make new_owner an owner of the feed together with the feed's current owner
+        feed.owner = [owner, new_owner]
+        feed.save()
+        response = self.client.get(self.create_read_url)
+        self.assertNotContains(response, "Tag2")
+        self.assertNotContains(response, "Tag3")        
+"""

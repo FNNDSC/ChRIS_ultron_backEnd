@@ -212,7 +212,7 @@ class FeedFileList(generics.ListCreateAPIView):
     """
     queryset = Feed.objects.all()
     serializer_class = FeedFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def perform_create(self, serializer):
         # set the file's feed and creator plugin when creating a new file
