@@ -83,3 +83,19 @@ just give it all privilages in mysql:
 ````
 GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
 ````
+
+### Documentation
+
+Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
+
+Install Sphinx and the http extension (useful to document the REST API)
+```
+pip install Sphinx
+pip install sphinxcontrib-httpdomain
+```
+
+Build the html documentation
+```
+cd docs/
+make html
+```
