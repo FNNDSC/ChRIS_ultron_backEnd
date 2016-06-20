@@ -252,6 +252,7 @@ class FileResource(generics.GenericAPIView):
     """
     queryset = FeedFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
 
     def get(self, request, *args, **kwargs):
         """
