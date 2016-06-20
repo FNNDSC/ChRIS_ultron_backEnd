@@ -1,8 +1,9 @@
 
-import os, json
+import os, json, io
 
 from django.test import TestCase
 from django.core.urlresolvers import reverse
+from django.core.files import File
 from django.contrib.auth.models import User
 from django.conf import settings
 
@@ -536,14 +537,35 @@ class FeedFileListViewTests(ViewTests):
 
         # create a test file to be uploaded
         test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
-        os.mkdir(test_file_path)
+        if not os.path.isdir(test_file_path):
+            os.mkdir(test_file_path)
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
         file.write("test file")
         file.close()
 
         # create two files in the DB "already uploaded" to the server
+        plugin = Plugin.objects.get(name="pacspull")
+        file = open(self.test_file, "r")
+        django_file = File(file)
+        feedfile = FeedFile(plugin=plugin)
+        feedfile.fname.save("file2.txt", django_file, save=True)
+        feedfile.feed = [feed]
+        feedfile.save()
+        feedfile = FeedFile(plugin=plugin)
+        feedfile.fname.save("file3.txt", django_file, save=True)
+        feedfile.feed = [feed]
+        feedfile.save()
+        file.close()
 
+    def tearDown(self):
+        #remove files created in the filesystem after each test
+        os.remove(self.test_file)
+        for f in os.listdir(settings.MEDIA_ROOT):
+            if f in ["file1.txt", "file2.txt", "file3.txt"]:
+                file = os.path.join(settings.MEDIA_ROOT, f)
+                os.remove(file) 
+    
     def test_feedfile_create_success(self):
         self.client.login(username=self.username, password=self.password)
         plugin = Plugin.objects.get(name="pacspull")
@@ -552,44 +574,156 @@ class FeedFileListViewTests(ViewTests):
             post = {"fname": f, "plugin": plugin.id}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(response.data["fname"].startswith("./file1"))
+        self.assertEqual(response.data["fname"], "./file1.txt")
         self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
-"""
-    def test_tag_create_failure_not_related_feed_owner(self):
+
+    def test_feedfile_create_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
+        plugin = Plugin.objects.get(name="pacspull")
+        # POST request using multipart/form-data to be able to upload file         
+        with open(self.test_file) as f:
+            post = {"fname": f, "plugin": plugin.id}
+            response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_tag_create_failure_unauthenticated(self):
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
+    def test_feedfile_create_failure_unauthenticated(self):
+        plugin = Plugin.objects.get(name="pacspull")
+        # POST request using multipart/form-data to be able to upload file         
+        with open(self.test_file) as f:
+            post = {"fname": f, "plugin": plugin.id}
+            response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_tag_list_success(self):
+    def test_feedfile_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "Tag2")
-        self.assertContains(response, "Tag3")
+        self.assertContains(response, "file2.txt")
+        self.assertContains(response, "file3.txt")
 
-    def test_tag_list_failure_not_related_feed_owner(self):
+    def test_feedfile_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_tag_list_failure_unauthenticated(self):
+    def test_feedfile_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
-    def test_tag_list_from_other_feed_owners_not_listed(self):
-        self.client.login(username=self.other_username, password=self.other_password)
+
+class FeedFileDetailViewTests(ViewTests):
+    """
+    Test the feedfile-detail view
+    """
+
+    def setUp(self):
+        super(FeedFileDetailViewTests, self).setUp()
         feed = Feed.objects.get(name=self.feedname)
-        owner = User.objects.get(username=self.username)
-        new_owner = User.objects.get(username=self.other_username)
-        # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner = [owner, new_owner]
-        feed.save()
-        response = self.client.get(self.create_read_url)
-        self.assertNotContains(response, "Tag2")
-        self.assertNotContains(response, "Tag3")        
-"""
+        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+
+        # create a test file 
+        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        if not os.path.isdir(test_file_path):
+            os.mkdir(test_file_path)
+        self.test_file = test_file_path + '/file1.txt'
+        file = open(self.test_file, "w")
+        file.write("test file")
+        file.close()
+
+        # create a file in the DB "already uploaded" to the server
+        plugin = Plugin.objects.get(name="pacspull")
+        file = open(self.test_file, "r")
+        django_file = File(file)
+        feedfile = FeedFile(plugin=plugin)
+        feedfile.fname.save("file1.txt", django_file, save=True)
+        feedfile.feed = [feed]
+        feedfile.save()
+        file.close()
+
+        self.read_update_delete_url = reverse("feedfile-detail", kwargs={"pk": feedfile.id})
+
+    def tearDown(self):
+        #remove files created in the filesystem after each test
+        os.remove(self.test_file)
+        os.remove(settings.MEDIA_ROOT + '/file1.txt')
+          
+    def test_feedfile_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "file1.txt")
+        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+
+    def test_feedfile_detail_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feedfile_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feedfile_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEquals(FeedFile.objects.count(), 0)
+
+    def test_feedfile_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feedfile_delete_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+
+class FileResourceViewTests(ViewTests):
+    """
+    Test the tag-detail view
+    """
+
+    def setUp(self):
+        super(FileResourceViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+
+        # create a test file 
+        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        if not os.path.isdir(test_file_path):
+            os.mkdir(test_file_path)
+        self.test_file = test_file_path + '/file1.txt'
+        file = open(self.test_file, "w")
+        file.write("test file")
+        file.close()
+            
+        # create a file in the DB "already uploaded" to the server
+        plugin = Plugin.objects.get(name="pacspull")
+        file = open(self.test_file, "r")
+        django_file = File(file)
+        feedfile = FeedFile(plugin=plugin)
+        feedfile.fname.save("file1.txt", django_file, save=True)
+        feedfile.feed = [feed]
+        feedfile.save()
+        file.close()
+
+        self.download_url = reverse("file-resource",
+                                    kwargs={"pk": feedfile.id}) + 'file1.txt'
+
+    def tearDown(self):
+        #remove files created in the filesystem after each test
+        os.remove(self.test_file)
+        os.remove(settings.MEDIA_ROOT + '/file1.txt')
+          
+    def test_fileresource_download_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.download_url)
+        self.assertEquals(response.status_code, 200)
+        self.assertEquals(str(response.content,'utf-8'), "test file")
+
+    def test_fileresource_download_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_fileresource_download_failure_unauthenticated(self):
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
