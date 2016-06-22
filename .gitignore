@@ -3,3 +3,5 @@
 __pycache__
 docs/build
 secrets.json
+.coverage
+htmlcov
