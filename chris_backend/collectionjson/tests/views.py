@@ -1,16 +1,25 @@
 from six.moves.urllib.parse import urljoin
 
 from rest_framework.views import APIView
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import ParseError
 
 from collectionjson.renderers import CollectionJsonRenderer
+from collectionjson.parsers import CollectionJsonParser
+
 from .models import Dummy, Idiot, Moron, Simple
 from .serializers import MoronHyperlinkedModelSerializer, IdiotHyperlinkedModelSerializer
 from .serializers import DummyHyperlinkedModelSerializer, SimpleModelSerializer
 
+
+class MoronModelViewSet(ModelViewSet):
+    renderer_classes = (CollectionJsonRenderer, )
+    parser_classes = (CollectionJsonParser, )
+    queryset = Moron.objects.all()
+    serializer_class = MoronHyperlinkedModelSerializer
+    
 
 class MoronReadOnlyModelViewSet(ReadOnlyModelViewSet):
     renderer_classes = (CollectionJsonRenderer, )
