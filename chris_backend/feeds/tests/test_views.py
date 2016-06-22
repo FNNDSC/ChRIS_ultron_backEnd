@@ -16,7 +16,9 @@ from feeds import views
 
 class ViewTests(TestCase):
     
-    def setUp(self):     
+    def setUp(self):
+        self.chris_username = 'chris'
+        self.chris_password = 'chris12'
         self.username = 'foo'
         self.password = 'bar'
         self.other_username = 'boo'
@@ -26,8 +28,11 @@ class ViewTests(TestCase):
         
         # create basic models
         
-        # create two users
-        User.objects.create_user(username=self.other_username, password=self.other_password)
+        # create the chris user and two other users
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+        User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
         user = User.objects.create_user(username=self.username,
                                         password=self.password)
         
@@ -103,11 +108,17 @@ class NoteDetailViewTests(ViewTests):
         self.assertContains(response, "title")
         self.assertContains(response, "content")
 
+    def test_note_detail_success_user_chris(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "title")
+        self.assertContains(response, "content")
+
     def test_note_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_note_detail_failure_access_denied(self):
+    def test_note_detail_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.read_update_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -158,6 +169,19 @@ class FeedListViewTests(ViewTests):
         self.assertEqual(response.data["name"], "Feed2")
         self.assertEqual(response.data["owners"], [self.username])
 
+    def test_feed_create_failure_ds_plugins_cannot_create_feeds(self):
+        self.client.login(username=self.username, password=self.password)
+        # get a plugin of type 'ds'
+        plugin = Plugin.objects.get(name="mri_convert")
+        # try to create a feed with a 'ds' plugin
+        bad_post = json.dumps({"template": {"data": [{"name": "name", "value": "Feed2"},
+                                          {"name": "plugin", "value": plugin.id}]}})
+        response = self.client.post(self.create_read_url, data=bad_post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'],
+                         "Could not create feed. Plugin mri_convert is of type 'ds'!")
+
     def test_feed_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
@@ -165,6 +189,12 @@ class FeedListViewTests(ViewTests):
 
     def test_feed_list_success(self):
         self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, "Feed1")
+        self.assertContains(response, "Feed3")
+
+    def test_feed_list_success_chris_user_lists_all_users_feeds(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "Feed1")
         self.assertContains(response, "Feed3")
@@ -276,13 +306,11 @@ class CommentListViewTests(ViewTests):
         self.assertEqual(response.data["title"], "Comment1")
         self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
 
-    def test_comment_create_success_not_related_feed_owner(self):
+    def test_comment_create_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["title"], "Comment1")
-        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_comment_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -396,7 +424,6 @@ class TagListViewTests(ViewTests):
         (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
         tag.feed = [feed]
         tag.save()
-
     def test_tag_create_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
@@ -648,6 +675,12 @@ class FeedFileDetailViewTests(ViewTests):
           
     def test_feedfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "file1.txt")
+        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+
+    def test_feedfile_detail_success_user_chris(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "file1.txt")
         self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))

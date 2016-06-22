@@ -23,9 +23,9 @@ class Feed(models.Model):
         """
         super(Feed, self).save(*args, **kwargs)
         if not hasattr(self, 'note'):
-            self.save_note()
+            self._save_note()
             
-    def save_note(self):
+    def _save_note(self):
         """
         Custom method to create and save a new note to the DB
         """

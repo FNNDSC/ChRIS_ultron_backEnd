@@ -54,14 +54,14 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
                                                read_only=True)
     fname = serializers.FileField(use_url=False)
-    file_resource = LinkField('get_file_link')
+    file_resource = LinkField('_get_file_link')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
 
     class Meta:
         model = FeedFile
         fields = ('url', 'fname', 'file_resource', 'feed', 'plugin')
 
-    def get_file_link(self, obj):
+    def _get_file_link(self, obj):
         """
         Custom method to get the hyperlink to the actual file resource
         """

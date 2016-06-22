@@ -173,7 +173,7 @@ class CommentList(generics.ListCreateAPIView):
     """
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly)
 
     def perform_create(self, serializer):
         """
