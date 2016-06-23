@@ -1,0 +1,22 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure("2") do |config|
+  # GENERAL SETUP
+  config.vm.box = "ubuntu/xenial64"
+  config.vm.hostname = "chris-ultron"
+
+  # script to setup the chris environment at startup
+  config.vm.provision :shell, :path => "bootstrap.sh"
+
+  # set the network settings
+  config.vm.network "private_network", ip: "192.168.33.10"
+
+  # set the shared directories
+  config.vm.synced_folder ".", "/vagrant", type: "nfs"
+  config.vm.synced_folder "/Users/nico/work/gitroot/chris-ultron-backend", "/home/ubuntu/chris-ultron-backend", type: "nfs"
+end
