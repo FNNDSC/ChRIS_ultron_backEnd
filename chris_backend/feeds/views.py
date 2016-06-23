@@ -93,7 +93,7 @@ class FeedList(generics.ListCreateAPIView):
     A view for the collection of feeds.
     """
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def perform_create(self, serializer):
         """
