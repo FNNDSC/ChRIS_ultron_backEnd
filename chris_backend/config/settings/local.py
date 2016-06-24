@@ -28,6 +28,8 @@ DATABASES['default']['TEST'] = {'CHARSET': 'utf8'}
 
 # Feed file storage
 MEDIA_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))) + '/users'
+if not os.path.exists(MEDIA_ROOT):
+    os.makedirs(MEDIA_ROOT)
 
 # Mail settings
 # ------------------------------------------------------------------------------
