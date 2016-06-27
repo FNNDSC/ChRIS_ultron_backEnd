@@ -82,7 +82,7 @@ class ParseErrorView(APIView):
 
 
 class UrlRewriteRenderer(CollectionJsonRenderer):
-    def get_href(self, request, view):
+    def get_href(self, request):
         return urljoin('http://rewritten.com', request.path)
     
 
