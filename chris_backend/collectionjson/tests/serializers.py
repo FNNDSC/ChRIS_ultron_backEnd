@@ -2,7 +2,7 @@
 from rest_framework.serializers import HyperlinkedIdentityField
 from rest_framework.serializers import HyperlinkedModelSerializer, ModelSerializer
 
-from collectionjson.fields import LinkField
+from collectionjson.fields import ItemLinkField
 from .models import Dummy, Idiot, Moron, Simple
 
         
@@ -19,8 +19,8 @@ class IdiotHyperlinkedModelSerializer(HyperlinkedModelSerializer):
 
 
 class DummyHyperlinkedModelSerializer(HyperlinkedModelSerializer):
-    other_stuff = LinkField('get_other_link')
-    empty = LinkField('get_empty_link')
+    other_stuff = ItemLinkField('get_other_link')
+    empty = ItemLinkField('get_empty_link')
     some_link = HyperlinkedIdentityField(view_name='moron-detail')
 
     class Meta(object):

@@ -1,7 +1,7 @@
 from rest_framework.serializers import HyperlinkedRelatedField, HyperlinkedIdentityField
 from rest_framework.serializers import HyperlinkedModelSerializer, ManyRelatedField
 from rest_framework.renderers import JSONRenderer
-from .fields import LinkField
+from .fields import ItemLinkField
 
 
 class CollectionJsonRenderer(JSONRenderer):
@@ -26,7 +26,7 @@ class CollectionJsonRenderer(JSONRenderer):
                 if k != id_field
                 and (isinstance(v, HyperlinkedRelatedField)
                 or isinstance(v, HyperlinkedIdentityField)   
-                or isinstance(v, LinkField)
+                or isinstance(v, ItemLinkField)
                 or (isinstance(v, ManyRelatedField)
                     and isinstance(v.child_relation, HyperlinkedRelatedField)))]
 

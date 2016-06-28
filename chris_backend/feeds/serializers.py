@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from collectionjson.fields import LinkField
+from collectionjson.fields import ItemLinkField
 from .models import Note, Tag, Feed, Comment, FeedFile
 
         
@@ -54,7 +54,7 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
                                                read_only=True)
     fname = serializers.FileField(use_url=False)
-    file_resource = LinkField('_get_file_link')
+    file_resource = ItemLinkField('_get_file_link')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
 
     class Meta:
