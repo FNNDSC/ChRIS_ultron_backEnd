@@ -78,15 +78,15 @@ class CustomFunctionsTests(ViewTests):
         self.assertContains(list_response, "com1")
         self.assertContains(list_response, "com2")
 
-    def test_append_plugins_link(self):
+    def test_append_collection_links(self):
         """
-        Test whether views.append_plugins_link() appends the list of plugins
+        Test whether views.append_collection_links() appends collection links 
         to its response argument
         """
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(reverse("feed-list"))
         request = response.renderer_context['request']
-        response = views.append_plugins_link(request, response)
+        response = views.append_collection_links(request, response)
         self.assertContains(response, reverse('plugin-list'))
         
 

@@ -30,11 +30,22 @@ def get_list_response(list_view_instance, queryset):
     return Response(serializer.data)
 
 
-def append_plugins_link(request, response):
+def append_collection_links(request, response):
     """
-    Convenience method to append to a response object a link to the plugin list 
+    Convenience method to append to a response object document-level links.
     """
-    response.data['links'] = {'plugins': reverse('plugin-list', request=request)}
+    response.data['collection_links'] = {'plugins': reverse('plugin-list', request=request)}
+    return response
+
+
+def append_collection_template(response, data_list):
+    """
+    Convenience method to append to a response a collection+json template.
+    """
+    data = []
+    for prop in data_list:
+        data.append({"name" : prop, "value" : ""})
+    response.data['template'] = {'data': data}
     return response
 
 
@@ -45,6 +56,15 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to return a list of the tags for the queried
+        feed that are owned by the currently authenticated user.
+        """
+        response = super(NoteDetail, self).retrieve(request, *args, **kwargs)
+        template_data = ["title", "content"]
+        return append_collection_template(response, template_data)
     
 
 class TagList(generics.ListCreateAPIView):
@@ -121,10 +141,10 @@ class FeedList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append a link relation pointing to the list of plugins.
+        Overriden to append document-level link relations.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
-        response = append_plugins_link(request, response)
+        response = append_collection_links(request, response)
         return response
 
 
@@ -222,11 +242,11 @@ class FeedFileList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the files for the queried feed and
-        append a link relation pointing to the list of plugins.
+        append document-level link relations.
         """
         queryset = self.get_feedfiles_queryset()
         response = get_list_response(self, queryset)
-        response = append_plugins_link(request, response)
+        response = append_collection_links(request, response)
         return response
 
     def get_feedfiles_queryset(self):

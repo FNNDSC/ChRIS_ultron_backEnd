@@ -108,8 +108,8 @@ class CollectionJsonRenderer(JSONRenderer):
         # ------------------------------------------
 
         links = []
-        if 'links' in data:
-            l = data.pop('links')
+        if 'collection_links' in data:
+            l = data.pop('collection_links')
             links = [self._make_link(key, l[key]) for key in l.keys()]
             
         if view.get_view_name() == 'Api Root':
@@ -141,6 +141,9 @@ class CollectionJsonRenderer(JSONRenderer):
         else:
             collection.update(self._get_items_and_links(view, data))
 
+        if 'template' in data:
+            collection['template'] = data.pop('template')
+            
         return {'collection': collection}
 
     def render(self, data, media_type=None, renderer_context=None):
