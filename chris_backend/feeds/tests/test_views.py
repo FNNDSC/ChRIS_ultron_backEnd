@@ -86,8 +86,21 @@ class CustomFunctionsTests(ViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(reverse("feed-list"))
         request = response.renderer_context['request']
-        response = views.append_collection_links(request, response)
+        links = {'plugins': reverse('plugin-list')}    
+        response = views.append_collection_links(request, response, links)
+        self.assertContains(response, 'plugins')
         self.assertContains(response, reverse('plugin-list'))
+
+    def test_append_collection_template(self):
+        """
+        Test whether views.append_collection_template() appends a collection+json 
+        template to its response argument
+        """
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(reverse("feed-list"))
+        template_data = {"name": "", "plugin": 0} 
+        response = views.append_collection_template(response, template_data)
+        self.assertContains(response, 'template')
         
 
 class NoteDetailViewTests(ViewTests):

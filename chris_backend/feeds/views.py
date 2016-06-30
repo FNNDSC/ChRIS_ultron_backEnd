@@ -30,22 +30,27 @@ def get_list_response(list_view_instance, queryset):
     return Response(serializer.data)
 
 
-def append_collection_links(request, response):
+def append_collection_links(request, response, link_dict):
     """
     Convenience method to append to a response object document-level links.
     """
-    response.data['collection_links'] = {'plugins': reverse('plugin-list', request=request)}
+    data = response.data
+    if not 'collection_links' in data:
+        data['collection_links'] = {}
+        
+    for (link_relation_name, url) in link_dict.items():
+        data['collection_links'][link_relation_name] = url
     return response
 
 
-def append_collection_template(response, data_list):
+def append_collection_template(response, template_data):
     """
     Convenience method to append to a response a collection+json template.
     """
     data = []
-    for prop in data_list:
-        data.append({"name" : prop, "value" : ""})
-    response.data['template'] = {'data': data}
+    for (k, v) in template_data.items():
+        data.append({"name": k, "value": v})
+    response.data["template"] = {"data": data}
     return response
 
 
@@ -59,11 +64,10 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overriden to return a list of the tags for the queried
-        feed that are owned by the currently authenticated user.
+        Overriden to append a collection+json template.
         """
         response = super(NoteDetail, self).retrieve(request, *args, **kwargs)
-        template_data = ["title", "content"]
+        template_data = {"title": "", "content": ""} 
         return append_collection_template(response, template_data)
     
 
@@ -86,9 +90,12 @@ class TagList(generics.ListCreateAPIView):
         """
         Overriden to return a list of the tags for the queried
         feed that are owned by the currently authenticated user.
+        A collection+json template is also added to the response.
         """
         queryset = self.get_tags_queryset(request.user)
-        return get_list_response(self, queryset)
+        response = get_list_response(self, queryset)
+        template_data = {"name": "", "color": ""} 
+        return append_collection_template(response, template_data)
 
     def get_tags_queryset(self, user):
         """
@@ -106,6 +113,14 @@ class TagDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(TagDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"name": "", "color": ""}
+        return append_collection_template(response, template_data)
 
 
 class FeedList(generics.ListCreateAPIView):
@@ -141,11 +156,14 @@ class FeedList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations.
+        Overriden to append document-level link relations and a collection+json
+        template to the response.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
-        response = append_collection_links(request, response)
-        return response
+        links = {'plugins': reverse('plugin-list', request=request)}    
+        response = append_collection_links(request, response, links)
+        template_data = {"name": "", "plugin": 0} 
+        return append_collection_template(response, template_data)
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -167,7 +185,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     def update_owners(self, serializer):
         """
         Custom method to update the feed's owners. Checks whether new owners
-        are system registered users
+        are system registered users.
         """
         feed = self.get_object() 
         currentOwners = feed.owner.values('username')
@@ -185,6 +203,14 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         if newOwners:
             currentOwners = [owner for owner in feed.owner.all()]
             serializer.save(owner=currentOwners+newOwners)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"name": "", "owners": [""]} 
+        return append_collection_template(response, template_data)
 
 
 class CommentList(generics.ListCreateAPIView):
@@ -205,13 +231,16 @@ class CommentList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the comments for the queried feed.
+        A collection+json template is also added to the response.
         """
         queryset = self.get_comments_queryset()
-        return get_list_response(self, queryset)
+        response = get_list_response(self, queryset)
+        template_data = {"title": "", "content": ""} 
+        return append_collection_template(response, template_data)
 
     def get_comments_queryset(self):
         """
-        Custom method to get the actual comments' queryset
+        Custom method to get the actual comments' queryset.
         """
         feed = self.get_object()
         return self.filter_queryset(feed.comments.all())
@@ -224,6 +253,14 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(CommentDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"title": "", "content": ""} 
+        return append_collection_template(response, template_data)
 
 
 class FeedFileList(generics.ListCreateAPIView):
@@ -242,12 +279,15 @@ class FeedFileList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the files for the queried feed and
-        append document-level link relations.
+        append document-level link relations and a collection+json
+        template to the response.
         """
         queryset = self.get_feedfiles_queryset()
         response = get_list_response(self, queryset)
-        response = append_collection_links(request, response)
-        return response
+        links = {'plugins': reverse('plugin-list', request=request)}    
+        response = append_collection_links(request, response, links)
+        template_data = {"fname": "", "plugin": 0} 
+        return append_collection_template(response, template_data)
 
     def get_feedfiles_queryset(self):
         """
@@ -264,6 +304,14 @@ class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(FeedFileDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"fname": ""}
+        return append_collection_template(response, template_data)
 
 
 class FileResource(generics.GenericAPIView):
