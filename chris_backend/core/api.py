@@ -43,6 +43,12 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/(?P<pk>[0-9]+)/$',
         PluginDetail.as_view(), name='plugin-detail'),
 
+    url(r'^v1/users/$',
+        views.UserList.as_view(), name='user-list'),
+    
+    url(r'^v1/users/(?P<pk>[0-9]+)/$',
+        views.UserDetail.as_view(), name='user-detail'),
+
 ])
 
 # Login and logout views for Djangos' browsable API

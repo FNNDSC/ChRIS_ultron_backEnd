@@ -178,38 +178,35 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to update feed's owners if requested by a PUT request.
         """
-        if 'owners' in self.request.data:
+        if 'owner' in self.request.data:
             self.update_owners(serializer)          
         super(FeedDetail, self).perform_update(serializer)
         
     def update_owners(self, serializer):
         """
-        Custom method to update the feed's owners. Checks whether new owners
-        are system registered users.
+        Custom method to update the feed's owners. Checks whether the new owner
+        is a system-registered user.
         """
         feed = self.get_object() 
-        currentOwners = feed.owner.values('username')
-        usernames = self.request.data.pop('owners')
-        newOwners = []
-        for usern in usernames:
-            if {'username': usern} not in currentOwners:
-                try:
-                    # check if user is a system registered user
-                    owner = User.objects.get(username=usern)
-                except ObjectDoesNotExist:
-                    pass
-                else:
-                    newOwners.append(owner)
-        if newOwners:
-            currentOwners = [owner for owner in feed.owner.all()]
-            serializer.save(owner=currentOwners+newOwners)
+        owners = feed.owner.values('username')
+        username = self.request.data.pop('owner')
+        if {'username': username} not in owners:
+            try:
+                # check if user is a system-registered user
+                owner = User.objects.get(username=username)
+            except ObjectDoesNotExist:
+                pass
+            else:
+                owners = [o for o in feed.owner.all()]
+                owners.append(owner)
+                serializer.save(owner=owners)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
         response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"name": "", "owners": [""]} 
+        template_data = {"name": "", "owner": ""} 
         return append_collection_template(response, template_data)
 
 

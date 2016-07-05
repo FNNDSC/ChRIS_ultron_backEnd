@@ -180,8 +180,10 @@ class FeedListViewTests(ViewTests):
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["name"], "Feed2")
-        self.assertEqual(response.data["owners"], [self.username])
-
+        feed = Feed.objects.get(name="Feed2")
+        owner = User.objects.get(username=self.username)
+        self.assertIn(owner, feed.owner.all())
+    
     def test_feed_create_failure_ds_plugins_cannot_create_feeds(self):
         self.client.login(username=self.username, password=self.password)
         # get a plugin of type 'ds'
@@ -235,7 +237,7 @@ class FeedDetailViewTests(ViewTests):
         self.read_update_delete_url = reverse("feed-detail", kwargs={"pk": feed.id})
         self.put = json.dumps({
             "template": {"data": [{"name": "name", "value": "Updated"},
-                                  {"name": "owners", "value": [self.other_username]}]}})
+                                  {"name": "owner", "value": self.other_username}]}})
           
     def test_feed_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -256,8 +258,9 @@ class FeedDetailViewTests(ViewTests):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
         self.assertContains(response, "Updated")
-        self.assertCountEqual(response.data["owners"],
-                              [self.username, self.other_username])
+        new_owner = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name="Updated")
+        self.assertIn(new_owner, feed.owner.all())
 
     def test_feed_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
@@ -271,11 +274,12 @@ class FeedDetailViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_feed_update_failure_new_unregistered_owner(self):
-        put = json.dumps({"template": {"data": [{"name": "owners", "value": ["foouser"]}]}})
+        put = json.dumps({"template": {"data": [{"name": "owner", "value": "foouser"}]}})
         self.client.login(username=self.username, password=self.password)
         response = self.client.put(self.read_update_delete_url, data=put,
                                    content_type=self.content_type)
-        self.assertNotIn("foouser", response.data["owners"])
+        feed = Feed.objects.get(name=self.feedname)
+        self.assertFalse(len(feed.owner.all()) > 1)
 
     def test_feed_delete_success(self):
         self.client.login(username=self.username, password=self.password)

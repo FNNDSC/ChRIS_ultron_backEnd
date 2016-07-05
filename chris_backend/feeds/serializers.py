@@ -32,12 +32,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
-    owners = serializers.ListField(child=serializers.CharField(), source='owner.all',
-                                   read_only=True)
+    owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
+                                                read_only=True)
     
     class Meta:
         model = Feed
-        fields = ('url', 'name', 'owners', 'note', 'tags', 'comments',
+        fields = ('url', 'name', 'owner', 'note', 'tags', 'comments',
                   'files', 'plugin')
 
 
