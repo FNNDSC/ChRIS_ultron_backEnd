@@ -31,14 +31,14 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
-    plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail', read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininst-detail', read_only=True)
     owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
                                                 read_only=True)
     
     class Meta:
         model = Feed
         fields = ('url', 'name', 'owner', 'note', 'tags', 'comments',
-                  'files', 'plugin')
+                  'files', 'plugin_inst')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):

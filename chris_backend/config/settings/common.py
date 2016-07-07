@@ -32,9 +32,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'feeds.apps.FeedsConfig',
-    'plugins.apps.PluginsConfig',
-    'collectionjson.apps.CollectionjsonConfig',
+    'feeds',
+    'collectionjson',
+    'plugins',
+    'plugins.pacspull',
 ]
 
 # Pagination
