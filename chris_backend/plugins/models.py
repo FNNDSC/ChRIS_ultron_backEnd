@@ -18,15 +18,13 @@ class Plugin(models.Model):
 
 
 class PluginParameter(models.Model):
-    start_date = models.DateTimeField(auto_now_add=True)
-    end_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100)
     optional = models.BooleanField(default=False)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='parameter')
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='parameters')
     
     class Meta:
-        ordering = ('start_date',)
+        ordering = ('plugin',)
 
     def __str__(self):
         return self.name
@@ -35,13 +33,32 @@ class PluginParameter(models.Model):
 class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='plugin_inst')
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
+    owner = models.ForeignKey('auth.User')
     
     class Meta:
         ordering = ('start_date',)
 
     def __str__(self):
         return self.id
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to save a new feed to the DB the first time the plugin instance is saved.
+        """
+        super(PluginInstance, self).save(*args, **kwargs)
+        if not hasattr(self, 'feed') and self.plugin.type=='fs':
+            self._save_feed()
+            
+    def _save_feed(self):
+        """
+        Custom method to create and save a new feed to the DB.
+        """
+        from feeds.models import Feed
+        feed = Feed()
+        feed.plugin_inst = self;
+        feed.owner = [self.owner]
+        feed.save()
 
 
 class StringParameter(models.Model):

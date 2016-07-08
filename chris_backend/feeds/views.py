@@ -5,8 +5,8 @@ from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
-from rest_framework.exceptions import ParseError
 
+from core import services 
 from core.renderers import BinaryFileRenderer
 from plugins.models import Plugin
 from .models import Note, Tag, Feed, Comment, FeedFile
@@ -14,44 +14,6 @@ from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
-
-
-def get_list_response(list_view_instance, queryset):
-    """
-    Convenience method to get an HTTP response with a list of objects
-    from a list view instance and a queryset
-    """
-    page = list_view_instance.paginate_queryset(queryset)
-    if page is not None:
-        serializer = list_view_instance.get_serializer(page, many=True)
-        return list_view_instance.get_paginated_response(serializer.data)
-
-    serializer = list_view_instance.get_serializer(queryset, many=True)
-    return Response(serializer.data)
-
-
-def append_collection_links(request, response, link_dict):
-    """
-    Convenience method to append to a response object document-level links.
-    """
-    data = response.data
-    if not 'collection_links' in data:
-        data['collection_links'] = {}
-        
-    for (link_relation_name, url) in link_dict.items():
-        data['collection_links'][link_relation_name] = url
-    return response
-
-
-def append_collection_template(response, template_data):
-    """
-    Convenience method to append to a response a collection+json template.
-    """
-    data = []
-    for (k, v) in template_data.items():
-        data.append({"name": k, "value": v})
-    response.data["template"] = {"data": data}
-    return response
 
 
 class NoteDetail(generics.RetrieveUpdateAPIView):
@@ -68,7 +30,7 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
         """
         response = super(NoteDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"title": "", "content": ""} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
     
 
 class TagList(generics.ListCreateAPIView):
@@ -93,9 +55,9 @@ class TagList(generics.ListCreateAPIView):
         A collection+json template is also added to the response.
         """
         queryset = self.get_tags_queryset(request.user)
-        response = get_list_response(self, queryset)
+        response = services.get_list_response(self, queryset)
         template_data = {"name": "", "color": ""} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
     def get_tags_queryset(self, user):
         """
@@ -120,28 +82,15 @@ class TagDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         response = super(TagDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"name": "", "color": ""}
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
 
-class FeedList(generics.ListCreateAPIView):
+class FeedList(generics.ListAPIView):
     """
     A view for the collection of feeds.
     """
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated,)
-
-    def perform_create(self, serializer):
-        """
-        Overriden to associate an owner list and plugin with the feed
-        before first saving to the DB.
-        """
-        # set a list of owners and creator plugin when creating a new feed
-        plugin_id = serializer.context['request'].data['plugin']
-        plugin = Plugin.objects.get(pk=plugin_id)
-        if plugin.type == 'ds':
-            detail = "Could not create feed. Plugin %s is of type 'ds'!" % plugin.name
-            raise ParseError(detail=detail)
-        serializer.save(owner=[self.request.user], plugin=plugin)
 
     def get_queryset(self):
         """
@@ -156,14 +105,12 @@ class FeedList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append document-level link relations.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
         links = {'plugins': reverse('plugin-list', request=request)}    
-        response = append_collection_links(request, response, links)
-        template_data = {"name": "", "plugin": 0} 
-        return append_collection_template(response, template_data)
+        response = services.append_collection_links(request, response, links)
+        return services.append_collection_links(request, response, links)
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -207,7 +154,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"name": "", "owner": ""} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
 
 class CommentList(generics.ListCreateAPIView):
@@ -231,9 +178,9 @@ class CommentList(generics.ListCreateAPIView):
         A collection+json template is also added to the response.
         """
         queryset = self.get_comments_queryset()
-        response = get_list_response(self, queryset)
+        response = services.get_list_response(self, queryset)
         template_data = {"title": "", "content": ""} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
     def get_comments_queryset(self):
         """
@@ -257,10 +204,10 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         response = super(CommentDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"title": "", "content": ""} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
 
-class FeedFileList(generics.ListCreateAPIView):
+class FeedFileList(generics.ListAPIView):
     """
     A view for the collection of feeds' files.
     """
@@ -276,15 +223,12 @@ class FeedFileList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the files for the queried feed and
-        append document-level link relations and a collection+json
-        template to the response.
+        append document-level link relations.
         """
         queryset = self.get_feedfiles_queryset()
-        response = get_list_response(self, queryset)
+        response = services.get_list_response(self, queryset)
         links = {'plugins': reverse('plugin-list', request=request)}    
-        response = append_collection_links(request, response, links)
-        template_data = {"fname": "", "plugin": 0} 
-        return append_collection_template(response, template_data)
+        return services.append_collection_links(request, response, links)
 
     def get_feedfiles_queryset(self):
         """
@@ -308,7 +252,7 @@ class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         response = super(FeedFileDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"fname": ""}
-        return append_collection_template(response, template_data)
+        return services.append_collection_template(response, template_data)
 
 
 class FileResource(generics.GenericAPIView):

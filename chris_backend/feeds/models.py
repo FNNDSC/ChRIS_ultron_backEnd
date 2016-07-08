@@ -19,7 +19,7 @@ class Feed(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to save a new note to the DB the first time the feed is saved
+        Overriden to save a new note to the DB the first time the feed is saved.
         """
         super(Feed, self).save(*args, **kwargs)
         if not hasattr(self, 'note'):
@@ -27,7 +27,7 @@ class Feed(models.Model):
             
     def _save_note(self):
         """
-        Custom method to create and save a new note to the DB
+        Custom method to create and save a new note to the DB.
         """
         note = Note()
         note.feed = self;

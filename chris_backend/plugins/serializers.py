@@ -5,10 +5,12 @@ from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
+    parameters = serializers.HyperlinkedIdentityField(view_name='pluginparam-list')
+    instances = serializers.HyperlinkedIdentityField(view_name='plugininst-list')
     
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'name', 'type')
+        fields = ('url', 'id', 'name', 'type', 'parameters', 'instances')
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -20,11 +22,12 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)   
     class Meta:
         model = PluginInstance
-        fields = ('url', 'plugin')
+        fields = ('url', 'owner', 'plugin')
 
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
