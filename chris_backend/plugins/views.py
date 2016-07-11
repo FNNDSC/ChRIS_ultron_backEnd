@@ -72,6 +72,10 @@ class PluginParameterList(generics.ListCreateAPIView):
         """
         queryset = self.get_plugin_parameters_queryset()
         response = services.get_list_response(self, queryset)
+        plugin = self.get_object()
+        links = {'plugin': reverse('plugin-detail', request=request,
+                                   kwargs={"pk": plugin.id})}    
+        response = services.append_collection_links(request, response, links)
         template_data = {"name": "", "optional": False, "type": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -122,6 +126,10 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         queryset = self.get_plugin_instances_queryset()
         response = services.get_list_response(self, queryset)
+        plugin = self.get_object()
+        links = {'plugin': reverse('plugin-detail', request=request,
+                                   kwargs={"pk": plugin.id})}
+        response = services.append_collection_links(request, response, links)
         param_names = self.get_plugin_parameter_names()
         template_data = {}
         for name in param_names:
