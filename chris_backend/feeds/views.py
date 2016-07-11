@@ -56,6 +56,10 @@ class TagList(generics.ListCreateAPIView):
         """
         queryset = self.get_tags_queryset(request.user)
         response = services.get_list_response(self, queryset)
+        feed = self.get_object()
+        links = {'feed': reverse('feed-detail', request=request,
+                                   kwargs={"pk": feed.id})}
+        response = services.append_collection_links(request, response, links)
         template_data = {"name": "", "color": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -179,6 +183,10 @@ class CommentList(generics.ListCreateAPIView):
         """
         queryset = self.get_comments_queryset()
         response = services.get_list_response(self, queryset)
+        feed = self.get_object()
+        links = {'feed': reverse('feed-detail', request=request,
+                                   kwargs={"pk": feed.id})}
+        response = services.append_collection_links(request, response, links)
         template_data = {"title": "", "content": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -222,7 +230,9 @@ class FeedFileList(generics.ListAPIView):
         """
         queryset = self.get_feedfiles_queryset()
         response = services.get_list_response(self, queryset)
-        links = {'plugins': reverse('plugin-list', request=request)}    
+        feed = self.get_object()
+        links = {'feed': reverse('feed-detail', request=request,
+                                   kwargs={"pk": feed.id})}   
         return services.append_collection_links(request, response, links)
 
     def get_feedfiles_queryset(self):
