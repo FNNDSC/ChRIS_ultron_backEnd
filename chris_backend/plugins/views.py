@@ -2,7 +2,8 @@
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
-from core import services 
+from collectionjson import services
+
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter
 from .serializers import PluginSerializer,  PluginParameterSerializer
@@ -44,7 +45,7 @@ class PluginDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to append a collection+json template.
         """
-        response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
+        response = super(PluginDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"name": "", "type": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -53,7 +54,7 @@ class PluginParameterList(generics.ListCreateAPIView):
     """
     A view for the collection of plugin parameters.
     """
-    serializer_class = PluginParameter
+    serializer_class = PluginParameterSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -86,7 +87,7 @@ class PluginParameterDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A plugin parameter view.
     """
-    serializer_class = PluginParameter
+    serializer_class = PluginParameterSerializer
     queryset = PluginParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -94,7 +95,7 @@ class PluginParameterDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to append a collection+json template.
         """
-        response = super(CommentDetail, self).retrieve(request, *args, **kwargs)
+        response = super(PluginParameterDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"name": "", "optional": False, "type": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -103,7 +104,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
     """
     A view for the collection of plugin instances.
     """
-    serializer_class = PluginInstance
+    serializer_class = PluginInstanceSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -147,7 +148,7 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
     """
     A plugin instance view.
     """
-    serializer_class = PluginInstance
+    serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -156,7 +157,7 @@ class StringParameterDetail(generics.RetrieveAPIView):
     """
     A string parameter view.
     """
-    serializer_class = StringParameter
+    serializer_class = StringParameterSerializer
     queryset = StringParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
     
@@ -165,7 +166,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     """
     An integer parameter view.
     """
-    serializer_class = IntParameter
+    serializer_class = IntParameterSerializer
     queryset = IntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -174,7 +175,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     """
     A float parameter view.
     """
-    serializer_class = FloatParameter
+    serializer_class = FloatParameterSerializer
     queryset = IntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
     
@@ -183,6 +184,6 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     """
     A boolean parameter view.
     """
-    serializer_class = BoolParameter
+    serializer_class = BoolParameterSerializer
     queryset = BoolParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)

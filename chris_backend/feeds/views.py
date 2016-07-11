@@ -6,9 +6,9 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
-from core import services 
+from collectionjson import services
 from core.renderers import BinaryFileRenderer
-from plugins.models import Plugin
+
 from .models import Note, Tag, Feed, Comment, FeedFile
 from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
@@ -214,11 +214,6 @@ class FeedFileList(generics.ListAPIView):
     queryset = Feed.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
-
-    def perform_create(self, serializer):
-        # set the file's feed and creator plugin when creating a new file
-        plugin_id = serializer.context['request'].data['plugin']
-        serializer.save(feed=[self.get_object()], plugin=Plugin.objects.get(pk=plugin_id))
 
     def list(self, request, *args, **kwargs):
         """
