@@ -19,7 +19,7 @@ class Plugin(models.Model):
 
 class PluginParameter(models.Model):
     name = models.CharField(max_length=100)
-    optional = models.BooleanField(default=False)
+    optional = models.BooleanField(default=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='parameters')
     
@@ -40,7 +40,7 @@ class PluginInstance(models.Model):
         ordering = ('start_date',)
 
     def __str__(self):
-        return self.id
+        return str(self.id)
 
     def save(self, *args, **kwargs):
         """
@@ -57,8 +57,11 @@ class PluginInstance(models.Model):
         from feeds.models import Feed
         feed = Feed()
         feed.plugin_inst = self;
+        feed.save()
         feed.owner = [self.owner]
         feed.save()
+        
+        
 
 
 class StringParameter(models.Model):

@@ -8,7 +8,7 @@ class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, blank=True, default='')
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='feed')
+    plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE, related_name='feed')
     owner = models.ManyToManyField('auth.User', related_name='feed')
     
     class Meta:

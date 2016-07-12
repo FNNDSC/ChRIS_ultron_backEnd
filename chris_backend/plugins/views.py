@@ -117,7 +117,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         Overriden to associate an owner and a plugin with the newly created 
         plugin instance before first saving to the DB.
         """
-        serializer.save(owner=[self.request.user], plugin=self.get_object())
+        serializer.save(owner=self.request.user, plugin=self.get_object())
 
     def list(self, request, *args, **kwargs):
         """
