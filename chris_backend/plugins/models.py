@@ -62,12 +62,10 @@ class PluginInstance(models.Model):
         feed.save()
         
         
-
-
 class StringParameter(models.Model):
     value = models.CharField(max_length=200)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='string_param')
-    plugin_param = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='string_inst')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='string_inst')
 
     def __str__(self):
         return self.value
@@ -76,28 +74,28 @@ class StringParameter(models.Model):
 class IntParameter(models.Model):
     value = models.IntegerField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='int_param')
-    plugin_param = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='int_inst')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='int_inst')
 
     def __str__(self):
-        return self.value
+        return str(self.value)
     
 
 class FloatParameter(models.Model):
     value = models.FloatField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='float_param')
-    plugin_param = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='float_inst')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='float_inst')
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
 
 class BoolParameter(models.Model):
     value = models.BooleanField(default=False)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='bool_param')
-    plugin_param = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='bool_inst')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='bool_inst')
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
 
 

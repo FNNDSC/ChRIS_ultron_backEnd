@@ -117,7 +117,23 @@ class PluginInstanceList(generics.ListCreateAPIView):
         Overriden to associate an owner and a plugin with the newly created 
         plugin instance before first saving to the DB.
         """
-        serializer.save(owner=self.request.user, plugin=self.get_object())
+        plugin = self.get_object()
+        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin)
+        request_data = serializer.context['request'].data   
+        parameters = plugin.parameters.all()
+        for parameter in parameters:
+            if parameter.name in request_data:
+                data = {'value': request_data[parameter.name]}
+                if parameter.type == 'string':
+                    parameter_serializer = StringParameterSerializer(data=data)
+                elif parameter.type == 'integer':
+                    parameter_serializer = IntParameterSerializer(data=data)
+                elif parameter.type == 'float':
+                    parameter_serializer = FloatParameterSerializer(data=data)
+                else:
+                    parameter_serializer = BoolParameterSerializer(data=data)
+            parameter_serializer.is_valid(raise_exception=True)
+            parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter) 
 
     def list(self, request, *args, **kwargs):
         """
