@@ -6,10 +6,10 @@ from collectionjson import services
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter
+
+from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer, StringParameterSerializer
-from .serializers import FloatParameterSerializer, IntParameterSerializer
-from .serializers import BoolParameterSerializer
+from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 
 
@@ -115,23 +115,19 @@ class PluginInstanceList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         """
         Overriden to associate an owner and a plugin with the newly created 
-        plugin instance before first saving to the DB.
+        plugin instance before first saving to the DB. All the plugin instace's
+        parameters in the resquest are also properly saved to the DB.
         """
         plugin = self.get_object()
+        #create plugin instance with corresponding owner and plugin
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin)
+        # collect parameters from the request and validate and save them to the DB
         request_data = serializer.context['request'].data   
         parameters = plugin.parameters.all()
         for parameter in parameters:
             if parameter.name in request_data:
                 data = {'value': request_data[parameter.name]}
-                if parameter.type == 'string':
-                    parameter_serializer = StringParameterSerializer(data=data)
-                elif parameter.type == 'integer':
-                    parameter_serializer = IntParameterSerializer(data=data)
-                elif parameter.type == 'float':
-                    parameter_serializer = FloatParameterSerializer(data=data)
-                else:
-                    parameter_serializer = BoolParameterSerializer(data=data)
+                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
             parameter_serializer.is_valid(raise_exception=True)
             parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter) 
 
@@ -181,7 +177,7 @@ class StringParameterDetail(generics.RetrieveAPIView):
     """
     A string parameter view.
     """
-    serializer_class = StringParameterSerializer
+    serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StringParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
     
@@ -190,7 +186,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     """
     An integer parameter view.
     """
-    serializer_class = IntParameterSerializer
+    serializer_class = PARAMETER_SERIALIZERS['integer']
     queryset = IntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
@@ -199,7 +195,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     """
     A float parameter view.
     """
-    serializer_class = FloatParameterSerializer
+    serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = IntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
     
@@ -208,6 +204,6 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     """
     A boolean parameter view.
     """
-    serializer_class = BoolParameterSerializer
+    serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
