@@ -23,6 +23,7 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_name = serializers.ReadOnlyField(source='plugin.name')
     owner = serializers.ReadOnlyField(source='owner.username')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
@@ -43,23 +44,23 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = PluginInstance
-        fields = ('url', 'owner', 'feed', 'plugin', 'string_param',
+        fields = ('url', 'plugin_name', 'owner', 'feed', 'plugin', 'string_param',
                   'int_param', 'float_param', 'bool_param')
 
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
-    name = serializers.ReadOnlyField(source='plugin_param.name')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)   
     class Meta:
         model = StringParameter
-        fields = ('url', 'name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
-    name = serializers.ReadOnlyField(source='plugin_param.name')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -67,11 +68,11 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = IntParameter
-        fields = ('url', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
-    name = serializers.ReadOnlyField(source='plugin_param.name')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -79,11 +80,11 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = FloatParameter
-        fields = ('url', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
-    name = serializers.ReadOnlyField(source='plugin_param.name')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -91,7 +92,7 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = BoolParameter
-        fields = ('url', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
         
 
 PARAMETER_SERIALIZERS={'string': StringParameterSerializer,

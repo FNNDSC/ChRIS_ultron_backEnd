@@ -110,7 +110,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
     """
     serializer_class = PluginInstanceSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def perform_create(self, serializer):
         """
