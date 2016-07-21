@@ -236,13 +236,13 @@ class PluginParameterDetailViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class PluginInstanceViewTests(ViewTests):
+class PluginInstanceListViewTests(ViewTests):
     """
     Test the plugininstance-list view
     """
 
     def setUp(self):
-        super(PluginInstanceViewTests, self).setUp()
+        super(PluginInstanceListViewTests, self).setUp()
         plugin = Plugin.objects.get(name="pacspull")
         # create a plugin parameter
         (param, tf) = PluginParameter.objects.get_or_create(plugin=plugin,
@@ -275,4 +275,28 @@ class PluginInstanceViewTests(ViewTests):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
+
+class PluginInstanceDetailViewTests(ViewTests):
+    """
+    Test the plugininstance-detail view
+    """
+
+    def setUp(self):
+        super(PluginInstanceDetailViewTests, self).setUp()
+        plugin = Plugin.objects.get(name="pacspull")
+
+        # create a plugin instance
+        user = User.objects.get(username=self.username)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})       
+         
+    def test_plugin_instance_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "pacspull")
+
+    def test_plugin_instance_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 

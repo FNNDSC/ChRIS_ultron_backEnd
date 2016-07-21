@@ -35,7 +35,6 @@ INSTALLED_APPS = [
     'feeds',
     'collectionjson',
     'plugins',
-    'plugins.pacspull',
 ]
 
 # Pagination
