@@ -1,6 +1,6 @@
 """
 Plugin manager module that provides functionality to add and delete plugins to the
-plugins app. The last modification date of a plugin can also be registered.
+plugins django app. The last modification date of a plugin can also be registered.
 """
 
 
@@ -8,9 +8,10 @@ from importlib import import_module
 from argparse import ArgumentParser
 from inspect import getmembers
 
-from plugins import models
+from django.utils import timezone
 
-form .plugin import AbstractPlugin
+from plugins.models import Plugin, PluginParameter 
+from .plugin import PluginService
 
 __version__ = "1.0.0"
 
@@ -28,20 +29,26 @@ class PluginManager(object):
                            help="register now as modification date")
         self.parser = parser
 
-    def _get_plugin_class(self, name):
-            module_name = "%s.%s" % (name, name)
+    def _get_plugin_service_class(self, name):
+        """
+        Internal method to get a plugin's class name given the plugin's name.
+        """
+        # a name.name plugins' package.module structure is assumed 
+        plugin_service_module_name = "%s.%s" % (name, name)
         try:
-            plugin_module = import_module(module_name)
+            plugin_service_module = import_module(plugin_service_module_name)
         except ImportError as e:
             raise ImportError("Error: failed to import module %s. Check if the \
-                 plugin's package was added." % module_name)
+                 plugin's package was added." % plugin_service_module_name)
         else:
-            for member in getmembers(plugin_module):
-                if issubclass(member[1], AbstractPlugin):
+            for member in getmembers(plugin_sevice_module):
+                if issubclass(member[1], PluginService):
                     return member[1]
-        return None
         
     def run(self, args=None):
+        """
+        Parse the arguments passed to the manager and perform the appropriate action.
+        """
         options = self.parser.parse_args(args)
         if options.add:
             self.add_plugin(options.name)
@@ -52,33 +59,40 @@ class PluginManager(object):
         self.args = options
         
     def add_plugin(self, name):
-        plugin_class = self._get_plugin_class(name)
-        if (plugin_class):
-            plugin = plugin_class()
-            plugin_repr = plugin.getJSON()
-            # add plugin to the db
-            db_pugin = models.Plugin()
-            db_pugin.name = plugin_repr.name
-            db_pugin.type = plugin_repr.type
-            db_pugin.save()
-            for params in plugin_repr.parameters:
-                # add plugin parameter to the db
-                db_plugin_param = models.PluginParameter()
-                db_plugin_param.plugin = db_pugin
-                db_plugin_param.name = params.name
-                db_plugin_param.type = params.type
-                db_plugin_param.optional = params.optional
-                db_plugin_param.save()
-        else:
-            raise AttributeError("No subclass of plugin.AbstractPlugin was \
-                 found in plugin module")
-                     
+        """
+        Register/add a new plugin.
+        """
+        plugin_service_class = self._get_plugin_service_class(name)
+        plugin_service = plugin_service_class()
+        plugin_repr = plugin_service.getJSONRepresentation()
+        # add plugin to the db
+        plugin = Plugin()
+        plugin.name = plugin_repr.name
+        plugin.type = plugin_repr.type
+        plugin.save()
+        for params in plugin_repr.parameters:
+            # add plugin parameter to the db
+            plugin_param = PluginParameter()
+            plugin_param.plugin = plugin
+            plugin_param.name = params.name
+            plugin_param.type = params.type
+            plugin_param.optional = params.optional
+            plugin_param.save()
+                  
     def remove_plugin(self, name):
-        pass
+        """
+        Remove an existing plugin.
+        """
+        plugin = Plugin.objects.get(name=name)
+        plugin.delete()
 
     def register_plugin_modification(self, name):
-        pass
-
+        """
+        Register current date as a new plugin modification date.
+        """
+        plugin = Plugin.objects.get(name=name)
+        plugin.modification_date = timezone.now()
+        plugin.save()
 
 
 # ENTRYPOINT

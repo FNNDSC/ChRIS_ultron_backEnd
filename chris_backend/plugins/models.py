@@ -7,7 +7,7 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
 class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     type = models.CharField(default='ds', max_length=4)
 
     class Meta:
