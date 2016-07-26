@@ -11,7 +11,7 @@ from inspect import getmembers
 from django.utils import timezone
 
 from plugins.models import Plugin, PluginParameter 
-from .plugin import PluginService
+from .base import ChrisApp
 
 __version__ = "1.0.0"
 
@@ -29,20 +29,20 @@ class PluginManager(object):
                            help="register now as modification date")
         self.parser = parser
 
-    def _get_plugin_service_class(self, name):
+    def _get_plugin_app_class(self, name):
         """
-        Internal method to get a plugin's class name given the plugin's name.
+        Internal method to get a plugin's app class name given the plugin's name.
         """
-        # a name.name plugins' package.module structure is assumed 
-        plugin_service_module_name = "%s.%s" % (name, name)
+        # a name.name plugin apps' package.module structure is assumed 
+        plugin_app_module_name = "%s.%s" % (name, name)
         try:
-            plugin_service_module = import_module(plugin_service_module_name)
+            plugin_app_module = import_module(plugin_app_module_name)
         except ImportError as e:
             raise ImportError("Error: failed to import module %s. Check if the \
-                 plugin's package was added." % plugin_service_module_name)
+                 plugin's app package was added." % plugin_app_module_name)
         else:
-            for member in getmembers(plugin_sevice_module):
-                if issubclass(member[1], PluginService):
+            for member in getmembers(plugin_app_module):
+                if issubclass(member[1], ChrisApp):
                     return member[1]
         
     def run(self, args=None):
@@ -62,9 +62,9 @@ class PluginManager(object):
         """
         Register/add a new plugin.
         """
-        plugin_service_class = self._get_plugin_service_class(name)
-        plugin_service = plugin_service_class()
-        plugin_repr = plugin_service.getJSONRepresentation()
+        plugin_app_class = self._get_plugin_app_class(name)
+        app = plugin_app_class()
+        plugin_repr = app.getJSONRepresentation()
         # add plugin to the db
         plugin = Plugin()
         plugin.name = plugin_repr.name
