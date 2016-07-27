@@ -26,15 +26,26 @@
  *
  */
 '''
-import sys, os
-import json
+import sys
 from argparse import ArgumentParser
 
-class ChrisApp(ArgumentParser):
+
+class BaseClassAttrEnforcer(type):
+    def __init__(cls, name, bases, d):
+        # class variables to be enforced in the subclasses
+        attrs = ['DESCRIPTION', 'TYPE', 'TITLE', 'LICENSE']
+        for attr in attrs:
+            if attr not in d:
+                raise ValueError("Class %s doesn't define %s class variable" % (name,
+                                                                                attr))
+        type.__init__(cls, name, bases, d)
+        
+
+class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     '''
     The super class for all valid ChRIS apps.
     '''
-
+    
     AUTHORS = 'FNNDSC (dev@babyMRI.org)'
     TITLE = ''
     CATEGORY = ''
@@ -48,23 +59,22 @@ class ChrisApp(ArgumentParser):
         '''
         The constructor of this app.
         '''
+        super(ChrisApp, self).__init__(description=self.DESCRIPTION)
+        self.options = []
+        # the custom parameter list
+        self._parameters = []
         self.add_argument('--json', action='store_true', dest='json', default=False,
                            help='show json representation of app (default: FALSE)')
         self.add_argument('--description', action='store_true', dest='description',
                            default=False,
                            help='show the description of this plugin (default: FALSE)')
-    
-        # the custom parameter list
-        self._parameters = []
-        self.options = []
+        self.define_parameters()
 
-        self.defineParameters()
-
-    def defineParameters(self):
+    def define_parameters(self):
         '''
         Define the parameters used by this app (abstract method in this class). 
         '''
-        raise NotImplementedError("ChrisApp.defineParameters()")
+        raise NotImplementedError("ChrisApp.define_parameters()")
 
     def run(self):
         '''
@@ -72,59 +82,55 @@ class ChrisApp(ArgumentParser):
         '''
         raise NotImplementedError("ChrisApp.run()")
 
-    def add_argument(self, *args, **kwargs):
+    def add_parameter(self, *args, **kwargs):
         '''
-        Add a command line argument to this app. 
+        Add a parameter to this app. 
         '''
         try:
-          name = kwargs['dest']
-          type = kwargs['type']
-          optional = kwargs['optional']
-         except KeyError as e:
-           detail = "%s parameter required. " % e 
+            name = kwargs['dest']
+            type = kwargs['type']
+            optional = kwargs['optional']
+        except KeyError as e:
+            detail = "%s option required. " % e 
             raise KeyError(detail)        
 
-        # grab the optional, default and help values
-        optional = True
+        # grab the default and help values
         default = None
         help = None
         if 'default' in kwargs:
-          default = kwargs['default']
+            default = kwargs['default']
         if 'help' in kwargs:
-          help = kwargs['help']
-        if 'optional' in kwargs:
-          optional = kwargs['optional']
+            help = kwargs['help']
 
         # store the parameters internally    
         param = {'name': name, 'type': type, 'optional': optional,
                  'help': help, 'default': default}
         self._parameters.append(param)
 
-        # add the argument to the parser
+        # add the parameter to the parser
         del kwargs['optional']
-        super(ChrisApp, self).add_argument(*args, **kwargs)
+        self.add_argument(*args, **kwargs)
 
-    def getJSONRepresentation():
+    def get_json_representation(self):
         repres = {}
-        repres['name'] = self.name
         repres['type'] = self.TYPE
-        repres['parameters'] = self.parameters
+        repres['parameters'] = self._parameters
         return repres
 
-    def launch(self):
+    def launch(self, args=None):
         '''
         This method triggers the parsing of arguments. The run() method gets called 
         if not --json or --description are specified.
         '''
-        options = self.parse_args()
+        options = self.parse_args(args)
         self.options = options
         if (options.json):
-          print(self.getJSONRpresentation())
+            print(self.get_json_representation())
         elif (options.description):
-          print(self.getDescription())
+            print(self.DESCRIPTION)
         else:
-          # run the app
-          self.run()
+            # run the app
+            self.run()
 
     def error(self, message):
         '''

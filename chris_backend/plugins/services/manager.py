@@ -3,6 +3,13 @@ Plugin manager module that provides functionality to add and delete plugins to t
 plugins django app. The last modification date of a plugin can also be registered.
 """
 
+import os, sys
+# load django
+sys.path.append(os.path.join(os.path.dirname(__file__),
+                             '../../../'))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+import django
+django.setup()
 
 from importlib import import_module
 from argparse import ArgumentParser
@@ -11,9 +18,9 @@ from inspect import getmembers
 from django.utils import timezone
 
 from plugins.models import Plugin, PluginParameter 
-from .base import ChrisApp
+from plugins.services.base import ChrisApp
 
-__version__ = "1.0.0"
+_apps_package_name = 'plugins.services'
 
 
 class PluginManager(object):
@@ -33,8 +40,8 @@ class PluginManager(object):
         """
         Internal method to get a plugin's app class name given the plugin's name.
         """
-        # a name.name plugin apps' package.module structure is assumed 
-        plugin_app_module_name = "%s.%s" % (name, name)
+        # a plugins.services.name.name plugin apps' package.module structure is assumed 
+        plugin_app_module_name = "%s.%s.%s" % (_apps_package_name, name, name)
         try:
             plugin_app_module = import_module(plugin_app_module_name)
         except ImportError as e:
@@ -42,7 +49,7 @@ class PluginManager(object):
                  plugin's app package was added." % plugin_app_module_name)
         else:
             for member in getmembers(plugin_app_module):
-                if issubclass(member[1], ChrisApp):
+                if issubclass(member[1], ChrisApp) and (not member[0]=='ChrisApp'):
                     return member[1]
         
     def run(self, args=None):
@@ -63,20 +70,22 @@ class PluginManager(object):
         Register/add a new plugin.
         """
         plugin_app_class = self._get_plugin_app_class(name)
+        import pdb; pdb.set_trace()
         app = plugin_app_class()
-        plugin_repr = app.getJSONRepresentation()
+        plugin_repr = app.get_json_representation()
         # add plugin to the db
         plugin = Plugin()
-        plugin.name = plugin_repr.name
-        plugin.type = plugin_repr.type
+        plugin.name = name
+        plugin.type = plugin_repr['type']
         plugin.save()
-        for params in plugin_repr.parameters:
+        params = plugin_repr['parameters']
+        for param in params:
             # add plugin parameter to the db
             plugin_param = PluginParameter()
             plugin_param.plugin = plugin
-            plugin_param.name = params.name
-            plugin_param.type = params.type
-            plugin_param.optional = params.optional
+            plugin_param.name = param['name']
+            plugin_param.type = params['type']
+            plugin_param.optional = params['optional']
             plugin_param.save()
                   
     def remove_plugin(self, name):
@@ -98,8 +107,6 @@ class PluginManager(object):
 # ENTRYPOINT
 if __name__ == "__main__":
     manager = PluginManager()
-    try:
-        manager.run()
-    except Exception as e:
-        print(e)
+    manager.run()
+
 
