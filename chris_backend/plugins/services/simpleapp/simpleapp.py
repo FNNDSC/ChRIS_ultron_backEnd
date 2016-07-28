@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 #                                                            _
 # Simple chris app demo
 #
@@ -12,10 +10,11 @@
 
 
 
-import os
+import os, sys
 
 # import the Chris app superclass
-from plugins.services.base import ChrisApp
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+from base import ChrisApp
 
 
 class SimpleApp(ChrisApp):

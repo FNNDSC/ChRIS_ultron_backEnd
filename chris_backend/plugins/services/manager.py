@@ -4,6 +4,10 @@ plugins django app. The last modification date of a plugin can also be registere
 """
 
 import os, sys
+from importlib import import_module
+from argparse import ArgumentParser
+from inspect import getmembers
+
 # load django
 sys.path.append(os.path.join(os.path.dirname(__file__),
                              '../../../'))
@@ -11,16 +15,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 import django
 django.setup()
 
-from importlib import import_module
-from argparse import ArgumentParser
-from inspect import getmembers
-
 from django.utils import timezone
 
-from plugins.models import Plugin, PluginParameter 
-from plugins.services.base import ChrisApp
+from plugins.models import Plugin, PluginParameter, TYPES
 
-_apps_package_name = 'plugins.services'
+_APPS_PACKAGE = 'plugins.services'
 
 
 class PluginManager(object):
@@ -40,8 +39,8 @@ class PluginManager(object):
         """
         Internal method to get a plugin's app class name given the plugin's name.
         """
-        # a plugins.services.name.name plugin apps' package.module structure is assumed 
-        plugin_app_module_name = "%s.%s.%s" % (_apps_package_name, name, name)
+        # an _apps_package_name.name.name package structure is assumed for the plugin app
+        plugin_app_module_name = "%s.%s.%s" % (_APPS_PACKAGE, name, name)
         try:
             plugin_app_module = import_module(plugin_app_module_name)
         except ImportError as e:
@@ -49,7 +48,10 @@ class PluginManager(object):
                  plugin's app package was added." % plugin_app_module_name)
         else:
             for member in getmembers(plugin_app_module):
-                if issubclass(member[1], ChrisApp) and (not member[0]=='ChrisApp'):
+                if (hasattr(member[1], 'run') and
+                    hasattr(member[1], 'define_parameters') and
+                    hasattr(member[1], 'get_json_representation') and
+                    not (member[0]=='ChrisApp')):
                     return member[1]
         
     def run(self, args=None):
@@ -70,7 +72,6 @@ class PluginManager(object):
         Register/add a new plugin.
         """
         plugin_app_class = self._get_plugin_app_class(name)
-        import pdb; pdb.set_trace()
         app = plugin_app_class()
         plugin_repr = app.get_json_representation()
         # add plugin to the db
@@ -84,22 +85,29 @@ class PluginManager(object):
             plugin_param = PluginParameter()
             plugin_param.plugin = plugin
             plugin_param.name = param['name']
-            plugin_param.type = params['type']
-            plugin_param.optional = params['optional']
+            plg_type = param['type']
+            plugin_param.type = [key for key in TYPES if TYPES[key]==plg_type][0]
+            plugin_param.optional = param['optional']
             plugin_param.save()
                   
     def remove_plugin(self, name):
         """
         Remove an existing plugin.
         """
-        plugin = Plugin.objects.get(name=name)
+        try:
+            plugin = Plugin.objects.get(name=name)
+        except Plugin.DoesNotExist:
+            raise NameError("Couldn't find %s plugin in the system" % name)
         plugin.delete()
 
     def register_plugin_modification(self, name):
         """
         Register current date as a new plugin modification date.
         """
-        plugin = Plugin.objects.get(name=name)
+        try:
+            plugin = Plugin.objects.get(name=name)
+        except Plugin.DoesNotExist:
+            raise NameError("Couldn't find %s plugin in the system" % name)
         plugin.modification_date = timezone.now()
         plugin.save()
 

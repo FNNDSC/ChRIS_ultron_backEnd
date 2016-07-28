@@ -13,7 +13,7 @@ from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 
 
-class PluginList(generics.ListCreateAPIView):
+class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.
     """
@@ -28,12 +28,10 @@ class PluginList(generics.ListCreateAPIView):
         """
         response = super(PluginList, self).list(request, *args, **kwargs)
         links = {'feeds': reverse('feed-list', request=request)}    
-        response = services.append_collection_links(request, response, links)
-        template_data = {"name": "", "type": ""} 
-        return services.append_collection_template(response, template_data)
+        return services.append_collection_links(request, response, links)
 
 
-class PluginDetail(generics.RetrieveUpdateDestroyAPIView):
+class PluginDetail(generics.RetrieveAPIView):
     """
     A plugin view.
     """
@@ -41,29 +39,14 @@ class PluginDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overriden to append a collection+json template.
-        """
-        response = super(PluginDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"name": "", "type": ""} 
-        return services.append_collection_template(response, template_data)
 
-
-class PluginParameterList(generics.ListCreateAPIView):
+class PluginParameterList(generics.ListAPIView):
     """
     A view for the collection of plugin parameters.
     """
     serializer_class = PluginParameterSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
-
-    def perform_create(self, serializer):
-        """
-        Overriden to associate a plugin with the newly created parameter
-        before first saving to the DB.
-        """
-        serializer.save(plugin=self.get_object())
 
     def list(self, request, *args, **kwargs):
         """
@@ -75,9 +58,7 @@ class PluginParameterList(generics.ListCreateAPIView):
         plugin = self.get_object()
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}    
-        response = services.append_collection_links(request, response, links)
-        template_data = {"name": "", "optional": False, "type": ""} 
-        return services.append_collection_template(response, template_data)
+        return services.append_collection_links(request, response, links)
 
     def get_plugin_parameters_queryset(self):
         """
@@ -87,21 +68,13 @@ class PluginParameterList(generics.ListCreateAPIView):
         return self.filter_queryset(plugin.parameters.all())
 
     
-class PluginParameterDetail(generics.RetrieveUpdateDestroyAPIView):
+class PluginParameterDetail(generics.RetrieveAPIView):
     """
     A plugin parameter view.
     """
     serializer_class = PluginParameterSerializer
     queryset = PluginParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overriden to append a collection+json template.
-        """
-        response = super(PluginParameterDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"name": "", "optional": False, "type": ""} 
-        return services.append_collection_template(response, template_data)
 
 
 class PluginInstanceList(generics.ListCreateAPIView):

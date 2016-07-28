@@ -26,8 +26,14 @@
  *
  */
 '''
-import sys
+import os, sys
 from argparse import ArgumentParser
+
+# load django
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+import django
+django.setup()
 
 
 class BaseClassAttrEnforcer(type):
@@ -88,7 +94,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         '''
         try:
             name = kwargs['dest']
-            type = kwargs['type']
+            param_type = kwargs['type']
             optional = kwargs['optional']
         except KeyError as e:
             detail = "%s option required. " % e 
@@ -96,15 +102,15 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
 
         # grab the default and help values
         default = None
-        help = None
+        param_help = None
         if 'default' in kwargs:
             default = kwargs['default']
         if 'help' in kwargs:
-            help = kwargs['help']
+            param_help = kwargs['help']
 
         # store the parameters internally    
-        param = {'name': name, 'type': type, 'optional': optional,
-                 'help': help, 'default': default}
+        param = {'name': name, 'type': param_type, 'optional': optional,
+                 'help': param_help, 'default': default}
         self._parameters.append(param)
 
         # add the parameter to the parser

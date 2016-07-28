@@ -4,6 +4,9 @@ from django.db import models
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values")]
 
+TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
+
+
 class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
