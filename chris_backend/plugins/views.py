@@ -11,6 +11,7 @@ from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
+from .services.manager import PluginManager
 
 
 class PluginList(generics.ListAPIView):
@@ -89,7 +90,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         Overriden to associate an owner and a plugin with the newly created 
         plugin instance before first saving to the DB. All the plugin instace's
-        parameters in the resquest are also properly saved to the DB.
+        parameters in the resquest are also properly saved to the DB. Finally
+        the plugin's app is run with the plugin instace's parameters.
         """
         plugin = self.get_object()
         #create plugin instance with corresponding owner and plugin
@@ -97,12 +99,17 @@ class PluginInstanceList(generics.ListCreateAPIView):
         # collect parameters from the request and validate and save them to the DB
         request_data = serializer.context['request'].data   
         parameters = plugin.parameters.all()
+        parameters_dict = {}
         for parameter in parameters:
             if parameter.name in request_data:
                 data = {'value': request_data[parameter.name]}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
-            parameter_serializer.is_valid(raise_exception=True)
-            parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter) 
+                parameter_serializer.is_valid(raise_exception=True)
+                parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
+                parameters_dict[parameter.name] = request_data[parameter.name]
+        # run the plugin's app
+        pl_m = PluginManager()
+        pl_m.run_plugin_app(plugin.name, parameters_dict)
 
     def list(self, request, *args, **kwargs):
         """
