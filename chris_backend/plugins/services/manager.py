@@ -8,12 +8,12 @@ from importlib import import_module
 from argparse import ArgumentParser
 from inspect import getmembers
 
-# load django
-sys.path.append(os.path.join(os.path.dirname(__file__),
-                             '../../../'))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
-import django
-django.setup()
+if "DJANGO_SETTINGS_MODULE" not in os.environ:
+    # django needs to be loaded (eg. when this script is run from the command line)
+    sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+    import django
+    django.setup()
 
 from django.utils import timezone
 
@@ -111,6 +111,24 @@ class PluginManager(object):
         plugin.modification_date = timezone.now()
         plugin.save()
 
+    def run_plugin_app(self, name, parameters):
+        """
+        Run a plugin's app.
+        """        
+        plugin_app_class = self._get_plugin_app_class(name)
+        app = plugin_app_class()
+        plugin_repr = app.get_json_representation()
+        app_args = []
+        for param_name in parameters:
+            param_value = parameters[param_name]
+            for plugin_param in plugin_repr['parameters']:
+                if plugin_param['name'] == param_name:
+                    app_args.append(plugin_param['flag'])
+                    if plugin_param['action'] == 'store':
+                        app_args.append(param_value)
+                    break
+        app.launch(app_args)
+                
 
 # ENTRYPOINT
 if __name__ == "__main__":
