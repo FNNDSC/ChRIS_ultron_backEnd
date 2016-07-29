@@ -29,11 +29,12 @@
 import os, sys
 from argparse import ArgumentParser
 
-# load django
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
-import django
-django.setup()
+if "DJANGO_SETTINGS_MODULE" not in os.environ:
+    # django needs to be loaded (eg. when some chris app is run from the command line)
+    sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
+    import django
+    django.setup()
 
 
 class BaseClassAttrEnforcer(type):
@@ -96,6 +97,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             name = kwargs['dest']
             param_type = kwargs['type']
             optional = kwargs['optional']
+            action = kwargs['action']
         except KeyError as e:
             detail = "%s option required. " % e 
             raise KeyError(detail)        
@@ -109,8 +111,8 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             param_help = kwargs['help']
 
         # store the parameters internally    
-        param = {'name': name, 'type': param_type, 'optional': optional,
-                 'help': param_help, 'default': default}
+        param = {'name': name, 'type': param_type, 'optional': optional, 'flag': args[0],
+                 'action': action, 'help': param_help, 'default': default}
         self._parameters.append(param)
 
         # add the parameter to the parser
@@ -118,6 +120,9 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         self.add_argument(*args, **kwargs)
 
     def get_json_representation(self):
+        '''
+        Return a JSON object with a reprsentation of this app (type and parameters). 
+        '''
         repres = {}
         repres['type'] = self.TYPE
         repres['parameters'] = self._parameters
@@ -142,9 +147,9 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         '''
         The error handler if wrong commandline arguments are specified.
         '''
-        print
-        sys.stderr.write( 'ERROR: %s\n' % message )
-        print
+        print()
+        sys.stderr.write('ERROR: %s\n' % message)
+        print()
         self.print_help()
-        sys.exit( 2 )
+        sys.exit(2)
 
