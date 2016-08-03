@@ -88,16 +88,21 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner and a plugin with the newly created 
-        plugin instance before first saving to the DB. All the plugin instace's
-        parameters in the resquest are also properly saved to the DB. Finally
-        the plugin's app is run with the plugin instace's parameters.
+        Overriden to associate an owner, a plugin and a previous plugin instance with 
+        the newly created plugin instance before first saving to the DB. All the plugin 
+        instace's parameters in the resquest are also properly saved to the DB. Finally
+        the plugin's app is run with the provided plugin instace's parameters.
         """
         plugin = self.get_object()
-        #create plugin instance with corresponding owner and plugin
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin)
-        # collect parameters from the request and validate and save them to the DB
-        request_data = serializer.context['request'].data   
+        request_data = serializer.context['request'].data
+        previous_id = ""
+        if 'previous' in request_data:
+            previous_id = request_data['previous']
+        previous = serializer.validate_previous(previous_id, plugin)
+        # create plugin instance with corresponding owner, plugin and previous instances
+        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
+                                      previous=previous)
+        # collect parameters from the request and validate and save them to the DB 
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -108,8 +113,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
-        pl_m = PluginManager()
-        pl_m.run_plugin_app(plugin.name, parameters_dict)
+        pl_manager = PluginManager()
+        pl_manager.run_plugin_app(plugin.name, parameters_dict)
 
     def list(self, request, *args, **kwargs):
         """
@@ -123,7 +128,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                    kwargs={"pk": plugin.id})}
         response = services.append_collection_links(request, response, links)
         param_names = self.get_plugin_parameter_names()
-        template_data = {}
+        template_data = {'previous': ""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)

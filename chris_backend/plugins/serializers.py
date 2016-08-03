@@ -1,4 +1,6 @@
 
+from django.core.exceptions import ObjectDoesNotExist
+
 from rest_framework import serializers
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
@@ -25,6 +27,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
     owner = serializers.ReadOnlyField(source='owner.username')
+    previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                   read_only=True)
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
@@ -44,8 +48,27 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = PluginInstance
-        fields = ('url', 'plugin_name', 'owner', 'feed', 'plugin', 'string_param',
-                  'int_param', 'float_param', 'bool_param')
+        fields = ('url', 'plugin_name', 'previous', 'owner', 'feed', 'plugin',
+                  'string_param', 'int_param', 'float_param', 'bool_param')
+
+    def validate_previous(self, previous_id, plugin):
+        """
+        Check that an id is provided for previous instance when corresponding plugin is
+        of type 'ds'. Then check that the provided id exists in the DB.
+        """
+        previous = None
+        if plugin.type=='ds':
+            if not previous_id:
+                raise serializers.ValidationError(
+                    {'detail': "A 'previous' plugin instance id is required"})
+            try:
+                pk = int(previous_id)
+                previous = PluginInstance.objects.get(pk=pk)
+            except (ValueError, ObjectDoesNotExist):
+                raise serializers.ValidationError(
+                    {'detail':
+                     "Couldn't find any 'previous' plugin instance with id %s" % previous_id})
+        return previous
 
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):

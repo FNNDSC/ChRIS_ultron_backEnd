@@ -24,7 +24,8 @@ class PluginParameter(models.Model):
     name = models.CharField(max_length=100)
     optional = models.BooleanField(default=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='parameters')
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE,
+                               related_name='parameters')
     
     class Meta:
         ordering = ('plugin',)
@@ -36,6 +37,8 @@ class PluginParameter(models.Model):
 class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
+    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
+                                 related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     owner = models.ForeignKey('auth.User')
     
@@ -47,7 +50,7 @@ class PluginInstance(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to save a new feed to the DB the first time the plugin instance is saved.
+        Overriden to save a new feed to the DB the first time the instance is saved.
         """
         super(PluginInstance, self).save(*args, **kwargs)
         if not hasattr(self, 'feed') and self.plugin.type=='fs':
@@ -67,8 +70,10 @@ class PluginInstance(models.Model):
         
 class StringParameter(models.Model):
     value = models.CharField(max_length=200)
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='string_param')
-    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='string_inst')
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='string_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='string_inst')
 
     def __str__(self):
         return self.value
@@ -76,8 +81,10 @@ class StringParameter(models.Model):
     
 class IntParameter(models.Model):
     value = models.IntegerField()
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='int_param')
-    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='int_inst')
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='int_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='int_inst')
 
     def __str__(self):
         return str(self.value)
@@ -85,8 +92,10 @@ class IntParameter(models.Model):
 
 class FloatParameter(models.Model):
     value = models.FloatField()
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='float_param')
-    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='float_inst')
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='float_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='float_inst')
 
     def __str__(self):
         return str(self.value)
@@ -94,8 +103,10 @@ class FloatParameter(models.Model):
 
 class BoolParameter(models.Model):
     value = models.BooleanField(default=False)
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE, related_name='bool_param')
-    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE, related_name='bool_inst')
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='bool_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='bool_inst')
 
     def __str__(self):
         return str(self.value)

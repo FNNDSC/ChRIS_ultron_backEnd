@@ -56,7 +56,8 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
                                                read_only=True)
     fname = serializers.FileField(use_url=False)
     file_resource = ItemLinkField('_get_file_link')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail', read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                      read_only=True)
 
     class Meta:
         model = FeedFile
