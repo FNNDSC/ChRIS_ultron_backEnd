@@ -1,13 +1,15 @@
 
-import json
+import os, json
 
 from django.test import TestCase
 from django.core.urlresolvers import reverse
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from rest_framework import status
 
 from plugins.models import Plugin, PluginParameter, PluginInstance
+from plugins.services.manager import PluginManager
 from plugins import views
 
 
@@ -133,13 +135,13 @@ class PluginInstanceListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceListViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
-        # create a plugin parameter
-        (param, tf) = PluginParameter.objects.get_or_create(plugin=plugin,
-                                                                name='mrn', type='string') 
+        # add a plugin to the system though the plugin manager
+        pl_manager = PluginManager()
+        pl_manager.add_plugin('simpleapp')
+        plugin = Plugin.objects.get(name="simpleapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(
-            {"template": {"data": [{"name": "mrn", "value": "Subj1"}]}})
+            {"template": {"data": [{"name": "dir", "value": "./"}]}})
 
         # create a plugin instance
         user = User.objects.get(username=self.username)
@@ -159,7 +161,7 @@ class PluginInstanceListViewTests(ViewTests):
     def test_plugin_instance_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "pacspull")
+        self.assertContains(response, "simpleapp")
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)

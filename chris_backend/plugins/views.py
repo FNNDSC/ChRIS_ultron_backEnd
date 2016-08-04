@@ -95,6 +95,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         plugin = self.get_object()
         request_data = serializer.context['request'].data
+        # get previous plugin instance
         previous_id = ""
         if 'previous' in request_data:
             previous_id = request_data['previous']
@@ -114,7 +115,11 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(plugin.name, parameters_dict)
+        inputdir = None
+        if previous:
+            inputdir = '/tmp/input'
+        outputdir = plugin_inst.get_output_path()
+        pl_manager.run_plugin_app(plugin.name, parameters_dict, outputdir, inputdir)
 
     def list(self, request, *args, **kwargs):
         """

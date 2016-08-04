@@ -111,7 +111,7 @@ class PluginManager(object):
         plugin.modification_date = timezone.now()
         plugin.save()
 
-    def run_plugin_app(self, name, parameters):
+    def run_plugin_app(self, name, parameter_dict, outputdir, inputdir=None):
         """
         Run a plugin's app.
         """        
@@ -119,14 +119,22 @@ class PluginManager(object):
         app = plugin_app_class()
         plugin_repr = app.get_json_representation()
         app_args = []
-        for param_name in parameters:
-            param_value = parameters[param_name]
-            for plugin_param in plugin_repr['parameters']:
-                if plugin_param['name'] == param_name:
-                    app_args.append(plugin_param['flag'])
-                    if plugin_param['action'] == 'store':
-                        app_args.append(param_value)
-                    break
+        # append input dir (only for ds plugins)
+        if plugin_repr['type'] == 'ds' and inputdir:
+            app_args.append(inputdir)
+        # append output dir 
+        app_args.append(outputdir)
+        # append the parameters
+        if parameter_dict:
+            for param_name in parameter_dict:
+                param_value = parameter_dict[param_name]
+                for plugin_param in plugin_repr['parameters']:
+                    if plugin_param['name'] == param_name:
+                        app_args.append(plugin_param['flag'])
+                        if plugin_param['action'] == 'store':
+                            app_args.append(param_value)
+                        break
+        # run the app with all the arguments
         app.launch(app_args)
                 
 

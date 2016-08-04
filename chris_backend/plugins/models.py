@@ -1,4 +1,8 @@
+
+import os
+
 from django.db import models
+from django.conf import settings
 
 
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
@@ -66,6 +70,24 @@ class PluginInstance(models.Model):
         feed.save()
         feed.owner = [self.owner]
         feed.save()
+
+    def get_output_path(self):
+        # 'fs' plugins will output files to:
+        # MEDIA_ROOT/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
+        # 'ds' plugins will output files to:
+        # MEDIA_ROOT/<username>/feed_<id>/...
+        #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
+        current = self
+        path = '/{0}_{1}/data'.format(current.plugin.name, current.id)
+        while not current.plugin.type == 'fs':
+            current = self.previous
+            path = '/{0}_{1}'.format(current.plugin.name, current.id) + path
+        root = settings.MEDIA_ROOT
+        username = self.owner.username
+        output_path = '{0}/{1}/feed_{2}'.format(root, username, self.feed.id) + path
+        if not os.path.isdir(output_path):
+            os.makedirs(output_path)
+        return output_path
         
         
 class StringParameter(models.Model):

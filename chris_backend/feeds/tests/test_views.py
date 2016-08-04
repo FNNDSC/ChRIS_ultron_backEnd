@@ -508,33 +508,47 @@ class FeedFileListViewTests(ViewTests):
         self.list_url = reverse("feedfile-list", kwargs={"pk": feed.id})
 
         # create a test file 
-        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        #test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        test_file_path = settings.MEDIA_ROOT
         if not os.path.isdir(test_file_path):
             os.mkdir(test_file_path)
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
-        file.write("test file")
+        file.write("test file1")
+        file.close()
+        file = open(test_file_path + '/file2.txt', "w")
+        file.write("test file2")
         file.close()
 
         # create two files in the DB "already uploaded" to the server)
         pl_inst = PluginInstance.objects.all()[0]
-        file = open(self.test_file, "r")
-        django_file = File(file)
+        #file = open(self.test_file, "r")
+        #django_file = File(file)
+        #feedfile = FeedFile(plugin_inst=pl_inst)
+        #feedfile.fname.save("file2.txt", django_file, save=True)
+        #feedfile.feed = [feed]
+        #feedfile.save()
+        #feedfile = FeedFile(plugin_inst=pl_inst)
+        #feedfile.fname.save("file3.txt", django_file, save=True)
+        #feedfile.feed = [feed]
+        #feedfile.save()
+        #file.close()
         feedfile = FeedFile(plugin_inst=pl_inst)
-        feedfile.fname.save("file2.txt", django_file, save=True)
+        feedfile.fname.name = 'file1.txt'
+        feedfile.save()
         feedfile.feed = [feed]
         feedfile.save()
         feedfile = FeedFile(plugin_inst=pl_inst)
-        feedfile.fname.save("file3.txt", django_file, save=True)
+        feedfile.fname.name = 'file2.txt'
+        feedfile.save()
         feedfile.feed = [feed]
         feedfile.save()
-        file.close()
 
     def tearDown(self):
         #remove files created in the filesystem after each test
-        os.remove(self.test_file)
+        #os.remove(self.test_file)
         for f in os.listdir(settings.MEDIA_ROOT):
-            if f in ["file1.txt", "file2.txt", "file3.txt"]:
+            if f in ["file1.txt", "file2.txt"]:
                 file = os.path.join(settings.MEDIA_ROOT, f)
                 os.remove(file)
 
@@ -550,8 +564,8 @@ class FeedFileListViewTests(ViewTests):
     def test_feedfile_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
+        self.assertContains(response, "file1.txt")
         self.assertContains(response, "file2.txt")
-        self.assertContains(response, "file3.txt")
 
     def test_feedfile_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -574,7 +588,7 @@ class FeedFileDetailViewTests(ViewTests):
         self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
 
         # create a test file 
-        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        test_file_path = settings.MEDIA_ROOT
         if not os.path.isdir(test_file_path):
             os.mkdir(test_file_path)
         self.test_file = test_file_path + '/file1.txt'
@@ -584,20 +598,17 @@ class FeedFileDetailViewTests(ViewTests):
 
         # create a file in the DB "already uploaded" to the server
         pl_inst = PluginInstance.objects.all()[0]
-        file = open(self.test_file, "r")
-        django_file = File(file)
         feedfile = FeedFile(plugin_inst=pl_inst)
-        feedfile.fname.save("file1.txt", django_file, save=True)
+        feedfile.fname.name = 'file1.txt'
+        feedfile.save()
         feedfile.feed = [feed]
         feedfile.save()
-        file.close()
 
         self.read_update_delete_url = reverse("feedfile-detail", kwargs={"pk": feedfile.id})
 
     def tearDown(self):
         #remove files created in the filesystem after each test
         os.remove(self.test_file)
-        os.remove(settings.MEDIA_ROOT + '/file1.txt')
           
     def test_feedfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -646,7 +657,7 @@ class FileResourceViewTests(ViewTests):
         feed = Feed.objects.get(name=self.feedname)
 
         # create a test file 
-        test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
+        test_file_path = settings.MEDIA_ROOT
         if not os.path.isdir(test_file_path):
             os.mkdir(test_file_path)
         self.test_file = test_file_path + '/file1.txt'
@@ -656,21 +667,17 @@ class FileResourceViewTests(ViewTests):
             
         # create a file in the DB "already uploaded" to the server
         pl_inst = PluginInstance.objects.all()[0]
-        file = open(self.test_file, "r")
-        django_file = File(file)
         feedfile = FeedFile(plugin_inst=pl_inst)
-        feedfile.fname.save("file1.txt", django_file, save=True)
+        feedfile.fname.name = 'file1.txt'
+        feedfile.save()
         feedfile.feed = [feed]
         feedfile.save()
-        file.close()
-
         self.download_url = reverse("file-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'
 
     def tearDown(self):
         #remove files created in the filesystem after each test
         os.remove(self.test_file)
-        os.remove(settings.MEDIA_ROOT + '/file1.txt')
           
     def test_fileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)

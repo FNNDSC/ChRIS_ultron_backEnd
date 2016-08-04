@@ -33,8 +33,9 @@ class SimpleApp(ChrisApp):
         self.add_parameter('--dir', action='store', dest='dir', type=str, default='./',
                           optional=True, help='look up directory')
 
-    def run(self):
-        print(os.system('ls ' + self.options.dir))
+    def run(self, options):
+        print(os.system('ls ' + options.dir + '>' + os.path.join(options.outputdir,
+                                                                 'out.txt')))
 
 
 # ENTRYPOINT

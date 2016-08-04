@@ -75,19 +75,26 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         self.add_argument('--description', action='store_true', dest='description',
                            default=False,
                            help='show the description of this plugin (default: FALSE)')
+        if self.TYPE=='ds':
+            # 'ds' plugins require an input directory
+            self.add_argument('inputdir', action='store', type=str,
+                              help='directory containing the input files')
+        # all plugins require an output directory
+        self.add_argument('outputdir', action='store', type=str,
+                              help='directory containing the output files/folders')
         self.define_parameters()
 
     def define_parameters(self):
         '''
         Define the parameters used by this app (abstract method in this class). 
         '''
-        raise NotImplementedError("ChrisApp.define_parameters()")
+        raise NotImplementedError("ChrisApp.define_parameters(self)")
 
-    def run(self):
+    def run(self, options):
         '''
         Execute this app (abstract method in this class). 
         '''
-        raise NotImplementedError("ChrisApp.run()")
+        raise NotImplementedError("ChrisApp.run(self, options)")
 
     def add_parameter(self, *args, **kwargs):
         '''
@@ -134,14 +141,13 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         if not --json or --description are specified.
         '''
         options = self.parse_args(args)
-        self.options = options
         if (options.json):
             print(self.get_json_representation())
         elif (options.description):
             print(self.DESCRIPTION)
         else:
             # run the app
-            self.run()
+            self.run(options)
 
     def error(self, message):
         '''
