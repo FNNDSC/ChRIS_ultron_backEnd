@@ -84,7 +84,7 @@ class PluginInstance(models.Model):
             path = '/{0}_{1}'.format(current.plugin.name, current.id) + path
         root = settings.MEDIA_ROOT
         username = self.owner.username
-        output_path = '{0}/{1}/feed_{2}'.format(root, username, self.feed.id) + path
+        output_path = '{0}/{1}/feed_{2}'.format(root, username, current.feed.id) + path
         if not os.path.isdir(output_path):
             os.makedirs(output_path)
         return output_path
