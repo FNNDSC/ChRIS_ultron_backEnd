@@ -1,5 +1,5 @@
 
-import os, json, io
+import os, json, shutil
 
 from django.test import TestCase
 from django.core.urlresolvers import reverse
@@ -496,7 +496,26 @@ class TagDetailViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
 
-class FeedFileListViewTests(ViewTests):
+class FeedFileViewTests(ViewTests):
+    """
+    Generric feedfile view tests' setup and tearDown
+    """
+
+    def setUp(self):
+        super(FeedFileViewTests, self).setUp()
+        # create test directory where files are created
+        self.test_dir = settings.MEDIA_ROOT + '/test'
+        settings.MEDIA_ROOT = self.test_dir
+        if not os.path.exists(self.test_dir):
+            os.makedirs(self.test_dir)
+
+    def tearDown(self):
+        #remove test directory
+        shutil.rmtree(self.test_dir)
+        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+
+        
+class FeedFileListViewTests(FeedFileViewTests):
     """
     Test the feedfile-list view
     """
@@ -508,10 +527,7 @@ class FeedFileListViewTests(ViewTests):
         self.list_url = reverse("feedfile-list", kwargs={"pk": feed.id})
 
         # create a test file 
-        #test_file_path = os.path.join(settings.MEDIA_ROOT, 'test')
-        test_file_path = settings.MEDIA_ROOT
-        if not os.path.isdir(test_file_path):
-            os.mkdir(test_file_path)
+        test_file_path = self.test_dir
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
         file.write("test file1")
@@ -544,14 +560,6 @@ class FeedFileListViewTests(ViewTests):
         feedfile.feed = [feed]
         feedfile.save()
 
-    def tearDown(self):
-        #remove files created in the filesystem after each test
-        #os.remove(self.test_file)
-        for f in os.listdir(settings.MEDIA_ROOT):
-            if f in ["file1.txt", "file2.txt"]:
-                file = os.path.join(settings.MEDIA_ROOT, f)
-                os.remove(file)
-
     def test_feedfile_create_failure_post_not_allowed(self):
         self.client.login(username=self.username, password=self.password)
         # try to create a new feed file with a POST request to the list
@@ -577,7 +585,7 @@ class FeedFileListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
 
-class FeedFileDetailViewTests(ViewTests):
+class FeedFileDetailViewTests(FeedFileViewTests):
     """
     Test the feedfile-detail view
     """
@@ -588,9 +596,7 @@ class FeedFileDetailViewTests(ViewTests):
         self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
 
         # create a test file 
-        test_file_path = settings.MEDIA_ROOT
-        if not os.path.isdir(test_file_path):
-            os.mkdir(test_file_path)
+        test_file_path = self.test_dir
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
         file.write("test file")
@@ -605,10 +611,6 @@ class FeedFileDetailViewTests(ViewTests):
         feedfile.save()
 
         self.read_update_delete_url = reverse("feedfile-detail", kwargs={"pk": feedfile.id})
-
-    def tearDown(self):
-        #remove files created in the filesystem after each test
-        os.remove(self.test_file)
           
     def test_feedfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -647,7 +649,7 @@ class FeedFileDetailViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class FileResourceViewTests(ViewTests):
+class FileResourceViewTests(FeedFileViewTests):
     """
     Test the tag-detail view
     """
@@ -657,9 +659,7 @@ class FileResourceViewTests(ViewTests):
         feed = Feed.objects.get(name=self.feedname)
 
         # create a test file 
-        test_file_path = settings.MEDIA_ROOT
-        if not os.path.isdir(test_file_path):
-            os.mkdir(test_file_path)
+        test_file_path = self.test_dir
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
         file.write("test file")
@@ -675,9 +675,6 @@ class FileResourceViewTests(ViewTests):
         self.download_url = reverse("file-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'
 
-    def tearDown(self):
-        #remove files created in the filesystem after each test
-        os.remove(self.test_file)
           
     def test_fileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)

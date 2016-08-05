@@ -1,5 +1,5 @@
 
-import os, json
+import os, json, shutil
 
 from django.test import TestCase
 from django.core.urlresolvers import reverse
@@ -135,6 +135,12 @@ class PluginInstanceListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceListViewTests, self).setUp()
+        # create test directory where files are created
+        self.test_dir = settings.MEDIA_ROOT + '/test'
+        settings.MEDIA_ROOT = self.test_dir
+        if not os.path.exists(self.test_dir):
+            os.makedirs(self.test_dir)
+        
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
         pl_manager.add_plugin('simpleapp')
@@ -146,6 +152,11 @@ class PluginInstanceListViewTests(ViewTests):
         # create a plugin instance
         user = User.objects.get(username=self.username)
         PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+
+    def tearDown(self):
+        #remove test directory
+        shutil.rmtree(self.test_dir)
+        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_success(self):
         self.client.login(username=self.username, password=self.password)

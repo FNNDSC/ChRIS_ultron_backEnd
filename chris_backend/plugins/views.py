@@ -117,7 +117,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         pl_manager = PluginManager()
         inputdir = None
         if previous:
-            inputdir = '/tmp/input'
+            inputdir = previous.get_output_path()
         outputdir = plugin_inst.get_output_path()
         pl_manager.run_plugin_app(plugin.name, parameters_dict, outputdir, inputdir)
 
