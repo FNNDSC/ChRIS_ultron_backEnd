@@ -120,6 +120,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
             inputdir = previous.get_output_path()
         outputdir = plugin_inst.get_output_path()
         pl_manager.run_plugin_app(plugin.name, parameters_dict, outputdir, inputdir)
+        # register output files with the system
+        plugin_inst.register_output_files()
 
     def list(self, request, *args, **kwargs):
         """
