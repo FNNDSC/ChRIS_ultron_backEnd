@@ -13,7 +13,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'name', 'type', 'parameters', 'instances')
+        fields = ('url', 'name', 'type', 'parameters', 'instances')
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -48,7 +48,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = PluginInstance
-        fields = ('url', 'plugin_name', 'previous', 'owner', 'feed', 'plugin',
+        fields = ('url', 'id', 'plugin_name', 'previous', 'owner', 'feed', 'plugin',
                   'string_param', 'int_param', 'float_param', 'bool_param')
 
     def validate_previous(self, previous_id, plugin):
