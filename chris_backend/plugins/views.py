@@ -115,13 +115,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
         pl_manager = PluginManager()
-        inputdir = None
-        if previous:
-            inputdir = previous.get_output_path()
-        outputdir = plugin_inst.get_output_path()
-        pl_manager.run_plugin_app(plugin.name, parameters_dict, outputdir, inputdir)
-        # register output files with the system
-        plugin_inst.register_output_files()
+        pl_manager.run_plugin_app(plugin_inst, parameters_dict)
 
     def list(self, request, *args, **kwargs):
         """

@@ -111,20 +111,27 @@ class PluginManager(object):
         plugin.modification_date = timezone.now()
         plugin.save()
 
-    def run_plugin_app(self, name, parameter_dict, outputdir, inputdir=None):
+    def run_plugin_app(self, plugin_inst, parameter_dict):
         """
         Run a plugin's app.
-        """        
-        plugin_app_class = self._get_plugin_app_class(name)
+        """
+        # instantiate the plugin's app
+        plugin_app_class = self._get_plugin_app_class(plugin_inst.plugin.name)
         app = plugin_app_class()
         plugin_repr = app.get_json_representation()
+        # get input dir
+        inputdir = ""
+        if plugin_inst.previous:
+            inputdir = plugin_inst.previous.get_output_path()
+        # get output dir
+        outputdir = plugin_inst.get_output_path()
         app_args = []
-        # append input dir (only for ds plugins)
+        # append input dir to app's argument list (only for ds plugins)
         if plugin_repr['type'] == 'ds' and inputdir:
             app_args.append(inputdir)
-        # append output dir 
+        # append output dir to app's argument list
         app_args.append(outputdir)
-        # append the parameters
+        # append the parameters to app's argument list
         if parameter_dict:
             for param_name in parameter_dict:
                 param_value = parameter_dict[param_name]
@@ -136,7 +143,10 @@ class PluginManager(object):
                         break
         # run the app with all the arguments
         app.launch(app_args)
+        # register output files with the system
+        plugin_inst.register_output_files()
                 
+
 
 # ENTRYPOINT
 if __name__ == "__main__":
