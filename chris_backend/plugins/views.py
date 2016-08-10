@@ -91,7 +91,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         Overriden to associate an owner, a plugin and a previous plugin instance with 
         the newly created plugin instance before first saving to the DB. All the plugin 
         instace's parameters in the resquest are also properly saved to the DB. Finally
-        the plugin's app is run with the provided plugin instace's parameters.
+        the plugin's app is run with the provided plugin instance's parameters.
         """
         plugin = self.get_object()
         request_data = serializer.context['request'].data

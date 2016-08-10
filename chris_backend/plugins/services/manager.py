@@ -131,6 +131,9 @@ class PluginManager(object):
             app_args.append(inputdir)
         # append output dir to app's argument list
         app_args.append(outputdir)
+        # append options file path (options are saved to this file) 
+        app_args.append("--saveopts")
+        app_args.append(os.path.join(os.path.dirname(outputdir), "opts.json"))
         # append the parameters to app's argument list
         if parameter_dict:
             for param_name in parameter_dict:

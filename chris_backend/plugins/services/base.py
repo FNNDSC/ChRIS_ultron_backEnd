@@ -28,6 +28,7 @@
 '''
 import os, sys
 from argparse import ArgumentParser
+import json
 
 if "DJANGO_SETTINGS_MODULE" not in os.environ:
     # django needs to be loaded (eg. when some chris app is run from the command line)
@@ -50,7 +51,7 @@ class BaseClassAttrEnforcer(type):
 
 class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     '''
-    The super class for all valid ChRIS apps.
+    The super class for all valid ChRIS plugin apps.
     '''
     
     AUTHORS = 'FNNDSC (dev@babyMRI.org)'
@@ -82,6 +83,10 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         # all plugins require an output directory
         self.add_argument('outputdir', action='store', type=str,
                               help='directory containing the output files/folders')
+        self.add_argument('--opts', action='store', dest='opts',
+                          help='file containing the arguments passed to this app')
+        self.add_argument('--saveopts', action='store', dest='saveopts', default=False,
+                           help='save arguments to a JSON file (default: FALSE)')
         self.define_parameters()
 
     def define_parameters(self):
@@ -145,9 +150,35 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             print(self.get_json_representation())
         elif (options.description):
             print(self.DESCRIPTION)
+        elif (options.opts):
+             # run the app with options read from JSON file
+            self.run(self.get_options_from_file(options.opts))
         else:
+            if (options.saveopts):
+                self.save_options(options, options.saveopts)
             # run the app
             self.run(options)
+
+    def get_options_from_file(self, file_path):
+        '''
+        Return the options parsed from a JSON file. 
+        '''
+        #read options JSON file
+        options_dict = {}
+        with open(file_path) as options_file:    
+            options_dict = json.load(options_file)
+        options = []
+        for opt_name in options_dict:
+            options.append(opt_name)
+            options.append(options_dict[opt_name])        
+        return self.parse_args(options)
+
+    def save_options(self, options, file_path):
+        '''
+        Save the options passed to the app to a JSON file. 
+        '''
+        with open(file_path, 'w') as outfile:
+            json.dump(vars(options), outfile)
 
     def error(self, message):
         '''
