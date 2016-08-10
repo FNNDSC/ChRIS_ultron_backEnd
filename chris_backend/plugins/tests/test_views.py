@@ -143,8 +143,8 @@ class PluginInstanceListViewTests(ViewTests):
         
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
-        pl_manager.add_plugin('simpleapp')
-        plugin = Plugin.objects.get(name="simpleapp")
+        pl_manager.add_plugin('simplefsapp')
+        plugin = Plugin.objects.get(name="simplefsapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(
             {"template": {"data": [{"name": "dir", "value": "./"}]}})
@@ -172,7 +172,7 @@ class PluginInstanceListViewTests(ViewTests):
     def test_plugin_instance_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "simpleapp")
+        self.assertContains(response, "simplefsapp")
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
