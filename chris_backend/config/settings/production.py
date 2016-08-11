@@ -101,3 +101,10 @@ LOGGING = {
 }
 
 # Your production stuff: Below this line define 3rd party library settings
+
+# corsheaders
+# ------------------------------------------------------------------------------
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ORIGIN_WHITELIST = (
+'babymri.org'
+)

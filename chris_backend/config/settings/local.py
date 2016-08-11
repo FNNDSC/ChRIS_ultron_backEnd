@@ -60,3 +60,6 @@ INSTALLED_APPS += ['django_extensions']
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
+# corsheaders
+# ------------------------------------------------------------------------------
+CORS_ORIGIN_ALLOW_ALL = True
