@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#!/usr/bin/env bash
+
 chrisDirectory="chris-ultron-backend"
 userHome="/home/ubuntu"
 virtualEnvironment="chris-ultron"
@@ -40,35 +42,6 @@ while getopts u:h:n: option ; do
         esac
 done
 
-echo "Provisioning virtual machine..."
-
-apt-get update
-
-echo "Preparing MySQL"
-apt-get install debconf-utils -y
-
-# set default mysql root password
-debconf-set-selections <<< "mysql-server mysql-server/root_password password 1234"
-debconf-set-selections <<< "mysql-server mysql-server/root_password_again password 1234"
-
-echo "Installing MySQL"
-apt-get install mysql-server libmysqlclient-dev -y
-
-echo "Initiating MySQL Databases"
-echo "CREATE DATABASE chris_dev CHARACTER SET utf8;GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';    GRANT ALL ON test_chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';" | mysql -u root -p1234
-
-echo "Installing Python"
-apt-get install python3-dev -y
-
-echo "Installing PIP"
-apt-get install python-pip -y
-
-echo "Upgrading PIP"
-pip install --upgrade pip
-
-echo "Installing Python Vitual Env"
-pip install virtualenv virtualenvwrapper
-
 echo "Preparing Python Virtual Env"
 
 _python_virtual_env_dir="$workingDirectory/$virtualEnvironmentDirectory"
@@ -77,6 +50,7 @@ _user_bashrc="$userHome/.bashrc"
 mkdir -p $_python_virtual_env_dir
 echo "export WORKON_HOME=$_python_virtual_env_dir" >> $_user_bashrc
 echo "source /usr/local/bin/virtualenvwrapper.sh" >> $_user_bashrc
+echo "workon $virtualEnvironment" >> $_user_bashrc
 export WORKON_HOME=$_python_virtual_env_dir
 source /usr/local/bin/virtualenvwrapper.sh
 
@@ -94,4 +68,3 @@ pip install -r requirements/local.txt
 
 echo "Installing Sphinx"
 pip install Sphinx sphinxcontrib-httpdomain
-

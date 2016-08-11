@@ -11,7 +11,8 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = "chris-ultron"
 
   # script to setup the chris environment at startup
-  config.vm.provision :shell, :path => "bootstrap.sh"
+  config.vm.provision :shell, :path => "bootstrap_root.sh"
+  config.vm.provision :shell, :path => "bootstrap_user.sh", :privileged => false
 
   # set the network settings
   config.vm.network "forwarded_port", guest: 8000, host: 8001
