@@ -12,12 +12,14 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
 
 TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
 
+PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
+
 
 class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
-    type = models.CharField(default='ds', max_length=4)
+    type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
 
     class Meta:
         ordering = ('type',)
