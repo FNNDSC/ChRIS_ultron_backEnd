@@ -17,7 +17,7 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 
 from django.utils import timezone
 
-from plugins.models import Plugin, PluginParameter, TYPES
+from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES
 
 _APPS_PACKAGE = 'plugins.services'
 
@@ -74,6 +74,10 @@ class PluginManager(object):
         plugin_app_class = self._get_plugin_app_class(name)
         app = plugin_app_class()
         plugin_repr = app.get_json_representation()
+        plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
+        if plugin_repr['type'] not in plugin_types:
+            raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
+                             % (plugin_types, plugin_app_class))
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
