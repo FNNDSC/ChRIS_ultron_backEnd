@@ -36,12 +36,12 @@ class SimpleDSApp(ChrisApp):
 
     def run(self, options):
         for (dirpath, dirnames, filenames) in os.walk(options.inputdir):
+            output_path =  os.path.join(options.outputdir,
+                                        dirpath.replace(options.inputdir, ""))
             for dirname in dirnames:
                 os.makedirs(os.path.join(output_path, dirnames))
             for name in filenames:
                 new_name = options.prefix + name
-                output_path =  os.path.join(options.outputdir,
-                                            dirpath.replace(options.inputdir, ""))
                 shutil.copy(os.path.join(dirpath, name), os.path.join(output_path, new_name))
             
 
