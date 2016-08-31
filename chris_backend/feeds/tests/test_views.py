@@ -79,7 +79,7 @@ class NoteDetailViewTests(ViewTests):
 
     def test_note_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_note_detail_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -96,7 +96,7 @@ class NoteDetailViewTests(ViewTests):
     def test_note_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_url, data=self.put,
                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_note_update_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -144,7 +144,7 @@ class FeedListViewTests(ViewTests):
 
     def test_feed_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feed_list_from_other_users_not_listed(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -174,7 +174,7 @@ class FeedDetailViewTests(ViewTests):
 
     def test_feed_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feed_detail_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -193,7 +193,7 @@ class FeedDetailViewTests(ViewTests):
     def test_feed_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feed_update_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -217,7 +217,7 @@ class FeedDetailViewTests(ViewTests):
 
     def test_feed_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feed_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -260,7 +260,7 @@ class CommentListViewTests(ViewTests):
     def test_comment_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_list_success_related_feed_owner(self):
         self.client.login(username=self.username, password=self.password)
@@ -276,7 +276,7 @@ class CommentListViewTests(ViewTests):
 
     def test_comment_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
 
 class CommentDetailViewTests(ViewTests):
@@ -312,7 +312,7 @@ class CommentDetailViewTests(ViewTests):
 
     def test_comment_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_update_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -323,7 +323,7 @@ class CommentDetailViewTests(ViewTests):
     def test_comment_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_update_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -339,7 +339,7 @@ class CommentDetailViewTests(ViewTests):
 
     def test_comment_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_comment_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -386,7 +386,7 @@ class TagListViewTests(ViewTests):
     def test_tag_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_tag_list_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -401,7 +401,7 @@ class TagListViewTests(ViewTests):
 
     def test_tag_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
     def test_tag_list_from_other_feed_owners_not_listed(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -450,7 +450,7 @@ class TagDetailViewTests(ViewTests):
 
     def test_tag_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_tag_detail_failure_not_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -472,7 +472,7 @@ class TagDetailViewTests(ViewTests):
     def test_tag_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_tag_update_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -488,7 +488,7 @@ class TagDetailViewTests(ViewTests):
 
     def test_tag_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_tag_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -582,7 +582,7 @@ class FeedFileListViewTests(FeedFileViewTests):
 
     def test_feedfile_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
 
 class FeedFileDetailViewTests(FeedFileViewTests):
@@ -631,7 +631,7 @@ class FeedFileDetailViewTests(FeedFileViewTests):
 
     def test_feedfile_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -641,7 +641,7 @@ class FeedFileDetailViewTests(FeedFileViewTests):
 
     def test_feedfile_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_feedfile_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -689,4 +689,4 @@ class FileResourceViewTests(FeedFileViewTests):
 
     def test_fileresource_download_failure_unauthenticated(self):
         response = self.client.get(self.download_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

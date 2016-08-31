@@ -52,7 +52,7 @@ class PluginListViewTests(ViewTests):
 
     def test_plugin_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginDetailViewTests(ViewTests):
@@ -73,7 +73,7 @@ class PluginDetailViewTests(ViewTests):
 
     def test_plugin_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginParameterListViewTests(ViewTests):
@@ -101,7 +101,7 @@ class PluginParameterListViewTests(ViewTests):
 
     def test_plugin_parameter_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginParameterDetailViewTests(ViewTests):
@@ -125,7 +125,7 @@ class PluginParameterDetailViewTests(ViewTests):
 
     def test_plugin_parameter_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginInstanceListViewTests(ViewTests):
@@ -167,7 +167,7 @@ class PluginInstanceListViewTests(ViewTests):
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_instance_list_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -176,7 +176,7 @@ class PluginInstanceListViewTests(ViewTests):
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
 
 class PluginInstanceDetailViewTests(ViewTests):
@@ -201,5 +201,5 @@ class PluginInstanceDetailViewTests(ViewTests):
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
