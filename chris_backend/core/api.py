@@ -1,6 +1,7 @@
 from django.conf.urls import url, include
 
 from rest_framework.urlpatterns import format_suffix_patterns
+from rest_framework.authtoken.views import obtain_auth_token
 
 from feeds import views
 from plugins.views import PluginList, PluginDetail, PluginInstanceDetail 
@@ -10,6 +11,8 @@ from plugins.views import BoolParameterDetail
 
 # API v1 endpoints
 urlpatterns = format_suffix_patterns([
+    
+    url(r'^v1/auth-token/$', obtain_auth_token),
     
     url(r'^v1/$', views.FeedList.as_view(), name='feed-list'),
     
