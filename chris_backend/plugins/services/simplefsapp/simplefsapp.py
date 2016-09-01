@@ -42,5 +42,5 @@ class SimpleFSApp(ChrisApp):
 
 # ENTRYPOINT
 if __name__ == "__main__":
-    app = SimpleApp()
+    app = SimpleFSApp()
     app.launch()

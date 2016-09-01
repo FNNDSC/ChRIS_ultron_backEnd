@@ -48,5 +48,5 @@ class SimpleDSApp(ChrisApp):
 
 # ENTRYPOINT
 if __name__ == "__main__":
-    app = SimpleApp()
+    app = SimpleDSApp()
     app.launch()
