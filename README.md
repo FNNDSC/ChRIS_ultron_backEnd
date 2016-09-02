@@ -132,6 +132,20 @@ Perform a simple GET request:
 http http://127.0.0.1:8000/
 ```
 
+#### Troubleshooting
+
+You might experience some issues with localhost/actual IP depending on local setup and possibly if you have a proxy. In that case, start the server with an actual <IP>:<port> 
+
+```
+python manage.py runserver XXX.YYY.ZZZ.WWW:8000
+```
+
+and connect to it explicitly:
+
+```
+http http://XXX.YYY.ZZZ.WWW:8000/
+```
+
 ### Documentation
 
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
