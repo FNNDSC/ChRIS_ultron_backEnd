@@ -91,7 +91,9 @@ pip freeze --local
 
 ### Testing:
 ````
-python chris_backend/manage.py test
+cd chris_backend
+python manage.py migrate
+python manage.py test
 ````
 If errors are gotten because of user chris not having enough database privilages then
 just give it all privilages in mysql:
