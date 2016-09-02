@@ -72,13 +72,14 @@ GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';
 Now, check out the repo:
 
 ```
-git clone 
+git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 ```
 
 ### Dependencies:
 This project uses requirement files to install dependencies in chris_env through pip:
 
 ````
+cd ChRIS_ultron_backEnd
 pip install -r requirements/local.txt
 ````
 
