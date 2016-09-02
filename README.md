@@ -104,6 +104,22 @@ GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
 
 ### First steps
 
+(See here for detailed instructions:
+
+First, create two users (one called 'chris' and one called <yourusername>)
+
+```
+# for user 'chris'
+python manage.py createsuperuser
+```
+
+and again:
+
+```
+# for user <yourusername>
+python manage.py createsuperuser
+```
+
 Now you can start the backend server
 
 ```
@@ -113,7 +129,7 @@ python manage.py runserver
 Perform a simple GET request:
 
 ```
-http
+http http://127.0.0.1:8000/
 ```
 
 ### Documentation
