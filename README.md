@@ -102,6 +102,20 @@ just give it all privilages in mysql:
 GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
 ````
 
+### First steps
+
+Now you can start the backend server
+
+```
+python manage.py runserver
+```
+
+Perform a simple GET request:
+
+```
+http
+```
+
 ### Documentation
 
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
