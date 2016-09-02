@@ -46,7 +46,14 @@ deactivate
 ````
 
 ### Development database:
-When creating your local database on MySQL's shell use:
+
+To create the development database, do
+
+```
+sudo mysql
+```
+
+Now create a local database on MySQL's shell:
 
 ````
 CREATE DATABASE chris_dev CHARACTER SET utf8;
@@ -59,6 +66,14 @@ Grant all privileges to user chris on the database:
 ````
 GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';
 ````
+
+### Check out the repo
+
+Now, check out the repo:
+
+```
+git clone 
+```
 
 ### Dependencies:
 This project uses requirement files to install dependencies in chris_env through pip:
