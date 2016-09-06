@@ -16,6 +16,8 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
 
+from pacs_ping import PACSPing
+from pacs_query import PACSQuery
 
 class PacsQueryApp(ChrisApp):
     '''
@@ -36,6 +38,24 @@ class PacsQueryApp(ChrisApp):
 
     def run(self, options):
         print(os.system('ls ' + options.dir + '>' + os.path.join(options.outputdir,'out.txt')))
+
+        # ping the PACS
+        ping = PACSPing(options)
+        ping_response = ping.run()
+
+        # query the PACS
+        query = PACSQuery(options)
+        query_response = query.run()
+
+        # if ping_response.success:
+        #     pass
+        # else:
+        #     print('ping failed')
+
+        # query the PACS
+
+        # save response
+
 
 
 # ENTRYPOINT
