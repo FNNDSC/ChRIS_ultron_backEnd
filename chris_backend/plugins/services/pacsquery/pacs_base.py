@@ -32,6 +32,10 @@ class PACSBase(object):
 
         self.query = ''
         self.command = ''
+        self.response = {
+            'status': 'error',
+            'data': {}
+        }
 
     def prepareCommand(self):
         # executable
@@ -50,4 +54,6 @@ class PACSBase(object):
         self.prepareCommand()
         # run the comnmand
         print(self.command)
-        return subprocess.run(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        print(subprocess.PIPE)
+        test = subprocess.run(self.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+        return test

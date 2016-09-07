@@ -10,7 +10,7 @@
 
 
 
-import os, sys
+import os, sys, json
 
 # import the Chris app superclass
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
@@ -46,6 +46,10 @@ class PacsQueryApp(ChrisApp):
         # query the PACS
         query = PACSQuery(options)
         query_response = query.run()
+        # print(json.dumps(query_response))
+
+        with open(os.path.join(options.outputdir,'query.txt'), 'w') as outfile:
+            json.dump(query_response, outfile, indent=4, sort_keys=True, separators=(',', ':'))
 
         # if ping_response.success:
         #     pass

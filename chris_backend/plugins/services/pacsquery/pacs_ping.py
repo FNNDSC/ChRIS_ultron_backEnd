@@ -14,14 +14,19 @@ class PACSPing(PACSBase):
         # prepare the query parameters
         self.prepareQuery()
         # prepare and run the command
-        response = super(PACSPing, self).run()
+        ping_response = super(PACSPing, self).run()
         # handle response
-        self.handle(response)
+        return self.handle(ping_response)
 
-    def handle(self, response):
+    def handle(self, ping_response):
         print('handle PACSPing')
-        print(response)
-        stdout = response.stdout.decode('ascii')
-        stderr = response.stderr.decode('ascii')
-        print(stdout)
-        print(stderr)
+        print(ping_response)
+        std = ping_response.stdout.decode('ascii')
+        print(std)
+        if std != '':
+            self.response['status'] = 'error';
+            self.response['data'] = std;
+        else:
+            self.response['status'] = 'success';
+
+        return self.response
