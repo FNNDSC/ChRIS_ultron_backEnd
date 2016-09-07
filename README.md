@@ -129,7 +129,7 @@ python manage.py runserver
 Perform a simple GET request:
 
 ```
-http http://127.0.0.1:8000/
+http http://127.0.0.1:8000/api/v1/
 ```
 
 #### Troubleshooting
@@ -144,6 +144,19 @@ and connect to it explicitly:
 
 ```
 http http://XXX.YYY.ZZZ.WWW:8000/
+```
+
+### Testing the API over HTTPS
+
+Run modwsgi Apache-based server:
+```
+python manage.py runmodwsgi --host 0.0.0.0 --port 8001 --https-port 8000 --ssl-certificate-file ../utils/ssl_cert/local.crt --ssl-certificate-key-file ../utils/ssl_cert/local.key --processes 8 --server-name localhost --https-only --reload-on-changes
+```
+
+Make requests over https without verifiying the self-signed SSL certificates:
+
+```
+http https://localhost:8000/api/v1/ --verify=no
 ```
 
 ### Documentation
