@@ -56,6 +56,10 @@ DEBUG_TOOLBAR_CONFIG = {
 # ------------------------------------------------------------------------------
 INSTALLED_APPS += ['django_extensions']
 
+# mod_wsgi express development server (multithreaded and supports Https)
+# ------------------------------------------------------------------------------
+INSTALLED_APPS += ['mod_wsgi.server']
+
 # TESTING
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
