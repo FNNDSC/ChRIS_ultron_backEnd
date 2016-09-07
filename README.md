@@ -46,7 +46,14 @@ deactivate
 ````
 
 ### Development database:
-When creating your local database on MySQL's shell use:
+
+To create the development database, do
+
+```
+sudo mysql
+```
+
+Now create a local database on MySQL's shell:
 
 ````
 CREATE DATABASE chris_dev CHARACTER SET utf8;
@@ -60,10 +67,19 @@ Grant all privileges to user chris on the database:
 GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';
 ````
 
+### Check out the repo
+
+Now, check out the repo:
+
+```
+git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
+```
+
 ### Dependencies:
 This project uses requirement files to install dependencies in chris_env through pip:
 
 ````
+cd ChRIS_ultron_backEnd
 pip install -r requirements/local.txt
 ````
 
@@ -75,6 +91,8 @@ pip freeze --local
 
 ### Testing:
 ````
+cd chris_backend
+python manage.py migrate
 python manage.py test
 ````
 If errors are gotten because of user chris not having enough database privilages then
@@ -83,6 +101,50 @@ just give it all privilages in mysql:
 ````
 GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
 ````
+
+### First steps
+
+(See here for detailed instructions:
+
+First, create two users (one called 'chris' and one called <yourusername>)
+
+```
+# for user 'chris'
+python manage.py createsuperuser
+```
+
+and again:
+
+```
+# for user <yourusername>
+python manage.py createsuperuser
+```
+
+Now you can start the backend server
+
+```
+python manage.py runserver
+```
+
+Perform a simple GET request:
+
+```
+http http://127.0.0.1:8000/
+```
+
+#### Troubleshooting
+
+You might experience some issues with localhost/actual IP depending on local setup and possibly if you have a proxy. In that case, start the server with an actual <IP>:<port> 
+
+```
+python manage.py runserver XXX.YYY.ZZZ.WWW:8000
+```
+
+and connect to it explicitly:
+
+```
+http http://XXX.YYY.ZZZ.WWW:8000/
+```
 
 ### Documentation
 
