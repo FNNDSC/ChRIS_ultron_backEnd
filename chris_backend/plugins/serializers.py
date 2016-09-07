@@ -48,8 +48,9 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'plugin_name', 'previous', 'owner', 'feed', 'plugin',
-                  'string_param', 'int_param', 'float_param', 'bool_param')
+        fields = ('url', 'id', 'plugin_name', 'start_date', 'end_date', 'status',
+                  'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
+                  'float_param', 'bool_param')
 
     def validate_previous(self, previous_id, plugin):
         """
