@@ -159,6 +159,11 @@ Make requests over https without verifiying the self-signed SSL certificates:
 http https://localhost:8000/api/v1/ --verify=no
 ```
 
+Self-signed "localhost" certificates can be generated again if necessary:
+```
+openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days 365 -keyout local.key -out local.crt  (server name should be set to "localhost" in the interactive questions)
+```
+
 ### Documentation
 
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
