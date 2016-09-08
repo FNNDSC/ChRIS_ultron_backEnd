@@ -4,26 +4,26 @@ from pacs_move import PACSMove
 
 class PACS(object):
     """docstring for PACS."""
-    def __init__(self, arg):
+    def __init__(self, arg={}):
         self.arg = arg
 
         if 'aet' in self.arg:
-            self.aet = self.arg.aet
+            self.aet = self.arg['aet']
         else:
             self.aet = 'CHRIS-ULTRON-AET'
 
         if 'aec' in self.arg:
-            self.aec = self.arg.aec
+            self.aec = self.arg['aec']
         else:
             self.aec = 'CHRIS-ULTRON-AEC'
 
         if 'server_ip' in self.arg:
-            self.server_ip = self.arg.server_ip
+            self.server_ip = self.arg['server_ip']
         else:
             self.server_ip = '192.168.1.110'
 
         if 'server_port' in self.arg:
-            self.server_port = self.arg.server_port
+            self.server_port = self.arg['server_port']
         else:
             self.server_port = '4242'
 

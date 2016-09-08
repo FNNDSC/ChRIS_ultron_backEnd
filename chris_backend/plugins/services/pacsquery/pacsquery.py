@@ -43,7 +43,13 @@ class PacsQueryApp(ChrisApp):
         # aec
         # ip
         # port
-        pacs = PACS(options)
+        pacs_settings = {
+            'aet': 'CHRIS-ULTRON-AET',
+            'aec': 'CHRIS-ULTRON-AEC',
+            'server_ip': '192.168.1.110',
+            'server_port': '4242'
+        }
+        pacs = PACS(pacs_settings)
 
         # echo the PACS to make sure we can access it
         # timeout
