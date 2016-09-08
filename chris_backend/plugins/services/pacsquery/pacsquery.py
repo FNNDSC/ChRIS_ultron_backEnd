@@ -16,8 +16,7 @@ import os, sys, json
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
 
-from pacs_ping import PACSPing
-from pacs_query import PACSQuery
+from pacs import PACS
 
 class PacsQueryApp(ChrisApp):
     '''
@@ -39,26 +38,28 @@ class PacsQueryApp(ChrisApp):
     def run(self, options):
         print(os.system('ls ' + options.dir + '>' + os.path.join(options.outputdir,'out.txt')))
 
-        # ping the PACS
-        ping = PACSPing(options)
-        ping_response = ping.run()
+        # common options between all request types
+        # aet
+        # aec
+        # ip
+        # port
+        pacs = PACS(options)
 
-        # query the PACS
-        query = PACSQuery(options)
-        query_response = query.run()
-        # print(json.dumps(query_response))
+        # echo the PACS to make sure we can access it
+        # timeout
+        echo = pacs.echo()
+
+        # find in the PACS
+        # find ALL by default (studies + series + images)
+        # type: all, study, series, image
+        # patient name
+        # patient age
+        # provide extra args for the find query
+        find = pacs.find()
+        print(find)
 
         with open(os.path.join(options.outputdir,'query.txt'), 'w') as outfile:
-            json.dump(query_response, outfile, indent=4, sort_keys=True, separators=(',', ':'))
-
-        # if ping_response.success:
-        #     pass
-        # else:
-        #     print('ping failed')
-
-        # query the PACS
-
-        # save response
+            json.dump(find, outfile, indent=4, sort_keys=True, separators=(',', ':'))
 
 
 

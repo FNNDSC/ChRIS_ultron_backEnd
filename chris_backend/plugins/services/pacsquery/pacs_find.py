@@ -1,16 +1,20 @@
-import re, json
+import subprocess, re
 
-from pacs_base import PACSBase
-
-class PACSQuery(PACSBase):
-    """docstring for PACSQuery."""
-    def __init__(self, arg):
-        super(PACSQuery, self).__init__(arg)
-        self.arg = arg
-        self.arg.parameters = {}
+class PACSFind():
+    """docstring for PACSFind."""
+    def __init__(self, command_suffix):
         self.executable = 'findscu'
+        self.command_suffix = command_suffix
+        # to be moved out
+        self.postfilter_parameters = {
+            'PatientSex': '',
+            'PerformedStationAETitle': '',
+            'StudyDescription': '',
+            'SeriesDescription': ''
+        }
 
-        self.study_parameters = {
+    def commandStudy(self, opt={}):
+        study_parameters = {
             'PatientID': '',
             'PatientName': '',
             'PatientBirthDate': '',
@@ -20,102 +24,60 @@ class PACSQuery(PACSBase):
             'StudyInstanceUID': '',
             'ModalitiesInStudy': '',
             'PerformedStationAETitle': '',
-            'QueryRetrieveLevel': ''
+            'QueryRetrieveLevel': 'STUDY'
         }
 
-        self.series_parameters = {
+        # build query
+        command = ' -xi'
+
+        if 'PatientID' in opt and opt['PatientID'] != '':
+            command += ' -P'
+        else:
+            command += ' -S'
+
+        return self.commandWrap(command, study_parameters, opt)
+
+    def commandSeries(self, opt={}):
+        series_parameters = {
             'NumberOfSeriesRelatedInstances': '',
             'InstanceNumber': '',
             'SeriesDescription': '',
             'StudyInstanceUID': '',
             'SeriesInstanceUID': '',
-            'QueryRetrieveLevel': ''
+            'QueryRetrieveLevel': 'SERIES'
         }
 
-        self.image_parameters = {
+        # build query
+        command = ' -xi'
+        command += ' -S'
+
+        return self.commandWrap(command, series_parameters, opt)
+
+    def commandImage(self, opt={}):
+        image_parameters = {
             'StudyInstanceUID': '',
             'SeriesInstanceUID': '',
-            'QueryRetrieveLevel': ''
+            'QueryRetrieveLevel': 'IMAGE'
         }
 
-        self.postfilter_parameters = {
-            'PatientSex': '',
-            'PerformedStationAETitle': '',
-            'StudyDescription': '',
-            'SeriesDescription': ''
-        }
-
-    def prepareStudyQuery(self):
-        print('prepare study query')
-
-        self.study_parameters['QueryRetrieveLevel'] = 'STUDY'
-
-        # TODO: loop through all study arguments
-        if 'PatientID' in self.arg.parameters:
-            self.study_parameters['PatientID'] = self.arg.parameters['PatientID']
-
-        if 'PatientName' in self.arg.parameters:
-            self.study_parameters['PatientName'] = self.arg.parameters['PatientName']
-
-        if 'StudyDate' in self.arg.parameters:
-            self.study_parameters['StudyDate'] = self.arg.parameters['StudyDate']
-
-        if 'Modality' in self.arg.parameters:
-            self.study_parameters['Modality'] = self.arg.parameters['Modality']
-
         # build query
-        self.query = ' -xi'
+        command = ' -xi'
+        command += ' -S'
 
-        if 'PatientID' in self.study_parameters and self.study_parameters['PatientID'] != '':
-            self.query += ' -P'
-        else:
-            self.query += ' -S'
+        return self.commandWrap(command, image_parameters, opt)
 
-        for key, value in self.study_parameters.items():
+    def commandWrap(self, command, parameters, opt={}):
+        for key, value in parameters.items():
+            # update value if provided
+            if key in opt:
+                value = opt[key]
+            # update command
             if value != '':
-                self.query += ' -k "' + key + '=' + value + '"'
-                self.study_parameters[key] = ''
+                command += ' -k "' + key + '=' + value + '"'
             else:
-                self.query += ' -k ' + key
+                command += ' -k ' + key
 
-        print(self.query)
-
-    def prepareSeriesQuery(self):
-        print('prepare series query')
-
-        self.series_parameters['QueryRetrieveLevel'] = 'SERIES'
-
-        #TODO: loop through all series arguments
-
-        # build query
-        self.query = ' -xi'
-        self.query += ' -S'
-
-        for key, value in self.series_parameters.items():
-            if value != '':
-                self.query += ' -k "' + key + '=' + value + '"'
-                self.series_parameters[key] = ''
-            else:
-                self.query += ' -k ' + key
-
-        print(self.query)
-
-    def prepareImageQuery(self):
-        print('prepare image query')
-        self.image_parameters['QueryRetrieveLevel'] = 'IMAGE'
-
-        # build query
-        self.query = ' -xi'
-        self.query += ' -S'
-
-        for key, value in self.image_parameters.items():
-            if value != '':
-                self.query += ' -k "' + key + '=' + value + '"'
-                self.image_parameters[key] = ''
-            else:
-                self.query += ' -k ' + key
-
-        print(self.query)
+        return self.executable + ' ' + command + ' ' + self.command_suffix
 
     def preparePostFilter(self):
         print('prepare post filter')
@@ -124,12 +86,12 @@ class PACSQuery(PACSBase):
         # $post_filter['StudyDescription'] = $studydescription;
         # $post_filter['SeriesDescription'] = $seriesdescription;
 
-    def run(self):
-        # self.server_port = '4241'
-        # prepare the study query parameters
-        self.prepareStudyQuery()
-        # prepare and run the command
-        study_response = super(PACSQuery, self).run()
+    def run(self, opt={}):
+        print('run PACSFind')
+        #
+        #
+        # find study
+        study_response = subprocess.run(self.commandStudy(opt), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
         # format response
         study_response = self.formatResponse(study_response)
         study_response_container = {
@@ -141,16 +103,17 @@ class PACSQuery(PACSBase):
         if study_response_container['status'] == 'error':
             return study_response_container
 
-        # loop through studies
+        #
+        #
+        # find series
         series_response_container = {
             'status': 'success',
             'data': []
         }
 
         for study in study_response_container['data']:
-            self.series_parameters['StudyInstanceUID'] = study['StudyInstanceUID']['value']
-            self.prepareSeriesQuery()
-            series_response = super(PACSQuery, self).run()
+            opt['StudyInstanceUID'] = study['StudyInstanceUID']['value']
+            series_response = subprocess.run(self.commandSeries(opt), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             series_response = self.formatResponse(series_response)
             if series_response['status'] == 'error':
                 series_response_container['status'] == 'error'
@@ -159,19 +122,18 @@ class PACSQuery(PACSBase):
         if series_response_container['status'] == 'error':
             return series_response_container
 
-        # loop through
-        # series$this->addParameter('StudyInstanceUID', $seriesvalue);
-        # $this->addParameter('SeriesInstanceUID', $resultseries['SeriesInstanceUID'][$j]);
+        #
+        #
+        # find images
         image_response_container = {
             'status': 'success',
             'data': []
         }
 
         for series in series_response_container['data']:
-            self.image_parameters['StudyInstanceUID'] = series['StudyInstanceUID']['value']
-            self.image_parameters['SeriesInstanceUID'] = series['SeriesInstanceUID']['value']
-            self.prepareImageQuery()
-            image_response = super(PACSQuery, self).run()
+            opt['StudyInstanceUID'] = series['StudyInstanceUID']['value']
+            opt['SeriesInstanceUID'] = series['SeriesInstanceUID']['value']
+            image_response = subprocess.run(self.commandImage(opt), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             image_response = self.formatResponse(image_response)
             if image_response['status'] == 'error':
                 image_response_container['status'] == 'error'
@@ -208,7 +170,6 @@ class PACSQuery(PACSBase):
         return status
 
     def parseResponse(self, response):
-        print('Parse response')
         data = []
 
         stdSplit = response.split('\n')
@@ -241,13 +202,17 @@ class PACSQuery(PACSBase):
 
     def formatResponse(self, response):
         std = response.stdout.decode('ascii')
+        response = {
+            'status': 'success',
+            'data': ''
+        }
 
         status = self.checkResponse(std)
         if status == 'error':
-            self.response['status'] = 'error';
-            self.response['data'] = std;
+            response['status'] = 'error';
+            response['data'] = std;
         else:
-            self.response['status'] = 'success';
-            self.response['data'] = self.parseResponse(std)
+            response['status'] = 'success';
+            response['data'] = self.parseResponse(std)
 
-        return self.response
+        return response
