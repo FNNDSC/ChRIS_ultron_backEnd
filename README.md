@@ -153,10 +153,10 @@ Run modwsgi Apache-based server:
 python manage.py runmodwsgi --host 0.0.0.0 --port 8001 --https-port 8000 --ssl-certificate-file ../utils/ssl_cert/local.crt --ssl-certificate-key-file ../utils/ssl_cert/local.key --processes 8 --server-name localhost --https-only --reload-on-changes
 ```
 
-Make requests over https without verifiying the self-signed SSL certificates:
+Make requests over https with the self-signed SSL certificate:
 
 ```
-http https://localhost:8000/api/v1/ --verify=no
+http https://localhost:8000/api/v1/ --verify=../utils/ssl_cert/local.crt
 ```
 
 Self-signed "localhost" certificates can be generated again if necessary:
