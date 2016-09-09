@@ -33,26 +33,24 @@ class PacsQueryApp(ChrisApp):
     VERSION = '0.1'
 
     def define_parameters(self):
-        self.add_parameter('--dir', action='store', dest='dir', type=str, default='./',optional=True, help='look up directory')
+        # PACS settings
+        self.add_parameter('--aet', action='store', dest='aet', type=str, default='CHRIS-ULTRON-AET',optional=True, help='aet')
+        self.add_parameter('--aec', action='store', dest='aec', type=str, default='CHRIS-ULTRON-AEC',optional=True, help='aec')
+        self.add_parameter('--serverIP', action='store', dest='server_ip', type=str, default='192.168.1.110',optional=True, help='PACS server IP')
+        self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
+
+        # Query settings
+        self.add_parameter('--patientID', action='store', dest='PatientID', type=str, default='',optional=True, help='Patient ID')
+        self.add_parameter('--patientName', action='store', dest='PatientName', type=str, default='',optional=True, help='Patient name')
+        self.add_parameter('--patientSex', action='store', dest='PatientSex', type=str, default='',optional=True, help='Patient sex')
+        self.add_parameter('--studyDate', action='store', dest='StudyDate', type=str, default='',optional=True, help='Study date (YYYY/MM/DD)')
+        self.add_parameter('--modalitiesInStudy', action='store', dest='ModalitiesInStudy', type=str, default='',optional=True, help='Modalities in study')
+        self.add_parameter('--performedStationAETitle', action='store', dest='PerformedStationAETitle', type=str, default='',optional=True, help='Performed station aet')
+        self.add_parameter('--studyDescription', action='store', dest='StudyDescription', type=str, default='',optional=True, help='Study description')
+        self.add_parameter('--seriesDescription', action='store', dest='SeriesDescription', type=str, default='',optional=True, help='Series Description')
+
 
     def run(self, options):
-        print(os.system('ls ' + options.dir + '>' + os.path.join(options.outputdir,'out.txt')))
-
-        # query parameters
-        #
-        #
-        #
-        #
-        query_settings = {
-            'PatientID': '',
-            'PatientName': '',
-            'PatientSex': '',
-            'StudyDate': '',
-            'ModalitiesInStudy': '*R',
-            'PerformedStationAETitle': '',
-            'StudyDescription': '',
-            'SeriesDescription': ''
-        }
 
         # common options between all request types
         # aet
@@ -60,15 +58,15 @@ class PacsQueryApp(ChrisApp):
         # ip
         # port
         pacs_settings = {
-            'aet': 'CHRIS-ULTRON-AET',
-            'aec': 'CHRIS-ULTRON-AEC',
-            'server_ip': '192.168.1.110',
-            'server_port': '4242'
+            'aet': options.aet,
+            'aec': options.aec,
+            'server_ip': options.server_ip,
+            'server_port': options.server_port
         }
+
         pacs = PACS(pacs_settings)
 
         # echo the PACS to make sure we can access it
-        # timeout
         echo = pacs.echo()
         if echo['status'] == 'error':
             with open(os.path.join(options.outputdir,echo['status'] + '.txt'), 'w') as outfile:
@@ -78,14 +76,22 @@ class PacsQueryApp(ChrisApp):
         # find in the PACS
         # find ALL by default (studies + series + images)
         # type: all, study, series, image
-        # patient name
-        # patient age
-        # provide extra args for the find query
+
+        # query parameters
+        query_settings = {
+            'PatientID': options.PatientID,
+            'PatientName': options.PatientName,
+            'PatientSex': options.PatientSex,
+            'StudyDate': options.StudyDate,
+            'ModalitiesInStudy': options.ModalitiesInStudy,
+            'PerformedStationAETitle': options.PerformedStationAETitle,
+            'StudyDescription': options.StudyDescription,
+            'SeriesDescription': options.SeriesDescription
+        }
+
         find = pacs.find(query_settings)
         with open(os.path.join(options.outputdir,find['status'] + '.txt'), 'w') as outfile:
             json.dump(find, outfile, indent=4, sort_keys=True, separators=(',', ':'))
-
-        print(find['data']['study'])
 
         return json.dumps(find)
 
