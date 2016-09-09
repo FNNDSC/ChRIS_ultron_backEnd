@@ -22,7 +22,8 @@ class PACSEcho():
         std = echo_response.stdout.decode('ascii')
         response = {
             'status': 'success',
-            'data': ''
+            'data': '',
+            'command': echo_response.args
         }
         if std != '':
             response['status'] = 'error';

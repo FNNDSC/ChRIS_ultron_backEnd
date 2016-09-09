@@ -204,7 +204,8 @@ class PACSFind():
         std = response.stdout.decode('ascii')
         response = {
             'status': 'success',
-            'data': ''
+            'data': '',
+            'command': response.args
         }
 
         status = self.checkResponse(std)

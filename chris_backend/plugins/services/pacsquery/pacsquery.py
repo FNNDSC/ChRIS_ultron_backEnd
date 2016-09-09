@@ -38,6 +38,22 @@ class PacsQueryApp(ChrisApp):
     def run(self, options):
         print(os.system('ls ' + options.dir + '>' + os.path.join(options.outputdir,'out.txt')))
 
+        # query parameters
+        #
+        #
+        #
+        #
+        query_settings = {
+            'PatientID': '',
+            'PatientName': '',
+            'PatientSex': '',
+            'StudyDate': '',
+            'ModalitiesInStudy': '*R',
+            'PerformedStationAETitle': '',
+            'StudyDescription': '',
+            'SeriesDescription': ''
+        }
+
         # common options between all request types
         # aet
         # aec
@@ -54,6 +70,10 @@ class PacsQueryApp(ChrisApp):
         # echo the PACS to make sure we can access it
         # timeout
         echo = pacs.echo()
+        if echo['status'] == 'error':
+            with open(os.path.join(options.outputdir,echo['status'] + '.txt'), 'w') as outfile:
+                json.dump(echo, outfile, indent=4, sort_keys=True, separators=(',', ':'))
+            return
 
         # find in the PACS
         # find ALL by default (studies + series + images)
@@ -61,13 +81,13 @@ class PacsQueryApp(ChrisApp):
         # patient name
         # patient age
         # provide extra args for the find query
-        find = pacs.find()
-        print(find)
-
-        with open(os.path.join(options.outputdir,'query.txt'), 'w') as outfile:
+        find = pacs.find(query_settings)
+        with open(os.path.join(options.outputdir,find['status'] + '.txt'), 'w') as outfile:
             json.dump(find, outfile, indent=4, sort_keys=True, separators=(',', ':'))
 
+        print(find['data']['study'])
 
+        return json.dumps(find)
 
 # ENTRYPOINT
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ class PACS(object):
         if 'server_port' in self.arg:
             self.server_port = self.arg['server_port']
         else:
-            self.server_port = '4242'
+            self.server_port = '4241'
 
         self.query = ''
         self.command_suffix = ''
