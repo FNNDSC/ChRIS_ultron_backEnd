@@ -16,6 +16,7 @@ import os, sys, json
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from pacs import PACS
 
 class PacsQueryApp(ChrisApp):
