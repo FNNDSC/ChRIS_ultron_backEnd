@@ -31,3 +31,6 @@ pip install --upgrade pip
 
 echo "Installing Python Vitual Env"
 pip install virtualenv virtualenvwrapper
+
+echo "Installing DCMTK"
+apt-get install dcmtk -y
