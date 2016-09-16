@@ -9,6 +9,9 @@ Vagrant.configure("2") do |config|
   # GENERAL SETUP
   config.vm.box = "ubuntu/xenial64"
   config.vm.hostname = "chris-ultron"
+  config.vm.provider "virtualbox" do |v|
+    v.name = "chris-ultron"
+  end
 
   # script to setup the chris environment at startup
   config.vm.provision :shell, :path => "bootstrap_root.sh"
