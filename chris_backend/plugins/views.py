@@ -52,7 +52,7 @@ class PluginParameterList(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return the list of parameters for the queried plugin.
-        A collection+json template is also added to the response.
+        A document-level link relation is also added to the response.
         """
         queryset = self.get_plugin_parameters_queryset()
         response = services.get_list_response(self, queryset)
