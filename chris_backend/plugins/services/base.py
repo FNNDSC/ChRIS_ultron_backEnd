@@ -105,6 +105,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         '''
         Add a parameter to this app. 
         '''
+        # make sure required parameter options were defined
         try:
             name = kwargs['dest']
             param_type = kwargs['type']
@@ -112,13 +113,16 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             action = kwargs['action']
         except KeyError as e:
             detail = "%s option required. " % e 
-            raise KeyError(detail)        
+            raise KeyError(detail)
+        if optional and ('default' not in kwargs):
+            detail = "A default values is required for optional parameter %s." % name
+            raise KeyError(detail)
 
         # grab the default and help values
         default = None
-        param_help = None
         if 'default' in kwargs:
             default = kwargs['default']
+        param_help = ""
         if 'help' in kwargs:
             param_help = kwargs['help']
 
