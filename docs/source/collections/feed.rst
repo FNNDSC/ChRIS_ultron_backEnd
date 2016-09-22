@@ -2,64 +2,57 @@
 Feed collection
 ===============
 
-Read-only.
+**Read-only**
 
-This resource refers to a collection of user-specific feed items. 
+
+This resource refers to a collection of user-specific feed_ items.
+
+.. _feed: ../items/feed.html
+
 
 A representation for this resource is served at the root of the API: /api/v1/. 
 
-Associated link relation:
+
+It is also linked in representations by any `link relation`_ with attribute:
+
+**"rel": "feeds"**
+
+.. _`link relation`: http://amundsen.com/media-types/collection/format/#link-relations
 
 
-It can also be obtained by making a GET request to the "href"
-URL of any link relation "rel": feeds 
+.. http:get:: /api/v1/auth-token/ 
 
-1-
-
-
-
-.. http:get:: /users/(int:user_id)/posts/(tag)
-
-   The posts tagged with `tag` that the user (`user_id`) wrote.
+   Gets the acces token for the user especified in the request content body.
 
    **Example request**:
 
    .. sourcecode:: http
 
-      GET /users/123/posts/web HTTP/1.1
-      Host: example.com
-      Accept: application/json, text/javascript
+      POST /api/v1/auth-token/ HTTP/1.1
+      Host: localhost:8000
+      Accept: application/json
+
+      {
+        "username": "bob",
+	"password": "bob-pass"
+      }
 
    **Example response**:
 
    .. sourcecode:: http
 
       HTTP/1.1 200 OK
-      Vary: Accept
-      Content-Type: text/javascript
+      Allow: POST, OPTIONS
+      Content-Type: application/json
 
-      [
-        {
-          "post_id": 12345,
-          "author_id": 123,
-          "tags": ["server", "web"],
-          "subject": "I tried Nginx"
-        },
-        {
-          "post_id": 12346,
-          "author_id": 123,
-          "tags": ["html5", "standards", "web"],
-          "subject": "We go to HTML 5"
-        }
-      ]
+      {
+        "token": "1612a857a43c21d688ccbe849dbfbf078cef8cc7"
+      }
 
-   :query sort: one of ``hit``, ``created-at``
-   :query offset: offset number. default is 0
-   :query limit: limit number. default is 30
-   :reqheader Accept: the response content type depends on
-                      :mailheader:`Accept` header
-   :reqheader Authorization: optional OAuth token to authenticate
-   :resheader Content-Type: this depends on :mailheader:`Accept`
-                            header of request
+   :reqheader Accept: application/json
+   :<json string username: the authenticating user's username
+   :<json string password: the authenticating user's password
+   :resheader Content-Type: application/json
+   :>json string token: access token for future authentications 
    :statuscode 200: no error
-   :statuscode 404: there's no user
+   :statuscode 400: unable to log in with provided credentials

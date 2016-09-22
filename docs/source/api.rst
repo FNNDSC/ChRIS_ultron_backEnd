@@ -1,6 +1,6 @@
-========
-REST API
-========
+==================
+REST API Reference
+==================
 
 This API uses the standard Collection+JSON_ hypermedia type to exchange resource 
 representations with clients. All the functionality provided by the API can be 
@@ -17,7 +17,7 @@ of feeds`_.
 .. _`collection of feeds`: collections/feed.html
 
 
-There are two main type of resources:
+There are two main type of resources served by the API:
 
 **Collection**
   A resource to group other resources together. Its representation focuses on links to 
@@ -28,13 +28,13 @@ There are two main type of resources:
   A standalone resource that is linked to from a collection’s representation.
   
 
-The following table shows the protocol semantics for the HTTP resources served by the API:
+The following table shows the API's HTTP protocol semantics for these resource types:
 
 
 .. table:: **API's accepted HTTP requests**
 
 	=====================  =====================    =====================  =====================
- 	                  Collection                                        Item
+ 	             Collection resource                              Item resource
 	--------------------------------------------    --------------------------------------------
 	read-only              read/write               read-only              read/write
 	=====================  =====================    =====================  =====================
@@ -48,7 +48,7 @@ The following table shows the protocol semantics for the HTTP resources served b
 
 
 
-Following are the list of resource types: 
+Following are the actuall lists of resource types: 
 
 
 **Collections:**
