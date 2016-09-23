@@ -1,49 +1,89 @@
-========
-REST API
-========
+==================
+REST API Reference
+==================
 
-.. http:get:: /users/(int:user_id)/posts/(tag)
+This API uses the standard Collection+JSON_ hypermedia type to exchange resource 
+representations with clients. All the functionality provided by the API can be 
+discovered by clients by doing :http:method:`get` requests to links ("href" elements)
+presented by the hypermedia documents returned by the web server, starting with the API's
+"home page". 
 
-   The posts tagged with `tag` that the user (`user_id`) wrote.
+.. _Collection+JSON: http://amundsen.com/media-types/collection/
 
-   **Example request**:
 
-   .. sourcecode:: http
+The API's "home page" relative url is: /api/v1/ which serves a user-specific `collection
+of feeds`_.
 
-      GET /users/123/posts/web HTTP/1.1
-      Host: example.com
-      Accept: application/json, text/javascript
+.. _`collection of feeds`: collections/feed.html
 
-   **Example response**:
 
-   .. sourcecode:: http
+There are two main type of resources served by the API:
 
-      HTTP/1.1 200 OK
-      Vary: Accept
-      Content-Type: text/javascript
+**Collection**
+  A resource to group other resources together. Its representation focuses on links to 
+  other resources, though it may also include snippets from the representations of those
+  other resources.
 
-      [
-        {
-          "post_id": 12345,
-          "author_id": 123,
-          "tags": ["server", "web"],
-          "subject": "I tried Nginx"
-        },
-        {
-          "post_id": 12346,
-          "author_id": 123,
-          "tags": ["html5", "standards", "web"],
-          "subject": "We go to HTML 5"
-        }
-      ]
+**Item**
+  A standalone resource that is linked to from a collection’s representation.
+  
 
-   :query sort: one of ``hit``, ``created-at``
-   :query offset: offset number. default is 0
-   :query limit: limit number. default is 30
-   :reqheader Accept: the response content type depends on
-                      :mailheader:`Accept` header
-   :reqheader Authorization: optional OAuth token to authenticate
-   :resheader Content-Type: this depends on :mailheader:`Accept`
-                            header of request
-   :statuscode 200: no error
-   :statuscode 404: there's no user
+The following table shows the API's HTTP protocol semantics for these resource types:
+
+
+.. table:: **API's accepted HTTP requests**
+
+	=====================  =====================    =====================  =====================
+ 	             Collection resource                              Item resource
+	--------------------------------------------    --------------------------------------------
+	read-only              read/write               read-only              read/write
+	=====================  =====================    =====================  =====================
+	:http:method:`get`     :http:method:`get`       :http:method:`get`     :http:method:`get`
+
+			       :http:method:`post`                             :http:method:`put`
+
+			       			                               :http:method:`delete`
+	=====================  =====================    =====================  =====================
+
+
+
+
+Following are the actuall lists of resource types: 
+
+
+**Collections:**
+
+.. toctree::
+   :maxdepth: 2
+
+   collections/feed
+   collections/comment
+   collections/tag
+   collections/file
+   collections/plugin
+   collections/plugin_parameter
+   collections/plugin_instance
+
+
+**Items:**
+
+.. toctree::
+   :maxdepth: 2
+   
+   items/feed
+   items/comment
+   items/tag
+   items/file
+   items/plugin
+   items/plugin_parameter
+   items/plugin_instance
+
+
+**Other resources:**
+
+.. toctree::
+   :maxdepth: 2
+   
+   other_resources/note
+   other_resources/file_content
+
