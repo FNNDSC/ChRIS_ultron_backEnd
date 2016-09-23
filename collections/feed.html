@@ -46,26 +46,154 @@
   <div class="section" id="feed-collection">
 <h1>Feed collection<a class="headerlink" href="#feed-collection" title="Permalink to this headline">¶</a></h1>
 <p><strong>Read-only</strong></p>
-<p>This resource refers to a collection of user-specific <a class="reference external" href="../items/feed.html">feed</a> items.</p>
-<p>A representation for this resource is served at the root of the API: /api/v1/.</p>
-<p>It is also linked in representations by any <a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
+<p>This resource type refers to a collection of user-specific <a class="reference external" href="../items/feed.html">feed</a> items.</p>
+<p>A representation is served at the root of the API: /api/v1/.</p>
+<p>In other resource representations this resource type is linked by any <a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a>
+with attribute:</p>
 <p><strong>&#8220;rel&#8221;: &#8220;feeds&#8221;</strong></p>
 <dl class="get">
-<dt id="get--api-v1-auth-token-">
-<code class="descname">GET </code><code class="descname">/api/v1/auth-token/</code><a class="headerlink" href="#get--api-v1-auth-token-" title="Permalink to this definition">¶</a></dt>
-<dd><p>Gets the acces token for the user especified in the request content body.</p>
+<dt id="get--api-v1-">
+<code class="descname">GET </code><code class="descname">/api/v1/</code><a class="headerlink" href="#get--api-v1-" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the list of feeds for the authenticated user.</p>
 <p><strong>Example request</strong>:</p>
-<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">POST</span> <span class="nn">/api/v1/auth-token/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
 <span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
-<span class="na">Accept</span><span class="o">:</span> <span class="l">application/json</span>
-
-{
-  &quot;username&quot;: &quot;bob&quot;,
-  &quot;password&quot;: &quot;bob-pass&quot;
-}
+<span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 </pre></div>
 </div>
-<p><strong>Example response</strong>:</p>
+</dd></dl>
+
+<dl class="docutils">
+<dt>{</dt>
+<dd><dl class="first docutils">
+<dt>&#8220;collection&#8221;: {</dt>
+<dd><p class="first">&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/">https://localhost:8000/api/v1/</a>&#8221;,
+&#8220;items&#8221;: [</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{</dt>
+<dd><dl class="first docutils">
+<dt>&#8220;data&#8221;: [</dt>
+<dd><dl class="first docutils">
+<dt>{</dt>
+<dd>&#8220;name&#8221;: &#8220;name&#8221;,
+&#8220;value&#8221;: &#8220;&#8221;</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>],
+&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/33/">https://localhost:8000/api/v1/33/</a>&#8221;,
+&#8220;links&#8221;: [</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{</dt>
+<dd>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/users/2/">https://localhost:8000/api/v1/users/2/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;owner&#8221;</dd>
+</dl>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/note33/">https://localhost:8000/api/v1/note33/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;note&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/33/tags/">https://localhost:8000/api/v1/33/tags/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;tags&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/33/comments/">https://localhost:8000/api/v1/33/comments/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;comments&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/33/files/">https://localhost:8000/api/v1/33/files/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;files&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/plugins/instances/58/">https://localhost:8000/api/v1/plugins/instances/58/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;plugin_inst&#8221;</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p class="last">]</p>
+</dd>
+</dl>
+<p>},
+{</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>&#8220;data&#8221;: [</dt>
+<dd><dl class="first docutils">
+<dt>{</dt>
+<dd>&#8220;name&#8221;: &#8220;name&#8221;,
+&#8220;value&#8221;: &#8220;&#8221;</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>],
+&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/34/">https://localhost:8000/api/v1/34/</a>&#8221;,
+&#8220;links&#8221;: [</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{</dt>
+<dd>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/users/2/">https://localhost:8000/api/v1/users/2/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;owner&#8221;</dd>
+</dl>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/note34/">https://localhost:8000/api/v1/note34/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;note&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/34/tags/">https://localhost:8000/api/v1/34/tags/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;tags&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/34/comments/">https://localhost:8000/api/v1/34/comments/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;comments&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/34/files/">https://localhost:8000/api/v1/34/files/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;files&#8221;</div></blockquote>
+<p>},
+{</p>
+<blockquote>
+<div>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/plugins/instances/59/">https://localhost:8000/api/v1/plugins/instances/59/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;plugin_inst&#8221;</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>]</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>],
+&#8220;links&#8221;: [</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>{</dt>
+<dd>&#8220;href&#8221;: &#8220;<a class="reference external" href="https://localhost:8000/api/v1/plugins/">https://localhost:8000/api/v1/plugins/</a>&#8221;,
+&#8220;rel&#8221;: &#8220;plugins&#8221;</dd>
+</dl>
+<p>}</p>
+</div></blockquote>
+<p class="last">],
+&#8220;version&#8221;: &#8220;1.0&#8221;</p>
+</dd>
+</dl>
+<p class="last">}</p>
+</dd>
+</dl>
+<p>}</p>
+<blockquote>
+<div><p><strong>Example response</strong>:</p>
 <div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
 <span class="na">Allow</span><span class="o">:</span> <span class="l">POST, OPTIONS</span>
 <span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
@@ -79,41 +207,28 @@
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">Request Headers:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; application/json</li>
-</ul>
-</td>
+<tr class="field-odd field"><th class="field-name" colspan="2">reqheader Accept:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">application/json</td>
 </tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Request JSON Object:</th></tr>
-<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><strong>username</strong> (<em>string</em>) &#8211; the authenticating user&#8217;s username</li>
-<li><strong>password</strong> (<em>string</em>) &#8211; the authenticating user&#8217;s password</li>
-</ul>
-</td>
+<tr class="field-even field"><th class="field-name" colspan="2">&lt;json string username:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body">the authenticating user&#8217;s username</td>
 </tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">Response Headers:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; application/json</li>
-</ul>
-</td>
+<tr class="field-odd field"><th class="field-name" colspan="2">&lt;json string password:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">the authenticating user&#8217;s password</td>
 </tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Response JSON Object:</th></tr>
-<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><strong>token</strong> (<em>string</em>) &#8211; access token for future authentications</li>
-</ul>
-</td>
+<tr class="field-even field"><th class="field-name" colspan="2">resheader Content-Type:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body">application/json</td>
 </tr>
-<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
-<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
-<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.1">400 Bad Request</a> &#8211; unable to log in with provided credentials</li>
-</ul>
-</td>
+<tr class="field-odd field"><th class="field-name" colspan="2">&gt;json string token:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">access token for future authentications</td>
+</tr>
+<tr class="field-even field"><th class="field-name">statuscode 200:</th><td class="field-body">no error</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">statuscode 400:</th><td class="field-body">unable to log in with provided credentials</td>
 </tr>
 </tbody>
 </table>
-</dd></dl>
-
+</div></blockquote>
 </div>
 
 

@@ -17,7 +17,7 @@ of feeds`_.
 .. _`collection of feeds`: collections/feed.html
 
 
-There are two main type of resources served by the API:
+There are two main types of resources served by the API:
 
 **Collection**
   A resource to group other resources together. Its representation focuses on links to 
