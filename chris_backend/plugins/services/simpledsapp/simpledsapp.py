@@ -21,14 +21,16 @@ class SimpleDSApp(ChrisApp):
     '''
     Add prefix given by the --prefix option to the name of each input file.
     '''
-    AUTHORS = 'FNNDSC (dev@babyMRI.org)'
-    TITLE = 'Simple chris ds app'
-    CATEGORY = ''
-    TYPE = 'ds'
-    DESCRIPTION = 'A simple chris ds app demo'
-    DOCUMENTATION = 'http://wiki'
-    LICENSE = 'Opensource (MIT)'
-    VERSION = '0.1'
+    AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
+    SELFPATH        = os.path.dirname(__file__)
+    SELFEXEC        = os.path.basename(__file__)
+    TITLE           = 'Simple chris ds app'
+    CATEGORY        = ''
+    TYPE            = 'ds'
+    DESCRIPTION     = 'A simple chris ds app demo'
+    DOCUMENTATION   = 'http://wiki'
+    LICENSE         = 'Opensource (MIT)'
+    VERSION         = '0.1'
 
     def define_parameters(self):
         self.add_parameter('--prefix', action='store', dest='prefix', type=str,
