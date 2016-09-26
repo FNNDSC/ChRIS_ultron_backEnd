@@ -18,18 +18,20 @@ from base import ChrisApp
 
 
 class SimpleFSApp(ChrisApp):
-    '''
-    Create file out.txt witht the directory listing of the directory
+    """
+    Create file out.txt with the directory listing of the directory
     given by the --dir argument.
-    '''
-    AUTHORS = 'FNNDSC (dev@babyMRI.org)'
-    TITLE = 'Simple chris fs app'
-    CATEGORY = ''
-    TYPE = 'fs'
-    DESCRIPTION = 'A simple chris fs app demo'
-    DOCUMENTATION = 'http://wiki'
-    LICENSE = 'Opensource (MIT)'
-    VERSION = '0.1'
+    """
+    AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
+    SELFPATH        = os.path.dirname(__file__)
+    SELFEXEC        = os.path.basename(__file__)
+    TITLE           = 'Simple chris fs app'
+    CATEGORY        = ''
+    TYPE            = 'fs'
+    DESCRIPTION     = 'A simple chris fs app demo'
+    DOCUMENTATION   = 'http://wiki'
+    LICENSE         = 'Opensource (MIT)'
+    VERSION         = '0.1'
 
     def define_parameters(self):
         self.add_parameter('--dir', action='store', dest='dir', type=str, default='./',

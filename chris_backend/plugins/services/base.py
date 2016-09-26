@@ -137,11 +137,13 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
 
     def get_json_representation(self):
         '''
-        Return a JSON object with a reprsentation of this app (type and parameters). 
+        Return a JSON object with a representation of this app (type and parameters).
         '''
-        repres = {}
-        repres['type'] = self.TYPE
-        repres['parameters'] = self._parameters
+        repres                  = {}
+        repres['type']          = self.TYPE
+        repres['parameters']    = self._parameters
+        repres['selfpath']      = self.SELFPATH
+        repres['selfexec']      = self.SELFEXEC
         return repres
 
     def launch(self, args=None):
