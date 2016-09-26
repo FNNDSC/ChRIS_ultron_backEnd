@@ -2,49 +2,128 @@
 Feed item
 =========
 
+.. _Collection+JSON: http://amundsen.com/media-types/collection/
 
-.. http:get:: /users/(int:user_id)/posts/(tag)
+.. _`link relation`: http://amundsen.com/media-types/collection/format/#link-relations
 
-   The posts tagged with `tag` that the user (`user_id`) wrote.
+
+**Read/write**
+
+
+This resource type refers to a user's feed item.
+
+In other Collection+JSON_ resource representations this resource type is linked by any
+`link relation`_ with attribute:
+
+**"rel": "feed"**
+
+
+.. http:get:: /api/v1/(int:feed_id)/
+
+   Gets an authenticated user's feed.
 
    **Example request**:
 
    .. sourcecode:: http
 
-      GET /users/123/posts/web HTTP/1.1
-      Host: example.com
-      Accept: application/json, text/javascript
+      GET /api/v1/35/ HTTP/1.1
+      Host: localhost:8000
+      Accept: application/vnd.collection+json
+
 
    **Example response**:
 
    .. sourcecode:: http
 
       HTTP/1.1 200 OK
-      Vary: Accept
-      Content-Type: text/javascript
+      Allow: GET, PUT, DELETE
+      Content-Type: application/vnd.collection+json
 
-      [
-        {
-          "post_id": 12345,
-          "author_id": 123,
-          "tags": ["server", "web"],
-          "subject": "I tried Nginx"
-        },
-        {
-          "post_id": 12346,
-          "author_id": 123,
-          "tags": ["html5", "standards", "web"],
-          "subject": "We go to HTML 5"
-        }
-      ]
+      {
+          "collection": {
+              "href": "https://localhost:8000/api/v1/35/",
+              "items": [
+                  {
+                      "data": [
+                          {
+                              "name": "name",
+                              "value": ""
+                          }
+                      ],
+                      "href": "https://localhost:8000/api/v1/35/",
+                      "links": [
+                          {
+                              "href": "https://localhost:8000/api/v1/users/2/",
+                              "rel": "owner"
+                          },
+                          {
+                              "href": "https://localhost:8000/api/v1/note35/",
+                              "rel": "note"
+                          },
+                          {
+                              "href": "https://localhost:8000/api/v1/35/tags/",
+                              "rel": "tags"
+                          },
+                          {
+                              "href": "https://localhost:8000/api/v1/35/comments/",
+                              "rel": "comments"
+                          },
+                          {
+                              "href": "https://localhost:8000/api/v1/35/files/",
+                              "rel": "files"
+                          },
+                          {
+                              "href": "https://localhost:8000/api/v1/plugins/instances/60/",
+                              "rel": "plugin_inst"
+                          }
+                      ]
+                  }
+              ],
+              "links": [],
+              "template": {
+                  "data": [
+                      {
+                          "name": "name",
+                          "value": ""
+                      },
+                      {
+                          "name": "owner",
+                          "value": ""
+                      }
+                  ]
+              },
+              "version": "1.0"
+          }
+      }
 
-   :query sort: one of ``hit``, ``created-at``
-   :query offset: offset number. default is 0
-   :query limit: limit number. default is 30
-   :reqheader Accept: the response content type depends on
-                      :mailheader:`Accept` header
-   :reqheader Authorization: optional OAuth token to authenticate
-   :resheader Content-Type: this depends on :mailheader:`Accept`
-                            header of request
+
+   :reqheader Accept: application/vnd.collection+json
+   :resheader Content-Type: application/vnd.collection+json
    :statuscode 200: no error
-   :statuscode 404: there's no user
+   :statuscode 401: authentication credentials were not provided
+
+   .. |--| unicode:: U+2013   .. en dash
+
+   .. _Properties: http://amundsen.com/media-types/collection/format/#properties
+   .. _`Link Relations`: http://amundsen.com/media-types/collection/format/#link-relations
+
+   Properties_ (API semantic descriptors):
+
+    - **name** (`string`) |--| feed's name
+    - **owner** (`string`) |--| a new feed's owner. Can be part of the template object in
+      PUT requests. Feeds can have more than one owner so they can be shared between users
+
+   `Link Relations`_:
+
+    - **owner** |--| links to a feed's owner
+    - **note** |--| links to a feed's note_
+    - **tags** |--| links to a feed's `collection of tags`_
+    - **comments** |--| links to a feed's `collection of comments`_
+    - **files** |--| links to a feed's `collection of files`_
+    - **plugin_inst** |--| links to the `plugin instance`_ that created a feed
+
+   .. _note: ../other_resources/note.html
+   .. _`collection of tags`: tag.html
+   .. _`collection of comments`: comment.html
+   .. _`collection of files`: file.html
+   .. _`plugin instance`: ../items/plugin_instance.html

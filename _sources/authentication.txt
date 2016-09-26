@@ -2,13 +2,13 @@
 REST API Authentication
 =======================
 
-The API documented here uses token-based authentication over SSL (https://). 
+The API documented here uses token-based authentication over SSL (https://).
 
 In order to receive an access token a POST request like the following must be made:
 
-.. http:post:: /api/v1/auth-token/ 
+.. http:post:: /api/v1/auth-token/
 
-   Gets the acces token for the user especified in the request content body.
+   :synopsis: Gets the acces token for the user especified in the request content body.
 
    **Example request**:
 
@@ -20,7 +20,7 @@ In order to receive an access token a POST request like the following must be ma
 
       {
         "username": "bob",
-	"password": "bob-pass"
+        "password": "bob-pass"
       }
 
    **Example response**:
@@ -39,6 +39,6 @@ In order to receive an access token a POST request like the following must be ma
    :<json string username: the authenticating user's username
    :<json string password: the authenticating user's password
    :resheader Content-Type: application/json
-   :>json string token: access token for future authentications 
+   :>json string token: access token for future authentications
    :statuscode 200: no error
    :statuscode 400: unable to log in with provided credentials

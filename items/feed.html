@@ -45,72 +45,127 @@
             
   <div class="section" id="feed-item">
 <h1>Feed item<a class="headerlink" href="#feed-item" title="Permalink to this headline">¶</a></h1>
+<p><strong>Read/write</strong></p>
+<p>This resource type refers to a user&#8217;s feed item.</p>
+<p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
+<a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
+<p><strong>&#8220;rel&#8221;: &#8220;feed&#8221;</strong></p>
 <dl class="get">
-<dt id="get--users-(int-user_id)-posts-(tag)">
-<code class="descname">GET </code><code class="descname">/users/</code><span class="sig-paren">(</span><em class="property">int: </em><em>user_id</em><span class="sig-paren">)</span><code class="descname">/posts/</code><span class="sig-paren">(</span><em>tag</em><span class="sig-paren">)</span><a class="headerlink" href="#get--users-(int-user_id)-posts-(tag)" title="Permalink to this definition">¶</a></dt>
-<dd><p>The posts tagged with <cite>tag</cite> that the user (<cite>user_id</cite>) wrote.</p>
+<dt id="get--api-v1-(int-feed_id)-">
+<code class="descname">GET </code><code class="descname">/api/v1/</code><span class="sig-paren">(</span><em class="property">int: </em><em>feed_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-(int-feed_id)-" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets an authenticated user&#8217;s feed.</p>
 <p><strong>Example request</strong>:</p>
-<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/users/123/posts/web</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
-<span class="na">Host</span><span class="o">:</span> <span class="l">example.com</span>
-<span class="na">Accept</span><span class="o">:</span> <span class="l">application/json, text/javascript</span>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/35/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
+<span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 </pre></div>
 </div>
 <p><strong>Example response</strong>:</p>
 <div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
-<span class="na">Vary</span><span class="o">:</span> <span class="l">Accept</span>
-<span class="na">Content-Type</span><span class="o">:</span> <span class="l">text/javascript</span>
+<span class="na">Allow</span><span class="o">:</span> <span class="l">GET, PUT, DELETE</span>
+<span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 
-<span class="p">[</span>
-  <span class="p">{</span>
-    <span class="s2">&quot;post_id&quot;</span><span class="o">:</span> <span class="mi">12345</span><span class="p">,</span>
-    <span class="s2">&quot;author_id&quot;</span><span class="o">:</span> <span class="mi">123</span><span class="p">,</span>
-    <span class="s2">&quot;tags&quot;</span><span class="o">:</span> <span class="p">[</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="s2">&quot;web&quot;</span><span class="p">],</span>
-    <span class="s2">&quot;subject&quot;</span><span class="o">:</span> <span class="s2">&quot;I tried Nginx&quot;</span>
-  <span class="p">},</span>
-  <span class="p">{</span>
-    <span class="s2">&quot;post_id&quot;</span><span class="o">:</span> <span class="mi">12346</span><span class="p">,</span>
-    <span class="s2">&quot;author_id&quot;</span><span class="o">:</span> <span class="mi">123</span><span class="p">,</span>
-    <span class="s2">&quot;tags&quot;</span><span class="o">:</span> <span class="p">[</span><span class="s2">&quot;html5&quot;</span><span class="p">,</span> <span class="s2">&quot;standards&quot;</span><span class="p">,</span> <span class="s2">&quot;web&quot;</span><span class="p">],</span>
-    <span class="s2">&quot;subject&quot;</span><span class="o">:</span> <span class="s2">&quot;We go to HTML 5&quot;</span>
-  <span class="p">}</span>
-<span class="p">]</span>
+<span class="p">{</span>
+    <span class="nt">&quot;collection&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/&quot;</span><span class="p">,</span>
+                <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/users/2/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;owner&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/note35/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;note&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/tags/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;tags&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/comments/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;comments&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/files/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;files&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_inst&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="nt">&quot;template&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+                    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+                <span class="p">},</span>
+                <span class="p">{</span>
+                    <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;owner&quot;</span><span class="p">,</span>
+                    <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+                <span class="p">}</span>
+            <span class="p">]</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;1.0&quot;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
 </pre></div>
 </div>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">Query Parameters:</th></tr>
+<tr class="field-odd field"><th class="field-name" colspan="2">Request Headers:</th></tr>
 <tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><strong>sort</strong> &#8211; one of <code class="docutils literal"><span class="pre">hit</span></code>, <code class="docutils literal"><span class="pre">created-at</span></code></li>
-<li><strong>offset</strong> &#8211; offset number. default is 0</li>
-<li><strong>limit</strong> &#8211; limit number. default is 30</li>
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; application/vnd.collection+json</li>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Request Headers:</th></tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Response Headers:</th></tr>
 <tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; the response content type depends on
-<em class="mailheader">Accept</em> header</li>
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7235#section-4.2">Authorization</a> &#8211; optional OAuth token to authenticate</li>
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; application/vnd.collection+json</li>
 </ul>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">Response Headers:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; this depends on <em class="mailheader">Accept</em>
-header of request</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
+<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
 <li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
-<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; there&#8217;s no user</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a> &#8211; authentication credentials were not provided</li>
 </ul>
 </td>
 </tr>
 </tbody>
 </table>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#properties">Properties</a> (API semantic descriptors):</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>name</strong> (<cite>string</cite>) – feed&#8217;s name</li>
+<li><strong>owner</strong> (<cite>string</cite>) – a new feed&#8217;s owner. Can be part of the template object in
+PUT requests. Feeds can have more than one owner so they can be shared between users</li>
+</ul>
+</div></blockquote>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">Link Relations</a>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>owner</strong> – links to a feed&#8217;s owner</li>
+<li><strong>note</strong> – links to a feed&#8217;s <a class="reference external" href="../other_resources/note.html">note</a></li>
+<li><strong>tags</strong> – links to a feed&#8217;s <a class="reference external" href="tag.html">collection of tags</a></li>
+<li><strong>comments</strong> – links to a feed&#8217;s <a class="reference external" href="comment.html">collection of comments</a></li>
+<li><strong>files</strong> – links to a feed&#8217;s <a class="reference external" href="file.html">collection of files</a></li>
+<li><strong>plugin_inst</strong> – links to the <a class="reference external" href="../items/plugin_instance.html">plugin instance</a> that created a feed</li>
+</ul>
+</div></blockquote>
 </dd></dl>
 
 </div>
