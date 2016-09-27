@@ -95,9 +95,9 @@ This resource type refers to a user's feed comment.
 
     - **owner** (`string`) |--| the comment's owner's username. Read-only
     - **title** (`string`) |--| comment's title. Can be part of the template object in PUT
-      requests
+      and POST requests
     - **content** (`string`) |--| comment's content. Can be part of the template object in
-      PUT requests
+      PUT and POST requests
 
    `Link Relations`_:
 
