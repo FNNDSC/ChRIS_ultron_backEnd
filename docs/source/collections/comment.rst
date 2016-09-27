@@ -40,7 +40,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    .. sourcecode:: http
 
       HTTP/1.1 200 OK
-      Allow: GET
+      Allow: GET, POST
       Content-Type: application/vnd.collection+json
 
       {
