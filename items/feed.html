@@ -27,7 +27,7 @@
     <link rel="top" title="chris ultron backend 0.0.1 documentation" href="../index.html" />
     <link rel="up" title="REST API Reference" href="../api.html" />
     <link rel="next" title="Comment item" href="comment.html" />
-    <link rel="prev" title="Plugin Instance collection" href="../collections/plugin_instance.html" />
+    <link rel="prev" title="User collection" href="../collections/user.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -53,7 +53,14 @@
 <dl class="get">
 <dt id="get--api-v1-(int-feed_id)-">
 <code class="descname">GET </code><code class="descname">/api/v1/</code><span class="sig-paren">(</span><em class="property">int: </em><em>feed_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-(int-feed_id)-" title="Permalink to this definition">¶</a></dt>
-<dd><p>Gets an authenticated user&#8217;s feed.</p>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Synopsis:</th><td class="field-body">Gets an authenticated user&#8217;s feed.</td>
+</tr>
+</tbody>
+</table>
 <p><strong>Example request</strong>:</p>
 <div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/35/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
 <span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
@@ -142,6 +149,7 @@
 <tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
 <li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
 <li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a> &#8211; authentication credentials were not provided</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; not found</li>
 </ul>
 </td>
 </tr>
@@ -150,20 +158,22 @@
 <p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#properties">Properties</a> (API semantic descriptors):</p>
 <blockquote>
 <div><ul class="simple">
-<li><strong>name</strong> (<cite>string</cite>) – feed&#8217;s name</li>
-<li><strong>owner</strong> (<cite>string</cite>) – a new feed&#8217;s owner. Can be part of the template object in
-PUT requests. Feeds can have more than one owner so they can be shared between users</li>
+<li><strong>name</strong> (<cite>string</cite>) – feed&#8217;s name. Can be part of the template object in PUT
+requests</li>
+<li><strong>owner</strong> (<cite>string</cite>) – username of a new feed&#8217;s owner. Can be part of the template
+object in PUT requests. Feeds can have more than one owner so they can be shared
+between users</li>
 </ul>
 </div></blockquote>
 <p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">Link Relations</a>:</p>
 <blockquote>
 <div><ul class="simple">
-<li><strong>owner</strong> – links to a feed&#8217;s owner</li>
-<li><strong>note</strong> – links to a feed&#8217;s <a class="reference external" href="../other_resources/note.html">note</a></li>
-<li><strong>tags</strong> – links to a feed&#8217;s <a class="reference external" href="tag.html">collection of tags</a></li>
-<li><strong>comments</strong> – links to a feed&#8217;s <a class="reference external" href="comment.html">collection of comments</a></li>
-<li><strong>files</strong> – links to a feed&#8217;s <a class="reference external" href="file.html">collection of files</a></li>
-<li><strong>plugin_inst</strong> – links to the <a class="reference external" href="../items/plugin_instance.html">plugin instance</a> that created a feed</li>
+<li><strong>owner</strong> – links to an <a class="reference external" href="user.html">owner</a> of the feed</li>
+<li><strong>note</strong> – links to the feed&#8217;s <a class="reference external" href="../other_resources/note.html">note</a></li>
+<li><strong>tags</strong> – links the feed&#8217;s <a class="reference external" href="../collections/tag.html">collection of tags</a></li>
+<li><strong>comments</strong> – links to the feed&#8217;s <a class="reference external" href="../collections/comment.html">collection of comments</a></li>
+<li><strong>files</strong> – links to the feed&#8217;s <a class="reference external" href="../collections/file.html">collection of files</a></li>
+<li><strong>plugin_inst</strong> – links to the <a class="reference external" href="plugin_instance.html">plugin instance</a> that created the feed</li>
 </ul>
 </div></blockquote>
 </dd></dl>
@@ -180,7 +190,7 @@ PUT requests. Feeds can have more than one owner so they can be shared between u
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="../api.html">REST API Reference</a><ul>
-      <li>Previous: <a href="../collections/plugin_instance.html" title="previous chapter">Plugin Instance collection</a></li>
+      <li>Previous: <a href="../collections/user.html" title="previous chapter">User collection</a></li>
       <li>Next: <a href="comment.html" title="next chapter">Comment item</a></li>
   </ul></li>
   </ul></li>

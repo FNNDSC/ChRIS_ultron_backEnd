@@ -137,7 +137,6 @@ with attribute:
 
    .. _Properties: http://amundsen.com/media-types/collection/format/#properties
    .. _`Link Relations`: http://amundsen.com/media-types/collection/format/#link-relations
-   .. _feed: ../items/feed.html
 
    Properties_ (API semantic descriptors):
 
