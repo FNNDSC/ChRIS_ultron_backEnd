@@ -43,8 +43,10 @@ class SimpleDSApp(ChrisApp):
             for dirname in dirnames:
                 os.makedirs(os.path.join(output_path, dirnames))
             for name in filenames:
-                new_name = options.prefix + name
-                shutil.copy(os.path.join(dirpath, name), os.path.join(output_path, new_name))
+                new_name    = options.prefix + name
+                str_outpath = os.path.join(output_path, new_name)
+                print('Creating new file... %s' % str_outpath)
+                shutil.copy(os.path.join(dirpath, name), str_outpath)
             
 
 
