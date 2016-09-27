@@ -20,7 +20,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
 .. http:get:: /api/v1/(int:feed_id)/
 
-   Gets an authenticated user's feed.
+   :synopsis: Gets an authenticated user's feed.
 
    **Example request**:
 
@@ -101,6 +101,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    :resheader Content-Type: application/vnd.collection+json
    :statuscode 200: no error
    :statuscode 401: authentication credentials were not provided
+   :statuscode 404: not found
 
    .. |--| unicode:: U+2013   .. en dash
 
@@ -109,21 +110,24 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
    Properties_ (API semantic descriptors):
 
-    - **name** (`string`) |--| feed's name
-    - **owner** (`string`) |--| a new feed's owner. Can be part of the template object in
-      PUT requests. Feeds can have more than one owner so they can be shared between users
+    - **name** (`string`) |--| feed's name. Can be part of the template object in PUT
+      requests
+    - **owner** (`string`) |--| username of a new feed's owner. Can be part of the template 
+      object in PUT requests. Feeds can have more than one owner so they can be shared
+      between users
 
    `Link Relations`_:
 
-    - **owner** |--| links to a feed's owner
-    - **note** |--| links to a feed's note_
-    - **tags** |--| links to a feed's `collection of tags`_
-    - **comments** |--| links to a feed's `collection of comments`_
-    - **files** |--| links to a feed's `collection of files`_
-    - **plugin_inst** |--| links to the `plugin instance`_ that created a feed
+    - **owner** |--| links to an owner_ of the feed
+    - **note** |--| links to the feed's note_
+    - **tags** |--| links the feed's `collection of tags`_
+    - **comments** |--| links to the feed's `collection of comments`_
+    - **files** |--| links to the feed's `collection of files`_
+    - **plugin_inst** |--| links to the `plugin instance`_ that created the feed
 
+   .. _owner: user.html
    .. _note: ../other_resources/note.html
-   .. _`collection of tags`: tag.html
-   .. _`collection of comments`: comment.html
-   .. _`collection of files`: file.html
-   .. _`plugin instance`: ../items/plugin_instance.html
+   .. _`collection of tags`: ../collections/tag.html
+   .. _`collection of comments`: ../collections/comment.html
+   .. _`collection of files`: ../collections/file.html
+   .. _`plugin instance`: plugin_instance.html
