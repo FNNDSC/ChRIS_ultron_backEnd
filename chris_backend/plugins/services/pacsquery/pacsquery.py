@@ -41,14 +41,14 @@ class PacsQueryApp(ChrisApp):
         self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
 
         # Query settings
-        self.add_parameter('--patientID', action='store', dest='PatientID', type=str, default='',optional=True, help='Patient ID')
-        self.add_parameter('--patientName', action='store', dest='PatientName', type=str, default='',optional=True, help='Patient name')
-        self.add_parameter('--patientSex', action='store', dest='PatientSex', type=str, default='',optional=True, help='Patient sex')
-        self.add_parameter('--studyDate', action='store', dest='StudyDate', type=str, default='',optional=True, help='Study date (YYYY/MM/DD)')
-        self.add_parameter('--modalitiesInStudy', action='store', dest='ModalitiesInStudy', type=str, default='',optional=True, help='Modalities in study')
-        self.add_parameter('--performedStationAETitle', action='store', dest='PerformedStationAETitle', type=str, default='',optional=True, help='Performed station aet')
-        self.add_parameter('--studyDescription', action='store', dest='StudyDescription', type=str, default='',optional=True, help='Study description')
-        self.add_parameter('--seriesDescription', action='store', dest='SeriesDescription', type=str, default='',optional=True, help='Series Description')
+        self.add_parameter('--patientID', action='store', dest='patient_id', type=str, default='2175',optional=True, help='Patient ID')
+        self.add_parameter('--patientName', action='store', dest='patient_name', type=str, default='',optional=True, help='Patient name')
+        self.add_parameter('--patientSex', action='store', dest='patient_sex', type=str, default='',optional=True, help='Patient sex')
+        self.add_parameter('--studyDate', action='store', dest='study_date', type=str, default='',optional=True, help='Study date (YYYY/MM/DD)')
+        self.add_parameter('--modalitiesInStudy', action='store', dest='modalities_in_study', type=str, default='',optional=True, help='Modalities in study')
+        self.add_parameter('--performedStationAETitle', action='store', dest='performed_station_aet', type=str, default='',optional=True, help='Performed station aet')
+        self.add_parameter('--studyDescription', action='store', dest='study_description', type=str, default='',optional=True, help='Study description')
+        self.add_parameter('--seriesDescription', action='store', dest='series_description', type=str, default='',optional=True, help='Series Description')
 
 
     def run(self, options):
@@ -80,14 +80,14 @@ class PacsQueryApp(ChrisApp):
 
         # query parameters
         query_settings = {
-            'PatientID': options.PatientID,
-            'PatientName': options.PatientName,
-            'PatientSex': options.PatientSex,
-            'StudyDate': options.StudyDate,
-            'ModalitiesInStudy': options.ModalitiesInStudy,
-            'PerformedStationAETitle': options.PerformedStationAETitle,
-            'StudyDescription': options.StudyDescription,
-            'SeriesDescription': options.SeriesDescription
+            'PatientID': options.patient_id,
+            'PatientName': options.patient_name,
+            'PatientSex': options.patient_sex,
+            'StudyDate': options.study_date,
+            'ModalitiesInStudy': options.modalities_in_study,
+            'PerformedStationAETitle': options.performed_station_aet,
+            'StudyDescription': options.study_description,
+            'SeriesDescription': options.series_description
         }
 
         find = pacs.find(query_settings)
