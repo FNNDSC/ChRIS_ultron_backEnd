@@ -1,0 +1,15 @@
+## pre-requisites
+`dcmtk`
+`pydicom`
+
+## service
+Add 
+`chris-ultron    10401/tcp   # chris ultron dicom listener`
+`chris-ultron    10401/udp   # chris ultron dicom listener`
+in `/etc/services`.
+
+## launchd
+Add `org.babymri.chris-ultron.plist` in `/Library/LaunchDaemons`.
+Load: `sudo launchctl load -w org.babymri.chris-ultron.plist`
+Unload: `sudo launchctl unload org.babymri.chris-ultron.plist`
+Test: `nc localhost 10401` (must hang)
