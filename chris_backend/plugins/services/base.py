@@ -54,14 +54,16 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     The super class for all valid ChRIS plugin apps.
     '''
     
-    AUTHORS = 'FNNDSC (dev@babyMRI.org)'
-    TITLE = ''
-    CATEGORY = ''
-    TYPE = 'ds'
-    DESCRIPTION = None
-    DOCUMENTATION = ''
-    LICENSE = ''
-    VERSION = ''
+    AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
+    TITLE           = ''
+    CATEGORY        = ''
+    TYPE            = 'ds'
+    SELFPATH        = ''
+    SELFEXEC        = ''
+    DESCRIPTION     = None
+    DOCUMENTATION   = ''
+    LICENSE         = ''
+    VERSION         = ''
   
     def __init__(self):
         '''
@@ -144,6 +146,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         repres['parameters']    = self._parameters
         repres['selfpath']      = self.SELFPATH
         repres['selfexec']      = self.SELFEXEC
+        repres['execshell']     = self.EXECSHELL
         return repres
 
     def launch(self, args=None):
