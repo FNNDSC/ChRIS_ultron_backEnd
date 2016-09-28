@@ -146,6 +146,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         repres['parameters']    = self._parameters
         repres['selfpath']      = self.SELFPATH
         repres['selfexec']      = self.SELFEXEC
+        repres['execshell']     = self.EXECSHELL
         return repres
 
     def launch(self, args=None):
