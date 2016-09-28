@@ -98,6 +98,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    :resheader Content-Type: application/vnd.collection+json
    :statuscode 200: no error
    :statuscode 401: authentication credentials were not provided
+   :statuscode 404: not found
 
    .. |--| unicode:: U+2013   .. en dash
 

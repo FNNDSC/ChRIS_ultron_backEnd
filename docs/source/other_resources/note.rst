@@ -12,6 +12,11 @@ Note
 
 This resource type refers to a feed note.
 
+In other Collection+JSON_ resource representations this resource type is linked by any
+`link relation`_ with attribute:
+
+**"rel": "note"**
+
 
 .. http:get:: /api/v1/note(int:note_id)/
 

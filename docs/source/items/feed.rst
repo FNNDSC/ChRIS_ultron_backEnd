@@ -112,7 +112,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
     - **name** (`string`) |--| feed's name. Can be part of the template object in PUT
       requests
-    - **owner** (`string`) |--| username of a new feed's owner. Can be part of the template 
+    - **owner** (`string`) |--| username of a new feed's owner. Can be part of the template
       object in PUT requests. Feeds can have more than one owner so they can be shared
       between users
 
@@ -120,7 +120,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
     - **owner** |--| links to an owner_ of the feed
     - **note** |--| links to the feed's note_
-    - **tags** |--| links the feed's `collection of tags`_
+    - **tags** |--| links to the feed's `collection of tags`_
     - **comments** |--| links to the feed's `collection of comments`_
     - **files** |--| links to the feed's `collection of files`_
     - **plugin_inst** |--| links to the `plugin instance`_ that created the feed
