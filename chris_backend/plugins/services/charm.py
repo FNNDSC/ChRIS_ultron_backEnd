@@ -142,7 +142,10 @@ class Charm():
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
-        str_cmd                 = 'python %s %s' % (str_exec, str_allCmdLineArgs)
+        if len(self.d_pluginRepr['execshell']):
+            str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
+
+        str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
         print(str_cmd)
 
         verbosity               = 10
