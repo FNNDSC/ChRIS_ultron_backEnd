@@ -99,6 +99,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    :statuscode 200: no error
    :statuscode 401: authentication credentials were not provided
    :statuscode 403: you do not have permission to perform this action
+   :statuscode 404: not found
 
    .. |--| unicode:: U+2013   .. en dash
 

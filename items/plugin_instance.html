@@ -26,7 +26,7 @@
     <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="top" title="chris ultron backend 0.0.1 documentation" href="../index.html" />
     <link rel="up" title="REST API Reference" href="../api.html" />
-    <link rel="next" title="Note" href="../other_resources/note.html" />
+    <link rel="next" title="User item" href="user.html" />
     <link rel="prev" title="Plugin Parameter item" href="plugin_parameter.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -45,6 +45,136 @@
             
   <div class="section" id="plugin-instance-item">
 <h1>Plugin Instance item<a class="headerlink" href="#plugin-instance-item" title="Permalink to this headline">¶</a></h1>
+<p><strong>Read-only</strong></p>
+<p>This resource type refers to a plugin instance item.</p>
+<p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
+<a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
+<p><strong>&#8220;rel&#8221;: &#8220;plugin_inst&#8221;</strong></p>
+<dl class="get">
+<dt id="get--api-v1-instances-(int-instance_id)-">
+<code class="descname">GET </code><code class="descname">/api/v1/instances/</code><span class="sig-paren">(</span><em class="property">int: </em><em>instance_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-instances-(int-instance_id)-" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Synopsis:</th><td class="field-body">Gets a plugin instance.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example request</strong>:</p>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/instances/60/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
+<span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
+</pre></div>
+</div>
+<p><strong>Example response</strong>:</p>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
+<span class="na">Allow</span><span class="o">:</span> <span class="l">GET</span>
+<span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
+
+<span class="p">{</span>
+    <span class="nt">&quot;collection&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="mi">60</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_name&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;simplefsapp&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;start_date&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-09-21T14:47:06.352445Z&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;end_date&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-09-21T14:47:06.352502Z&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;started&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;owner&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;jbernal&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
+                <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;feed&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/12/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/string-parameter/56/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;string_param&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;1.0&quot;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Request Headers:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; application/vnd.collection+json</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Response Headers:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; application/vnd.collection+json</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a> &#8211; authentication credentials were not provided</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; not found</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#properties">Properties</a> (API semantic descriptors):</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>id</strong> (<cite>int</cite>) – instance&#8217;s id</li>
+<li><strong>plugin_name</strong> (<cite>string</cite>) – corresponding plugin&#8217;s name</li>
+<li><strong>start_date</strong> (<cite>string</cite>) – starting date of the associated plugin process</li>
+<li><strong>end_date</strong> (<cite>boolean</cite>) – end date of the associated plugin process</li>
+<li><strong>status</strong> (<cite>string</cite>) – status of the associated plugin process</li>
+<li><strong>owner</strong> (<cite>string</cite>) – the plugin instance&#8217;s owner&#8217;s username</li>
+</ul>
+</div></blockquote>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">Link Relations</a>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>plugin</strong> – links to the corresponding <a class="reference external" href="plugin.html">plugin</a></li>
+<li><strong>feed</strong> – links to the corresponding <a class="reference external" href="feed.html">feed</a></li>
+<li><strong>string_param</strong> – links to a <a class="reference external" href="../other_resources/string_parameter_instance.html">string parameter instance</a></li>
+<li><strong>int_param</strong> – links to an <a class="reference external" href="../other_resources/integer_parameter_instance.html">integer parameter instance</a></li>
+<li><strong>float_param</strong> – links to a <a class="reference external" href="../other_resources/float_parameter_instance.html">float parameter instance</a></li>
+<li><strong>bool_param</strong> – links to a <a class="reference external" href="../other_resources/boolean_parameter_instance.html">boolean parameter instance</a></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
 </div>
 
 
@@ -58,7 +188,7 @@
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="../api.html">REST API Reference</a><ul>
       <li>Previous: <a href="plugin_parameter.html" title="previous chapter">Plugin Parameter item</a></li>
-      <li>Next: <a href="../other_resources/note.html" title="next chapter">Note</a></li>
+      <li>Next: <a href="user.html" title="next chapter">User item</a></li>
   </ul></li>
   </ul></li>
 </ul>
