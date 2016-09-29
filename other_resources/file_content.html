@@ -26,6 +26,7 @@
     <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="top" title="chris ultron backend 0.0.1 documentation" href="../index.html" />
     <link rel="up" title="REST API Reference" href="../api.html" />
+    <link rel="next" title="String Parameter instance" href="string_parameter_instance.html" />
     <link rel="prev" title="Note" href="note.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -44,67 +45,58 @@
             
   <div class="section" id="file-content">
 <h1>File content<a class="headerlink" href="#file-content" title="Permalink to this headline">¶</a></h1>
+<p><strong>Read-only</strong></p>
+<p>This resource type refers to a feed file&#8217;s content.</p>
+<p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
+<a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
+<p><code class="docutils literal"><span class="pre">&quot;rel&quot;:</span> <span class="pre">&quot;file_resource&quot;</span></code></p>
 <dl class="get">
-<dt id="get--users-(int-user_id)-posts-(tag)">
-<code class="descname">GET </code><code class="descname">/users/</code><span class="sig-paren">(</span><em class="property">int: </em><em>user_id</em><span class="sig-paren">)</span><code class="descname">/posts/</code><span class="sig-paren">(</span><em>tag</em><span class="sig-paren">)</span><a class="headerlink" href="#get--users-(int-user_id)-posts-(tag)" title="Permalink to this definition">¶</a></dt>
-<dd><p>The posts tagged with <cite>tag</cite> that the user (<cite>user_id</cite>) wrote.</p>
+<dt id="get--api-v1-files-(int-file_id)-filename-">
+<code class="descname">GET </code><code class="descname">/api/v1/files/</code><span class="sig-paren">(</span><em class="property">int: </em><em>file_id</em><span class="sig-paren">)</span><code class="descname">/filename/</code><a class="headerlink" href="#get--api-v1-files-(int-file_id)-filename-" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Synopsis:</th><td class="field-body">Gets the content of a feed file.</td>
+</tr>
+</tbody>
+</table>
 <p><strong>Example request</strong>:</p>
-<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/users/123/posts/web</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
-<span class="na">Host</span><span class="o">:</span> <span class="l">example.com</span>
-<span class="na">Accept</span><span class="o">:</span> <span class="l">application/json, text/javascript</span>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/files/30/new_out.txt</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
+<span class="na">Accept</span><span class="o">:</span> <span class="l">*/*</span>
 </pre></div>
 </div>
 <p><strong>Example response</strong>:</p>
 <div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
-<span class="na">Vary</span><span class="o">:</span> <span class="l">Accept</span>
-<span class="na">Content-Type</span><span class="o">:</span> <span class="l">text/javascript</span>
+<span class="na">Allow</span><span class="o">:</span> <span class="l">GET</span>
+<span class="na">Content-Type</span><span class="o">:</span> <span class="l">*/*</span>
 
-<span class="p">[</span>
-  <span class="p">{</span>
-    <span class="s2">&quot;post_id&quot;</span><span class="o">:</span> <span class="mi">12345</span><span class="p">,</span>
-    <span class="s2">&quot;author_id&quot;</span><span class="o">:</span> <span class="mi">123</span><span class="p">,</span>
-    <span class="s2">&quot;tags&quot;</span><span class="o">:</span> <span class="p">[</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="s2">&quot;web&quot;</span><span class="p">],</span>
-    <span class="s2">&quot;subject&quot;</span><span class="o">:</span> <span class="s2">&quot;I tried Nginx&quot;</span>
-  <span class="p">},</span>
-  <span class="p">{</span>
-    <span class="s2">&quot;post_id&quot;</span><span class="o">:</span> <span class="mi">12346</span><span class="p">,</span>
-    <span class="s2">&quot;author_id&quot;</span><span class="o">:</span> <span class="mi">123</span><span class="p">,</span>
-    <span class="s2">&quot;tags&quot;</span><span class="o">:</span> <span class="p">[</span><span class="s2">&quot;html5&quot;</span><span class="p">,</span> <span class="s2">&quot;standards&quot;</span><span class="p">,</span> <span class="s2">&quot;web&quot;</span><span class="p">],</span>
-    <span class="s2">&quot;subject&quot;</span><span class="o">:</span> <span class="s2">&quot;We go to HTML 5&quot;</span>
-  <span class="p">}</span>
-<span class="p">]</span>
+
+This is the content of this file.
 </pre></div>
 </div>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">Query Parameters:</th></tr>
+<tr class="field-odd field"><th class="field-name" colspan="2">Request Headers:</th></tr>
 <tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><strong>sort</strong> &#8211; one of <code class="docutils literal"><span class="pre">hit</span></code>, <code class="docutils literal"><span class="pre">created-at</span></code></li>
-<li><strong>offset</strong> &#8211; offset number. default is 0</li>
-<li><strong>limit</strong> &#8211; limit number. default is 30</li>
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; <em>/</em></li>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Request Headers:</th></tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Response Headers:</th></tr>
 <tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; the response content type depends on
-<em class="mailheader">Accept</em> header</li>
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7235#section-4.2">Authorization</a> &#8211; optional OAuth token to authenticate</li>
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; <em>/</em></li>
 </ul>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name" colspan="2">Response Headers:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
-<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; this depends on <em class="mailheader">Accept</em>
-header of request</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
+<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
 <li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
-<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; there&#8217;s no user</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a> &#8211; authentication credentials were not provided</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.4">403 Forbidden</a> &#8211; you do not have permission to perform this action</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; not found</li>
 </ul>
 </td>
 </tr>
@@ -125,6 +117,7 @@ header of request</li>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="../api.html">REST API Reference</a><ul>
       <li>Previous: <a href="note.html" title="previous chapter">Note</a></li>
+      <li>Next: <a href="string_parameter_instance.html" title="next chapter">String Parameter instance</a></li>
   </ul></li>
   </ul></li>
 </ul>

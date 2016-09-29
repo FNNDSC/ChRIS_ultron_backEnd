@@ -45,6 +45,108 @@
             
   <div class="section" id="float-parameter-instance">
 <h1>Float Parameter instance<a class="headerlink" href="#float-parameter-instance" title="Permalink to this headline">¶</a></h1>
+<p><strong>Read-only</strong></p>
+<p>This resource type refers to a float plugin parameter&#8217;s instance.</p>
+<p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
+<a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
+<p><code class="docutils literal"><span class="pre">&quot;rel&quot;:</span> <span class="pre">&quot;float_inst&quot;</span></code></p>
+<dl class="get">
+<dt id="get--api-v1-plugins-float-parameter-(int-parameterinstance_id)-">
+<code class="descname">GET </code><code class="descname">/api/v1/plugins/float-parameter/</code><span class="sig-paren">(</span><em class="property">int: </em><em>parameterinstance_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-plugins-float-parameter-(int-parameterinstance_id)-" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Synopsis:</th><td class="field-body">Gets a float plugin parameter&#8217;s instance.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example request</strong>:</p>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/plugins/float-parameter/70/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
+<span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
+</pre></div>
+</div>
+<p><strong>Example response</strong>:</p>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
+<span class="na">Allow</span><span class="o">:</span> <span class="l">GET</span>
+<span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
+
+<span class="p">{</span>
+    <span class="nt">&quot;collection&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/float-parameter/70/&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;param_name&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;dir&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;~/&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">],</span>
+                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/float-parameter/70/&quot;</span><span class="p">,</span>
+                <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/80/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_inst&quot;</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/parameters/26/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_param&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;1.0&quot;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Request Headers:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-5.3.2">Accept</a> &#8211; application/vnd.collection+json</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Response Headers:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><ul class="first simple">
+<li><a class="reference external" href="http://tools.ietf.org/html/rfc7231#section-3.1.1.5">Content-Type</a> &#8211; application/vnd.collection+json</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Status Codes:</th><td class="field-body"><ul class="first last simple">
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.2.1">200 OK</a> &#8211; no error</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.2">401 Unauthorized</a> &#8211; authentication credentials were not provided</li>
+<li><a class="reference external" href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.4.5">404 Not Found</a> &#8211; not found</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#properties">Properties</a> (API semantic descriptors):</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>param_name</strong> (<cite>string</cite>) – name of the corresponding <a class="reference external" href="../items/plugin_parameter.html">plugin parameter</a></li>
+<li><strong>value</strong> (<cite>float</cite>) – parameter instance&#8217;s value</li>
+</ul>
+</div></blockquote>
+<p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">Link Relations</a>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><strong>plugin_inst</strong> – links to the corresponding <a class="reference external" href="../items/plugin_instance.html">plugin instance</a></li>
+<li><strong>plugin_param</strong> – links to the corresponding <a class="reference external" href="../items/plugin_parameter.html">plugin parameter</a></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
 </div>
 
 

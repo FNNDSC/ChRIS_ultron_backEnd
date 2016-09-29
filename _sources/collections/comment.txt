@@ -19,7 +19,7 @@ This resource type refers to a collection of feed_-specific comment_ items.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "comments"**
+``"rel": "comments"``
 
 
 .. http:get:: /api/v1/(int:feed_id)/comments/

@@ -15,7 +15,7 @@ This resource type refers to a feed note.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "note"**
+``"rel": "note"``
 
 
 .. http:get:: /api/v1/note(int:note_id)/
@@ -36,7 +36,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    .. sourcecode:: http
 
       HTTP/1.1 200 OK
-      Allow: GET, PUT, DELETE
+      Allow: GET, PUT
       Content-Type: application/vnd.collection+json
 
       {

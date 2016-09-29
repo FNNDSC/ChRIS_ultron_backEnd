@@ -49,7 +49,7 @@
 <p>This resource type refers to a feed note.</p>
 <p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
 <a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
-<p><strong>&#8220;rel&#8221;: &#8220;note&#8221;</strong></p>
+<p><code class="docutils literal"><span class="pre">&quot;rel&quot;:</span> <span class="pre">&quot;note&quot;</span></code></p>
 <dl class="get">
 <dt id="get--api-v1-note(int-note_id)-">
 <code class="descname">GET </code><code class="descname">/api/v1/note</code><span class="sig-paren">(</span><em class="property">int: </em><em>note_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-note(int-note_id)-" title="Permalink to this definition">¶</a></dt>
@@ -69,7 +69,7 @@
 </div>
 <p><strong>Example response</strong>:</p>
 <div class="highlight-http"><div class="highlight"><pre><span></span><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
-<span class="na">Allow</span><span class="o">:</span> <span class="l">GET, PUT, DELETE</span>
+<span class="na">Allow</span><span class="o">:</span> <span class="l">GET, PUT</span>
 <span class="na">Content-Type</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 
 <span class="p">{</span>

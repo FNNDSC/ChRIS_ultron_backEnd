@@ -15,7 +15,7 @@ This resource type refers to a plugin item.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "plugin"**
+``"rel": "plugin"``
 
 
 .. http:get:: /api/v1/plugins/(int:plugin_id)/

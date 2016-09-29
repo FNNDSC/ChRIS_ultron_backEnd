@@ -10,7 +10,7 @@ File item
 **Read/write**
 
 
-This resource type refers to a user's feed tag.
+This resource type refers to a user's feed file item.
 
 
 .. http:get:: /api/v1/files/(int:file_id)/

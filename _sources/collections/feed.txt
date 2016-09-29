@@ -19,7 +19,7 @@ A Collection+JSON_ representation is served at the root of the API: /api/v1/.
 In other resource representations this resource type is linked by any `link relation`_
 with attribute:
 
-**"rel": "feeds"**
+``"rel": "feeds"``
 
 
 .. http:get:: /api/v1/

@@ -15,7 +15,7 @@ This resource type refers to a user's feed item.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "feed"**
+``"rel": "feed"``
 
 
 .. http:get:: /api/v1/(int:feed_id)/
