@@ -15,7 +15,7 @@ This resource type refers to a registered user.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "owner"**
+``"rel": "owner"``
 
 
 .. http:get:: /api/v1/users/(int:user_id)/

@@ -15,7 +15,7 @@ This resource type refers to a plugin parameter item.
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-**"rel": "plugin_param"**
+``"rel": "plugin_param"``
 
 
 .. http:get:: /api/v1/parameters/(int:parameter_id)/
