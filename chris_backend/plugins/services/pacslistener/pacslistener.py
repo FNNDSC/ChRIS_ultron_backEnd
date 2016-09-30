@@ -230,19 +230,19 @@ class PACSListener():
                 # image.info file
                 # mri_info? :/
 
-                # cleanup
-                try:
-                    shutil.rmtree(self.uuid_directory)
-                except OSError as e:
-                    errorfile = open(self.log_error, 'w')
-                    errorfile.write('Remove ' + self.uuid_directory + ' tree\n')
-                    errorfile.write('Error number: ' + str(e.errno) + '\n')
-                    errorfile.write('File name: ' + e.filename + '\n')
-                    errorfile.write('Error message: ' + e.strerror + '\n')
-                    errorfile.close()
+        # cleanup
+        try:
+            shutil.rmtree(self.uuid_directory)
+        except OSError as e:
+            errorfile = open(self.log_error, 'w')
+            errorfile.write('Remove ' + self.uuid_directory + ' tree\n')
+            errorfile.write('Error number: ' + str(e.errno) + '\n')
+            errorfile.write('File name: ' + e.filename + '\n')
+            errorfile.write('Error message: ' + e.strerror + '\n')
+            errorfile.close()
 
-                # what about log files?
-                # import logger?
+        # what about log files?
+        # import logger?
 
         outputfile.close()
 
