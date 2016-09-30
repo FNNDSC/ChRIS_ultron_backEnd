@@ -38,6 +38,7 @@ class PACSListener():
 
         # create unique directory to store inconming data
         self.uuid = str(uuid.uuid4())
+        self.uuid = '3f0afeb7-0d1d-41d6-9d77-bba3e81901ba'
         self.uuid_directory = os.path.join( self.tmp_directory, self.uuid)
         self.log_error = os.path.join(self.log_directory, 'err-' + self.uuid + '.txt')
         self.log_output = os.path.join(self.log_directory, 'out-' + self.uuid + '.txt')
@@ -113,6 +114,9 @@ class PACSListener():
         outputfile = open(self.log_output, 'w')
         outputfile.write( 'UUID DIRECTORY:' + '\n')
         outputfile.write( self.uuid_directory + '\n')
+
+        # Keep track of "receiving.series" files
+        series_received = set()
 
         for directory in abs_dirs:
 
@@ -195,7 +199,8 @@ class PACSListener():
                     'SeriesDate': series_date,
                     'SeriesInstanceUID': series_uid
                 }
-                series_info_path = os.path.join(abs_series, 'series.info')
+                series_info_path = os.path.join(abs_series, 'receiving.series')
+                series_received.add(series_info_path) 
                 self.saveinfo(series_info_path, series_info)
 
                 ###########
@@ -229,6 +234,13 @@ class PACSListener():
 
                 # image.info file
                 # mri_info? :/
+        
+        # rename receiving.series to series.info
+        # changing name lets external applications know the incoming data has been received
+        for series in series_received:
+            last_index = series.rfind('receiving.series')
+            target = series[:last_index] + 'series.info'
+            os.rename(series, target)
 
         # cleanup
         try:
