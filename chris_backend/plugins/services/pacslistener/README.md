@@ -4,6 +4,14 @@ dcmtk
 pydicom
 ```
 
+## configuration
+In `xinetd` or in `launchd`, the dicom listener scripts requires the following arguments to be provided:
+```
+   -t: temporary directory
+   -l: log directory
+   -d: data directory
+
+```
 ## service
 In `/etc/services` add: 
 ```

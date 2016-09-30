@@ -10,21 +10,27 @@
 #
 
 
-
-import os, sys
+import os
 import subprocess
 import datetime
 import uuid
 import shutil
 import dicom
+import configparser
+import argparse
+
+parser = argparse.ArgumentParser(description='DICOM Listener script (based on DCMTK and PyDicom)')
+parser.add_argument('-t', '--tmpdir', action='store', dest='tmp_directory', required=True, type=str, help='Directory to store temporary files.')
+parser.add_argument('-l', '--logdir', action='store', dest='log_directory', required=True, type=str, help='Directory to store log files.')
+parser.add_argument('-d', '--datadir', action='store', dest='data_directory', required=True, type=str, help='Directory to store DICOM files.')
 
 class PACSListener():
 
-    def __init__(self):
+    def __init__(self, args):
 
-        self.tmp_directory = '/tmp'
-        self.log_directory = '/tmp/log'
-        self.data_directory = '/tmp/data'
+        self.tmp_directory = args.tmp_directory
+        self.log_directory = args.log_directory
+        self.data_directory = args.data_directory
 
         os.makedirs(self.tmp_directory, exist_ok=True)
         os.makedirs(self.log_directory, exist_ok=True)
@@ -73,6 +79,27 @@ class PACSListener():
             errorfile.close()
             raise NameError('PatientDirectory doesn\'t exist:' + path)
 
+    def saveinfo(self, path, info):
+
+        if not os.path.exists(path):
+            
+            with open(path, 'w') as info_file:
+                try:
+                    info.write(info_file)
+                except OSError as e:
+                    errorfile = open(self.log_error, 'w')
+                    errorfile.write('Write ' + path + ' file\n')
+                    errorfile.write('Error number: ' + str(e.errno) + '\n')
+                    errorfile.write('File name: ' + e.filename + '\n')
+                    errorfile.write('Error message: ' + e.strerror + '\n')
+                    errorfile.close()
+
+        if not os.path.exists(path):
+            errorfile = open(self.log_error, 'w')
+            errorfile.write('PatientDirectory doesn\'t exist:' + path + '\n')
+            errorfile.close()
+            raise NameError('PatientDirectory doesn\'t exist:' + path)
+
     def run(self):
 
         # start listening to incoming data
@@ -96,18 +123,34 @@ class PACSListener():
                 abs_data = os.path.join(directory, data)
                 dcm_info = dicom.read_file(abs_data)
 
-                # patient info
+                ###########
+                # PATIENT
+                #
+
+                # fetch patient info
                 patient_id = self.sanitize(dcm_info.PatientID)
                 patient_name = self.sanitize(dcm_info.PatientName)
                 outputfile.write( 'PatientID: ' + patient_id + '\n')
                 outputfile.write( 'PatientName: ' + patient_name + '\n')
 
+                # create patient directory
                 abs_patient = os.path.join(self.data_directory, patient_id + '-' + patient_name)
                 self.mkdir(abs_patient)
 
-                # patient.info file
+                # create patient.info file
+                patient_info = configparser.ConfigParser()
+                patient_info['PATIENT'] = {
+                    'PatientID': patient_id,
+                    'PatientName': patient_name
+                }
+                patient_info_path = os.path.join(abs_patient, 'patient.info')
+                self.saveinfo(patient_info_path, patient_info)
 
-                # study info
+                ###########
+                # STUDY
+                #
+
+                # fetch study info
                 study_description = self.sanitize(dcm_info.StudyDescription)
                 study_date = self.sanitize(dcm_info.StudyDate)
                 study_uid = self.sanitize(dcm_info.StudyInstanceUID)
@@ -115,12 +158,25 @@ class PACSListener():
                 outputfile.write( 'StudyDate: ' + study_date + '\n')
                 outputfile.write( 'StudyInstanceUID: ' + study_uid + '\n')
 
+                # create study directory
                 abs_study = os.path.join(abs_patient, study_description + '-' + study_date + '-' + study_uid)
                 self.mkdir(abs_study)
 
-                # study.info file
+               # create study.info file
+                study_info = configparser.ConfigParser()
+                study_info['STUDY'] = {
+                    'StudyDescriptiont': study_description,
+                    'StudyDate': study_date,
+                    'StudyInstanceUID': study_uid
+                }
+                study_info_path = os.path.join(abs_study, 'study.info')
+                self.saveinfo(study_info_path, study_info)
 
-                # series info
+                ###########
+                # SERIES
+                #
+
+                # fetch series info
                 series_description = self.sanitize(dcm_info.SeriesDescription)
                 series_date = self.sanitize(dcm_info.SeriesDate)
                 series_uid = self.sanitize(dcm_info.SeriesInstanceUID)
@@ -128,12 +184,25 @@ class PACSListener():
                 outputfile.write( 'SeriesDate: ' + series_date + '\n')
                 outputfile.write( 'SeriesInstanceUID: ' + series_uid + '\n')
 
+                # create series directory
                 abs_series = os.path.join(abs_study, series_description + '-' + series_date + '-' + series_uid)
                 self.mkdir(abs_series)
 
-                # series.info file
+               # create study.info file
+                series_info = configparser.ConfigParser()
+                series_info['SERIES'] = {
+                    'SeriesDescription': series_description,
+                    'SeriesDate': series_date,
+                    'SeriesInstanceUID': series_uid
+                }
+                series_info_path = os.path.join(abs_series, 'series.info')
+                self.saveinfo(series_info_path, series_info)
 
-                # image info
+                ###########
+                # IMAGE
+                #
+
+                # fetch image info
                 image_uid = self.sanitize(dcm_info.SOPInstanceUID)
                 image_instance_number = self.sanitize(dcm_info.InstanceNumber)
                 outputfile.write( 'SOPInstanceUID: ' + image_uid + '\n')
@@ -159,6 +228,7 @@ class PACSListener():
                     raise NameError('PatientDirectory doesn\'t exist:' + abs_image)
 
                 # image.info file
+                # mri_info? :/
 
                 # cleanup
                 try:
@@ -170,10 +240,12 @@ class PACSListener():
                     errorfile.write('File name: ' + e.filename + '\n')
                     errorfile.write('Error message: ' + e.strerror + '\n')
                     errorfile.close()
-                # what about log files?
 
-        outputfile.close() 
+                # what about log files?
+                # import logger?
+
+        outputfile.close()
 
 # start listener
-pacs_listener = PACSListener()
+pacs_listener = PACSListener(parser.parse_args())
 pacs_listener.run()

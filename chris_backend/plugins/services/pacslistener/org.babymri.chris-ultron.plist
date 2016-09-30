@@ -6,8 +6,16 @@
     <string>nico</string>
     <key>Label</key>
     <string>org.babymri.chris-ultron</string>
-    <key>Program</key>
-    <string>/Users/nico/work/gitroot/chris-ultron-backend/chris_backend/plugins/services/pacslistener/pacslistener.py</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/nico/work/gitroot/chris-ultron-backend/chris_backend/plugins/services/pacslistener/pacslistener.py</string>
+    	<string>-t</string>
+    	<string>/tmp</string>
+    	<string>-l</string>
+    	<string>/tmp/log</string>
+    	<string>-d</string>
+    	<string>/tmp/data</string>
+    </array>
     <key>inetdCompatibility</key>
     <dict>
         <key>Wait</key>
