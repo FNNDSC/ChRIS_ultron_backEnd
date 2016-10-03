@@ -14,6 +14,7 @@ TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
+STATUS_TYPES = ['started', 'running-on-remote', 'finished-on-remote']
 
 class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
@@ -47,7 +48,7 @@ class PluginParameter(models.Model):
 class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, default='started')
+    status = models.CharField(max_length=30, default=STATUS_TYPES[0])
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
