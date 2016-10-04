@@ -10,9 +10,12 @@ import  sys
 import  os
 import  pprint
 import  datetime
-from    ._colors    import Colors
+
+from    .pman._colors       import Colors
+from    .pman.crunner       import crunner
+from    .pman.purl          import Purl
+
 import  pdb
-from    .crunner    import crunner
 
 class Charm():
 
@@ -161,6 +164,13 @@ class Charm():
 
         # self.app.launch(self.l_appArgs)
         self.c_pluginInst.register_output_files()
+
+    def app_pman(self, *args, **kwargs):
+        """
+        Run the "app" via pman
+        """
+
+
 
 
 if __name__ == '__main__':
