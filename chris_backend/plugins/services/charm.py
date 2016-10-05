@@ -10,12 +10,18 @@ import  sys
 import  os
 import  pprint
 import  datetime
+import  socket
+import  json
 
 from    .pman._colors       import Colors
 from    .pman.crunner       import crunner
 from    .pman.purl          import Purl
 
 import  pdb
+
+class pman_settings():
+    HOST    =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    PORT    = '5010'
 
 class Charm():
 
@@ -124,6 +130,9 @@ class Charm():
         if str_method == 'crunner':
             self.app_crunner()
             b_launched  = True
+        if str_method == 'pman':
+            self.app_pman()
+            b_launched  = True
 
         if b_launched: self.c_pluginInst.register_output_files()
 
@@ -169,7 +178,73 @@ class Charm():
         """
         Run the "app" via pman
         """
+        str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
+        print('in app_pman, cmdLineArg = %s' % str_cmdLineArgs)
 
+        str_allCmdLineArgs      = ' '.join(self.l_appArgs)
+        str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+
+        if len(self.d_pluginRepr['execshell']):
+            str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
+
+        str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
+        print('in app_pman, cmd = %s' % str_cmd)
+
+        d_msg = {
+            'action':   'run',
+            'meta': {
+                        'cmd':      str_cmd,
+                        'threaded': True,
+                        'auid':     self.c_pluginInst.owner.username,
+                        'jid':      self.d_pluginInst['id']
+            }
+        }
+        print(d_msg)
+
+        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        print(str_http)
+
+        purl    = Purl(
+            msg         = json.dumps(d_msg),
+            http        = str_http,
+            verb        = 'POST',
+            contentType = 'application/vnd.collection+json',
+            b_raw       = True,
+            b_quiet     = False,
+            jsonwrapper = 'payload',
+        )
+
+        # run the app
+        print(json.dumps(json.loads(purl()), indent=2))
+
+    def app_statusCheckAndRegister(self, *args, **kwargs):
+        """
+        Check on the status of the job, and if just finished without error,
+        register output files.
+        """
+
+        # First get current status
+        str_status  = self.c_pluginInst.status
+
+        # Now ask pman for the job status
+        d_msg   = {
+            "action": "status",
+            "meta": {
+                    "key":      "jid",
+                    "value":    self.d_pluginInst['id']
+            }
+        }
+        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+
+        purl    = Purl(
+            msg         = json.dumps(d_msg),
+            http        = str_http,
+            verb        = 'GET',
+            contentType = 'application/vnd.collection+json',
+            b_raw       = True,
+            b_quiet     = False,
+            jsonwrapper = 'payload',
+        )
 
 
 
