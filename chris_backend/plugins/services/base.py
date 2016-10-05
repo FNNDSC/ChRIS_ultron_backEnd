@@ -60,6 +60,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     TYPE            = 'ds'
     SELFPATH        = ''
     SELFEXEC        = ''
+    EXECSHELL       = ''
     DESCRIPTION     = None
     DOCUMENTATION   = ''
     LICENSE         = ''
