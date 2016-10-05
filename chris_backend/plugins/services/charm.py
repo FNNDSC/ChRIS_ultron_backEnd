@@ -11,9 +11,9 @@ import  os
 import  pprint
 import  datetime
 
-from    .pman._colors       import Colors
-from    .pman.crunner       import crunner
-from    .pman.purl          import Purl
+#from    .pman._colors       import Colors
+#from    .pman.crunner       import crunner
+#from    .pman.purl          import Purl
 
 import  pdb
 
