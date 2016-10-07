@@ -27,7 +27,7 @@ class SimpleFSApp(ChrisApp):
     AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
     SELFPATH        = os.path.dirname(__file__)
     SELFEXEC        = os.path.basename(__file__)
-    EXECSHELL       = 'python'
+    EXECSHELL       = 'python3'
     TITLE           = 'Simple chris fs app'
     CATEGORY        = ''
     TYPE            = 'fs'

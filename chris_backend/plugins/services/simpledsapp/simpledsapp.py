@@ -10,7 +10,7 @@
 
 
 
-import os, sys, shutil
+import os, sys, shutil, time
 
 # import the Chris app superclass
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
@@ -24,7 +24,7 @@ class SimpleDSApp(ChrisApp):
     AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
     SELFPATH        = os.path.dirname(__file__)
     SELFEXEC        = os.path.basename(__file__)
-    EXECSHELL       = 'python'
+    EXECSHELL       = 'python3'
     TITLE           = 'Simple chris ds app'
     CATEGORY        = ''
     TYPE            = 'ds'
@@ -34,10 +34,21 @@ class SimpleDSApp(ChrisApp):
     VERSION         = '0.1'
 
     def define_parameters(self):
+
         self.add_parameter('--prefix', action='store', dest='prefix', type=str,
                           optional=False, help='prefix for file names')
+        self.add_parameter('--sleepLength',
+                           action   = 'store',
+                           dest     = 'sleepLength',
+                           type     = str,
+                           optional = True,
+                           help     ='prefix for file names',
+                           default  = '0')
 
     def run(self, options):
+
+        time.sleep(int(options.sleepLength))
+        print('sleeping for %s' % options.sleepLength)
         for (dirpath, dirnames, filenames) in os.walk(options.inputdir):
             output_path =  os.path.join(options.outputdir,
                                         dirpath.replace(options.inputdir, ""))
