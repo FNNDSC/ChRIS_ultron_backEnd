@@ -2,7 +2,7 @@
 
 """
 
-chram - ChRIS / pman interface.
+charm - ChRIS / pman interface.
 
 """
 
@@ -13,10 +13,11 @@ import  datetime
 import  socket
 import  json
 
-#from    .pman._colors       import Colors
-#from    .pman.crunner       import crunner
-#from    .pman.purl          import Purl
+from    .pman._colors       import Colors
+from    .pman.crunner       import crunner
+from    .pman.purl          import Purl
 
+import  datetime
 import  pdb
 
 class pman_settings():
@@ -132,7 +133,6 @@ class Charm():
             b_launched  = True
         if str_method == 'pman':
             self.app_pman()
-            b_launched  = True
 
         if b_launched: self.c_pluginInst.register_output_files()
 
@@ -178,9 +178,12 @@ class Charm():
         """
         Run the "app" via pman
         """
-        str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
+
+        print(self.d_args)
+        str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
         print('in app_pman, cmdLineArg = %s' % str_cmdLineArgs)
 
+        print('in app_pman, l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
@@ -196,7 +199,7 @@ class Charm():
                         'cmd':      str_cmd,
                         'threaded': True,
                         'auid':     self.c_pluginInst.owner.username,
-                        'jid':      self.d_pluginInst['id']
+                        'jid':      str(self.d_pluginInst['id'])
             }
         }
         print(d_msg)
@@ -231,7 +234,7 @@ class Charm():
             "action": "status",
             "meta": {
                     "key":      "jid",
-                    "value":    self.d_pluginInst['id']
+                    "value":    str(self.d_pluginInst['id'])
             }
         }
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
@@ -239,14 +242,79 @@ class Charm():
         purl    = Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
-            verb        = 'GET',
+            verb        = 'POST',
             contentType = 'application/vnd.collection+json',
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
         )
 
+        d_pman          = json.loads(purl())
+        str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        str_DBstatus    = self.c_pluginInst.status
+        self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
+        self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
+        if str_pmanStatus == 'finishedSuccessfully' and str_pmanStatus != str_DBstatus:
+            self.qprint('Registering output files...', comms = 'status')
+            self.c_pluginInst.register_output_files()
+            self.c_pluginInst.status    = str_pmanStatus
+            self.c_pluginInst.end_date  = datetime.datetime.now()
+            self.c_pluginInst.save()
+            self.qprint("Saving job DB status   as '%s'" %  str_pmanStatus,
+                                                            comms = 'status')
+            self.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
+                                                            comms = 'status')
+        if str_pmanStatus == 'finishedWithError': self.app_handleRemoteError()
 
+
+    def app_handleRemoteError(self, *args, **kwargs):
+        """
+        Collect the 'stderr' from the remote app
+        """
+
+        str_deepVal = ''
+
+        def str_deepnest(d):
+            nonlocal str_deepVal
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    str_deepnest(v)
+                else:
+                    # self.str_deep = '%s' % ("{0} : {1}".format(k, v))
+                    str_deepVal = v
+
+        # Collect the 'stderr' from pman for this instance
+        d_msg   = {
+            "action": "search",
+            "meta": {
+                "key":      "jid",
+                "value":    str(self.d_pluginInst['id']),
+                "job":      "0",
+                "when":     "end",
+                "field":    "stderr"
+            }
+        }
+        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+
+        purl    = Purl(
+            msg         = json.dumps(d_msg),
+            http        = str_http,
+            verb        = 'POST',
+            contentType = 'application/vnd.collection+json',
+            b_raw       = True,
+            b_quiet     = False,
+            jsonwrapper = 'payload',
+        )
+
+        self.str_deep   = ''
+        d_pman          = json.loads(purl())
+        str_deepnest(d_pman['d_ret'])
+        self.qprint(str_deepVal, comms = 'error')
+
+        purl.d_msg['meta']['field'] = 'returncode'
+        d_pman          = json.loads(purl())
+        str_deepnest(d_pman['d_ret'])
+        self.qprint(str_deepVal, comms = 'error')
 
 if __name__ == '__main__':
 
