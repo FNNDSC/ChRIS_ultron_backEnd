@@ -176,17 +176,11 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         """
         instance = self.get_object()
 
-        instance.status = 'whatever'
-        instance.save()
+        chris2pman   = charm.Charm(
+            plugin_inst = instance
+        )
 
-        # chris2pman   = charm.Charm(
-        #     plugin_inst = instance
-        # )
-        #
-        # if status is finished and not yet_register_outputfiles():
-        #     register_outputfile()
-        #     yet_register_outputfiles(true)
-
+        chris2pman.app_statusCheckAndRegister()
 
         serializer = self.get_serializer(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
