@@ -41,7 +41,7 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 class BaseClassAttrEnforcer(type):
     def __init__(cls, name, bases, d):
         # class variables to be enforced in the subclasses
-        attrs = ['DESCRIPTION', 'TYPE', 'TITLE', 'LICENSE']
+        attrs = ['DESCRIPTION', 'TYPE', 'TITLE', 'LICENSE', 'SELFPATH', 'SELFEXEC', 'EXECSHELL']
         for attr in attrs:
             if attr not in d:
                 raise ValueError("Class %s doesn't define %s class variable" % (name,
