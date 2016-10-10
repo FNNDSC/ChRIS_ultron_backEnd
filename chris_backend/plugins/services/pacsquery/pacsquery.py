@@ -10,14 +10,11 @@
 
 
 
-import os, sys, json
+import os, sys, json, pypx
 
 # import the Chris app superclass
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from pacs import PACS
 
 class PacsQueryApp(ChrisApp):
     '''
@@ -65,10 +62,8 @@ class PacsQueryApp(ChrisApp):
             'server_port': options.server_port
         }
 
-        pacs = PACS(pacs_settings)
-
         # echo the PACS to make sure we can access it
-        echo = pacs.echo()
+        echo = pypx.echo(pacs_settings)
         if echo['status'] == 'error':
             with open(os.path.join(options.outputdir,echo['status'] + '.txt'), 'w') as outfile:
                 json.dump(echo, outfile, indent=4, sort_keys=True, separators=(',', ':'))
@@ -90,7 +85,8 @@ class PacsQueryApp(ChrisApp):
             'SeriesDescription': options.series_description
         }
 
-        find = pacs.find(query_settings)
+        # python 3.5...
+        find = pypx.find({**pacs_settings, **query_settings})
         with open(os.path.join(options.outputdir,find['status'] + '.txt'), 'w') as outfile:
             json.dump(find, outfile, indent=4, sort_keys=True, separators=(',', ':'))
 
