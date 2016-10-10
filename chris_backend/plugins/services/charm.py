@@ -13,9 +13,9 @@ import  datetime
 import  socket
 import  json
 
-from    .pman._colors       import Colors
-from    .pman.crunner       import crunner
-from    .pman.purl          import Purl
+from    pman._colors       import Colors
+from    pman.crunner       import crunner
+from    pman.purl          import Purl
 
 import  datetime
 import  pdb
