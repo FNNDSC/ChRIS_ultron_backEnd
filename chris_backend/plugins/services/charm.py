@@ -13,9 +13,13 @@ import  datetime
 import  socket
 import  json
 
-from    .pman._colors       import Colors
-from    .pman.crunner       import crunner
-from    .pman.purl          import Purl
+# from    .pman._colors       import Colors
+# from    .pman.crunner       import crunner
+# from    .pman.purl          import Purl
+
+from    pman._colors       import Colors
+from    pman.crunner       import crunner
+from    pman.purl          import Purl
 
 import  datetime
 import  pdb
@@ -254,7 +258,7 @@ class Charm():
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
         self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
-        if str_pmanStatus == 'finishedSuccessfully' and str_pmanStatus != str_DBstatus:
+        if 'finished' in str_pmanStatus and str_pmanStatus != str_DBstatus:
             self.qprint('Registering output files...', comms = 'status')
             self.c_pluginInst.register_output_files()
             self.c_pluginInst.status    = str_pmanStatus
@@ -280,8 +284,8 @@ class Charm():
                 if isinstance(v, dict):
                     str_deepnest(v)
                 else:
-                    # self.str_deep = '%s' % ("{0} : {1}".format(k, v))
-                    str_deepVal = v
+                    str_deepVal = '%s' % ("{0} : {1}".format(k, v))
+                    # str_deepVal = v
 
         # Collect the 'stderr' from pman for this instance
         d_msg   = {
