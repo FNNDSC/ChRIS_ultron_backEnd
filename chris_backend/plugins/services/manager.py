@@ -92,6 +92,11 @@ class PluginManager(object):
             plg_type = param['type']
             plugin_param.type = [key for key in TYPES if TYPES[key]==plg_type][0]
             plugin_param.optional = param['optional']
+            if param['default'] is None:
+                plugin_param.default = ""
+            else:
+                plugin_param.default = str(param['default'])
+            plugin_param.help = param['help']
             plugin_param.save()
                   
     def remove_plugin(self, name):

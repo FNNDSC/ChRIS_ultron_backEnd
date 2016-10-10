@@ -9,8 +9,9 @@ Welcome to chris ultron backend's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
+   authentication
    api
 
 Indices and tables

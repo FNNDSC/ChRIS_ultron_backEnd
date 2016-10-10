@@ -10,7 +10,7 @@
 
 
 
-import os, sys, shutil
+import os, sys, shutil, time
 
 # import the Chris app superclass
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
@@ -21,28 +21,44 @@ class SimpleDSApp(ChrisApp):
     '''
     Add prefix given by the --prefix option to the name of each input file.
     '''
-    AUTHORS = 'FNNDSC (dev@babyMRI.org)'
-    TITLE = 'Simple chris ds app'
-    CATEGORY = ''
-    TYPE = 'ds'
-    DESCRIPTION = 'A simple chris ds app demo'
-    DOCUMENTATION = 'http://wiki'
-    LICENSE = 'Opensource (MIT)'
-    VERSION = '0.1'
+    AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
+    SELFPATH        = os.path.dirname(__file__)
+    SELFEXEC        = os.path.basename(__file__)
+    EXECSHELL       = 'python3'
+    TITLE           = 'Simple chris ds app'
+    CATEGORY        = ''
+    TYPE            = 'ds'
+    DESCRIPTION     = 'A simple chris ds app demo'
+    DOCUMENTATION   = 'http://wiki'
+    LICENSE         = 'Opensource (MIT)'
+    VERSION         = '0.1'
 
     def define_parameters(self):
+
         self.add_parameter('--prefix', action='store', dest='prefix', type=str,
                           optional=False, help='prefix for file names')
+        self.add_parameter('--sleepLength',
+                           action   = 'store',
+                           dest     = 'sleepLength',
+                           type     = str,
+                           optional = True,
+                           help     ='prefix for file names',
+                           default  = '0')
 
     def run(self, options):
+
+        time.sleep(int(options.sleepLength))
+        print('sleeping for %s' % options.sleepLength)
         for (dirpath, dirnames, filenames) in os.walk(options.inputdir):
             output_path =  os.path.join(options.outputdir,
                                         dirpath.replace(options.inputdir, ""))
             for dirname in dirnames:
                 os.makedirs(os.path.join(output_path, dirnames))
             for name in filenames:
-                new_name = options.prefix + name
-                shutil.copy(os.path.join(dirpath, name), os.path.join(output_path, new_name))
+                new_name    = options.prefix + name
+                str_outpath = os.path.join(output_path, new_name)
+                print('Creating new file... %s' % str_outpath)
+                shutil.copy(os.path.join(dirpath, name), str_outpath)
             
 
 

@@ -41,7 +41,7 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 class BaseClassAttrEnforcer(type):
     def __init__(cls, name, bases, d):
         # class variables to be enforced in the subclasses
-        attrs = ['DESCRIPTION', 'TYPE', 'TITLE', 'LICENSE']
+        attrs = ['DESCRIPTION', 'TYPE', 'TITLE', 'LICENSE', 'SELFPATH', 'SELFEXEC', 'EXECSHELL']
         for attr in attrs:
             if attr not in d:
                 raise ValueError("Class %s doesn't define %s class variable" % (name,
@@ -54,14 +54,17 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     The super class for all valid ChRIS plugin apps.
     '''
     
-    AUTHORS = 'FNNDSC (dev@babyMRI.org)'
-    TITLE = ''
-    CATEGORY = ''
-    TYPE = 'ds'
-    DESCRIPTION = None
-    DOCUMENTATION = ''
-    LICENSE = ''
-    VERSION = ''
+    AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
+    TITLE           = ''
+    CATEGORY        = ''
+    TYPE            = 'ds'
+    SELFPATH        = ''
+    SELFEXEC        = ''
+    EXECSHELL       = ''
+    DESCRIPTION     = None
+    DOCUMENTATION   = ''
+    LICENSE         = ''
+    VERSION         = ''
   
     def __init__(self):
         '''
@@ -105,6 +108,7 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         '''
         Add a parameter to this app. 
         '''
+        # make sure required parameter options were defined
         try:
             name = kwargs['dest']
             param_type = kwargs['type']
@@ -112,13 +116,16 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             action = kwargs['action']
         except KeyError as e:
             detail = "%s option required. " % e 
-            raise KeyError(detail)        
+            raise KeyError(detail)
+        if optional and ('default' not in kwargs):
+            detail = "A default values is required for optional parameter %s." % name
+            raise KeyError(detail)
 
         # grab the default and help values
         default = None
-        param_help = None
         if 'default' in kwargs:
             default = kwargs['default']
+        param_help = ""
         if 'help' in kwargs:
             param_help = kwargs['help']
 
@@ -133,11 +140,14 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
 
     def get_json_representation(self):
         '''
-        Return a JSON object with a reprsentation of this app (type and parameters). 
+        Return a JSON object with a representation of this app (type and parameters).
         '''
-        repres = {}
-        repres['type'] = self.TYPE
-        repres['parameters'] = self._parameters
+        repres                  = {}
+        repres['type']          = self.TYPE
+        repres['parameters']    = self._parameters
+        repres['selfpath']      = self.SELFPATH
+        repres['selfexec']      = self.SELFEXEC
+        repres['execshell']     = self.EXECSHELL
         return repres
 
     def launch(self, args=None):

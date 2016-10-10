@@ -14,6 +14,7 @@ TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
+STATUS_TYPES = ['started', 'running-on-remote', 'finished-on-remote']
 
 class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
@@ -31,7 +32,9 @@ class Plugin(models.Model):
 class PluginParameter(models.Model):
     name = models.CharField(max_length=100)
     optional = models.BooleanField(default=True)
+    default = models.CharField(max_length=200, blank=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
+    help = models.TextField(blank=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE,
                                related_name='parameters')
     
@@ -45,7 +48,7 @@ class PluginParameter(models.Model):
 class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, default='started')
+    status = models.CharField(max_length=30, default=STATUS_TYPES[0])
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
@@ -117,7 +120,7 @@ class PluginInstance(models.Model):
         
         
 class StringParameter(models.Model):
-    value = models.CharField(max_length=200)
+    value = models.CharField(max_length=200, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -150,7 +153,7 @@ class FloatParameter(models.Model):
 
 
 class BoolParameter(models.Model):
-    value = models.BooleanField(default=False)
+    value = models.BooleanField(default=False, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='bool_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
