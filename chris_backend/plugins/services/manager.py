@@ -8,6 +8,7 @@ from importlib import import_module
 from argparse import ArgumentParser
 from inspect import getmembers
 
+
 if "DJANGO_SETTINGS_MODULE" not in os.environ:
     # django needs to be loaded (eg. when this script is run from the command line)
     sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
@@ -17,10 +18,11 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 
 from django.utils import timezone
 
-from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES
+from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 
 _APPS_PACKAGE = 'plugins.services'
 
+from plugins.services import charm
 
 class PluginManager(object):
 
@@ -144,6 +146,8 @@ class PluginManager(object):
         app_args.append("--saveopts")
         app_args.append(os.path.join(os.path.dirname(outputdir), "opts.json"))
         # append the parameters to app's argument list
+        print('in run_plugin_app, parameter_dict = %s' % parameter_dict)
+        print('in run_plugin_app, plugin_repr = %s' % plugin_repr['parameters'])
         if parameter_dict:
             for param_name in parameter_dict:
                 param_value = parameter_dict[param_name]
@@ -154,9 +158,25 @@ class PluginManager(object):
                             app_args.append(param_value)
                         break
         # run the app with all the arguments
-        app.launch(app_args)
+        print('in run_plugin_app, app_args = %s' % app_args)
+
+        chris2pman   = charm.Charm(
+            app_args    = app_args,
+            d_args      = parameter_dict,
+            plugin_inst = plugin_inst,
+            plugin_repr = plugin_repr,
+            app         = app,
+            inputdir    = inputdir,
+            outputdir   = outputdir
+        )
+
+        # chris2pman.app_crunner()
+        chris2pman.app_manage(method = 'pman')
+        # app.launch(app_args)
+        # poll loop
+
         # register output files with the system
-        plugin_inst.register_output_files()
+        # plugin_inst.register_output_files()
                 
 
 
