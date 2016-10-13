@@ -11,6 +11,7 @@ sudo apt-get install git
 sudo apt-get install mysql-server
 sudo apt-get install apache2 apache2-dev
 sudo apt-get install python-pip python3-dev libmysqlclient-dev
+sudo apt-get install libssl-dev libcurl4-openssl-dev
 sudo pip install virtualenv virtualenvwrapper
 ````
 
