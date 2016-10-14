@@ -114,7 +114,7 @@ class Charm():
         self.qprint('app            = %s'   % self.app)
         self.qprint('inputdir       = %s'   % self.str_inputdir)
         self.qprint('outputdir      = %s'   % self.str_outputdir)
-        pdb.set_trace()
+        # pdb.set_trace()
 
     def app_manage(self, **kwargs):
         """
@@ -250,7 +250,9 @@ class Charm():
         )
 
         d_pman          = json.loads(purl())
+        print("aleee...")
         str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        print("ooop...")
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
         self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
