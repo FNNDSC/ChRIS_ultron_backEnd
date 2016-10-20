@@ -13,18 +13,45 @@ import  datetime
 import  socket
 import  json
 
-from    pman._colors       import Colors
-from    pman.crunner       import crunner
-from    pman.purl          import Purl
+from    pman._colors        import Colors
+from    pman.crunner        import crunner
+from    pman.purl           import Purl
+from    pman.message        import Message
 
-import  datetime
-import  pdb
+import  pudb
 
 class pman_settings():
-    HOST    =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    PORT    = '5010'
+    HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    PORT        = '5010'
+    WORKON_HOME = os.environ['WORKON_HOME']
+    VIRTUAL_ENV = os.environ['VIRTUAL_ENV']
+    EXEC        = 'python3'
+    PATH        = '%s/lib/python3.5/site-packages/pman/pman.py' % VIRTUAL_ENV
+    ARGS        = "--raw 1 --http --port 5010 --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
+                    os.environ['HOME']
 
 class Charm():
+
+    def log(self, *args):
+        """
+        get/set the log object.
+
+        Caller can further manipulate the log object with object-specific
+        calls.
+        """
+        if len(args):
+            self._log = args[0]
+        else:
+            return self._log
+
+    def name(self, *args):
+        """
+        get/set the descriptive name text of this object.
+        """
+        if len(args):
+            self.__name = args[0]
+        else:
+            return self.__name
 
     def qprint(self, msg, **kwargs):
 
@@ -32,16 +59,21 @@ class Charm():
         for k,v in kwargs.items():
             if k == 'comms':    str_comms  = v
 
+        if self.b_useDebug:
+            write   = self.debug
+        else:
+            write   = print
+
         if not self.b_quiet:
-            if str_comms == 'status':   print(Colors.PURPLE,    end="")
-            if str_comms == 'error':    print(Colors.RED,       end="")
-            if str_comms == "tx":       print(Colors.YELLOW + "---->")
-            if str_comms == "rx":       print(Colors.GREEN  + "<----")
-            print('%s' % datetime.datetime.now() + " | ",       end="")
-            print(msg)
-            if str_comms == "tx":       print(Colors.YELLOW + "---->")
-            if str_comms == "rx":       print(Colors.GREEN  + "<----")
-            print(Colors.NO_COLOUR, end="")
+            if str_comms == 'status':   write(Colors.PURPLE,    end="")
+            if str_comms == 'error':    write(Colors.RED,       end="")
+            if str_comms == "tx":       write(Colors.YELLOW + "---->")
+            if str_comms == "rx":       write(Colors.GREEN  + "<----")
+            write('%s' % datetime.datetime.now() + " | ",       end="")
+            write(msg)
+            if str_comms == "tx":       write(Colors.YELLOW + "---->")
+            if str_comms == "rx":       write(Colors.GREEN  + "<----")
+            write(Colors.NO_COLOUR, end="")
 
     def col2_print(self, str_left, str_right):
         print(Colors.WHITE +
@@ -52,32 +84,38 @@ class Charm():
     def __init__(self, **kwargs):
         # threading.Thread.__init__(self)
 
-        self.str_http       = ""
-        self.str_ip         = ""
-        self.str_port       = ""
-        self.str_URL        = ""
-        self.str_verb       = ""
-        self.str_msg        = ""
-        self.d_msg          = {}
-        self.str_protocol   = "http"
-        self.pp             = pprint.PrettyPrinter(indent=4)
-        self.b_man          = False
-        self.str_man        = ''
-        self.b_quiet        = False
-        self.b_raw          = False
-        self.auth           = ''
-        self.str_jsonwrapper= ''
-        self.str_inputdir   = ''
-        self.str_outputdir  = ''
+        self._log                   = Message()
+        self._log._b_syslog         = True
+        self.__name                 = "Charm"
+        self.b_useDebug             = False
+        self.str_debugFile          = '%s/tmp/debug-charm.log' % os.environ['HOME']
 
-        self.d_args         = {}
-        self.l_appArgs      = {}
-        self.c_pluginInst   = {}
-        self.d_pluginRepr   = {}
-        self.app            = None
+        self.str_http               = ""
+        self.str_ip                 = ""
+        self.str_port               = ""
+        self.str_URL                = ""
+        self.str_verb               = ""
+        self.str_msg                = ""
+        self.d_msg                  = {}
+        self.str_protocol           = "http"
+        self.pp                     = pprint.PrettyPrinter(indent=4)
+        self.b_man                  = False
+        self.str_man                = ''
+        self.b_quiet                = False
+        self.b_raw                  = False
+        self.auth                   = ''
+        self.str_jsonwrapper        = ''
+        self.str_inputdir           = ''
+        self.str_outputdir          = ''
 
-        self.LC             = 40
-        self.RC             = 40
+        self.d_args                 = {}
+        self.l_appArgs              = {}
+        self.c_pluginInst           = {}
+        self.d_pluginRepr           = {}
+        self.app                    = None
+
+        self.LC                     = 40
+        self.RC                     = 40
 
         for key,val in kwargs.items():
 
@@ -88,6 +126,13 @@ class Charm():
             if key == 'app':            self.app            = val
             if key == 'inputdir':       self.str_inputdir   = val
             if key == 'outputdir':      self.str_outputdir  = val
+            if key == 'useDebug':       self.b_useDebug     = val
+            if key == 'debugFile':      self.str_debugFile  = val
+
+        if self.b_useDebug:
+            self.debug                  = Message(logTo = self.str_debugFile)
+            self.debug._b_syslog        = True
+            self.debug._b_flushNewLine  = True
 
         self.d_pluginInst   = vars(self.c_pluginInst)
 
@@ -140,7 +185,7 @@ class Charm():
         self.app.launch(self.l_appArgs)
         self.c_pluginInst.register_output_files()
 
-    def app_crunner(self):
+    def app_crunnerWrap(self):
         """
         Run the "app" in a crunner instance.
 
@@ -149,7 +194,7 @@ class Charm():
         """
 
         str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
-        print(str_cmdLineArgs)
+        self.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
 
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
@@ -158,9 +203,27 @@ class Charm():
             str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        print(str_cmd)
+        self.qprint('cmd = %s' % str_cmd)
 
-        verbosity               = 10
+        self.app_crunner(str_cmd, loopctl = True)
+        self.c_pluginInst.register_output_files()
+
+    def app_crunner(self, str_cmd, **kwargs):
+        """
+        Run the "app" in a crunner instance.
+
+        :param self:
+        :return:
+        """
+
+        # The loopctl controls whether or not to block on the
+        # crunner shell job
+        b_loopctl               = False
+
+        for k,v in kwargs.items():
+            if k == 'loopctl':  b_loopctl = v
+
+        verbosity               = 1
         shell                   = crunner(verbosity = verbosity)
 
         shell.b_splitCompound   = True
@@ -169,21 +232,62 @@ class Charm():
         shell.b_echoCmd         = True
 
         shell(str_cmd)
-        shell.jobs_loopctl()
+        if b_loopctl:
+            shell.jobs_loopctl()
 
-        # self.app.launch(self.l_appArgs)
-        self.c_pluginInst.register_output_files()
+    def app_pman_checkIfAvailable(self, *args, **kwargs):
+        """
+        This method checks if the remote 'pman' service is available by asking
+        'pman' for system status.
+
+        :param args:
+        :param kwargs:
+        :return: True | False
+        """
+
+        d_msg = {
+            "action":   "hello",
+            "meta": {
+                        "askAbout":     "sysinfo",
+                        "echoBack":     "Hi there!"
+            }
+        }
+
+        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+
+        purl    = Purl(
+            msg         = json.dumps(d_msg),
+            http        = str_http,
+            verb        = 'POST',
+            contentType = 'application/vnd.collection+json',
+            b_raw       = True,
+            b_quiet     = False,
+            jsonwrapper = 'payload',
+        )
+
+        # speak to pman...
+        d_response      = json.loads(purl())
+        if isinstance(d_response, dict):
+            print("class")
+            self.qprint('response from purl() in checkIfAvailable: %s ' % json.dumps(d_response, indent=2))
+        else:
+            self.qprint('response from purl(): %s' % d_response)
+            if "Connection refused" in d_response:
+                self.app_pman_start()
 
     def app_pman(self, *args, **kwargs):
         """
         Run the "app" via pman
         """
 
-        print(self.d_args)
-        str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
-        print('in app_pman, cmdLineArg = %s' % str_cmdLineArgs)
+        # First, check if pman is available... and start it if it is not.
+        self.app_pman_checkIfAvailable()
 
-        print('in app_pman, l_appArgs = %s' % self.l_appArgs)
+        self.qprint('d_args = %s' % self.d_args)
+        str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
+        self.qprint('in app_pman, cmdLineArg = %s' % str_cmdLineArgs)
+
+        self.qprint('in app_pman, l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
@@ -191,7 +295,7 @@ class Charm():
             str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        print('in app_pman, cmd = %s' % str_cmd)
+        self.qprint('in app_pman, cmd = %s' % str_cmd)
 
         d_msg = {
             'action':   'run',
@@ -202,10 +306,10 @@ class Charm():
                         'jid':      str(self.d_pluginInst['id'])
             }
         }
-        print(d_msg)
 
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
-        print(str_http)
+
+        # pudb.set_trace()
 
         purl    = Purl(
             msg         = json.dumps(d_msg),
@@ -218,7 +322,32 @@ class Charm():
         )
 
         # run the app
-        print(json.dumps(json.loads(purl()), indent=2))
+        d_response      = json.loads(purl())
+        if isinstance(d_response, dict):
+            print("class")
+            self.qprint('response from purl(): %s ' % json.dumps(d_response, indent=2))
+        else:
+            self.qprint('response from purl(): %s' % d_response)
+            if "Connection refused" in d_response:
+                self.qprint('in app pman, fatal error in talking to pman', comms = 'error')
+
+    def app_pman_start(self, *args, **kwargs):
+        """
+        Attempt to start a remote pman service.
+
+        This method is called is an attempt to speak with a pman service is unsuccessful, and
+        the assumption is that 'pman' is down. We will attempt to restart 'pman' for this
+        user in this case.
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
+
+        str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
+        self.qprint('pman start cmd = %s' % str_pmanStart)
+        self.app_crunner('%s' % str_pmanStart, loopctl = False)
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
@@ -250,9 +379,7 @@ class Charm():
         )
 
         d_pman          = json.loads(purl())
-        print("aleee...")
         str_pmanStatus  = d_pman['d_ret']['l_status'][0]
-        print("ooop...")
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
         self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
