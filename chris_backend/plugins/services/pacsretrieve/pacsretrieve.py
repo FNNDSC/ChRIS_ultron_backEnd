@@ -22,6 +22,9 @@ class PacsRetrieveApp(ChrisApp):
     given by the --dir argument.
     '''
     AUTHORS = 'FNNDSC (dev@babyMRI.org)'
+    SELFPATH        = os.path.dirname(__file__)
+    SELFEXEC        = os.path.basename(__file__)
+    EXECSHELL       = 'python3'
     TITLE = 'Pacs Retrieve'
     CATEGORY = ''
     TYPE = 'ds'
@@ -35,6 +38,7 @@ class PacsRetrieveApp(ChrisApp):
         # PACS settings
         self.add_parameter('--aet', action='store', dest='aet', type=str, default='CHRIS-ULTRON-AET',optional=True, help='aet')
         self.add_parameter('--aec', action='store', dest='aec', type=str, default='CHRIS-ULTRON-AEC',optional=True, help='aec')
+        self.add_parameter('--aetListener', action='store', dest='aet_listener', type=str, default='CHRIS-ULTRON-LIS',optional=True, help='aet listener')
         self.add_parameter('--serverIP', action='store', dest='server_ip', type=str, default='192.168.1.110',optional=True, help='PACS server IP')
         self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
 

@@ -114,7 +114,6 @@ class Charm():
         self.qprint('app            = %s'   % self.app)
         self.qprint('inputdir       = %s'   % self.str_inputdir)
         self.qprint('outputdir      = %s'   % self.str_outputdir)
-        pdb.set_trace()
 
     def app_manage(self, **kwargs):
         """

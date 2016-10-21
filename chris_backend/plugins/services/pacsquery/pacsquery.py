@@ -22,6 +22,9 @@ class PacsQueryApp(ChrisApp):
     given by the --dir argument.
     '''
     AUTHORS = 'FNNDSC (dev@babyMRI.org)'
+    SELFPATH        = os.path.dirname(__file__)
+    SELFEXEC        = os.path.basename(__file__)
+    EXECSHELL       = 'python3'
     TITLE = 'Pacs Query'
     CATEGORY = ''
     TYPE = 'fs'
