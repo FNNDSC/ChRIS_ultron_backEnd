@@ -146,8 +146,6 @@ class PluginManager(object):
         app_args.append("--saveopts")
         app_args.append(os.path.join(os.path.dirname(outputdir), "opts.json"))
         # append the parameters to app's argument list
-        print('in run_plugin_app, parameter_dict = %s' % parameter_dict)
-        print('in run_plugin_app, plugin_repr = %s' % plugin_repr['parameters'])
         if parameter_dict:
             for param_name in parameter_dict:
                 param_value = parameter_dict[param_name]
@@ -158,7 +156,6 @@ class PluginManager(object):
                             app_args.append(param_value)
                         break
         # run the app with all the arguments
-        print('in run_plugin_app, app_args = %s' % app_args)
 
         chris2pman   = charm.Charm(
             app_args    = app_args,
@@ -167,7 +164,9 @@ class PluginManager(object):
             plugin_repr = plugin_repr,
             app         = app,
             inputdir    = inputdir,
-            outputdir   = outputdir
+            outputdir   = outputdir,
+            useDebug    = True,
+            debugFile   = '%s/tmp/debug-charm.log' % os.environ['HOME']
         )
 
         # chris2pman.app_crunner()
