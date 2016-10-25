@@ -64,16 +64,20 @@ class Charm():
         else:
             write   = print
 
+        # pudb.set_trace()
+
         if not self.b_quiet:
-            if str_comms == 'status':   write(Colors.PURPLE,    end="")
-            if str_comms == 'error':    write(Colors.RED,       end="")
-            if str_comms == "tx":       write(Colors.YELLOW + "---->")
-            if str_comms == "rx":       write(Colors.GREEN  + "<----")
-            write('%s' % datetime.datetime.now() + " | ",       end="")
-            write(msg)
-            if str_comms == "tx":       write(Colors.YELLOW + "---->")
-            if str_comms == "rx":       write(Colors.GREEN  + "<----")
-            write(Colors.NO_COLOUR, end="")
+            if not self.b_useDebug:
+                if str_comms == 'status':   write(Colors.PURPLE,    end="")
+                if str_comms == 'error':    write(Colors.RED,       end="")
+                if str_comms == "tx":       write(Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(Colors.GREEN  + "<----")
+                write('%s' % datetime.datetime.now() + " ",       end="")
+            write(' | ' + msg)
+            if not self.b_useDebug:
+                if str_comms == "tx":       write(Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(Colors.GREEN  + "<----")
+                write(Colors.NO_COLOUR, end="")
 
     def col2_print(self, str_left, str_right):
         print(Colors.WHITE +
@@ -88,7 +92,11 @@ class Charm():
         self._log._b_syslog         = True
         self.__name                 = "Charm"
         self.b_useDebug             = False
-        self.str_debugFile          = '%s/tmp/debug-charm.log' % os.environ['HOME']
+
+        str_debugDir                = '%s/tmp' % os.environ['HOME']
+        if not os.path.exists(str_debugDir):
+            os.makedirs(str_debugDir)
+        self.str_debugFile          = '%s/debug-charm.log' % str_debugDir
 
         self.str_http               = ""
         self.str_ip                 = ""
@@ -152,14 +160,13 @@ class Charm():
 
             """)
 
-        self.qprint('d_args         = \n%s' % self.pp.pformat(self.d_args))
+        self.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.qprint('app_args       = %s'   % self.l_appArgs)
-        self.qprint('d_pluginInst   = \n%s' % self.pp.pformat(self.d_pluginInst))
-        self.qprint('d_pluginRepr   = \n%s' % self.pp.pformat(self.d_pluginRepr))
+        self.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
+        self.qprint('d_pluginRepr   = %s'   % self.pp.pformat(self.d_pluginRepr).strip())
         self.qprint('app            = %s'   % self.app)
         self.qprint('inputdir       = %s'   % self.str_inputdir)
         self.qprint('outputdir      = %s'   % self.str_outputdir)
-        # pdb.set_trace()
 
     def app_manage(self, **kwargs):
         """
@@ -224,7 +231,9 @@ class Charm():
             if k == 'loopctl':  b_loopctl = v
 
         verbosity               = 1
-        shell                   = crunner(verbosity = verbosity)
+        shell                   = crunner(verbosity = verbosity,
+                                          debug     = True,
+                                          debugTo   = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
 
         shell.b_splitCompound   = True
         shell.b_showStdOut      = True
@@ -268,10 +277,9 @@ class Charm():
         # speak to pman...
         d_response      = json.loads(purl())
         if isinstance(d_response, dict):
-            print("class")
-            self.qprint('response from purl() in checkIfAvailable: %s ' % json.dumps(d_response, indent=2))
+            self.qprint('successful response from purl() in checkIfAvailable: %s ' % json.dumps(d_response, indent=2))
         else:
-            self.qprint('response from purl(): %s' % d_response)
+            self.qprint('unsuccessful response from purl(): %s' % d_response)
             if "Connection refused" in d_response:
                 self.app_pman_start()
 
@@ -347,6 +355,9 @@ class Charm():
 
         str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
         self.qprint('pman start cmd = %s' % str_pmanStart)
+
+        # pudb.set_trace()
+
         self.app_crunner('%s' % str_pmanStart, loopctl = False)
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
