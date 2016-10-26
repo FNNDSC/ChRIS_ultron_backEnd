@@ -155,6 +155,7 @@ class PluginManager(object):
                         if plugin_param['action'] == 'store':
                             app_args.append(param_value)
                         break
+
         # run the app with all the arguments
 
         chris2pman   = charm.Charm(

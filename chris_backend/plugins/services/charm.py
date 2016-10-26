@@ -125,8 +125,7 @@ class Charm():
         self.LC                     = 40
         self.RC                     = 40
 
-        for key,val in kwargs.items():
-
+        for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs      = val
             if key == 'd_args':         self.d_args         = val
             if key == 'plugin_inst':    self.c_pluginInst   = val
@@ -149,16 +148,22 @@ class Charm():
             print(Colors.LIGHT_GREEN)
             print("""
             \t\t\t+---------------------+
-            \t\t\t| Welcome to Charm.py |
+            \t\t\t|  Welcome to charm!  |
             \t\t\t+---------------------+
             """)
             print(Colors.CYAN + """
-            Charm is the interface class/code between ChRIS and a pman process management
+            'charm' is the interface class/code between ChRIS and a pman process management
             system.
 
-            See 'charm.py --man commands' for more help.
-
-            """)
+            See 'charm.py --man commands' for more help. """)
+            if self.b_useDebug:
+                print("""
+                See the file '%s' for debugging output.
+                """ % (self.str_debugFile))
+            else:
+                print("""
+                See *this* stream for debugging output.
+                """)
 
         self.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.qprint('app_args       = %s'   % self.l_appArgs)
@@ -272,6 +277,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         # speak to pman...
@@ -327,6 +334,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         # run the app
@@ -387,6 +396,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         d_pman          = json.loads(purl())
@@ -444,6 +455,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         self.str_deep   = ''
