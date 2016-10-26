@@ -27,8 +27,8 @@ class pman_settings():
     VIRTUAL_ENV = os.environ['VIRTUAL_ENV']
     EXEC        = 'python3'
     PATH        = '%s/lib/python3.5/site-packages/pman/pman.py' % VIRTUAL_ENV
-    ARGS        = "--raw 1 --http --port 5010 --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
-                    os.environ['HOME']
+    ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
+                    ( PORT, os.environ['HOME'] )
 
 class Charm():
 
