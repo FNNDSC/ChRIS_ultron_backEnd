@@ -66,6 +66,8 @@ class PacsQueryApp(ChrisApp):
         }
 
         # echo the PACS to make sure we can access it
+        pacs_settings['executable'] = '/usr/bin/echoscu'
+
         echo = pypx.echo(pacs_settings)
         if echo['status'] == 'error':
             with open(os.path.join(options.outputdir,echo['status'] + '.txt'), 'w') as outfile:
@@ -75,6 +77,7 @@ class PacsQueryApp(ChrisApp):
         # find in the PACS
         # find ALL by default (studies + series + images)
         # type: all, study, series, image
+        pacs_settings['executable'] = '/usr/bin/findscu'
 
         # query parameters
         query_settings = {
