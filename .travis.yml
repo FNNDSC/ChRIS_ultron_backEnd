@@ -9,13 +9,13 @@ before_install:
   - sudo apt-get install apache2 apache2-dev
   - sudo apt-get install python3-dev libmysqlclient-dev
   - sudo apt-get install libssl-dev libcurl4-openssl-dev
+  - mysql -u root -e "CREATE DATABASE chris_dev CHARACTER SET utf8;"
+  - mysql -u root -e "GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';"
+  - mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';"
 # command to install dependencies
 install: pip install -r requirements/local.txt
 # command to setup database
 before_script:
-  - mysql -u root -e "CREATE DATABASE chris_dev CHARACTER SET utf8;"
-  - mysql -u root -e "GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';"
-  - mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';"
   - python chris_backend/manage.py migrate
 # command to run tests
 script: python chris_backend/manage.py test
