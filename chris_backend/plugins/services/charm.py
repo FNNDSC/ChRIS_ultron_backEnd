@@ -25,7 +25,7 @@ import  pudb
 class pman_settings():
 
     p           = pman.__path__
-    str_path    = str(p).split("'/")[1].split("']")[0]
+    str_path    = '/' + str(p).split("'/")[1].split("']")[0]
 
     HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
     PORT        = '5010'
@@ -270,6 +270,8 @@ class Charm():
                         "echoBack":     "Hi there!"
             }
         }
+
+        # pudb.set_trace()
 
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
 
