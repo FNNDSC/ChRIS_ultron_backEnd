@@ -1,6 +1,5 @@
 language: python
-dist: trusty
-sudo: required
+dist: xenial
 python:
   - "3.5"
 services:
