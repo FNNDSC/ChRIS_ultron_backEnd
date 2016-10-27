@@ -1,4 +1,6 @@
 # ChRIS_ultron_backEnd
+[![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
+
 Back end for ChRIS Ultron.
 
 ## Development environment
