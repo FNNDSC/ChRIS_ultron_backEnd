@@ -197,7 +197,7 @@ class PluginInstanceDetailViewTests(ViewTests):
          
     def test_plugin_instance_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        pudb.set_trace()
+        # pudb.set_trace()
         response = self.client.get(self.read_url)
         self.assertContains(response, "pacspull")
 
