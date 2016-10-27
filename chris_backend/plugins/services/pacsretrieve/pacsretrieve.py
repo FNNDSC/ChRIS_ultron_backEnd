@@ -43,9 +43,9 @@ class PacsRetrieveApp(ChrisApp):
         self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
 
         # Retrieve settings
-        self.add_parameter('--seriesUIDS', action='store', dest='series_uids', type=str, default='2,3',optional=True, help='Series UIDs to be retrieved')
+        self.add_parameter('--seriesUIDS', action='store', dest='series_uids', type=str, default='0,1',optional=True, help='Series UIDs to be retrieved')
         self.add_parameter('--seriesFile', action='store', dest='series_file', type=str, default='/tmp/success.txt',optional=True, help='Files from which SeriesInstanceUID to be pulled will be fetched')
-        self.add_parameter('--dataLocation', action='store', dest='data_location', type=str, default='/tmp/data',optional=True, help='Location where the DICOM Listener receives the data.')
+        self.add_parameter('--dataLocation', action='store', dest='data_location', type=str, default='/tmp/host/data',optional=True, help='Location where the DICOM Listener receives the data.')
 
     def run(self, options):
 
@@ -64,6 +64,7 @@ class PacsRetrieveApp(ChrisApp):
         }
 
         # echo the PACS to make sure we can access it
+        pacs_settings['executable'] = '/usr/bin/echoscu'
         echo = pypx.echo(pacs_settings)
         if echo['status'] == 'error':
             with open(os.path.join(options.outputdir,echo['status'] + '.txt'), 'w') as outfile:
@@ -71,12 +72,9 @@ class PacsRetrieveApp(ChrisApp):
             return
 
         # create dummy series file with all series
-        find = pypx.find({})
-        series_file = options.series_file
-        with open(series_file, 'w') as outfile:
-            json.dump(find, outfile, indent=4, sort_keys=True, separators=(',', ':'))
+        series_file = os.path.join(options.inputdir, 'success.txt')
 
-
+        # uids to be fetched from success.txt
         uids = options.series_uids.split(',')
         uids_set = set(uids)
         print(uids_set)
@@ -84,11 +82,12 @@ class PacsRetrieveApp(ChrisApp):
         # parser series file
         data_file = open(series_file, 'r')
         data = json.load(data_file)
-        print(data)
+        print(data['data'])
         data_file.close()
         filtered_uids = [series for series in data['data'] if str(series['uid']['value']) in uids_set]
-        path_dict = {}
+        print( filtered_uids )
 
+        path_dict = []
         data_directory = options.data_location
 
         # create destination directories
@@ -100,7 +99,7 @@ class PacsRetrieveApp(ChrisApp):
             source = os.path.join(data_directory, series_dir)
             series_info = os.path.join(source, 'series.info')
             destination = os.path.join(options.outputdir, series_dir)
-            path_dict[str(series['uid']['value'])] = {'source': source, 'destination': destination, 'info': series_info}
+            path_dict.append( {'source': source, 'destination': destination, 'info': series_info} )
 
         print(path_dict)
 
@@ -109,18 +108,24 @@ class PacsRetrieveApp(ChrisApp):
         # wait for files to arrive!
         timer = 0 # 30mn
 
-        while timer < 10: # 1h
-            for path in path_dict.keys():
+        while timer < 100: # 1h
+            for path in path_dict[:]:
                 # what if pulling an existing dataset (.info file already there? need extra flag to force re=pull?)
                 if os.path.isfile(path['info']):
-                    os.makedirs(path['destination'])
-                    shutil.copytree(path['source'], path['destination'])
+
+                    if not os.path.exists(path['destination']):
+                      os.makedirs(path['destination'])
+                      shutil.copytree(path['source'], path['destination'])
+                    else:
+                      print('nothing..')
 
                     # remove from dictionnary
-                    del path_dict[k]
+                    path_dict.remove(path)
 
-            
-            time.sleep( 10 )
+            if len(path_dict) == 0:
+               break
+
+            time.sleep( 1 )
             timer += 10
 
 
