@@ -7,8 +7,9 @@ services:
 before_install:
   - sudo apt-get update
   - sudo apt-get install apache2 apache2-dev
-  - sudo apt-get install python3-dev libmysqlclient-dev
+  - sudo apt-get install python3-dev
   - sudo apt-get install libssl-dev libcurl4-openssl-dev
+  - sudo apt-get install mysql-server libmysqlclient-dev
   - mysql -u root -e "CREATE DATABASE chris_dev CHARACTER SET utf8;"
   - mysql -u root -e "GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';"
   - mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';"
