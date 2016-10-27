@@ -8,7 +8,9 @@ from django.conf import settings
 from plugins.models import Plugin, PluginParameter, PluginInstance
 from plugins.services.manager import PluginManager
 
+import time
 
+import pudb
 
 class PluginManagerTests(TestCase):
     
@@ -73,12 +75,15 @@ class PluginManagerTests(TestCase):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
+        pudb.set_trace()
+
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
         pl_manager = PluginManager()
         pl_manager.run_plugin_app(pl_inst, parameter_dict)
+        time.sleep(5)
         self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         #remove test directory
