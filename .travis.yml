@@ -18,4 +18,5 @@ before_script:
   - python chris_backend/manage.py migrate
 # command to run tests
 script: python chris_backend/manage.py test
-notifications:  slack: fnndsc:WtDpBdT7VxV8YVD4K0NPHnW1
+notifications:
+  slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
