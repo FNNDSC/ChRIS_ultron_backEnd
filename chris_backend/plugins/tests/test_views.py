@@ -11,8 +11,10 @@ from rest_framework import status
 from plugins.models import Plugin, PluginParameter, PluginInstance
 from plugins.services.manager import PluginManager
 from plugins import views
+from plugins.services import charm
 
 import pudb
+import time
 
 class ViewTests(TestCase):
     
@@ -156,7 +158,7 @@ class PluginInstanceListViewTests(ViewTests):
 
     def tearDown(self):
         #remove test directory
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_success(self):
@@ -193,7 +195,23 @@ class PluginInstanceDetailViewTests(ViewTests):
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
-        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})       
+        # pudb.set_trace()
+
+        # We need to "run" this fake object in order for pman to register the job id.
+        parameter_dict  = {'dir': './'}
+        # Fake representation too...
+        d_pluginRepr    = {'selfpath': '/bin',
+                           'selfexec': 'ls',
+                           'execshell': ''}
+        chris2pman   = charm.Charm(
+            d_args      = parameter_dict,
+            plugin_inst = pl_inst,
+            plugin_repr = d_pluginRepr
+        )
+        chris2pman.app_manage(method = 'pman')
+        time.sleep(2)
+
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
          
     def test_plugin_instance_detail_success(self):
         self.client.login(username=self.username, password=self.password)
