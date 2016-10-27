@@ -171,7 +171,7 @@ class PluginManager(object):
         )
 
         # chris2pman.app_crunner()
-        chris2pman.app_manage(method = 'internal')
+        chris2pman.app_manage(method = 'pman')
         # app.launch(app_args)
         # poll loop
 
