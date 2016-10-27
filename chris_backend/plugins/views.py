@@ -15,6 +15,8 @@ from .services.manager import PluginManager
 
 from .services import charm
 
+import pudb
+
 import  socket
 # This will need to be better addressed!
 class pman_settings():
@@ -175,6 +177,8 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         :return:
         """
         instance = self.get_object()
+
+        # pudb.set_trace()
 
         chris2pman   = charm.Charm(
             plugin_inst = instance
