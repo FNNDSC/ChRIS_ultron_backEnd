@@ -75,7 +75,7 @@ class PluginManagerTests(TestCase):
         if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-        pudb.set_trace()
+        # pudb.set_trace()
 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
