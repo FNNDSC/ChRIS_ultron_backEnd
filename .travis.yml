@@ -15,8 +15,9 @@ before_script:
   - mysql -u root -e "CREATE DATABASE chris_dev CHARACTER SET utf8;"
   - mysql -u root -e "GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';"
   - mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';"
-  - python chris_backend/manage.py migrate
+  - cd chris_backend
+  - python manage.py migrate
 # command to run tests
-script: python chris_backend/manage.py test
+script: python manage.py test
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
