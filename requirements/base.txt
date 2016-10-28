@@ -9,4 +9,4 @@ pyzmq==16.0.0
 webob==1.6.1
 psutil==4.3.1
 # tmp for pacs* plugins (until hooks to run in dock)
-pypx==0.1
+pypx==0.4

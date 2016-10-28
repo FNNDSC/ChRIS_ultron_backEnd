@@ -54,11 +54,13 @@ class PacsRetrieveApp(ChrisApp):
         # common options between all request types
         # aet
         # aec
+        # aet_listener
         # ip
         # port
         pacs_settings = {
             'aet': options.aet,
             'aec': options.aec,
+            'aet_listener': options.aet_listener,
             'server_ip': options.server_ip,
             'server_port': options.server_port
         }
@@ -77,20 +79,19 @@ class PacsRetrieveApp(ChrisApp):
         # uids to be fetched from success.txt
         uids = options.series_uids.split(',')
         uids_set = set(uids)
-        print(uids_set)
 
         # parser series file
         data_file = open(series_file, 'r')
         data = json.load(data_file)
-        print(data['data'])
         data_file.close()
         filtered_uids = [series for series in data['data'] if str(series['uid']['value']) in uids_set]
-        print( filtered_uids )
 
         path_dict = []
         data_directory = options.data_location
 
-        # create destination directories
+        # create destination directories and move series
+        pacs_settings['executable'] = '/usr/bin/movescu'
+
         for series in filtered_uids:
             patient_dir = pypx.utils.patientPath('', series['PatientID']['value'], series['PatientName']['value'])
             study_dir = pypx.utils.studyPath(patient_dir, series['StudyDescription']['value'], series['StudyDate']['value'], series['StudyInstanceUID']['value'])
@@ -98,27 +99,31 @@ class PacsRetrieveApp(ChrisApp):
 
             source = os.path.join(data_directory, series_dir)
             series_info = os.path.join(source, 'series.info')
-            destination = os.path.join(options.outputdir, series_dir)
-            path_dict.append( {'source': source, 'destination': destination, 'info': series_info} )
+            destination_study = os.path.join(options.outputdir, study_dir)
+            destination_series = os.path.join(options.outputdir, series_dir)
 
-        print(path_dict)
+            path_dict.append( {'source': source, 'destination_study': destination_study, 'destination_series': destination_series, 'info': series_info} )
 
-        # start moving all files from PACS
+            # move series
+            pacs_settings['series_uid'] = series['SeriesInstanceUID']['value']
+            output = pypx.move(pacs_settings)
 
         # wait for files to arrive!
         timer = 0 # 30mn
 
         while timer < 100: # 1h
             for path in path_dict[:]:
+
                 # what if pulling an existing dataset (.info file already there? need extra flag to force re=pull?)
                 if os.path.isfile(path['info']):
 
-                    if not os.path.exists(path['destination']):
-                      os.makedirs(path['destination'])
-                      shutil.copytree(path['source'], path['destination'])
+                    if not os.path.exists(path['destination_study']):
+                      os.makedirs(path['destination_study'])
                     else:
-                      print('nothing..')
+                      print(path['destination_study'] + ' already exists.')
 
+                    # copy series to output
+                    shutil.copytree(path['source'], path['destination_series'])
                     # remove from dictionnary
                     path_dict.remove(path)
 
