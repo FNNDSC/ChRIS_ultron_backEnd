@@ -159,14 +159,14 @@ class Charm():
             'charm' is the interface class/code between ChRIS and a pman process management
             system.
 
-            See 'charm.py --man commands' for more help. """)
+            Type 'charm.py --man commands' for more help. """)
             if self.b_useDebug:
                 print("""
-                See the file '%s' for debugging output.
+            Debugging output is directed to the file '%s'.
                 """ % (self.str_debugFile))
             else:
                 print("""
-                See *this* stream for debugging output.
+            Debugging output will appear in *this* console.
                 """)
 
         self.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
@@ -359,7 +359,7 @@ class Charm():
         Attempt to start a remote pman service.
 
         This method is called is an attempt to speak with a pman service is unsuccessful, and
-        the assumption is that 'pman' is down. We will attempt to restart 'pman' for this
+        the assumption is that 'pman' is down. We will attempt to start 'pman' for this
         user in this case.
 
         :param args:
