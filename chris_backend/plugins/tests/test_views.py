@@ -158,7 +158,9 @@ class PluginInstanceListViewTests(ViewTests):
 
     def tearDown(self):
         #remove test directory
-        shutil.rmtree(self.test_dir, ignore_errors=True)
+        # shutil.rmtree(self.test_dir, ignore_errors=True)
+        print('removing dir %s...' % self.test_dir)
+        shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_success(self):
@@ -209,7 +211,7 @@ class PluginInstanceDetailViewTests(ViewTests):
             plugin_repr = d_pluginRepr
         )
         chris2pman.app_manage(method = 'pman')
-        time.sleep(2)
+        time.sleep(5)
 
         self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
          
