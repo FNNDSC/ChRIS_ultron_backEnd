@@ -83,7 +83,7 @@ class PluginManagerTests(TestCase):
         parameter_dict = {'dir': './'}
         pl_manager = PluginManager()
         pl_manager.run_plugin_app(pl_inst, parameter_dict)
-        time.sleep(2)
+        time.sleep(5)
         self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         #remove test directory
