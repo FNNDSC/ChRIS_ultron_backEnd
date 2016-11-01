@@ -72,7 +72,7 @@ class Comment(models.Model):
 
 class FeedFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=200)
+    fname = models.FileField(max_length=2048)
     feed = models.ManyToManyField(Feed, related_name='files')
     plugin_inst = models.ForeignKey('plugins.PluginInstance', on_delete=models.CASCADE, related_name='file')
 

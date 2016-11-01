@@ -177,7 +177,16 @@ class PluginManager(object):
 
         # register output files with the system
         # plugin_inst.register_output_files()
-                
+
+    def check_plugin_app_exec_status(self, plugin_inst):
+        """
+        Check a plugin's app execution status. It connects to pman to determine job
+        status.
+        """
+        chris2pman   = charm.Charm(
+            plugin_inst = plugin_inst
+        )
+        chris2pman.app_statusCheckAndRegister()        
 
 
 # ENTRYPOINT

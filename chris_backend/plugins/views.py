@@ -13,9 +13,6 @@ from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
-from .services import charm
-
-import pudb
 
 import  socket
 # This will need to be better addressed!
@@ -169,26 +166,13 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overwritten method -- connect to pman to determine job status.
-
-        :param request:
-        :param args:
-        :param kwargs:
-        :return:
+        Overwritten method to check a plugin's instance status.
         """
         instance = self.get_object()
-
-        # pudb.set_trace()
-
-        chris2pman   = charm.Charm(
-            plugin_inst = instance
-        )
-
-        chris2pman.app_statusCheckAndRegister()
-
+        pl_manager = PluginManager()
+        pl_manager.check_plugin_app_exec_status(instance)
         serializer = self.get_serializer(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
-
         return  response
 
 class StringParameterDetail(generics.RetrieveAPIView):
