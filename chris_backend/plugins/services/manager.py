@@ -93,6 +93,10 @@ class PluginManager(object):
         """
         Register/add a new plugin to the system.
         """
+        # check wether the plugin already exist
+        existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
+        if name in existing_plugin_names:
+            raise ValueError("Plugin '%s' already exists in the system" % name)
         # get representation from the corresponding app
         app_repr = self.get_plugin_app_representation(name)
         # add plugin to the db
@@ -112,7 +116,7 @@ class PluginManager(object):
         try:
             plugin = Plugin.objects.get(name=name)
         except Plugin.DoesNotExist:
-            raise NameError("Couldn't find %s plugin in the system" % name)
+            raise NameError("Couldn't find '%s' plugin in the system" % name)
         return plugin
                   
     def remove_plugin(self, name):
