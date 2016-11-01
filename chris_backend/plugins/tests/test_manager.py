@@ -53,10 +53,10 @@ class PluginManagerTests(TestCase):
         self.assertEquals(Plugin.objects.count(), 0)
         self.assertEquals(PluginParameter.objects.count(), 0)
 
-    def test_mananger_can_register_plugin_modification_date(self):
+    def test_mananger_can_register_plugin_app_modification_date(self):
         """
         Test whether the manager can register a new modification date for an
-        existing plugin.
+        existing plugin app.
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         initial_modification_date = plugin.modification_date
