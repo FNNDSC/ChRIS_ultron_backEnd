@@ -26,12 +26,6 @@ DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
 DATABASES['default']['TEST'] = {'CHARSET': 'utf8'}
 
-# pman settings
-PMAN    = {
-    'host': 'localhost',
-    'port': 5010
-}
-
 # Feed file storage
 MEDIA_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))) + '/users'
 if not os.path.exists(MEDIA_ROOT):
