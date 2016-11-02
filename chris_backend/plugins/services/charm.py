@@ -6,6 +6,8 @@ charm - ChRIS / pman interface.
 
 """
 
+from django.conf import settings
+
 import  sys
 import  os
 import  pprint
@@ -13,8 +15,9 @@ import  datetime
 import  socket
 import  json
 
-import  pman
+# import  pman
 
+from    pman.pman           import pman
 from    pman._colors        import Colors
 from    pman.crunner        import crunner
 from    pman.purl           import Purl
@@ -22,17 +25,17 @@ from    pman.message        import Message
 
 import  pudb
 
-class pman_settings():
-
-    p           = pman.__path__
-    str_path    = '/' + str(p).split("'/")[1].split("']")[0]
-
-    HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    PORT        = '5010'
-    EXEC        = 'python3'
-    PATH        = '%s/pman.py' % str_path
-    ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
-                    ( PORT, os.environ['HOME'] )
+# class pman_settings():
+#
+#     p           = pman.__path__
+#     str_path    = '/' + str(p).split("'/")[1].split("']")[0]
+#
+#     HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+#     PORT        = '5010'
+#     EXEC        = 'python3'
+#     PATH        = '%s/pman.py' % str_path
+#     ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
+#                     ( PORT, os.environ['HOME'] )
 
 class Charm():
 
@@ -273,7 +276,7 @@ class Charm():
 
         # pudb.set_trace()
 
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         purl    = Purl(
             msg         = json.dumps(d_msg),
@@ -300,6 +303,15 @@ class Charm():
         """
         Run the "app" via pman
         """
+
+        # The following snippet sets the pman IP to the actual host
+        # Set the pman IP to specific host IP.
+        # This is to address some issues on development relating to proxy handling.
+        # If your setup complains at this line, simply comment it out and leave
+        # the host as 'localhost'
+        settings.PMAN['host']   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         # First, check if pman is available... and start it if it is not.
         self.app_pman_checkIfAvailable()
@@ -328,8 +340,6 @@ class Charm():
             }
         }
 
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
-
         # pudb.set_trace()
 
         purl    = Purl(
@@ -347,9 +357,10 @@ class Charm():
         # run the app
         d_response      = json.loads(purl())
         if isinstance(d_response, dict):
-            print("class")
+            self.qprint("looks like we got a successful response from pman")
             self.qprint('response from purl(): %s ' % json.dumps(d_response, indent=2))
         else:
+            self.qprint("looks like we got an UNSUCCESSFUL response from pman")
             self.qprint('response from purl(): %s' % d_response)
             if "Connection refused" in d_response:
                 self.qprint('in app pman, fatal error in talking to pman', comms = 'error')
@@ -368,12 +379,50 @@ class Charm():
         """
         self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
 
-        str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
-        self.qprint('pman start cmd = %s' % str_pmanStart)
+        # str_pmanPath    = '/' + str(pman.__path__).split("'/")[1].split("']")[0] + '/pman.py'
 
+        self.qprint('pman IP: %s' % settings.PMAN['host'])
+
+        pmanArgs        = {
+            'ip':           settings.PMAN['host'],
+            'port':         settings.PMAN['port'],
+            'raw':          '1',
+            'protocol':     'tcp',
+            'listeners':    '12',
+            'http':         True,
+            'debugToFile':  True,
+            'debugFile':    '%s/tmp/debug-charm-internal.py' % os.environ['HOME']
+        }
+
+        self.qprint('Calling pman constructor internally.')
+        self.qprint('pmanArgs = %s' % pmanArgs)
+
+        comm    = pman(
+            IP          = pmanArgs['ip'],
+            port        = pmanArgs['port'],
+            protocol    = pmanArgs['protocol'],
+            raw         = pmanArgs['raw'],
+            listeners   = pmanArgs['listeners'],
+            http        = pmanArgs['http'],
+            debugToFile = pmanArgs['debugToFile'],
+            debugFile   = pmanArgs['debugFile']
+        )
+        comm.start()
+        self.qprint('Called pman constructor internally.')
+
+        #
+        #     HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+        #     PORT        = '5010'
+        #     EXEC        = 'python3'
+        #     PATH        = '%s/pman.py' % str_path
+        #     ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
+        #                     ( PORT, os.environ['HOME'] )
+
+
+        # str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
+        # self.qprint('pman start cmd = %s' % str_pmanStart)
         # pudb.set_trace()
-
-        self.app_crunner('%s' % str_pmanStart, loopctl = False)
+        # self.app_crunner('%s' % str_pmanStart, loopctl = False)
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
@@ -392,7 +441,7 @@ class Charm():
                     "value":    str(self.d_pluginInst['id'])
             }
         }
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         purl    = Purl(
             msg         = json.dumps(d_msg),
@@ -451,7 +500,7 @@ class Charm():
                 "field":    "stderr"
             }
         }
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         purl    = Purl(
             msg         = json.dumps(d_msg),
