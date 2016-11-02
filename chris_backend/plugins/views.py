@@ -164,7 +164,6 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         instance = self.get_object()
         pl_manager = PluginManager()
         pl_manager.check_plugin_app_exec_status(instance)
-        serializer = self.get_serializer(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         return  response
 
