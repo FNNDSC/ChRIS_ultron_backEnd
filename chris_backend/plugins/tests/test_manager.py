@@ -60,9 +60,11 @@ class PluginManagerTests(TestCase):
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         initial_modification_date = plugin.modification_date
+        print(initial_modification_date)
         pl_manager = PluginManager()
         pl_manager.run(['--modify', self.plugin_fs_name])
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        print(plugin.modification_date)
         self.assertTrue(plugin.modification_date > initial_modification_date)
 
     def test_mananger_can_run_registered_plugin_app(self):
