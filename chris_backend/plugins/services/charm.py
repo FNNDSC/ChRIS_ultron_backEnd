@@ -12,15 +12,8 @@ import  pprint
 import  datetime
 import  socket
 import  json
-
-import  pman
-
-from    pman._colors        import Colors
-from    pman.crunner        import crunner
-from    pman.purl           import Purl
-from    pman.message        import Message
-
 import  pudb
+import  pman
 
 class pman_settings():
 
@@ -72,27 +65,27 @@ class Charm():
 
         if not self.b_quiet:
             if not self.b_useDebug:
-                if str_comms == 'status':   write(Colors.PURPLE,    end="")
-                if str_comms == 'error':    write(Colors.RED,       end="")
-                if str_comms == "tx":       write(Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(Colors.GREEN  + "<----")
+                if str_comms == 'status':   write(pman.Colors.PURPLE,    end="")
+                if str_comms == 'error':    write(pman.Colors.RED,       end="")
+                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
                 write('%s' % datetime.datetime.now() + " ",       end="")
             write(' | ' + msg)
             if not self.b_useDebug:
-                if str_comms == "tx":       write(Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(Colors.GREEN  + "<----")
-                write(Colors.NO_COLOUR, end="")
+                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
+                write(pman.Colors.NO_COLOUR, end="")
 
     def col2_print(self, str_left, str_right):
-        print(Colors.WHITE +
+        print(pman.Colors.WHITE +
               ('%*s' % (self.LC, str_left)), end='')
-        print(Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR)
+        print(pman.Colors.LIGHT_BLUE +
+              ('%*s' % (self.RC, str_right)) + pman.Colors.NO_COLOUR)
 
     def __init__(self, **kwargs):
         # threading.Thread.__init__(self)
 
-        self._log                   = Message()
+        self._log                   = pman.Message()
         self._log._b_syslog         = True
         self.__name                 = "Charm"
         self.b_useDebug             = False
@@ -141,7 +134,7 @@ class Charm():
             if key == 'debugFile':      self.str_debugFile  = val
 
         if self.b_useDebug:
-            self.debug                  = Message(logTo = self.str_debugFile)
+            self.debug                  = pman.Message(logTo = self.str_debugFile)
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
@@ -149,13 +142,13 @@ class Charm():
 
         if not self.b_quiet:
 
-            print(Colors.LIGHT_GREEN)
+            print(pman.Colors.LIGHT_GREEN)
             print("""
             \t\t\t+---------------------+
             \t\t\t|  Welcome to charm!  |
             \t\t\t+---------------------+
             """)
-            print(Colors.CYAN + """
+            print(pman.Colors.CYAN + """
             'charm' is the interface class/code between ChRIS and a pman process management
             system.
 
@@ -240,7 +233,8 @@ class Charm():
             if k == 'loopctl':  b_loopctl = v
 
         verbosity               = 1
-        shell                   = crunner(verbosity = verbosity,
+        shell                   = pman.crunner(
+                                          verbosity = verbosity,
                                           debug     = True,
                                           debugTo   = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
 
@@ -275,7 +269,7 @@ class Charm():
 
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -302,7 +296,7 @@ class Charm():
         """
 
         # First, check if pman is available... and start it if it is not.
-        self.app_pman_checkIfAvailable()
+        #self.app_pman_checkIfAvailable()
 
         self.qprint('d_args = %s' % self.d_args)
         str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
@@ -332,7 +326,7 @@ class Charm():
 
         # pudb.set_trace()
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -394,7 +388,7 @@ class Charm():
         }
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -453,7 +447,7 @@ class Charm():
         }
         str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
