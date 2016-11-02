@@ -60,6 +60,7 @@ class PluginManagerTests(TestCase):
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         initial_modification_date = plugin.modification_date
+        time.sleep(2)
         pl_manager = PluginManager()
         pl_manager.run(['--modify', self.plugin_fs_name])
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
