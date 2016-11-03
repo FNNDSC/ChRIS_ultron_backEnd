@@ -118,11 +118,12 @@ class PluginManagerTests(TestCase):
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
-        self.pl_manager.check_plugin_app_exec_status(pl_inst)
-        # not a good test_dir# could be finished
-        self.assertEquals(pl_inst.status, 'finishedSuccessfully')
         parameter_dict = {'dir': './'}
         self.pl_manager.run_plugin_app(pl_inst, parameter_dict)
+        time.sleep(5)
+        self.pl_manager.check_plugin_app_exec_status(pl_inst)
+        possibleStatus =  ['started', 'finishedSuccessfully']
+        self.assertTrue(pl_inst.status in possibleStatus)
 
         #remove test directory
         shutil.rmtree(test_dir)
