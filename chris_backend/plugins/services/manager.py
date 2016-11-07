@@ -211,6 +211,14 @@ class PluginManager(object):
         # register output files with the system
         # plugin_inst.register_output_files()
 
+    def pman_shutdown(self):
+        """
+        Shutdown a pman instance
+        :return:
+        """
+        chris2pman   = charm.Charm()
+        chris2pman.app_pman_shutdown()
+
     def check_plugin_app_exec_status(self, plugin_inst):
         """
         Check a plugin's app execution status. It connects to pman to determine job
