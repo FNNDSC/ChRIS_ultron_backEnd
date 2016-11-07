@@ -17,6 +17,7 @@ import  json
 import  pudb
 
 import  pman
+import  threading
 
 # from    pman.pman           import pman
 # from    pman._colors        import Colors
@@ -124,7 +125,7 @@ class Charm():
 
         self.d_args                 = {}
         self.l_appArgs              = {}
-        self.c_pluginInst           = {}
+        self.c_pluginInst           = {'contents':  'void'}
         self.d_pluginRepr           = {}
         self.app                    = None
 
@@ -147,7 +148,12 @@ class Charm():
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
-        self.d_pluginInst   = vars(self.c_pluginInst)
+        # This for the case when Charm is instantiated w/o a plugin instance, eg
+        # as a dispatcher to simply send a pman instance a message.
+        try:
+            self.d_pluginInst   = vars(self.c_pluginInst)
+        except:
+            self.d_pluginInst   = {}
 
         if not self.b_quiet:
 
@@ -255,7 +261,25 @@ class Charm():
         if b_loopctl:
             shell.jobs_loopctl()
 
-    def app_pman_checkIfAvailable(self, *args, **kwargs):
+    def app_pman_shutdown(self):
+        """
+        This method sends a shutdown command over HTTP to the pman server process.
+
+        :return:
+        """
+
+
+
+        d_msg = {
+            "action": "quit",
+            "meta": {
+                    "when":         "now",
+                    "saveDB":       True
+                }
+        }
+        d_response = self.app_pman_send(msg = d_msg)
+
+    def app_pman_send(self, *args, **kwargs):
         """
         This method checks if the remote 'pman' service is available by asking
         'pman' for system status.
@@ -265,13 +289,10 @@ class Charm():
         :return: True | False
         """
 
-        d_msg = {
-            "action":   "hello",
-            "meta": {
-                        "askAbout":     "sysinfo",
-                        "echoBack":     "Hi there!"
-            }
-        }
+        d_msg = {}
+
+        for k,v in kwargs.items():
+            if k == 'msg':  d_msg = v
 
         # pudb.set_trace()
 
@@ -291,6 +312,47 @@ class Charm():
 
         # speak to pman...
         d_response      = json.loads(purl())
+        return d_response
+
+    def app_pman_checkIfAvailable(self, *args, **kwargs):
+        """
+        This method checks if the remote 'pman' service is available by asking
+        'pman' for system status.
+
+        :param args:
+        :param kwargs:
+        :return: True | False
+        """
+
+        d_msg = {
+            "action":   "hello",
+            "meta": {
+                        "askAbout":     "sysinfo",
+                        "echoBack":     "Alls' well."
+            }
+        }
+
+        d_response = self.app_pman_send(msg = d_msg)
+
+        # # pudb.set_trace()
+        #
+        # str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        #
+        # purl    = pman.Purl(
+        #     msg         = json.dumps(d_msg),
+        #     http        = str_http,
+        #     verb        = 'POST',
+        #     contentType = 'application/vnd.collection+json',
+        #     b_raw       = True,
+        #     b_quiet     = False,
+        #     jsonwrapper = 'payload',
+        #     debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+        #     useDebug    = self.b_useDebug
+        # )
+        #
+        # # speak to pman...
+        # d_response      = json.loads(purl())
+
         if isinstance(d_response, dict):
             self.qprint('successful response from purl() in checkIfAvailable: %s ' % json.dumps(d_response, indent=2))
         else:
@@ -308,7 +370,7 @@ class Charm():
         # This is to address some issues on development relating to proxy handling.
         # If your setup complains at this line, simply comment it out and leave
         # the host as 'localhost'
-        #settings.PMAN['host']   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+        settings.PMAN['host']   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
 
         str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
@@ -396,8 +458,6 @@ class Charm():
         self.qprint('Calling pman constructor internally.')
         self.qprint('pmanArgs = %s' % pmanArgs)
 
-        print(pmanArgs)
-
         comm    = pman.pman(
             IP          = pmanArgs['ip'],
             port        = pmanArgs['port'],
@@ -408,7 +468,11 @@ class Charm():
             debugToFile = pmanArgs['debugToFile'],
             debugFile   = pmanArgs['debugFile']
         )
-        comm.start()
+
+        t_comm = threading.Thread(target = comm.thread_serve)
+        t_comm.start()
+        # comm.thread_serve()
+
         self.qprint('Called pman constructor internally.')
 
         #
