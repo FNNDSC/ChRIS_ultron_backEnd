@@ -1,6 +1,7 @@
 """
-Plugin manager module that provides functionality to add and delete plugins to the
-plugins django app. The last modification date of a plugin can also be registered.
+Plugin manager module that provides functionality to add, modify and delete plugins to the
+plugins django app. There is also functionality to run and check the execution status of a
+plugin's app.
 """
 
 import os, sys
@@ -19,10 +20,11 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 from django.utils import timezone
 
 from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
+from plugins.services import charm
 
+# define the python package for the plugins' apps
 _APPS_PACKAGE = 'plugins.services'
 
-from plugins.services import charm
 
 class PluginManager(object):
 
@@ -55,7 +57,91 @@ class PluginManager(object):
                     hasattr(member[1], 'get_json_representation') and
                     not (member[0]=='ChrisApp')):
                     return member[1]
+
+    def get_plugin_app_representation(self, name):
+        """
+        Get a plugin's app representation given the plugin's name.
+        """
+        plugin_app_class = self._get_plugin_app_class(name)
+        app = plugin_app_class()
+        app_repr = app.get_json_representation()
+        plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
+        if app_repr['type'] not in plugin_types:
+            raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
+                             % (plugin_types, plugin_app_class))
+        return app_repr
+
+    def _save_plugin_param(self, plugin, param):
+        """
+        Internal method to save a plugin parameter into the DB.
+        """
+        # add plugin parameter to the db
+        plugin_param = PluginParameter()
+        plugin_param.plugin = plugin
+        plugin_param.name = param['name']
+        plg_type = param['type']
+        plugin_param.type = [key for key in TYPES if TYPES[key]==plg_type][0]
+        plugin_param.optional = param['optional']
+        if param['default'] is None:
+            plugin_param.default = ""
+        else:
+            plugin_param.default = str(param['default'])
+        plugin_param.help = param['help']
+        plugin_param.save()
         
+    def add_plugin(self, name):
+        """
+        Register/add a new plugin to the system.
+        """
+        # check wether the plugin already exist
+        existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
+        if name in existing_plugin_names:
+            raise ValueError("Plugin '%s' already exists in the system" % name)
+        # get representation from the corresponding app
+        app_repr = self.get_plugin_app_representation(name)
+        # add plugin to the db
+        plugin = Plugin()
+        plugin.name = name
+        plugin.type = app_repr['type']
+        plugin.save()
+        # add plugin's parameters to the db
+        params = app_repr['parameters']
+        for param in params:
+            self._save_plugin_param(plugin, param)
+
+    def get_plugin(self, name):
+        """
+        Get an existing/registered plugin.
+        """
+        try:
+            plugin = Plugin.objects.get(name=name)
+        except Plugin.DoesNotExist:
+            raise NameError("Couldn't find '%s' plugin in the system" % name)
+        return plugin
+                  
+    def remove_plugin(self, name):
+        """
+        Remove an existing/registered plugin from the system.
+        """
+        plugin = self.get_plugin(name)
+        plugin.delete()
+
+    def register_plugin_app_modification(self, name):
+        """
+        Register/add new parameters to a plugin from the corresponding plugin's app.
+        Also add the current date as a new plugin modification date.
+        """
+        plugin = self.get_plugin(name)
+        # get the new representation from the corresponding app
+        app_repr = self.get_plugin_app_representation(name)
+        new_params = app_repr['parameters']
+        existing_param_names = [parameter.name for parameter in plugin.parameters.all()]
+        for param in new_params:
+            if param['name'] not in existing_param_names:
+                self._save_plugin_param(plugin, param)
+        plugin.modification_date = timezone.now()
+        plugin.save()
+
     def run(self, args=None):
         """
         Parse the arguments passed to the manager and perform the appropriate action.
@@ -66,61 +152,8 @@ class PluginManager(object):
         elif options.remove:
             self.remove_plugin(options.name)
         elif options.modify:
-            self.register_plugin_modification(options.name)
+            self.register_plugin_app_modification(options.name)
         self.args = options
-        
-    def add_plugin(self, name):
-        """
-        Register/add a new plugin.
-        """
-        plugin_app_class = self._get_plugin_app_class(name)
-        app = plugin_app_class()
-        plugin_repr = app.get_json_representation()
-        plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
-        if plugin_repr['type'] not in plugin_types:
-            raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
-                             % (plugin_types, plugin_app_class))
-        # add plugin to the db
-        plugin = Plugin()
-        plugin.name = name
-        plugin.type = plugin_repr['type']
-        plugin.save()
-        params = plugin_repr['parameters']
-        for param in params:
-            # add plugin parameter to the db
-            plugin_param = PluginParameter()
-            plugin_param.plugin = plugin
-            plugin_param.name = param['name']
-            plg_type = param['type']
-            plugin_param.type = [key for key in TYPES if TYPES[key]==plg_type][0]
-            plugin_param.optional = param['optional']
-            if param['default'] is None:
-                plugin_param.default = ""
-            else:
-                plugin_param.default = str(param['default'])
-            plugin_param.help = param['help']
-            plugin_param.save()
-                  
-    def remove_plugin(self, name):
-        """
-        Remove an existing plugin.
-        """
-        try:
-            plugin = Plugin.objects.get(name=name)
-        except Plugin.DoesNotExist:
-            raise NameError("Couldn't find %s plugin in the system" % name)
-        plugin.delete()
-
-    def register_plugin_modification(self, name):
-        """
-        Register current date as a new plugin modification date.
-        """
-        try:
-            plugin = Plugin.objects.get(name=name)
-        except Plugin.DoesNotExist:
-            raise NameError("Couldn't find %s plugin in the system" % name)
-        plugin.modification_date = timezone.now()
-        plugin.save()
 
     def run_plugin_app(self, plugin_inst, parameter_dict):
         """
@@ -155,6 +188,7 @@ class PluginManager(object):
                         if plugin_param['action'] == 'store':
                             app_args.append(param_value)
                         break
+
         # run the app with all the arguments
 
         chris2pman   = charm.Charm(
@@ -176,7 +210,16 @@ class PluginManager(object):
 
         # register output files with the system
         # plugin_inst.register_output_files()
-                
+
+    def check_plugin_app_exec_status(self, plugin_inst):
+        """
+        Check a plugin's app execution status. It connects to pman to determine job
+        status.
+        """
+        chris2pman   = charm.Charm(
+            plugin_inst = plugin_inst
+        )
+        chris2pman.app_statusCheckAndRegister()        
 
 
 # ENTRYPOINT

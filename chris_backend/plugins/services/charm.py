@@ -6,29 +6,16 @@ charm - ChRIS / pman interface.
 
 """
 
+from django.conf import settings
+
 import  sys
 import  os
 import  pprint
 import  datetime
 import  socket
 import  json
-
-from    pman._colors        import Colors
-from    pman.crunner        import crunner
-from    pman.purl           import Purl
-from    pman.message        import Message
-
 import  pudb
-
-class pman_settings():
-    HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    PORT        = '5011'
-    WORKON_HOME = os.environ['WORKON_HOME']
-    VIRTUAL_ENV = os.environ['VIRTUAL_ENV']
-    EXEC        = 'python3'
-    PATH        = '%s/lib/python3.5/site-packages/pman/pman.py' % VIRTUAL_ENV
-    ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
-                    ( PORT, os.environ['HOME'] )
+import  pman
 
 class Charm():
 
@@ -68,27 +55,27 @@ class Charm():
 
         if not self.b_quiet:
             if not self.b_useDebug:
-                if str_comms == 'status':   write(Colors.PURPLE,    end="")
-                if str_comms == 'error':    write(Colors.RED,       end="")
-                if str_comms == "tx":       write(Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(Colors.GREEN  + "<----")
+                if str_comms == 'status':   write(pman.Colors.PURPLE,    end="")
+                if str_comms == 'error':    write(pman.Colors.RED,       end="")
+                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
                 write('%s' % datetime.datetime.now() + " ",       end="")
             write(' | ' + msg)
             if not self.b_useDebug:
-                if str_comms == "tx":       write(Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(Colors.GREEN  + "<----")
-                write(Colors.NO_COLOUR, end="")
+                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
+                write(pman.Colors.NO_COLOUR, end="")
 
     def col2_print(self, str_left, str_right):
-        print(Colors.WHITE +
+        print(pman.Colors.WHITE +
               ('%*s' % (self.LC, str_left)), end='')
-        print(Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR)
+        print(pman.Colors.LIGHT_BLUE +
+              ('%*s' % (self.RC, str_right)) + pman.Colors.NO_COLOUR)
 
     def __init__(self, **kwargs):
         # threading.Thread.__init__(self)
 
-        self._log                   = Message()
+        self._log                   = pman.Message()
         self._log._b_syslog         = True
         self.__name                 = "Charm"
         self.b_useDebug             = False
@@ -125,8 +112,7 @@ class Charm():
         self.LC                     = 40
         self.RC                     = 40
 
-        for key,val in kwargs.items():
-
+        for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs      = val
             if key == 'd_args':         self.d_args         = val
             if key == 'plugin_inst':    self.c_pluginInst   = val
@@ -138,7 +124,7 @@ class Charm():
             if key == 'debugFile':      self.str_debugFile  = val
 
         if self.b_useDebug:
-            self.debug                  = Message(logTo = self.str_debugFile)
+            self.debug                  = pman.Message(logTo = self.str_debugFile)
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
@@ -146,19 +132,25 @@ class Charm():
 
         if not self.b_quiet:
 
-            print(Colors.LIGHT_GREEN)
+            print(pman.Colors.LIGHT_GREEN)
             print("""
             \t\t\t+---------------------+
-            \t\t\t| Welcome to Charm.py |
+            \t\t\t|  Welcome to charm!  |
             \t\t\t+---------------------+
             """)
-            print(Colors.CYAN + """
-            Charm is the interface class/code between ChRIS and a pman process management
+            print(pman.Colors.CYAN + """
+            'charm' is the interface class/code between ChRIS and a pman process management
             system.
 
-            See 'charm.py --man commands' for more help.
-
-            """)
+            Type 'charm.py --man commands' for more help. """)
+            if self.b_useDebug:
+                print("""
+            Debugging output is directed to the file '%s'.
+                """ % (self.str_debugFile))
+            else:
+                print("""
+            Debugging output will appear in *this* console.
+                """)
 
         self.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.qprint('app_args       = %s'   % self.l_appArgs)
@@ -231,7 +223,7 @@ class Charm():
             if k == 'loopctl':  b_loopctl = v
 
         verbosity               = 1
-        shell                   = crunner(verbosity = verbosity,
+        shell                   = pman.crunner(verbosity = verbosity,
                                           debug     = True,
                                           debugTo   = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
 
@@ -262,9 +254,11 @@ class Charm():
             }
         }
 
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        # pudb.set_trace()
 
-        purl    = Purl(
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -272,6 +266,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         # speak to pman...
@@ -287,6 +283,15 @@ class Charm():
         """
         Run the "app" via pman
         """
+
+        # The following snippet sets the pman IP to the actual host
+        # Set the pman IP to specific host IP.
+        # This is to address some issues on development relating to proxy handling.
+        # If your setup complains at this line, simply comment it out and leave
+        # the host as 'localhost'
+        #settings.PMAN['host']   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         # First, check if pman is available... and start it if it is not.
         self.app_pman_checkIfAvailable()
@@ -316,11 +321,9 @@ class Charm():
             }
         }
 
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
-
         # pudb.set_trace()
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -328,14 +331,17 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         # run the app
         d_response      = json.loads(purl())
         if isinstance(d_response, dict):
-            print("class")
+            self.qprint("looks like we got a successful response from pman")
             self.qprint('response from purl(): %s ' % json.dumps(d_response, indent=2))
         else:
+            self.qprint("looks like we got an UNSUCCESSFUL response from pman")
             self.qprint('response from purl(): %s' % d_response)
             if "Connection refused" in d_response:
                 self.qprint('in app pman, fatal error in talking to pman', comms = 'error')
@@ -345,7 +351,7 @@ class Charm():
         Attempt to start a remote pman service.
 
         This method is called is an attempt to speak with a pman service is unsuccessful, and
-        the assumption is that 'pman' is down. We will attempt to restart 'pman' for this
+        the assumption is that 'pman' is down. We will attempt to start 'pman' for this
         user in this case.
 
         :param args:
@@ -354,12 +360,52 @@ class Charm():
         """
         self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
 
-        str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
-        self.qprint('pman start cmd = %s' % str_pmanStart)
+        # str_pmanPath    = '/' + str(pman.__path__).split("'/")[1].split("']")[0] + '/pman.py'
 
+        self.qprint('pman IP: %s' % settings.PMAN['host'])
+
+        pmanArgs        = {
+            'ip':           settings.PMAN['host'],
+            'port':         settings.PMAN['port'],
+            'raw':          '1',
+            'protocol':     'tcp',
+            'listeners':    '12',
+            'http':         True,
+            'debugToFile':  True,
+            'debugFile':    '%s/tmp/debug-charm-internal.py' % os.environ['HOME']
+        }
+
+        self.qprint('Calling pman constructor internally.')
+        self.qprint('pmanArgs = %s' % pmanArgs)
+
+        print(pmanArgs)
+
+        comm    = pman.pman(
+            IP          = pmanArgs['ip'],
+            port        = pmanArgs['port'],
+            protocol    = pmanArgs['protocol'],
+            raw         = pmanArgs['raw'],
+            listeners   = pmanArgs['listeners'],
+            http        = pmanArgs['http'],
+            debugToFile = pmanArgs['debugToFile'],
+            debugFile   = pmanArgs['debugFile']
+        )
+        comm.start()
+        self.qprint('Called pman constructor internally.')
+
+        #
+        #     HOST        =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+        #     PORT        = '5010'
+        #     EXEC        = 'python3'
+        #     PATH        = '%s/pman.py' % str_path
+        #     ARGS        = "--raw 1 --http --port %s --listeners 12 --debugToFile --debugFile %s/tmp/debug-pman.log" % \
+        #                     ( PORT, os.environ['HOME'] )
+
+
+        # str_pmanStart   = '%s %s %s' % (pman_settings.EXEC, pman_settings.PATH, pman_settings.ARGS)
+        # self.qprint('pman start cmd = %s' % str_pmanStart)
         # pudb.set_trace()
-
-        self.app_crunner('%s' % str_pmanStart, loopctl = False)
+        # self.app_crunner('%s' % str_pmanStart, loopctl = False)
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
@@ -378,9 +424,9 @@ class Charm():
                     "value":    str(self.d_pluginInst['id'])
             }
         }
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -388,9 +434,12 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         d_pman          = json.loads(purl())
+        print( d_pman )
         str_pmanStatus  = d_pman['d_ret']['l_status'][0]
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
@@ -435,9 +484,9 @@ class Charm():
                 "field":    "stderr"
             }
         }
-        str_http        = '%s:%s' % (pman_settings.HOST, pman_settings.PORT)
+        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
-        purl    = Purl(
+        purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -445,6 +494,8 @@ class Charm():
             b_raw       = True,
             b_quiet     = False,
             jsonwrapper = 'payload',
+            debugFile   = '%s/tmp/debug-purl.log' % os.environ['HOME'],
+            useDebug    = self.b_useDebug
         )
 
         self.str_deep   = ''

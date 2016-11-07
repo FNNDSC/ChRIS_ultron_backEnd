@@ -13,14 +13,6 @@ from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
-from .services import charm
-
-import  socket
-# This will need to be better addressed!
-class pman_settings():
-    HOST    =  [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    PORT    = '5010'
-
 class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.
@@ -167,24 +159,12 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overwritten method -- connect to pman to determine job status.
-
-        :param request:
-        :param args:
-        :param kwargs:
-        :return:
+        Overwritten method to check a plugin's instance status.
         """
         instance = self.get_object()
-
-        chris2pman   = charm.Charm(
-            plugin_inst = instance
-        )
-
-        chris2pman.app_statusCheckAndRegister()
-
-        serializer = self.get_serializer(instance)
+        pl_manager = PluginManager()
+        pl_manager.check_plugin_app_exec_status(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
-
         return  response
 
 class StringParameterDetail(generics.RetrieveAPIView):
