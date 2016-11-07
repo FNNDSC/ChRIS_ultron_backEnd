@@ -157,6 +157,9 @@ class PluginInstanceListViewTests(ViewTests):
         PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
     def tearDown(self):
+        pl_manager = PluginManager()
+        pl_manager.pman_shutdown()
+
         #remove test directory
         # shutil.rmtree(self.test_dir, ignore_errors=True)
         print('removing dir %s...' % self.test_dir)
@@ -188,6 +191,13 @@ class PluginInstanceDetailViewTests(ViewTests):
     """
     Test the plugininstance-detail view
     """
+
+    # def tearDown(self):
+    #
+    #     pl_manager = PluginManager()
+    #     pl_manager.pman_shutdown()
+
+
 
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
