@@ -1,4 +1,6 @@
 
+from django.core.exceptions import FieldError
+
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
@@ -30,6 +32,26 @@ class PluginList(generics.ListAPIView):
         links = {'feeds': reverse('feed-list', request=request)}    
         return services.append_collection_links(request, response, links)
 
+
+class PluginListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of plugins resulting from a query search.
+    """
+    serializer_class = PluginSerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the plugins 
+        that match the query search parameters.
+        """
+        query_params = self.request.GET.dict()
+        try:
+            q = Plugin.objects.filter(**query_params)
+        except FieldError as e:
+            return []
+        return q
+        
 
 class PluginDetail(generics.RetrieveAPIView):
     """
