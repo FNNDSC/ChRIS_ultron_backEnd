@@ -4,10 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from rest_framework.authtoken.views import obtain_auth_token
 
 from feeds import views
-from plugins.views import PluginList, PluginDetail, PluginInstanceDetail 
-from plugins.views import PluginInstanceList, PluginParameterList, PluginParameterDetail
-from plugins.views import StringParameterDetail, IntParameterDetail, FloatParameterDetail
-from plugins.views import BoolParameterDetail
+from plugins import views as pl_views
 
 # API v1 endpoints
 urlpatterns = format_suffix_patterns([
@@ -43,34 +40,36 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
         views.FileResource.as_view(), name='file-resource'),
 
-    url(r'^v1/plugins/$', PluginList.as_view(), name='plugin-list'),
+    url(r'^v1/plugins/$', pl_views.PluginList.as_view(), name='plugin-list'),
+    url(r'^v1/plugins/search/$',
+        pl_views.PluginListQuerySearch.as_view(), name='plugin-list-query-search'),
     
     url(r'^v1/plugins/(?P<pk>[0-9]+)/$',
-        PluginDetail.as_view(), name='plugin-detail'),
+        pl_views.PluginDetail.as_view(), name='plugin-detail'),
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/parameters/$',
-        PluginParameterList.as_view(), name='pluginparameter-list'),
+        pl_views.PluginParameterList.as_view(), name='pluginparameter-list'),
 
     url(r'^v1/plugins/parameters/(?P<pk>[0-9]+)/$',
-        PluginParameterDetail.as_view(), name='pluginparameter-detail'),
+        pl_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
-        PluginInstanceList.as_view(), name='plugininstance-list'),
+        pl_views.PluginInstanceList.as_view(), name='plugininstance-list'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
-        PluginInstanceDetail.as_view(), name='plugininstance-detail'),
+        pl_views.PluginInstanceDetail.as_view(), name='plugininstance-detail'),
 
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
-        StringParameterDetail.as_view(), name='stringparameter-detail'),
+        pl_views.StringParameterDetail.as_view(), name='stringparameter-detail'),
     
     url(r'^v1/plugins/int-parameter/(?P<pk>[0-9]+)/$',
-        IntParameterDetail.as_view(), name='intparameter-detail'),
+        pl_views.IntParameterDetail.as_view(), name='intparameter-detail'),
 
     url(r'^v1/plugins/float-parameter/(?P<pk>[0-9]+)/$',
-        FloatParameterDetail.as_view(), name='floatparameter-detail'),
+        pl_views.FloatParameterDetail.as_view(), name='floatparameter-detail'),
 
     url(r'^v1/plugins/bool-parameter/(?P<pk>[0-9]+)/$',
-        BoolParameterDetail.as_view(), name='boolparameter-detail'),
+        pl_views.BoolParameterDetail.as_view(), name='boolparameter-detail'),
 
     url(r'^v1/users/$',
         views.UserList.as_view(), name='user-list'),
