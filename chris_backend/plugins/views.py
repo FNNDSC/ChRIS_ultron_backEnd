@@ -15,6 +15,7 @@ from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
+
 class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.
@@ -48,8 +49,8 @@ class PluginListQuerySearch(generics.ListAPIView):
         query_params = self.request.GET.dict()
         try:
             q = Plugin.objects.filter(**query_params)
-        except FieldError as e:
-            return []
+        except (FieldError, ValueError):
+            return [] 
         return q
         
 
@@ -169,6 +170,37 @@ class PluginInstanceList(generics.ListCreateAPIView):
         plugin = self.get_object()
         params = plugin.parameters.all()
         return [param.name for param in params]
+
+
+class PluginInstanceListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of plugin instances resulting from a query search.
+    """
+    serializer_class = PluginInstanceSerializer
+    queryset = Plugin.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return the list of plugin instances for the queried plugin
+        that match the query search
+        """
+        query_params = request.GET.dict()
+        queryset = self.get_plugin_instances_filtered_queryset(query_params)
+        response = services.get_list_response(self, queryset)
+        return response
+
+    def get_plugin_instances_filtered_queryset(self, query_params):
+        """
+        Custom method to return a queryset that is only comprised by the plugin's 
+        instances that match the query search parameters.
+        """
+        plugin = self.get_object()
+        try:
+            q = PluginInstance.objects.filter(plugin=plugin).filter(**query_params)
+        except (FieldError, ValueError):
+            return []
+        return q
 
         
 class PluginInstanceDetail(generics.RetrieveAPIView):
