@@ -136,7 +136,11 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(plugin_inst, parameters_dict)
+        pl_manager.run_plugin_app(plugin_inst, parameters_dict,
+                                  quiet       = True,
+                                  useDebug    = True,
+                                  debugFile   = '/dev/null'
+                                  )
 
     def list(self, request, *args, **kwargs):
         """
@@ -181,11 +185,14 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overwritten method to check a plugin's instance status.
+        Overloaded method to check a plugin's instance status.
         """
         instance = self.get_object()
         pl_manager = PluginManager()
-        pl_manager.check_plugin_app_exec_status(instance)
+        pl_manager.check_plugin_app_exec_status(instance,
+                                                quiet       = True,
+                                                useDebug    = True,
+                                                debugFile   = '/dev/null')
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         return  response
 
