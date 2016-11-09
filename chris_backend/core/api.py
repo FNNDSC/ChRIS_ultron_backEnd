@@ -22,6 +22,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/(?P<pk>[0-9]+)/tags/$',
         views.TagList.as_view(), name='tag-list'),
 
+    url(r'^v1/tags/$',
+        views.FullTagList.as_view(), name='full-tag-list'),
+
     url(r'^v1/tags/(?P<pk>[0-9]+)/$',
         views.TagDetail.as_view(), name='tag-detail'),
     
@@ -41,6 +44,7 @@ urlpatterns = format_suffix_patterns([
         views.FileResource.as_view(), name='file-resource'),
 
     url(r'^v1/plugins/$', pl_views.PluginList.as_view(), name='plugin-list'),
+    
     url(r'^v1/plugins/search/$',
         pl_views.PluginListQuerySearch.as_view(), name='plugin-list-query-search'),
     
@@ -55,6 +59,9 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
         pl_views.PluginInstanceList.as_view(), name='plugininstance-list'),
+    
+    url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/search/$',
+        pl_views.PluginInstanceListQuerySearch.as_view(), name='plugininstance-list-query-search'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
         pl_views.PluginInstanceDetail.as_view(), name='plugininstance-detail'),

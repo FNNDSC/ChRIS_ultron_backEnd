@@ -35,7 +35,7 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
 
 class TagList(generics.ListCreateAPIView):
     """
-    A view for the collection of tags.
+    A view for a feed-specific collection of tags.
     """
     queryset = Feed.objects.all()
     serializer_class = TagSerializer
@@ -70,6 +70,35 @@ class TagList(generics.ListCreateAPIView):
         feed = self.get_object()
         tags = [tag for tag in feed.tags.all() if tag.owner==user]
         return self.filter_queryset(tags)
+
+
+class FullTagList(generics.ListAPIView):
+    """
+    A view for the full collection of tags.
+    """
+    serializer_class = TagSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the tags 
+        owned by the currently authenticated user.
+        """
+        user = self.request.user
+        # if the user is chris then return all the tags in the system
+        if (user.username == 'chris'):
+            return Tag.objects.all()
+        
+        return Tag.objects.filter(owner=user)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append document-level link relations.
+        """
+        response = super(FullTagList, self).list(request, *args, **kwargs)
+        links = {'feeds': reverse('feed-list', request=request)}    
+        response = services.append_collection_links(request, response, links)
+        return services.append_collection_links(request, response, links)
         
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -112,7 +141,8 @@ class FeedList(generics.ListAPIView):
         Overriden to append document-level link relations.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
-        links = {'plugins': reverse('plugin-list', request=request)}    
+        links = {'plugins': reverse('plugin-list', request=request),
+                 'tags': reverse('full-tag-list', request=request)}    
         response = services.append_collection_links(request, response, links)
         return services.append_collection_links(request, response, links)
 

@@ -414,6 +414,57 @@ class TagListViewTests(ViewTests):
         response = self.client.get(self.create_read_url)
         self.assertNotContains(response, "Tag2")
         self.assertNotContains(response, "Tag3")
+
+class FullTagListViewTests(ViewTests):
+    """
+    Test the full-tag-list view
+    """
+
+    def setUp(self):
+        super(FullTagListViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.list_url = reverse("full-tag-list")
+
+        # create one tag for self.feedname
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
+        tag.feed = [feed]
+        tag.save()
+        
+        plugin = Plugin.objects.get(name="pacspull", type="fs")
+        
+        # create a new feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst.feed.name = "new"
+        pl_inst.feed.save()
+
+        # create another tag for the new feed
+        feed = Feed.objects.get(name="new")
+        (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
+        tag.feed = [feed]
+        tag.save()
+
+    def test_full_tag_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "Tag2")
+        self.assertContains(response, "Tag3")
+
+    def test_full_tag_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        
+    def test_full_tag_list_from_other_feed_owners_not_listed(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        feed = Feed.objects.get(name=self.feedname)
+        owner = User.objects.get(username=self.username)
+        new_owner = User.objects.get(username=self.other_username)
+        # make new_owner an owner of the feed together with the feed's current owner
+        feed.owner = [owner, new_owner]
+        feed.save()
+        response = self.client.get(self.list_url)
+        self.assertNotContains(response, "Tag2")
+        self.assertNotContains(response, "Tag3")
         
       
 class TagDetailViewTests(ViewTests):
