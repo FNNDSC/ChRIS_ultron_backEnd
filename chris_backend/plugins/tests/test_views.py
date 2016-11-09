@@ -143,9 +143,14 @@ class PluginInstanceListViewTests(ViewTests):
         settings.MEDIA_ROOT = self.test_dir
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
-        
+
+        # pudb.set_trace()
+
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
+        pl_manager.startup_apps_exec_server(quiet       = True,
+                                            useDebug    = True,
+                                            debugFile   = '/dev/null')
         pl_manager.add_plugin('simplefsapp')
         plugin = Plugin.objects.get(name="simplefsapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
@@ -158,11 +163,13 @@ class PluginInstanceListViewTests(ViewTests):
 
     def tearDown(self):
         pl_manager = PluginManager()
-        pl_manager.pman_shutdown()
+        pl_manager.shutdown_apps_exec_server(quiet       = True,
+                                             useDebug    = True,
+                                             debugFile   = '/dev/null')
 
         #remove test directory
         # shutil.rmtree(self.test_dir, ignore_errors=True)
-        print('removing dir %s...' % self.test_dir)
+        # print('removing dir %s...' % self.test_dir)
         shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
@@ -192,12 +199,11 @@ class PluginInstanceDetailViewTests(ViewTests):
     Test the plugininstance-detail view
     """
 
-    # def tearDown(self):
-    #
-    #     pl_manager = PluginManager()
-    #     pl_manager.pman_shutdown()
-
-
+    def tearDown(self):
+        pl_manager = PluginManager()
+        pl_manager.shutdown_apps_exec_server(quiet       = True,
+                                             useDebug    = True,
+                                             debugFile   = '/dev/null')
 
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
@@ -209,6 +215,11 @@ class PluginInstanceDetailViewTests(ViewTests):
 
         # pudb.set_trace()
 
+        pl_manager = PluginManager()
+        pl_manager.startup_apps_exec_server(quiet       = True,
+                                            useDebug    = True,
+                                            debugFile   = '/dev/null')
+
         # We need to "run" this fake object in order for pman to register the job id.
         parameter_dict  = {'dir': './'}
         # Fake representation too...
@@ -218,7 +229,10 @@ class PluginInstanceDetailViewTests(ViewTests):
         chris2pman   = charm.Charm(
             d_args      = parameter_dict,
             plugin_inst = pl_inst,
-            plugin_repr = d_pluginRepr
+            plugin_repr = d_pluginRepr,
+            quiet       = True,
+            useDebug    = True,
+            debugFile   = '/dev/null'
         )
         chris2pman.app_manage(method = 'pman')
         time.sleep(5)
@@ -227,7 +241,6 @@ class PluginInstanceDetailViewTests(ViewTests):
          
     def test_plugin_instance_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        # pudb.set_trace()
         response = self.client.get(self.read_url)
         self.assertContains(response, "pacspull")
 
