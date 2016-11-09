@@ -20,6 +20,7 @@ before_script:
   - pman --raw 1 --http --port 5010 --listeners 12 --ip 127.0.0.1 &
   - sleep 5
 # command to run tests
-script: python manage.py test
+script:
+  - python manage.py test
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
