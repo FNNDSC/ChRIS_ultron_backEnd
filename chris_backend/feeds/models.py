@@ -10,7 +10,7 @@ class Feed(models.Model):
     owner = models.ManyToManyField('auth.User', related_name='feed')
     
     class Meta:
-        ordering = ('creation_date',)
+        ordering = ('-creation_date',)
 
     def __str__(self):
         return self.name
