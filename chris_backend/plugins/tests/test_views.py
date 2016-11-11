@@ -58,6 +58,26 @@ class PluginListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class PluginListQuerySearchViewTests(ViewTests):
+    """
+    Test the plugin-list-query-search view
+    """
+
+    def setUp(self):
+        super(PluginListQuerySearchViewTests, self).setUp()     
+        self.list_url = reverse("plugin-list-query-search") + '?name=pacspull'
+
+    def test_plugin_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "pacspull")
+        self.assertNotContains(response, "mri_convert")
+
+    def test_plugin_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class PluginDetailViewTests(ViewTests):
     """
     Test the plugin-detail view
@@ -191,6 +211,39 @@ class PluginInstanceListViewTests(ViewTests):
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceListQuerySearchViewTests(ViewTests):
+    """
+    Test the plugininstance-list-query-search view
+    """
+
+    def setUp(self):
+        super(PluginInstanceListQuerySearchViewTests, self).setUp()
+        
+        user = User.objects.get(username=self.username)
+        self.inst_ids = []
+        # create two plugin instances
+        plugin = Plugin.objects.get(name="pacspull") 
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        self.inst_ids.append(inst.id)
+        plugin = Plugin.objects.get(name="mri_convert") 
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        self.inst_ids.append(inst.id)
+
+        self.list_url = reverse("plugininstance-list-query-search",
+                                kwargs={"pk": plugin.id}) + '?id=' + str(inst.id)
+
+    def test_plugin_instance_query_search_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        # response should only contain the instances that match the query
+        self.assertContains(response, self.inst_ids[1])
+        self.assertNotContains(response, self.inst_ids[0])
+
+    def test_plugin_instance_query_search_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         
 

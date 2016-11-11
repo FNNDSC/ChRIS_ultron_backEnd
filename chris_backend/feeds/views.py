@@ -1,5 +1,5 @@
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, FieldError
 from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
@@ -145,6 +145,30 @@ class FeedList(generics.ListAPIView):
                  'tags': reverse('full-tag-list', request=request)}    
         response = services.append_collection_links(request, response, links)
         return services.append_collection_links(request, response, links)
+    
+
+class FeedListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of feeds resulting from a query search.
+    """
+    serializer_class = FeedSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        """
+        Custom method to return a queryset that is only comprised by the plugin's 
+        instances that match the query search parameters.
+        """
+        user = self.request.user
+        query_params = self.request.GET.dict()
+        try:
+             # if the user is chris then return all the feeds that match the query
+            if (user.username == 'chris'):
+                return Feed.objects.filter(**query_params)
+            return Feed.objects.filter(owner=user).filter(**query_params)       
+        except (FieldError, ValueError):
+            return []
+        return q
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):

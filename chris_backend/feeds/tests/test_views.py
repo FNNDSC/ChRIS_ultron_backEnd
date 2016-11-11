@@ -151,6 +151,44 @@ class FeedListViewTests(ViewTests):
         response = self.client.get(self.list_url)
         self.assertNotContains(response, "Feed1")
         self.assertNotContains(response, "Feed2")
+
+
+class FeedListQuerySearchViewTests(ViewTests):
+    """
+    Test the feed-list-query-search view
+    """
+
+    def setUp(self):
+        super(FeedListQuerySearchViewTests, self).setUp()     
+              
+        self.list_url = reverse("feed-list-query-search") + '?name=' + self.feedname
+
+        # create an additional feed using a "fs" plugin instance
+        plugin = Plugin.objects.get(name="pacspull")
+        user = User.objects.get(username=self.username)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst.feed.name = "Feed2"
+        pl_inst.feed.save()
+
+    def test_feed_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, self.feedname)
+        self.assertNotContains(response, "Feed2")
+
+    def test_feed_list_query_search_success_chris_user_lists_all_matching_feeds(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, self.feedname)
+
+    def test_feed_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_list_query_search_from_other_users_not_listed(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertNotContains(response, "Feed2")
         
 
 class FeedDetailViewTests(ViewTests):

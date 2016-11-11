@@ -12,6 +12,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/auth-token/$', obtain_auth_token),
     
     url(r'^v1/$', views.FeedList.as_view(), name='feed-list'),
+
+    url(r'^v1/search/$',
+        views.FeedListQuerySearch.as_view(), name='feed-list-query-search'),
     
     url(r'^v1/(?P<pk>[0-9]+)/$',
         views.FeedDetail.as_view(), name='feed-detail'),
@@ -61,7 +64,8 @@ urlpatterns = format_suffix_patterns([
         pl_views.PluginInstanceList.as_view(), name='plugininstance-list'),
     
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/search/$',
-        pl_views.PluginInstanceListQuerySearch.as_view(), name='plugininstance-list-query-search'),
+        pl_views.PluginInstanceListQuerySearch.as_view(),
+        name='plugininstance-list-query-search'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
         pl_views.PluginInstanceDetail.as_view(), name='plugininstance-detail'),
