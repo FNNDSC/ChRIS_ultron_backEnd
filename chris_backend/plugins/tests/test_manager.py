@@ -97,15 +97,25 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
-        self.pl_manager.run_plugin_app(pl_inst, parameter_dict,
-                                       useDebug     = True,
-                                       debugFile    = '/dev/null',
-                                       quiet        = True)
+
+        self.pl_manager.startup_apps_exec_server(   quiet       = True,
+                                                    useDebug    = True,
+                                                    debugFile   = '/dev/null')
+
+
+        self.pl_manager.run_plugin_app(             pl_inst,
+                                                    parameter_dict,
+                                                    useDebug     = True,
+                                                    debugFile    = '/dev/null',
+                                                    quiet        = True)
         time.sleep(5)
         self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
-        #remove test directory
+        # remove test directory and shutdown apps_exec_server
         shutil.rmtree(test_dir)
+        self.pl_manager.shutdown_apps_exec_server(  quiet       = True,
+                                                    useDebug    = True,
+                                                    debugFile   = '/dev/null')
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
     def test_mananger_can_check_plugin_app_exec_status(self):
