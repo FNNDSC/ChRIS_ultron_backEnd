@@ -183,7 +183,7 @@ class PluginInstanceListViewTests(ViewTests):
         # remove test directory
         # shutil.rmtree(self.test_dir, ignore_errors=True)
         # print('removing dir %s...' % self.test_dir)
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_success(self):
