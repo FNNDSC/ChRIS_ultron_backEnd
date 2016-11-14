@@ -137,11 +137,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(plugin_inst, parameters_dict,
-                                  quiet       = True,
-                                  useDebug    = True,
-                                  debugFile   = '/dev/null'
-                                  )
+        pl_manager.run_plugin_app(plugin_inst, parameters_dict)
 
     def list(self, request, *args, **kwargs):
         """
@@ -221,10 +217,7 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         """
         instance = self.get_object()
         pl_manager = PluginManager()
-        pl_manager.check_plugin_app_exec_status(instance,
-                                                quiet       = True,
-                                                useDebug    = True,
-                                                debugFile   = '/dev/null')
+        pl_manager.check_plugin_app_exec_status(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         return  response
 
