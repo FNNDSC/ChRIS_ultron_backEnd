@@ -59,7 +59,7 @@ class TagList(generics.ListCreateAPIView):
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
-        response = services.append_collection_links(request, response, links)
+        response = services.append_collection_links(response, links)
         template_data = {"name": "", "color": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -97,8 +97,7 @@ class FullTagList(generics.ListAPIView):
         """
         response = super(FullTagList, self).list(request, *args, **kwargs)
         links = {'feeds': reverse('feed-list', request=request)}    
-        response = services.append_collection_links(request, response, links)
-        return services.append_collection_links(request, response, links)
+        return services.append_collection_links(response, links)
         
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -143,8 +142,7 @@ class FeedList(generics.ListAPIView):
         response = super(FeedList, self).list(request, *args, **kwargs)
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request)}    
-        response = services.append_collection_links(request, response, links)
-        return services.append_collection_links(request, response, links)
+        return services.append_collection_links(response, links)
     
 
 class FeedListQuerySearch(generics.ListAPIView):
@@ -240,7 +238,7 @@ class CommentList(generics.ListCreateAPIView):
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
-        response = services.append_collection_links(request, response, links)
+        response = services.append_collection_links(response, links)
         template_data = {"title": "", "content": ""} 
         return services.append_collection_template(response, template_data)
 
@@ -287,7 +285,7 @@ class FeedFileList(generics.ListAPIView):
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}   
-        return services.append_collection_links(request, response, links)
+        return services.append_collection_links(response, links)
 
     def get_feedfiles_queryset(self):
         """

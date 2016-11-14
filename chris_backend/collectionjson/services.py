@@ -15,9 +15,9 @@ def get_list_response(list_view_instance, queryset):
     return Response(serializer.data)
 
 
-def append_collection_links(request, response, link_dict):
+def append_collection_links(response, link_dict):
     """
-    Convenience method to append to a response object document-level links.
+    Convenience method to append document-level links to a response object.
     """
     data = response.data
     if not 'collection_links' in data:

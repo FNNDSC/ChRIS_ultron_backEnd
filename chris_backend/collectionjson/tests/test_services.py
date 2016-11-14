@@ -67,7 +67,7 @@ class FunctionTests(SimpleGetTest):
         response = self.response
         request = response.renderer_context['request']
         links = {"morons": self.endpoint}
-        response = services.append_collection_links(request, response, links)
+        response = services.append_collection_links(response, links)
         self.assertEqual(response.data['collection_links'],
                          {'morons': self.endpoint})
 
