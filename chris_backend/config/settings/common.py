@@ -34,6 +34,9 @@ except Exception:
     }
 PMAN['port'] = 5010
 
+# debug control output
+CHRIS_DEBUG   = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': True}
+
 # Application definition
 
 INSTALLED_APPS = [
