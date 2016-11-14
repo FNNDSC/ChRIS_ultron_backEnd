@@ -168,9 +168,7 @@ class PluginInstanceListViewTests(ViewTests):
 
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
-        pl_manager.startup_apps_exec_server(quiet       = True,
-                                            useDebug    = True,
-                                            debugFile   = '/dev/null')
+        # pl_manager.startup_apps_exec_server()
         pl_manager.add_plugin('simplefsapp')
         plugin = Plugin.objects.get(name="simplefsapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
@@ -182,12 +180,7 @@ class PluginInstanceListViewTests(ViewTests):
         PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
     def tearDown(self):
-        pl_manager = PluginManager()
-        pl_manager.shutdown_apps_exec_server(quiet       = True,
-                                             useDebug    = True,
-                                             debugFile   = '/dev/null')
-
-        #remove test directory
+        # remove test directory
         # shutil.rmtree(self.test_dir, ignore_errors=True)
         # print('removing dir %s...' % self.test_dir)
         shutil.rmtree(self.test_dir)
@@ -205,9 +198,14 @@ class PluginInstanceListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_instance_list_success(self):
+        pl_manager = PluginManager()
+        pl_manager.startup_apps_exec_server(clearDB = True)
+
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "simplefsapp")
+
+        pl_manager.shutdown_apps_exec_server()
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
@@ -252,12 +250,6 @@ class PluginInstanceDetailViewTests(ViewTests):
     Test the plugininstance-detail view
     """
 
-    def tearDown(self):
-        pl_manager = PluginManager()
-        pl_manager.shutdown_apps_exec_server(quiet       = True,
-                                             useDebug    = True,
-                                             debugFile   = '/dev/null')
-
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
         plugin = Plugin.objects.get(name="pacspull")
@@ -266,36 +258,32 @@ class PluginInstanceDetailViewTests(ViewTests):
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
-        # pudb.set_trace()
-
-        pl_manager = PluginManager()
-        pl_manager.startup_apps_exec_server(quiet       = True,
-                                            useDebug    = True,
-                                            debugFile   = '/dev/null')
-
-        # We need to "run" this fake object in order for pman to register the job id.
-        parameter_dict  = {'dir': './'}
-        # Fake representation too...
-        d_pluginRepr    = {'selfpath': '/bin',
-                           'selfexec': 'ls',
-                           'execshell': ''}
-        chris2pman   = charm.Charm(
-            d_args      = parameter_dict,
-            plugin_inst = pl_inst,
-            plugin_repr = d_pluginRepr,
-            quiet       = True,
-            useDebug    = True,
-            debugFile   = '/dev/null'
-        )
-        chris2pman.app_manage(method = 'pman')
-        time.sleep(5)
-
         self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
          
     def test_plugin_instance_detail_success(self):
+
+        user            = User.objects.get(username=self.username)
+        plugin          = Plugin.objects.get(name="pacspull")
+        (pl_inst, tf)   = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        # pudb.set_trace()
+        pl_manager = PluginManager()
+        pl_manager.startup_apps_exec_server(clearDB = True)
+
+        chris2pman   = charm.Charm(
+            d_args      = {'dir': './'},
+            plugin_inst = pl_inst,
+            plugin_repr = {'selfpath': '/bin',
+                           'selfexec': 'ls',
+                           'execshell': ''}
+        )
+
+        chris2pman.app_manage(method = 'pman')
+        time.sleep(5)
+
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, "pacspull")
+        pl_manager.shutdown_apps_exec_server()
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
