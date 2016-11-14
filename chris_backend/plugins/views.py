@@ -31,7 +31,7 @@ class PluginList(generics.ListAPIView):
         """
         response = super(PluginList, self).list(request, *args, **kwargs)
         links = {'feeds': reverse('feed-list', request=request)}    
-        return services.append_collection_links(request, response, links)
+        return services.append_collection_links(response, links)
 
 
 class PluginListQuerySearch(generics.ListAPIView):
@@ -81,7 +81,7 @@ class PluginParameterList(generics.ListAPIView):
         plugin = self.get_object()
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}    
-        return services.append_collection_links(request, response, links)
+        return services.append_collection_links(response, links)
 
     def get_plugin_parameters_queryset(self):
         """
@@ -149,7 +149,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         plugin = self.get_object()
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}
-        response = services.append_collection_links(request, response, links)
+        response = services.append_collection_links(response, links)
         param_names = self.get_plugin_parameter_names()
         template_data = {'previous': ""}
         for name in param_names:
