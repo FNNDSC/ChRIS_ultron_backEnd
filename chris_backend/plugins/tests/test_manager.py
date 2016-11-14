@@ -98,31 +98,23 @@ class PluginManagerTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
 
-        self.pl_manager.startup_apps_exec_server(   quiet       = True,
-                                                    useDebug    = True,
-                                                    debugFile   = '/dev/null')
-
-
-        self.pl_manager.run_plugin_app(             pl_inst,
-                                                    parameter_dict,
-                                                    useDebug     = True,
-                                                    debugFile    = '/dev/null',
-                                                    quiet        = True)
+        self.pl_manager.startup_apps_exec_server(clearDB = True)
+        self.pl_manager.run_plugin_app( pl_inst,
+                                        parameter_dict,
+                                        )
         time.sleep(5)
         self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         # remove test directory and shutdown apps_exec_server
         shutil.rmtree(test_dir)
-        self.pl_manager.shutdown_apps_exec_server(  quiet       = True,
-                                                    useDebug    = True,
-                                                    debugFile   = '/dev/null')
+        self.pl_manager.shutdown_apps_exec_server()
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
     def test_mananger_can_check_plugin_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
         """
-         # create test directory where files are created
+        # create test directory where files are created
         test_dir = settings.MEDIA_ROOT + '/test'
         settings.MEDIA_ROOT = test_dir
         if not os.path.exists(test_dir):
@@ -132,20 +124,17 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
-        self.pl_manager.run_plugin_app(pl_inst, parameter_dict,
-                                       quiet        = True,
-                                       useDebug     = True,
-                                       debugFile    = '/dev/null')
+
+        self.pl_manager.startup_apps_exec_server(clearDB = True)
+        self.pl_manager.run_plugin_app(pl_inst, parameter_dict)
         time.sleep(5)
-        self.pl_manager.check_plugin_app_exec_status(pl_inst,
-                                                     quiet        = True,
-                                                     useDebug     = True,
-                                                     debugFile    = '/dev/null')
+        self.pl_manager.check_plugin_app_exec_status(pl_inst)
         possibleStatus =  ['started', 'finishedSuccessfully']
         self.assertTrue(pl_inst.status in possibleStatus)
 
-        #remove test directory
+        # remove test directory and shutdown apps_exec_server
         shutil.rmtree(test_dir)
+        self.pl_manager.shutdown_apps_exec_server()
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
 
