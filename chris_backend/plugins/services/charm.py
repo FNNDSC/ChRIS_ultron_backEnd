@@ -6,18 +6,17 @@ charm - ChRIS / pman interface.
 
 """
 
-from django.conf import settings
-
 import  sys
 import  os
 import  pprint
 import  datetime
-import  socket
 import  json
 import  pudb
-
-import  pman
 import  threading
+import  pman
+
+from django.conf import settings
+
 
 class Charm():
 
@@ -552,9 +551,6 @@ class Charm():
         self.qprint(str_deepVal, comms = 'error')
 
 if __name__ == '__main__':
-
-    str_defIP = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    str_defPort = 5010
 
     parser  = argparse.ArgumentParser(description = 'interface between ChRIS and pman')
 
