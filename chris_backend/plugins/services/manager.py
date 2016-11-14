@@ -41,6 +41,11 @@ class PluginManager(object):
                            help="register now as modification date")
         self.parser = parser
 
+        # Debug specifications
+        self.b_quiet            = False
+        self.b_useDebug         = True
+        self.str_debugFile      = '%s/tmp/debug-charm.log' % os.environ['HOME']
+
     def _get_plugin_app_class(self, name):
         """
         Internal method to get a plugin's app class name given the plugin's name.
@@ -162,13 +167,10 @@ class PluginManager(object):
         Run a plugin's app.
         """
 
-        b_quiet         = False
-        b_useDebug      = True
-        str_debugFile   = '%s/tmp/debug-charm.log' % os.environ['HOME']
         for k, v in kwargs.items():
-            if k == 'useDebug':     b_useDebug      = v
-            if k == 'debugFile':    str_debugFile   = v
-            if k == 'quiet':        b_quiet         = v
+            if k == 'useDebug':     self.b_useDebug     = v
+            if k == 'debugFile':    self.str_debugFile  = v
+            if k == 'quiet':        self.b_quiet        = v
 
         # instantiate the plugin's app
         plugin_app_class = self._get_plugin_app_class(plugin_inst.plugin.name)
@@ -208,10 +210,7 @@ class PluginManager(object):
             plugin_repr = plugin_repr,
             app         = app,
             inputdir    = inputdir,
-            outputdir   = outputdir,
-            useDebug    = b_useDebug,
-            debugFile   = str_debugFile,
-            quiet       = b_quiet
+            outputdir   = outputdir
         )
 
         #
@@ -244,6 +243,9 @@ class PluginManager(object):
         Shutdown a pman instance
         :return:
         """
+
+        # pudb.set_trace()
+
         chris2pman   = charm.Charm(**kwargs)
         chris2pman.app_pman_checkIfAvailable()
         # Wait a bit for transients
