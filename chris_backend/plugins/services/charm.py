@@ -318,7 +318,7 @@ class Charm():
             "action":   "hello",
             "meta": {
                         "askAbout":     "sysinfo",
-                        "echoBack":     "Alls' well."
+                        "echoBack":     "All's well."
             }
         }
 
