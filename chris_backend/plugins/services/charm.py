@@ -79,12 +79,15 @@ class Charm():
         self._log                   = pman.Message()
         self._log._b_syslog         = True
         self.__name                 = "Charm"
-        self.b_useDebug             = False
+        self.b_useDebug             = settings.CHRIS_DEBUG['useDebug']
 
         str_debugDir                = '%s/tmp' % os.environ['HOME']
         if not os.path.exists(str_debugDir):
             os.makedirs(str_debugDir)
         self.str_debugFile          = '%s/debug-charm.log' % str_debugDir
+
+        if len(settings.CHRIS_DEBUG['debugFile']):
+            self.str_debugFile      = settings.CHRIS_DEBUG['debugFile']
 
         self.str_http               = ""
         self.str_ip                 = ""
@@ -97,7 +100,7 @@ class Charm():
         self.pp                     = pprint.PrettyPrinter(indent=4)
         self.b_man                  = False
         self.str_man                = ''
-        self.b_quiet                = False
+        self.b_quiet                = settings.CHRIS_DEBUG['quiet']
         self.b_raw                  = False
         self.auth                   = ''
         self.str_jsonwrapper        = ''
@@ -113,6 +116,9 @@ class Charm():
         self.LC                     = 40
         self.RC                     = 40
 
+        # If True, will clear the pman DB on each call to pman.
+        self.b_clearDB              = False
+
         for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs      = val
             if key == 'd_args':         self.d_args         = val
@@ -124,6 +130,7 @@ class Charm():
             if key == 'useDebug':       self.b_useDebug     = val
             if key == 'debugFile':      self.str_debugFile  = val
             if key == 'quiet':          self.b_quiet        = val
+            if key == 'clearDB':        self.b_clearDB      = val
 
         if self.b_useDebug:
             self.debug                  = pman.Message(logTo = self.str_debugFile)
@@ -254,8 +261,6 @@ class Charm():
         :return:
         """
 
-
-
         d_msg = {
             "action": "quit",
             "meta": {
@@ -313,6 +318,8 @@ class Charm():
         :param kwargs:
         :return: True | False
         """
+
+        # pudb.set_trace()
 
         d_msg = {
             "action":   "hello",
@@ -420,7 +427,8 @@ class Charm():
             'listeners':    '12',
             'http':         True,
             'debugToFile':  self.b_useDebug,
-            'debugFile':    str_debugFile
+            'debugFile':    str_debugFile,
+            'clearDB':      self.b_clearDB
         }
 
         self.qprint('Calling pman constructor internally.')
@@ -435,7 +443,8 @@ class Charm():
             listeners   = pmanArgs['listeners'],
             http        = pmanArgs['http'],
             debugToFile = pmanArgs['debugToFile'],
-            debugFile   = pmanArgs['debugFile']
+            debugFile   = pmanArgs['debugFile'],
+            clearDB     = pmanArgs['clearDB']
         )
 
         t_comm = threading.Thread(target = comm.thread_serve)
