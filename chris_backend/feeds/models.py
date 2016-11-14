@@ -1,5 +1,7 @@
 
 from django.db import models
+import django_filters
+from rest_framework.filters import FilterSet
 
 class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
@@ -30,6 +32,15 @@ class Feed(models.Model):
         note = Note()
         note.feed = self;
         note.save()
+
+
+class FeedFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='lte')
+    
+    class Meta:
+        model = Feed
+        fields = ['name', 'min_creation_date', 'max_creation_date']
         
             
 class Note(models.Model):

@@ -9,7 +9,7 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import Note, Tag, Feed, Comment, FeedFile
+from .models import Note, Tag, Feed, FeedFilter, Comment, FeedFile
 from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
@@ -143,7 +143,7 @@ class FeedList(generics.ListAPIView):
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request)}    
         return services.append_collection_links(response, links)
-    
+        
 
 class FeedListQuerySearch(generics.ListAPIView):
     """
@@ -151,22 +151,18 @@ class FeedListQuerySearch(generics.ListAPIView):
     """
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated,)
+    filter_class = FeedFilter
 
     def get_queryset(self):
         """
-        Custom method to return a queryset that is only comprised by the plugin's 
-        instances that match the query search parameters.
+        Overriden to return a custom queryset that is only comprised by the feeds 
+        owned by the currently authenticated user.
         """
         user = self.request.user
-        query_params = self.request.GET.dict()
-        try:
-             # if the user is chris then return all the feeds that match the query
-            if (user.username == 'chris'):
-                return Feed.objects.filter(**query_params)
-            return Feed.objects.filter(owner=user).filter(**query_params)       
-        except (FieldError, ValueError):
-            return []
-        return q
+        # if the user is chris then return all the feeds in the system
+        if (user.username == 'chris'):
+            return Feed.objects.all()
+        return Feed.objects.filter(owner=user)
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
