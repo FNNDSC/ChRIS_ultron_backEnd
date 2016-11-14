@@ -336,14 +336,7 @@ class Charm():
         """
         Run the "app" via pman
         """
-
-        # The following snippet sets the pman IP to the actual host
-        # Set the pman IP to specific host IP.
-        # This is to address some issues on development relating to proxy handling.
-        # If your setup complains at this line, simply comment it out and leave
-        # the host as 'localhost'
-        settings.PMAN['host']   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-
+        
         str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
 
         # First, check if pman is available... and start it if it is not.
