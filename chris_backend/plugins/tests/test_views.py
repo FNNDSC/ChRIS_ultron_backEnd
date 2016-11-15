@@ -8,7 +8,7 @@ from django.conf import settings
 
 from rest_framework import status
 
-from plugins.models import Plugin, PluginParameter, PluginInstance
+from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
 from plugins.services.manager import PluginManager
 from plugins import views
 from plugins.services import charm
@@ -221,24 +221,25 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         super(PluginInstanceListQuerySearchViewTests, self).setUp()
         
         user = User.objects.get(username=self.username)
-        self.inst_ids = []
+        
         # create two plugin instances
         plugin = Plugin.objects.get(name="pacspull") 
         (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-        self.inst_ids.append(inst.id)
+        # set first instance's status
+        inst.status = STATUS_TYPES[0]
         plugin = Plugin.objects.get(name="mri_convert") 
         (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-        self.inst_ids.append(inst.id)
+        # set second instance's status
+        inst.status = STATUS_TYPES[2]
 
-        self.list_url = reverse("plugininstance-list-query-search",
-                                kwargs={"pk": plugin.id}) + '?id=' + str(inst.id)
+        self.list_url = reverse("plugininstance-list-query-search") + '?status='+ STATUS_TYPES[0]
 
     def test_plugin_instance_query_search_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         # response should only contain the instances that match the query
-        self.assertContains(response, self.inst_ids[1])
-        self.assertNotContains(response, self.inst_ids[0])
+        self.assertContains(response, STATUS_TYPES[0])
+        self.assertNotContains(response, STATUS_TYPES[1])
 
     def test_plugin_instance_query_search_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
