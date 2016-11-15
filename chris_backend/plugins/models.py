@@ -4,6 +4,9 @@ import os
 from django.db import models
 from django.conf import settings
 
+import django_filters
+from rest_framework.filters import FilterSet
+
 from feeds.models import Feed, FeedFile
 
 
@@ -27,6 +30,15 @@ class Plugin(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class PluginFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='lte')
+    
+    class Meta:
+        model = Plugin
+        fields = ['name', 'type', 'min_creation_date', 'max_creation_date']
 
 
 class PluginParameter(models.Model):
@@ -117,6 +129,18 @@ class PluginInstance(models.Model):
                 feedfile.save()
                 feedfile.feed = [feed]
                 feedfile.save()
+
+
+class PluginInstanceFilter(FilterSet):
+    min_start_date = django_filters.DateFilter(name="start_date", lookup_expr='gte')
+    max_start_date = django_filters.DateFilter(name="start_date", lookup_expr='lte')
+    min_end_date = django_filters.DateFilter(name="end_date", lookup_expr='gte')
+    max_end_date = django_filters.DateFilter(name="end_date", lookup_expr='lte')
+    
+    class Meta:
+        model = PluginInstance
+        fields = ['status', 'previous', 'min_start_date', 'max_start_date',
+                  'min_end_date', 'max_end_date']
         
         
 class StringParameter(models.Model):

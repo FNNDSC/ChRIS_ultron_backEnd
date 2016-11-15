@@ -1,13 +1,12 @@
 
-from django.core.exceptions import FieldError
-
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
 from collectionjson import services
 
-from .models import Plugin, PluginParameter, PluginInstance, StringParameter
-from .models import FloatParameter, IntParameter, BoolParameter
+from .models import Plugin, PluginFilter, PluginParameter 
+from .models import PluginInstance, PluginInstanceFilter
+from .models import StringParameter, FloatParameter, IntParameter, BoolParameter
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
@@ -39,19 +38,9 @@ class PluginListQuerySearch(generics.ListAPIView):
     A view for the collection of plugins resulting from a query search.
     """
     serializer_class = PluginSerializer
+    queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
-
-    def get_queryset(self):
-        """
-        Overriden to return a custom queryset that is only comprised by the plugins 
-        that match the query search parameters.
-        """
-        query_params = self.request.GET.dict()
-        try:
-            q = Plugin.objects.filter(**query_params)
-        except (FieldError, ValueError):
-            return [] 
-        return q
+    filter_class = PluginFilter
         
 
 class PluginDetail(generics.RetrieveAPIView):
@@ -177,30 +166,19 @@ class PluginInstanceListQuerySearch(generics.ListAPIView):
     A view for the collection of plugin instances resulting from a query search.
     """
     serializer_class = PluginInstanceSerializer
-    queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    filter_class = PluginInstanceFilter
 
-    def list(self, request, *args, **kwargs):
+    def get_queryset(self):
         """
-        Overriden to return the list of plugin instances for the queried plugin
-        that match the query search
+        Overriden to return a custom queryset that is only comprised by the plugin  
+        instances owned by the currently authenticated user.
         """
-        query_params = request.GET.dict()
-        queryset = self.get_plugin_instances_filtered_queryset(query_params)
-        response = services.get_list_response(self, queryset)
-        return response
-
-    def get_plugin_instances_filtered_queryset(self, query_params):
-        """
-        Custom method to return a queryset that is only comprised by the plugin's 
-        instances that match the query search parameters.
-        """
-        plugin = self.get_object()
-        try:
-            q = PluginInstance.objects.filter(plugin=plugin).filter(**query_params)
-        except (FieldError, ValueError):
-            return []
-        return q
+        user = self.request.user
+        # if the user is chris then return all the plugin instances in the system
+        if (user.username == 'chris'):
+            return PluginInstance.objects.all()
+        return PluginInstance.objects.filter(owner=user)
 
         
 class PluginInstanceDetail(generics.RetrieveAPIView):

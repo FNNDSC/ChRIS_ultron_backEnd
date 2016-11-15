@@ -63,7 +63,7 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
         pl_views.PluginInstanceList.as_view(), name='plugininstance-list'),
     
-    url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/search/$',
+    url(r'^v1/plugins/instances/search/$',
         pl_views.PluginInstanceListQuerySearch.as_view(),
         name='plugininstance-list-query-search'),
 

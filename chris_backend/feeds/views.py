@@ -1,5 +1,5 @@
 
-from django.core.exceptions import ObjectDoesNotExist, FieldError
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
@@ -143,7 +143,7 @@ class FeedList(generics.ListAPIView):
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request)}    
         return services.append_collection_links(response, links)
-        
+
 
 class FeedListQuerySearch(generics.ListAPIView):
     """
