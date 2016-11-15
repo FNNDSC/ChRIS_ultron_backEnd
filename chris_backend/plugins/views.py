@@ -29,6 +29,10 @@ class PluginList(generics.ListAPIView):
         template to the response.
         """
         response = super(PluginList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('plugin-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request)}    
         return services.append_collection_links(response, links)
 
@@ -136,9 +140,14 @@ class PluginInstanceList(generics.ListCreateAPIView):
         queryset = self.get_plugin_instances_queryset()
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
+        # append query list
+        query_list = [reverse('plugininstance-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}
         response = services.append_collection_links(response, links)
+        # append write template
         param_names = self.get_plugin_parameter_names()
         template_data = {'previous': ""}
         for name in param_names:

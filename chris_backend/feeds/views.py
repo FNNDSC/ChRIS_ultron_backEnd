@@ -140,6 +140,10 @@ class FeedList(generics.ListAPIView):
         Overriden to append document-level link relations.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('feed-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request)}    
         return services.append_collection_links(response, links)

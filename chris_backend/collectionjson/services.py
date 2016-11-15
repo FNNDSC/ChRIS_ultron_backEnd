@@ -1,4 +1,8 @@
 
+from urllib.parse import urlparse
+
+from django.core.urlresolvers import resolve
+
 from rest_framework.response import Response
 
 def get_list_response(list_view_instance, queryset):
@@ -36,4 +40,21 @@ def append_collection_template(response, template_data):
     for (k, v) in template_data.items():
         data.append({"name": k, "value": v})
     response.data["template"] = {"data": data}
+    return response
+
+
+def append_collection_querylist(response, query_url_list):
+    """
+    Convenience method to append to a response a collection+json queries template.
+    """
+    queries = []
+    for query_url in query_url_list:
+        relative_url = urlparse(query_url).path
+        match = resolve(relative_url)
+        filters = match.func.view_class().filter_class.base_filters
+        data = []
+        for k in filters.keys():
+            data.append({"name": k, "value": ""})
+        queries.append({'href': query_url, 'rel': 'search', "data": data})
+    response.data["queries"] = queries
     return response

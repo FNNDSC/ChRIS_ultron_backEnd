@@ -141,9 +141,11 @@ class CollectionJsonRenderer(JSONRenderer):
         else:
             collection.update(self._get_items_and_links(view, data))
 
+        if 'queries' in data:
+            collection['queries'] = data.pop('queries')
+
         if 'template' in data:
             collection['template'] = data.pop('template')
-            
         return {'collection': collection}
 
     def render(self, data, media_type=None, renderer_context=None):
