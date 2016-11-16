@@ -29,6 +29,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
+    previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
@@ -48,7 +49,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'plugin_name', 'start_date', 'end_date', 'status',
+        fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
                   'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
                   'float_param', 'bool_param')
 
