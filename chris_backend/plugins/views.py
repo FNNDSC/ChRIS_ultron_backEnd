@@ -112,8 +112,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         request_data = serializer.context['request'].data
         # get previous plugin instance
         previous_id = ""
-        if 'previous' in request_data:
-            previous_id = request_data['previous']
+        if 'previous_id' in request_data:
+            previous_id = request_data['previous_id']
         previous = serializer.validate_previous(previous_id, plugin)
         # create plugin instance with corresponding owner, plugin and previous instances
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
@@ -149,7 +149,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         param_names = self.get_plugin_parameter_names()
-        template_data = {'previous': ""}
+        template_data = {'previous_id': ""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)
