@@ -28,7 +28,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
    .. sourcecode:: http
 
-      GET /api/v1/plugins/12/instances/ HTTP/1.1
+      GET /api/v1/plugins/4/instances/ HTTP/1.1
       Host: localhost:8000
       Accept: application/vnd.collection+json
 
@@ -43,25 +43,29 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
       {
           "collection": {
-              "href": "https://localhost:8000/api/v1/plugins/12/instances/",
+              "href": "http://localhost:8000/api/v1/plugins/4/instances/",
               "items": [
                   {
                       "data": [
                           {
                               "name": "id",
-                              "value": 60
+                              "value": 8
+                          },
+                          {
+                              "name": "previous_id",
+                              "value": 5
                           },
                           {
                               "name": "plugin_name",
-                              "value": "simplefsapp"
+                              "value": "simpledsapp"
                           },
                           {
                               "name": "start_date",
-                              "value": "2016-09-21T14:47:06.352445Z"
+                              "value": "2016-11-16T17:27:19.192067Z"
                           },
                           {
                               "name": "end_date",
-                              "value": "2016-09-21T14:47:06.352502Z"
+                              "value": "2016-11-16T17:27:19.192118Z"
                           },
                           {
                               "name": "status",
@@ -72,18 +76,18 @@ In other Collection+JSON_ resource representations this resource type is linked 
                               "value": "jbernal"
                           }
                       ],
-                      "href": "https://localhost:8000/api/v1/plugins/instances/60/",
+                      "href": "http://localhost:8000/api/v1/plugins/instances/8/",
                       "links": [
                           {
-                              "href": "https://localhost:8000/api/v1/35/",
-                              "rel": "feed"
+                              "href": "http://localhost:8000/api/v1/plugins/instances/5/",
+                              "rel": "previous"
                           },
                           {
-                              "href": "https://localhost:8000/api/v1/plugins/12/",
+                              "href": "http://localhost:8000/api/v1/plugins/4/",
                               "rel": "plugin"
                           },
                           {
-                              "href": "https://localhost:8000/api/v1/plugins/string-parameter/56/",
+                              "href": "http://localhost:8000/api/v1/plugins/string-parameter/6/",
                               "rel": "string_param"
                           }
                       ]
@@ -92,19 +96,23 @@ In other Collection+JSON_ resource representations this resource type is linked 
                       "data": [
                           {
                               "name": "id",
-                              "value": 61
+                              "value": 9
+                          },
+                          {
+                              "name": "previous_id",
+                              "value": 6
                           },
                           {
                               "name": "plugin_name",
-                              "value": "simplefsapp"
+                              "value": "simpledsapp"
                           },
                           {
                               "name": "start_date",
-                              "value": "2016-09-21T14:50:41.694232Z"
+                              "value": "2016-11-16T17:27:39.508197Z"
                           },
                           {
                               "name": "end_date",
-                              "value": "2016-09-21T14:50:41.694289Z"
+                              "value": "2016-11-16T17:27:39.508248Z"
                           },
                           {
                               "name": "status",
@@ -115,33 +123,77 @@ In other Collection+JSON_ resource representations this resource type is linked 
                               "value": "jbernal"
                           }
                       ],
-                      "href": "https://localhost:8000/api/v1/plugins/instances/61/",
+                      "href": "http://localhost:8000/api/v1/plugins/instances/9/",
                       "links": [
                           {
-                              "href": "https://localhost:8000/api/v1/36/",
-                              "rel": "feed"
+                              "href": "http://localhost:8000/api/v1/plugins/instances/6/",
+                              "rel": "previous"
                           },
                           {
-                              "href": "https://localhost:8000/api/v1/plugins/12/",
+                              "href": "http://localhost:8000/api/v1/plugins/4/",
                               "rel": "plugin"
+                          },
+                          {
+                              "href": "http://localhost:8000/api/v1/plugins/string-parameter/7/",
+                              "rel": "string_param"
                           }
                       ]
-                  }
+                  },
               ],
               "links": [
                   {
-                      "href": "https://localhost:8000/api/v1/plugins/12/",
+                      "href": "http://localhost:8000/api/v1/plugins/4/",
                       "rel": "plugin"
+                  }
+              ],
+              "queries": [
+                  {
+                      "data": [
+                          {
+                              "name": "root_id",
+                              "value": ""
+                          },
+                          {
+                              "name": "status",
+                              "value": ""
+                          },
+                          {
+                              "name": "previous_id",
+                              "value": ""
+                          },
+                          {
+                              "name": "min_start_date",
+                              "value": ""
+                          },
+                          {
+                              "name": "max_start_date",
+                              "value": ""
+                          },
+                          {
+                              "name": "min_end_date",
+                              "value": ""
+                          },
+                          {
+                              "name": "max_end_date",
+                              "value": ""
+                          }
+                      ],
+                      "href": "http://localhost:8000/api/v1/plugins/instances/search/",
+                      "rel": "search"
                   }
               ],
               "template": {
                   "data": [
                       {
-                          "name": "previous",
+                          "name": "prefix",
                           "value": ""
                       },
                       {
-                          "name": "dir",
+                          "name": "sleepLength",
+                          "value": ""
+                      },
+                      {
+                          "name": "previous_id",
                           "value": ""
                       }
                   ]
@@ -149,6 +201,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
               "version": "1.0"
           }
       }
+
 
    :reqheader Accept: application/vnd.collection+json
    :resheader Content-Type: application/vnd.collection+json
