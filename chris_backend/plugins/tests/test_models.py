@@ -9,7 +9,28 @@ from feeds.models import Feed, FeedFile
 from plugins.models import Plugin, PluginParameter, PluginInstance
 
 
+class PluginModelTests(TestCase):
+    
+    def setUp(self):
+        self.plugin_fs_name = "simplefsapp"
+        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
 
+        # create a plugin
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
+                                                    type='fs')
+        # add plugins' parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin_fs,
+            name='dir',
+            type=self.plugin_fs_parameters['dir']['type'],
+            optional=self.plugin_fs_parameters['dir']['optional'])
+
+    def test_get_plugin_parameter_names(self):
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        param_names = plugin.get_plugin_parameter_names()
+        self.assertEquals(param_names, ['dir'])
+        
+      
 class PluginInstanceModelTests(TestCase):
     
     def setUp(self):
@@ -74,6 +95,22 @@ class PluginInstanceModelTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         self.assertEquals(Feed.objects.count(), 0)
 
+    def test_get_root_instance(self):
+        """
+        Test whether custom get_root_instance method returns the root 'fs' plugin 
+        instance for a give plugin instance.
+        """
+        # create a 'fs' plugin instance 
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        pl_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user)
+        # create a 'ds' plugin instance whose root is the previous 'fs' plugin instance
+        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=pl_inst_root)
+        root_instance = pl_inst.get_root_instance()
+        self.assertEquals(root_instance, pl_inst_root)
+
     def test_get_output_path(self):
         """
         Test whether custom get_output_path method returns appropriate output paths
@@ -85,7 +122,8 @@ class PluginInstanceModelTests(TestCase):
         pl_inst_fs = PluginInstance.objects.create(plugin=plugin_fs, owner=user)
         # 'fs' plugins will output files to:
         # MEDIA_ROOT/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
-        fs_output_path = '{0}/{1}/feed_{2}/{3}_{4}/data'.format(self.test_dir, self.username,
+        fs_output_path = '{0}/{1}/feed_{2}/{3}_{4}/data'.format(self.test_dir,
+                                                                self.username,
                                                              pl_inst_fs.feed.id,
                                                              pl_inst_fs.plugin.name,
                                                              pl_inst_fs.id) 

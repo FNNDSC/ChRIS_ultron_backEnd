@@ -1,5 +1,7 @@
 from six.moves.urllib.parse import urljoin
 
+from django_filters.rest_framework import DjangoFilterBackend
+
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet
 from rest_framework.response import Response
@@ -9,7 +11,7 @@ from rest_framework.exceptions import ParseError
 from collectionjson.renderers import CollectionJsonRenderer
 from collectionjson.parsers import CollectionJsonParser
 
-from .models import Dummy, Idiot, Moron, Simple
+from .models import Dummy, Idiot, Moron, MoronFilter, Simple
 from .serializers import MoronHyperlinkedModelSerializer, IdiotHyperlinkedModelSerializer
 from .serializers import DummyHyperlinkedModelSerializer, SimpleModelSerializer
 
@@ -19,6 +21,8 @@ class MoronModelViewSet(ModelViewSet):
     parser_classes = (CollectionJsonParser, )
     queryset = Moron.objects.all()
     serializer_class = MoronHyperlinkedModelSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MoronFilter
     
 
 class MoronReadOnlyModelViewSet(ReadOnlyModelViewSet):

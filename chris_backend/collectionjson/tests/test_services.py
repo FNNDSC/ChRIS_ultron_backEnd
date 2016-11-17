@@ -82,6 +82,19 @@ class FunctionTests(SimpleGetTest):
         self.assertEqual(response.data['template'],
                          {'data': [{'name': 'name', 'value': ''}]})
 
+    def test_append_collection_querylist(self):
+        """
+        Test whether services.append_collection_querylist() appends a collection+json
+        queries template list to it response argument
+        """
+        response = self.response
+        request = response.renderer_context['request']
+        query_urls = [self.endpoint]
+        response = services.append_collection_querylist(response, query_urls)
+        self.assertEqual(response.data['queries'],
+                         [{'href': query_urls[0], 'rel': 'search',
+                           "data": [{"name": "name", "value": ""}]}])
+
 
 router = DefaultRouter()
 router.register('moron', views.MoronModelViewSet)

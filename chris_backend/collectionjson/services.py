@@ -51,7 +51,7 @@ def append_collection_querylist(response, query_url_list):
     for query_url in query_url_list:
         relative_url = urlparse(query_url).path
         match = resolve(relative_url)
-        filters = match.func.view_class().filter_class.base_filters
+        filters = match.func.cls.filter_class.base_filters
         data = []
         for k in filters.keys():
             data.append({"name": k, "value": ""})

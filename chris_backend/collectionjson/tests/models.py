@@ -1,5 +1,6 @@
 
 from django.db.models import Model, CharField, ForeignKey, ManyToManyField
+from rest_framework.filters import FilterSet
 
 # Create your models here.
 class Moron(Model):
@@ -7,8 +8,15 @@ class Moron(Model):
 
     class Meta:
         app_label = "collectionjson"
+        
 
+class MoronFilter(FilterSet):
+    
+    class Meta:
+        model = Moron
+        fields = ['name']
 
+        
 class Idiot(Model):
     name = CharField(max_length=100)
 
