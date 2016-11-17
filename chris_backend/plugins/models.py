@@ -30,6 +30,13 @@ class Plugin(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_plugin_parameter_names(self):
+        """
+        Custom method to get the list of plugin parameter names.
+        """
+        params = self.parameters.all()
+        return [param.name for param in params]
     
 
 class PluginFilter(FilterSet):

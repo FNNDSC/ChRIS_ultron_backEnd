@@ -62,7 +62,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         if plugin.type=='ds':
             if not previous_id:
                 raise serializers.ValidationError(
-                    {'detail': "A 'previous' plugin instance id is required"})
+                    {'detail': "A previous plugin instance id is required"})
             try:
                 pk = int(previous_id)
                 previous = PluginInstance.objects.get(pk=pk)

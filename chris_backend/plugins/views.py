@@ -148,7 +148,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                    kwargs={"pk": plugin.id})}
         response = services.append_collection_links(response, links)
         # append write template
-        param_names = self.get_plugin_parameter_names()
+        param_names = plugin.get_plugin_parameter_names()
         template_data = {'previous_id': ""}
         for name in param_names:
             template_data[name] = ""
@@ -160,14 +160,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         plugin = self.get_object()
         return self.filter_queryset(plugin.instances.all())
-
-    def get_plugin_parameter_names(self):
-        """
-        Custom method to get the list of plugin parameter names.
-        """
-        plugin = self.get_object()
-        params = plugin.parameters.all()
-        return [param.name for param in params]
 
 
 class PluginInstanceListQuerySearch(generics.ListAPIView):
