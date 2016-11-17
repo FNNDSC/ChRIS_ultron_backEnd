@@ -24,6 +24,8 @@
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
     <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
     <link rel="top" title="chris ultron backend 0.0.1 documentation" href="../index.html" />
     <link rel="up" title="REST API Reference" href="../api.html" />
     <link rel="next" title="User item" href="user.html" />
@@ -62,7 +64,7 @@
 </tbody>
 </table>
 <p><strong>Example request</strong>:</p>
-<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/instances/60/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/instances/16/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
 <span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
 <span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 </pre></div>
@@ -74,47 +76,51 @@
 
 <span class="p">{</span>
     <span class="nt">&quot;collection&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:8000/api/v1/plugins/instances/16/&quot;</span><span class="p">,</span>
         <span class="nt">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span>
             <span class="p">{</span>
                 <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="mi">60</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="mi">16</span>
+                    <span class="p">},</span>
+                    <span class="p">{</span>
+                        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;previous_id&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="mi">6</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_name&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;simplefsapp&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;simpledsapp&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;start_date&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-09-21T14:47:06.352445Z&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-11-17T21:33:22.281362Z&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;end_date&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-09-21T14:47:06.352502Z&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;2016-11-17T21:34:13.860258Z&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;started&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;finishedSuccessfully&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;owner&quot;</span><span class="p">,</span>
                         <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;jbernal&quot;</span>
                     <span class="p">}</span>
                 <span class="p">],</span>
-                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
+                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:8000/api/v1/plugins/instances/16/&quot;</span><span class="p">,</span>
                 <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
                     <span class="p">{</span>
-                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/35/&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;feed&quot;</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:8000/api/v1/plugins/instances/6/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;previous&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
-                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/12/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:8000/api/v1/plugins/4/&quot;</span><span class="p">,</span>
                         <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
-                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/string-parameter/56/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;http://localhost:8000/api/v1/plugins/string-parameter/14/&quot;</span><span class="p">,</span>
                         <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;string_param&quot;</span>
                     <span class="p">}</span>
                 <span class="p">]</span>
@@ -155,6 +161,7 @@
 <blockquote>
 <div><ul class="simple">
 <li><strong>id</strong> (<cite>int</cite>) – instance&#8217;s id</li>
+<li><strong>previous_id</strong> (<cite>int</cite>) – previous instance&#8217;s id</li>
 <li><strong>plugin_name</strong> (<cite>string</cite>) – corresponding plugin&#8217;s name</li>
 <li><strong>start_date</strong> (<cite>string</cite>) – starting date of the associated plugin process</li>
 <li><strong>end_date</strong> (<cite>boolean</cite>) – end date of the associated plugin process</li>
@@ -166,7 +173,8 @@
 <blockquote>
 <div><ul class="simple">
 <li><strong>plugin</strong> – links to the corresponding <a class="reference external" href="plugin.html">plugin</a></li>
-<li><strong>feed</strong> – links to the corresponding <a class="reference external" href="feed.html">feed</a></li>
+<li><strong>previous</strong> – links to the previous plugin instance</li>
+<li><strong>feed</strong> – links to the corresponding <a class="reference external" href="feed.html">feed</a> (only for plugins of type &#8216;fs&#8217;)</li>
 <li><strong>string_param</strong> – links to a <a class="reference external" href="../other_resources/string_parameter_instance.html">string parameter instance</a></li>
 <li><strong>int_param</strong> – links to an <a class="reference external" href="../other_resources/integer_parameter_instance.html">integer parameter instance</a></li>
 <li><strong>float_param</strong> – links to a <a class="reference external" href="../other_resources/float_parameter_instance.html">float parameter instance</a></li>
@@ -218,7 +226,7 @@
       &copy;2016, FNNDSC Devs.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.6</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.4.8</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
       
       |

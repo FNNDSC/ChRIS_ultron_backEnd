@@ -26,7 +26,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
    .. sourcecode:: http
 
-      GET /api/v1/instances/60/ HTTP/1.1
+      GET /api/v1/instances/16/ HTTP/1.1
       Host: localhost:8000
       Accept: application/vnd.collection+json
 
@@ -41,47 +41,51 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
       {
           "collection": {
-              "href": "https://localhost:8000/api/v1/plugins/instances/60/",
+              "href": "http://localhost:8000/api/v1/plugins/instances/16/",
               "items": [
                   {
                       "data": [
                           {
                               "name": "id",
-                              "value": 60
+                              "value": 16
+                          },
+                          {
+                              "name": "previous_id",
+                              "value": 6
                           },
                           {
                               "name": "plugin_name",
-                              "value": "simplefsapp"
+                              "value": "simpledsapp"
                           },
                           {
                               "name": "start_date",
-                              "value": "2016-09-21T14:47:06.352445Z"
+                              "value": "2016-11-17T21:33:22.281362Z"
                           },
                           {
                               "name": "end_date",
-                              "value": "2016-09-21T14:47:06.352502Z"
+                              "value": "2016-11-17T21:34:13.860258Z"
                           },
                           {
                               "name": "status",
-                              "value": "started"
+                              "value": "finishedSuccessfully"
                           },
                           {
                               "name": "owner",
                               "value": "jbernal"
                           }
                       ],
-                      "href": "https://localhost:8000/api/v1/plugins/instances/60/",
+                      "href": "http://localhost:8000/api/v1/plugins/instances/16/",
                       "links": [
                           {
-                              "href": "https://localhost:8000/api/v1/35/",
-                              "rel": "feed"
+                              "href": "http://localhost:8000/api/v1/plugins/instances/6/",
+                              "rel": "previous"
                           },
                           {
-                              "href": "https://localhost:8000/api/v1/plugins/12/",
+                              "href": "http://localhost:8000/api/v1/plugins/4/",
                               "rel": "plugin"
                           },
                           {
-                              "href": "https://localhost:8000/api/v1/plugins/string-parameter/56/",
+                              "href": "http://localhost:8000/api/v1/plugins/string-parameter/14/",
                               "rel": "string_param"
                           }
                       ]
@@ -107,6 +111,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    Properties_ (API semantic descriptors):
 
     - **id** (`int`) |--| instance's id
+    - **previous_id** (`int`) |--| previous instance's id
     - **plugin_name** (`string`) |--| corresponding plugin's name
     - **start_date** (`string`) |--| starting date of the associated plugin process
     - **end_date** (`boolean`) |--| end date of the associated plugin process
@@ -116,7 +121,8 @@ In other Collection+JSON_ resource representations this resource type is linked 
    `Link Relations`_:
 
     - **plugin** |--| links to the corresponding plugin_
-    - **feed** |--| links to the corresponding feed_
+    - **previous** |--| links to the previous plugin instance
+    - **feed** |--| links to the corresponding feed_ (only for plugins of type 'fs')
     - **string_param** |--| links to a `string parameter instance`_
     - **int_param** |--| links to an `integer parameter instance`_
     - **float_param** |--| links to a `float parameter instance`_
