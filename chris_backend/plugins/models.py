@@ -138,10 +138,8 @@ class PluginInstance(models.Model):
         output_path = self.get_output_path()
         for (dirpath, dirnames, filenames) in os.walk(output_path):
             for name in filenames:
-                feedfile = FeedFile(plugin_inst=self)
+                feedfile = FeedFile(plugin_inst=self, feed=feed)
                 feedfile.fname.name = os.path.join(dirpath, name)
-                feedfile.save()
-                feedfile.feed = [feed]
                 feedfile.save()
 
 

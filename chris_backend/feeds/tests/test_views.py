@@ -638,15 +638,11 @@ class FeedFileListViewTests(FeedFileViewTests):
         #feedfile.feed = [feed]
         #feedfile.save()
         #file.close()
-        feedfile = FeedFile(plugin_inst=pl_inst)
+        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file1.txt'
         feedfile.save()
-        feedfile.feed = [feed]
-        feedfile.save()
-        feedfile = FeedFile(plugin_inst=pl_inst)
+        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file2.txt'
-        feedfile.save()
-        feedfile.feed = [feed]
         feedfile.save()
 
     def test_feedfile_create_failure_post_not_allowed(self):
@@ -693,10 +689,8 @@ class FeedFileDetailViewTests(FeedFileViewTests):
 
         # create a file in the DB "already uploaded" to the server
         pl_inst = PluginInstance.objects.all()[0]
-        feedfile = FeedFile(plugin_inst=pl_inst)
+        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file1.txt'
-        feedfile.save()
-        feedfile.feed = [feed]
         feedfile.save()
 
         self.read_update_delete_url = reverse("feedfile-detail", kwargs={"pk": feedfile.id})
@@ -705,13 +699,13 @@ class FeedFileDetailViewTests(FeedFileViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "file1.txt")
-        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
 
     def test_feedfile_detail_success_user_chris(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "file1.txt")
-        self.assertTrue(response.data["feed"][0].endswith(self.corresponding_feed_url))
+        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
 
     def test_feedfile_detail_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -756,10 +750,8 @@ class FileResourceViewTests(FeedFileViewTests):
             
         # create a file in the DB "already uploaded" to the server
         pl_inst = PluginInstance.objects.all()[0]
-        feedfile = FeedFile(plugin_inst=pl_inst)
+        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file1.txt'
-        feedfile.save()
-        feedfile.feed = [feed]
         feedfile.save()
         self.download_url = reverse("file-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'

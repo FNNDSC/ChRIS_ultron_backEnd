@@ -52,16 +52,19 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
                                                read_only=True)
-    fname = serializers.FileField(use_url=False)
-    file_resource = ItemLinkField('_get_file_link')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                       read_only=True)
-
+    file_resource = ItemLinkField('_get_file_link')
+    fname = serializers.FileField(use_url=False)
+    feed_id = serializers.ReadOnlyField(source='feed.id')
+    plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
+    
     class Meta:
         model = FeedFile
-        fields = ('url', 'fname', 'file_resource', 'feed', 'plugin_inst')
+        fields = ('url', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource', 'feed',
+                  'plugin_inst')
 
     def _get_file_link(self, obj):
         """
