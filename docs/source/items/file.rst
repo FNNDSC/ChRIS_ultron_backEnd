@@ -92,6 +92,8 @@ This resource type refers to a user's feed file item.
 
     - **fname** (`string`) |--| file's name. Can be part of the template object in PUT
       requests
+    - **feed_id** (`int`) |--| corresponding feed_'s id
+    - **plugin_inst_id** (`int`) |--| corresponding `plugin instance`_'s id
 
    `Link Relations`_:
 
