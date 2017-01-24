@@ -1,0 +1,12 @@
+.dockerignore
+Dockerfile
+.gitignore
+.travis.yml
+secrets.json
+.coverage
+.git
+LICENSE
+README.md
+utils
+docs
+htmlcov
