@@ -11,10 +11,10 @@ RUN apt-get update \
   && apt-get install -y libssl-dev libcurl4-openssl-dev \
   && apt-get install -y apache2 apache2-dev \
   && echo "alias python=python3" > ~/.bashrc \
-  && echo "alias pip=pip3" > ~/.bashrc \
+  && echo "alias pip=pip3" >> ~/.bashrc \
   && pip3 install -r ${REQPATH}/local.txt
 
 WORKDIR $APPROOT
-#ENTRYPOINT ["python3"]
+ENTRYPOINT ["python3", "manage.py"]
 EXPOSE 8000
-#CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["runserver", "0.0.0.0:8000"]
