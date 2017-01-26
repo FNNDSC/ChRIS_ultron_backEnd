@@ -20,6 +20,9 @@ apt-get install mysql-server libmysqlclient-dev -y
 echo "Initiating MySQL Databases"
 echo "CREATE DATABASE chris_dev CHARACTER SET utf8;GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';    GRANT ALL ON test_chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';" | mysql -u root -p1234
 
+echo "SSL Deps for PyCurl"
+apt-get install libssl-dev libcurl4-openssl-dev -y
+
 echo "Installing Python"
 apt-get install python3-dev -y
 
