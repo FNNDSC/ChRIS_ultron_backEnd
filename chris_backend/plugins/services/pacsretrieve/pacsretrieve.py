@@ -134,7 +134,7 @@ class PacsRetrieveApp(ChrisApp):
                break
 
             time.sleep( 1 )
-            timer += 10
+            timer += 1
 
         print('Done.')
 
