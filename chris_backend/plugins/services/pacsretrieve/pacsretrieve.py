@@ -108,6 +108,9 @@ class PacsRetrieveApp(ChrisApp):
             pacs_settings['series_uid'] = series['SeriesInstanceUID']['value']
             output = pypx.move(pacs_settings)
 
+            
+        print('Receiving data.')
+        
         # wait for files to arrive!
         timer = 0 # 30mn
 
@@ -133,10 +136,7 @@ class PacsRetrieveApp(ChrisApp):
             time.sleep( 1 )
             timer += 10
 
-
-
-
-
+        print('Done.')
 
 # ENTRYPOINT
 if __name__ == "__main__":
