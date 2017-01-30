@@ -12,7 +12,7 @@ docker run --name chris_dev_db --volumes-from chris_dev_db_data -v "$PWD/docker-
 echo " "
 
 echo "3-Starting chris development environment container with access to the previous mysql container ..."
-docker run --name chris_dev --link chris_dev_db:mysql -v "$PWD/chris_backend":/usr/src/chris_backend -p 8000:8000 -d fnndsc/chris_dev_backend:local
+docker run --name chris_dev --link chris_dev_db:mysql -v "$PWD/chris_backend":/usr/src/chris_backend -p 8000:8000 -d fnndsc/chris_dev_backend
 export chris_dev_IP="$(docker inspect --format '{{.NetworkSettings.IPAddress}}' chris_dev)"
 echo " "
 
