@@ -1,5 +1,7 @@
 #!/bin/bash
 
+APPROOT="/usr/src/chris_backend"
+
 echo "Creating chris containerized development environment"
 echo " "
 
@@ -12,7 +14,7 @@ docker run --name chris_dev_db --volumes-from chris_dev_db_data -v "$PWD/docker-
 echo " "
 
 echo "3-Starting chris development environment container with access to the previous mysql container ..."
-docker run --name chris_dev --link chris_dev_db:mysql -v "$PWD/chris_backend":/usr/src/chris_backend -p 8000:8000 -d fnndsc/chris_dev_backend
+docker run --name chris_dev --link chris_dev_db:mysql -v "$PWD/chris_backend":$APPROOT -p 8000:8000 -d fnndsc/chris_dev_backend
 export chris_dev_IP="$(docker inspect --format '{{.NetworkSettings.IPAddress}}' chris_dev)"
 echo " "
 
@@ -24,6 +26,10 @@ echo " "
 
 echo "5-Making migrations"
 docker exec chris_dev python3 manage.py migrate
+echo " "
+
+echo "6-Registering plugins"
+docker exec chris_dev sh -c 'for i in $(ls -d plugins/services/*/); do if [ -f ${i}$(basename ${i}).py ]; then python3 plugins/services/manager.py --add $(basename ${i}) 2> /dev/null; fi; done'
 echo " "
 
 echo "6-Restarting Djando development server ..."
