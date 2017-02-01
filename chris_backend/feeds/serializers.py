@@ -38,7 +38,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = Feed
-        fields = ('url', 'name', 'owner', 'note', 'tags', 'comments',
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner', 'note', 'tags', 'comments',
                   'files', 'plugin_inst')
 
 
