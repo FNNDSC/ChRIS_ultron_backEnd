@@ -108,10 +108,11 @@ class PacsRetrieveApp(ChrisApp):
             pacs_settings['series_uid'] = series['SeriesInstanceUID']['value']
             output = pypx.move(pacs_settings)
 
-        # wait for files to arrive!
-        timer = 0 # 30mn
-
+            
         print('Receiving data.')
+        
+        # wait for files to arrive!
+        timer = 0
 
         while timer < 100: # 1h
             for path in path_dict[:]:
@@ -135,10 +136,7 @@ class PacsRetrieveApp(ChrisApp):
             time.sleep( 1 )
             timer += 1
 
-        print('\nDone.')
-
-
-
+        print('Done.')
 
 # ENTRYPOINT
 if __name__ == "__main__":

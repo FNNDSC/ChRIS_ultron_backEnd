@@ -6,6 +6,5 @@ six==1.10.0
 sqlparse==0.2.1
 collection-json==0.1.1
 coverage==4.2
-httpie==0.9.6
 mod-wsgi-httpd==2.4.12.6
 mod-wsgi==4.5.7
