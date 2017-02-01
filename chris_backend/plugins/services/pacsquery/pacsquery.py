@@ -41,7 +41,7 @@ class PacsQueryApp(ChrisApp):
         self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
 
         # Query settings
-        self.add_parameter('--patientID', action='store', dest='patient_id', type=str, default='2175',optional=True, help='Patient ID')
+        self.add_parameter('--patientID', action='store', dest='patient_id', type=str, default='',optional=True, help='Patient ID')
         self.add_parameter('--patientName', action='store', dest='patient_name', type=str, default='',optional=True, help='Patient name')
         self.add_parameter('--patientSex', action='store', dest='patient_sex', type=str, default='',optional=True, help='Patient sex')
         self.add_parameter('--studyDate', action='store', dest='study_date', type=str, default='',optional=True, help='Study date (YYYY/MM/DD)')
@@ -49,7 +49,6 @@ class PacsQueryApp(ChrisApp):
         self.add_parameter('--performedStationAETitle', action='store', dest='performed_station_aet', type=str, default='',optional=True, help='Performed station aet')
         self.add_parameter('--studyDescription', action='store', dest='study_description', type=str, default='',optional=True, help='Study description')
         self.add_parameter('--seriesDescription', action='store', dest='series_description', type=str, default='',optional=True, help='Series Description')
-
 
     def run(self, options):
 
@@ -79,9 +78,11 @@ class PacsQueryApp(ChrisApp):
         # type: all, study, series, image
         pacs_settings['executable'] = '/usr/bin/findscu'
 
+        first_patient_id = options.patient_id.split(',')[0]
+
         # query parameters
         query_settings = {
-            'PatientID': options.patient_id,
+            'PatientID': first_patient_id,
             'PatientName': options.patient_name,
             'PatientSex': options.patient_sex,
             'StudyDate': options.study_date,
