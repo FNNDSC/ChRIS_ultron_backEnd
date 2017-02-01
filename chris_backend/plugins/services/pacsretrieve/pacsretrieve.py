@@ -43,9 +43,9 @@ class PacsRetrieveApp(ChrisApp):
         self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
 
         # Retrieve settings
-        self.add_parameter('--seriesUIDS', action='store', dest='series_uids', type=str, default='0,1',optional=True, help='Series UIDs to be retrieved')
-        self.add_parameter('--seriesFile', action='store', dest='series_file', type=str, default='/tmp/success.txt',optional=True, help='Files from which SeriesInstanceUID to be pulled will be fetched')
-        self.add_parameter('--dataLocation', action='store', dest='data_location', type=str, default='/tmp/host/data',optional=True, help='Location where the DICOM Listener receives the data.')
+        self.add_parameter('--seriesUIDS', action='store', dest='series_uids', type=str, default=',', optional=True, help='Series UIDs to be retrieved')
+        self.add_parameter('--seriesFile', action='store', dest='series_file', type=str, default='/tmp/success.txt', optional=True, help='Files from which SeriesInstanceUID to be pulled will be fetched')
+        self.add_parameter('--dataLocation', action='store', dest='data_location', type=str, default='/tmp/host/data', optional=True, help='Location where the DICOM Listener receives the data.')
 
     def run(self, options):
 
@@ -111,6 +111,8 @@ class PacsRetrieveApp(ChrisApp):
         # wait for files to arrive!
         timer = 0 # 30mn
 
+        print('Receiving data.')
+
         while timer < 100: # 1h
             for path in path_dict[:]:
 
@@ -131,9 +133,9 @@ class PacsRetrieveApp(ChrisApp):
                break
 
             time.sleep( 1 )
-            timer += 10
+            timer += 1
 
-
+        print('\nDone.')
 
 
 
