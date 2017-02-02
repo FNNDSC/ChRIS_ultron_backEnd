@@ -33,6 +33,11 @@ except Exception:
         'host': '127.0.0.1'
     }
 PMAN['port'] = 5010
+if 'PMAN_PORT_5010_TCP_ADDR' in os.environ:
+    PMAN['host'] = os.environ['PMAN_PORT_5010_TCP_ADDR']
+if 'PMAN_PORT_5010_TCP_PORT' in os.environ:
+    PMAN['port'] = os.environ['PMAN_PORT_5010_TCP_PORT']
+
 
 # debug control output
 CHRIS_DEBUG   = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': True}
