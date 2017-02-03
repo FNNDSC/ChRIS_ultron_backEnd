@@ -82,7 +82,9 @@ class PluginInstanceModelTests(TestCase):
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        
         self.assertEquals(Feed.objects.count(), 1)
+        self.assertEquals(pl_inst.feed.name,pl_inst.plugin.name)
 
     def test_save_do_not_create_new_feed_just_after_ds_plugininstance_is_created(self):
         """
