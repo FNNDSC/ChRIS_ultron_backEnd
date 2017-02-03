@@ -95,7 +95,6 @@ class PluginInstance(models.Model):
         feed.plugin_inst = self;
         feed.save()
         feed.name = self.plugin.name
-        feed.save()
         feed.owner = [self.owner]
         feed.save()
 
