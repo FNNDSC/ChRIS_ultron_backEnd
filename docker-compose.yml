@@ -1,0 +1,54 @@
+# https://docs.docker.com/compose/yml/
+# Each service defined in docker-compose.yml must specify exactly one of
+# image or build. Other keys are optional, and are analogous to their
+# docker run command-line counterparts.
+#
+# As with docker run, options specified in the Dockerfile (e.g., CMD,
+# EXPOSE, VOLUME, ENV) are respected by default - you don't need to
+# specify them again in docker-compose.yml.
+#
+
+chris_dev:
+  image:  fnndsc/chris_dev_backend
+  volumes:
+    - ./chris_backend:/usr/src/chris_backend
+  ports:
+    - "8000:8000"
+  links:
+    - chris_dev_db:mysql
+    - pman_dev:pman
+  labels:
+    name: "ChRIS_ultron_backEnd"
+    role: "Backend development server"
+
+
+chris_dev_db:
+  image:  mysql:5
+  volumes_from:
+    - chris_dev_db_data
+  environment:
+    - MYSQL_ROOT_PASSWORD=rootp
+    - MYSQL_DATABASE=chris_dev
+    - MYSQL_USER=chris
+    - MYSQL_PASSWORD=Chris1234
+  labels:
+    name: "ChRIS_ultron_backEnd MySQL Database"
+    role: "Backend development database"
+
+
+chris_dev_db_data:
+  image:  alpine
+  command: echo Data Container
+  volumes:
+    - /var/lib/mysql
+  labels:
+    name: "ChRIS_ultron_backEnd database data"
+    role: "Backend development database data"
+
+
+pman_dev:
+  image:  fnndsc/pman
+  restart:  always
+  labels:
+    name: "pman"
+    role: "Proccess manager service"
