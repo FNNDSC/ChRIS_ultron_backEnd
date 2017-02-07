@@ -50,10 +50,11 @@ class SimpleDSApp(ChrisApp):
         time.sleep(int(options.sleepLength))
         print('sleeping for %s' % options.sleepLength)
         for (dirpath, dirnames, filenames) in os.walk(options.inputdir):
-            output_path =  os.path.join(options.outputdir,
-                                        dirpath.replace(options.inputdir, ""))
+            relative_path  = dirpath.replace(options.inputdir, "").strip("/")
+            output_path =  os.path.join(options.outputdir, relative_path)
             for dirname in dirnames:
-                os.makedirs(os.path.join(output_path, dirnames))
+                print('Creating directory... %s' % os.path.join(output_path, dirname))
+                os.makedirs(os.path.join(output_path, dirname))
             for name in filenames:
                 new_name    = options.prefix + name
                 str_outpath = os.path.join(output_path, new_name)
