@@ -1,4 +1,4 @@
-# Docker file for ChRIS development environment
+# Docker file for ChRIS development server
 
 FROM fnndsc/ubuntu-python3:latest
 MAINTAINER fnndsc "dev@babymri.org"
