@@ -12,6 +12,7 @@ chris_dev:
   image:  fnndsc/chris_dev_backend
   volumes:
     - ./chris_backend:/usr/src/chris_backend
+    - /tmp:/incoming
   ports:
     - "8000:8000"
   links:
@@ -52,3 +53,13 @@ pman_dev:
   labels:
     name: "pman"
     role: "Proccess manager service"
+
+dicom_listener:
+  image:  fnndsc/dck-dicom-listener
+  volumes:
+    - /tmp:/incoming
+  ports:
+    - "1043:10402"
+  labels:
+    name: "dicom_listener"
+    role: "Dicom listener"
