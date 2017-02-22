@@ -60,7 +60,7 @@ dicom_listener:
   volumes:
     - /tmp:/incoming
   ports:
-    - "1043:10402"
+    - "10403:10402"
   labels:
     name: "dicom_listener"
     role: "Dicom listener"
