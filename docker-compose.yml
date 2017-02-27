@@ -12,7 +12,7 @@ chris_dev:
   image:  fnndsc/chris_dev_backend
   volumes:
     - ./chris_backend:/usr/src/chris_backend
-    - /tmp:/incoming
+    - /home/chris/incoming:/incoming
   ports:
     - "8050:8000"
   links:
@@ -58,7 +58,7 @@ pman_dev:
 dicom_listener:
   image:  fnndsc/dck-dicom-listener
   volumes:
-    - /tmp:/incoming
+    - /home/chris/incoming:/incoming
   ports:
     - "10403:10402"
   labels:
