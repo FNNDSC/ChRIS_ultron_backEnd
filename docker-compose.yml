@@ -14,7 +14,7 @@ chris_dev:
     - ./chris_backend:/usr/src/chris_backend
     - /tmp:/incoming
   ports:
-    - "8000:8000"
+    - "8050:8000"
   links:
     - chris_dev_db:mysql
     - pman_dev:pman
