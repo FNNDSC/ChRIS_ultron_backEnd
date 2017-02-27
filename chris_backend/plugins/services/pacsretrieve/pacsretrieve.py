@@ -16,6 +16,26 @@ import os, sys, json, time, shutil, pypx
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
 
+# dicom settings
+#
+DICOM = {}
+DICOM['server_ip'] = '173.48.120.248'
+DICOM['server_port'] = '4242'
+DICOM['called_aet'] = 'ORTHANC'
+DICOM['calling_aet'] = 'CHIPS'
+DICOM['dicom_data'] = '/incoming/data/'
+
+if 'DICOM_SERVER_IP' in os.environ:
+    DICOM['server_ip'] = os.environ['DICOM_SERVER_IP']
+if 'DICOM_SERVER_PORT' in os.environ:
+    DICOM['server_port'] = os.environ['DICOM_SERVER_PORT']
+if 'CALLING_AET' in os.environ:
+    DICOM['calling_aet'] = os.environ['DICOM_CALLING_AET']
+if 'CALLED_AET' in os.environ:
+    DICOM['called_aet'] = os.environ['CALLED_AET']
+if 'DICOM_DATA' in os.environ:
+    DICOM['dicom_data'] = os.environ['DICOM_DATA']
+
 class PacsRetrieveApp(ChrisApp):
     '''
     Create file out.txt witht the directory listing of the directory
@@ -38,31 +58,27 @@ class PacsRetrieveApp(ChrisApp):
         # PACS settings
         self.add_parameter(
             '--aet', action='store', dest='aet', type=str,
-            default='CHRIS-ULTRON-AET', optional=True, help='aet')
+            default=DICOM['calling_aet'], optional=True, help='aet')
         self.add_parameter(
             '--aec', action='store', dest='aec', type=str,
-            default='CHRIS-ULTRON-AEC', optional=True, help='aec')
+            default=DICOM['called_aet'], optional=True, help='aec')
         self.add_parameter(
             '--aetListener', action='store', dest='aet_listener', type=str,
-            default='CHRIS-ULTRON-LIS', optional=True, help='aet listener')
+            default=DICOM['calling_aet'], optional=True, help='aet listener')
         self.add_parameter(
             '--serverIP', action='store', dest='server_ip', type=str,
-            default='192.168.1.110', optional=True, help='PACS server IP')
+            default=DICOM['server_ip'], optional=True, help='PACS server IP')
         self.add_parameter(
             '--serverPort', action='store', dest='server_port', type=str,
-            default='4242', optional=True, help='PACS server port')
+            default=DICOM['server_port'], optional=True, help='PACS server port')
 
         # Retrieve settings
         self.add_parameter(
             '--seriesUIDS', action='store', dest='series_uids', type=str,
             default=',', optional=True, help='Series UIDs to be retrieved')
         self.add_parameter(
-            '--seriesFile', action='store', dest='series_file', type=str,
-            default='/tmp/success.txt', optional=True,
-            help='Files from which SeriesInstanceUID to be pulled will be fetched')
-        self.add_parameter(
             '--dataLocation', action='store', dest='data_location', type=str,
-            default='/incoming/data', optional=True,
+            default=DICOM['dicom_data'], optional=True,
             help='Location where the DICOM Listener receives the data.')
 
     def run(self, options):
