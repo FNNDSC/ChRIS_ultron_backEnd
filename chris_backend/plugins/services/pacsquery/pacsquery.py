@@ -16,6 +16,26 @@ import os, sys, json, pypx
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from base import ChrisApp
 
+# dicom settings
+#
+DICOM = {}
+DICOM['server_ip'] = '173.48.120.248'
+DICOM['server_port'] = '4242'
+DICOM['called_aet'] = 'ORTHANC'
+DICOM['calling_aet'] = 'CHIPS'
+DICOM['dicom_data'] = '/incoming/data/'
+
+if 'DICOM_SERVER_IP' in os.environ:
+    DICOM['server_ip'] = os.environ['DICOM_SERVER_IP']
+if 'DICOM_SERVER_PORT' in os.environ:
+    DICOM['server_port'] = os.environ['DICOM_SERVER_PORT']
+if 'CALLING_AET' in os.environ:
+    DICOM['calling_aet'] = os.environ['DICOM_CALLING_AET']
+if 'CALLED_AET' in os.environ:
+    DICOM['called_aet'] = os.environ['CALLED_AET']
+if 'DICOM_DATA' in os.environ:
+    DICOM['dicom_data'] = os.environ['DICOM_DATA']
+
 class PacsQueryApp(ChrisApp):
     '''
     Create file out.txt witht the directory listing of the directory
@@ -35,20 +55,44 @@ class PacsQueryApp(ChrisApp):
 
     def define_parameters(self):
         # PACS settings
-        self.add_parameter('--aet', action='store', dest='aet', type=str, default='CHRIS-ULTRON-AET',optional=True, help='aet')
-        self.add_parameter('--aec', action='store', dest='aec', type=str, default='CHRIS-ULTRON-AEC',optional=True, help='aec')
-        self.add_parameter('--serverIP', action='store', dest='server_ip', type=str, default='192.168.1.110',optional=True, help='PACS server IP')
-        self.add_parameter('--serverPort', action='store', dest='server_port', type=str, default='4242',optional=True, help='PACS server port')
+        self.add_parameter(
+            '--aet', action='store', dest='aet', type=str,
+            default=DICOM['calling_aet'],optional=True, help='aet')
+        self.add_parameter(
+            '--aec', action='store', dest='aec', type=str,
+            default=DICOM['called_aet'],optional=True, help='aec')
+        self.add_parameter(
+            '--serverIP', action='store', dest='server_ip', type=str,
+            default=DICOM['server_ip'],optional=True, help='PACS server IP')
+        self.add_parameter(
+            '--serverPort', action='store', dest='server_port', type=str,
+            default=DICOM['server_port'],optional=True, help='PACS server port')
 
         # Query settings
-        self.add_parameter('--patientID', action='store', dest='patient_id', type=str, default='',optional=True, help='Patient ID')
-        self.add_parameter('--patientName', action='store', dest='patient_name', type=str, default='',optional=True, help='Patient name')
-        self.add_parameter('--patientSex', action='store', dest='patient_sex', type=str, default='',optional=True, help='Patient sex')
-        self.add_parameter('--studyDate', action='store', dest='study_date', type=str, default='',optional=True, help='Study date (YYYY/MM/DD)')
-        self.add_parameter('--modalitiesInStudy', action='store', dest='modalities_in_study', type=str, default='',optional=True, help='Modalities in study')
-        self.add_parameter('--performedStationAETitle', action='store', dest='performed_station_aet', type=str, default='',optional=True, help='Performed station aet')
-        self.add_parameter('--studyDescription', action='store', dest='study_description', type=str, default='',optional=True, help='Study description')
-        self.add_parameter('--seriesDescription', action='store', dest='series_description', type=str, default='',optional=True, help='Series Description')
+        self.add_parameter(
+            '--patientID', action='store', dest='patient_id', type=str,
+            default='',optional=True, help='Patient ID')
+        self.add_parameter(
+            '--patientName', action='store', dest='patient_name', type=str,
+            default='',optional=True, help='Patient name')
+        self.add_parameter(
+            '--patientSex', action='store', dest='patient_sex', type=str,
+            default='',optional=True, help='Patient sex')
+        self.add_parameter(
+            '--studyDate', action='store', dest='study_date', type=str,
+            default='',optional=True, help='Study date (YYYY/MM/DD)')
+        self.add_parameter(
+            '--modalitiesInStudy', action='store', dest='modalities_in_study', type=str,
+            default='',optional=True, help='Modalities in study')
+        self.add_parameter(
+            '--performedStationAETitle', action='store', dest='performed_station_aet', type=str,
+            default='',optional=True, help='Performed station aet')
+        self.add_parameter(
+            '--studyDescription', action='store', dest='study_description', type=str,
+            default='',optional=True, help='Study description')
+        self.add_parameter(
+            '--seriesDescription', action='store', dest='series_description', type=str,
+            default='',optional=True, help='Series Description')
 
     def run(self, options):
 
