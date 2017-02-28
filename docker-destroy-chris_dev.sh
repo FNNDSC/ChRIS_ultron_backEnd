@@ -7,5 +7,5 @@ echo "1-Stopping services ..."
 docker-compose stop
 echo " "
 
-echo "4-Removing all containers ..."
+echo "2-Removing all containers ..."
 docker-compose rm -vf 
