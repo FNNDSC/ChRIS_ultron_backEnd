@@ -14,14 +14,25 @@ chris_dev:
     - ./chris_backend:/usr/src/chris_backend
   volumes_from:
     - dicom_listener
+    - chris_dev_files
   ports:
     - "8050:8000"
+    - "5010:5010"
   links:
     - chris_dev_db:mysql
-    - pman_dev:pman
   labels:
     name: "ChRIS_ultron_backEnd"
     role: "Backend development server"
+
+
+chris_dev_files:
+  image:  alpine
+  command: echo Files container
+  volumes:
+    - /usr/users
+  labels:
+    name: "ChRIS_ultron_backEnd feed files"
+    role: "Backend development feed files"
 
 
 chris_dev_db:
@@ -40,20 +51,12 @@ chris_dev_db:
 
 chris_dev_db_data:
   image:  alpine
-  command: echo Data Container
+  command: echo Data container
   volumes:
     - /var/lib/mysql
   labels:
     name: "ChRIS_ultron_backEnd database data"
     role: "Backend development database data"
-
-
-pman_dev:
-  image:  fnndsc/pman
-  restart:  always
-  labels:
-    name: "pman"
-    role: "Proccess manager service"
 
 
 dicom_listener:
