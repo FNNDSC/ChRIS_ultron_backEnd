@@ -32,11 +32,8 @@ docker-compose restart chris_dev
 echo " "
 
 echo "8-Now create three chris API users"
-echo 'Please name one of the users as "chris"' 
+echo 'Please name one of the users as "chris"'
+echo " "
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
-
-
-
- 
