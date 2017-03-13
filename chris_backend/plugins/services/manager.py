@@ -26,7 +26,6 @@ from plugins.services import charm
 # define the python package for the plugins' apps
 _APPS_PACKAGE = 'plugins.services'
 
-import pudb
 
 class PluginManager(object):
 
