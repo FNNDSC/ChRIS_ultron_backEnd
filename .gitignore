@@ -7,3 +7,4 @@ secrets.json
 .coverage
 htmlcov
 .docker
+.idea
