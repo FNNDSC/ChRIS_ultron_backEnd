@@ -30,7 +30,7 @@ class Feed(models.Model):
         Custom method to create and save a new note to the DB.
         """
         note = Note()
-        note.feed = self;
+        note.feed = self
         note.save()
 
 
