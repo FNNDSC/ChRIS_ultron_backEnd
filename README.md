@@ -8,6 +8,9 @@ Back end for ChRIS Ultron.
 This is a Django-MySQL project.
 
 On ubuntu:
+
+**NB: do NOT set a root password for the mysql data base in the following!**
+
 ````
 sudo apt-get update
 sudo apt-get install git
