@@ -32,13 +32,10 @@ class PluginManager(object):
 
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
-        parser.add_argument("name", help="plugin name")
         group = parser.add_mutually_exclusive_group()
-        group.add_argument("-a", "--add", action="store_true", help="add a new plugin")
-        group.add_argument("-r", "--remove", action="store_true",
-                           help="remove an existing plugin")
-        group.add_argument("-m", "--modify", action="store_true",
-                           help="register now as modification date")
+        group.add_argument("-a", "--add", help="add a new plugin", metavar='PluginName')
+        group.add_argument("-r", "--remove", help="remove an existing plugin", metavar='PluginName')
+        group.add_argument("-m", "--modify", help="register NOW as modification date", metavar='PluginName')
         self.parser = parser
 
         # Debug specifications
@@ -155,11 +152,11 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.add:
-            self.add_plugin(options.name)
+            self.add_plugin(options.add)
         elif options.remove:
-            self.remove_plugin(options.name)
+            self.remove_plugin(options.remove)
         elif options.modify:
-            self.register_plugin_app_modification(options.name)
+            self.register_plugin_app_modification(options.modify)
         self.args = options
 
     def run_plugin_app(self, plugin_inst, parameter_dict, **kwargs):
