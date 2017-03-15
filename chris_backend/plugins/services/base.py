@@ -1,4 +1,4 @@
-'''
+"""
 /**
  *
  *            sSSs   .S    S.    .S_sSSs     .S    sSSs
@@ -25,17 +25,10 @@
  *                        dev@babyMRI.org
  *
  */
-'''
-import os, sys
+"""
+import sys
 from argparse import ArgumentParser
 import json
-
-if "DJANGO_SETTINGS_MODULE" not in os.environ:
-    # django needs to be loaded (eg. when some chris app is run from the command line)
-    sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
-    import django
-    django.setup()
 
 
 class BaseClassAttrEnforcer(type):
@@ -50,9 +43,9 @@ class BaseClassAttrEnforcer(type):
         
 
 class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
-    '''
+    """
     The super class for all valid ChRIS plugin apps.
-    '''
+    """
     
     AUTHORS         = 'FNNDSC (dev@babyMRI.org)'
     TITLE           = ''
@@ -67,9 +60,9 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
     VERSION         = ''
   
     def __init__(self):
-        '''
+        """
         The constructor of this app.
-        '''
+        """
         super(ChrisApp, self).__init__(description=self.DESCRIPTION)
         self.options = []
         # the custom parameter list
@@ -93,21 +86,21 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         self.define_parameters()
 
     def define_parameters(self):
-        '''
+        """
         Define the parameters used by this app (abstract method in this class). 
-        '''
+        """
         raise NotImplementedError("ChrisApp.define_parameters(self)")
 
     def run(self, options):
-        '''
+        """
         Execute this app (abstract method in this class). 
-        '''
+        """
         raise NotImplementedError("ChrisApp.run(self, options)")
 
     def add_parameter(self, *args, **kwargs):
-        '''
+        """
         Add a parameter to this app. 
-        '''
+        """
         # make sure required parameter options were defined
         try:
             name = kwargs['dest']
@@ -139,9 +132,9 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         self.add_argument(*args, **kwargs)
 
     def get_json_representation(self):
-        '''
+        """
         Return a JSON object with a representation of this app (type and parameters).
-        '''
+        """
         repres                  = {}
         repres['type']          = self.TYPE
         repres['parameters']    = self._parameters
@@ -151,10 +144,10 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         return repres
 
     def launch(self, args=None):
-        '''
+        """
         This method triggers the parsing of arguments. The run() method gets called 
         if not --json or --description are specified.
-        '''
+        """
         options = self.parse_args(args)
         if (options.json):
             print(self.get_json_representation())
@@ -170,11 +163,10 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
             self.run(options)
 
     def get_options_from_file(self, file_path):
-        '''
+        """
         Return the options parsed from a JSON file. 
-        '''
+        """
         #read options JSON file
-        options_dict = {}
         with open(file_path) as options_file:    
             options_dict = json.load(options_file)
         options = []
@@ -184,16 +176,16 @@ class ChrisApp(ArgumentParser, metaclass=BaseClassAttrEnforcer):
         return self.parse_args(options)
 
     def save_options(self, options, file_path):
-        '''
+        """
         Save the options passed to the app to a JSON file. 
-        '''
+        """
         with open(file_path, 'w') as outfile:
             json.dump(vars(options), outfile)
 
     def error(self, message):
-        '''
+        """
         The error handler if wrong commandline arguments are specified.
-        '''
+        """
         print()
         sys.stderr.write('ERROR: %s\n' % message)
         print()
