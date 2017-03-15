@@ -1,12 +1,9 @@
-#!/usr/bin/env python3.5
-
 """
 
 charm - ChRIS / pman interface.
 
 """
 
-import  sys
 import  os
 import  pprint
 import  datetime
@@ -558,10 +555,4 @@ class Charm():
         d_pman          = json.loads(purl())
         str_deepnest(d_pman['d_ret'])
         self.qprint(str_deepVal, comms = 'error')
-
-if __name__ == '__main__':
-
-    parser  = argparse.ArgumentParser(description = 'interface between ChRIS and pman')
-
-    sys.exit(0)
 
