@@ -10,10 +10,11 @@ from rest_framework.filters import FilterSet
 from feeds.models import Feed, FeedFile
 
 
+# API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values")]
 
-TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
+TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 

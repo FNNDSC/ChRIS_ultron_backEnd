@@ -1,15 +1,15 @@
 """
 Plugin manager module that provides functionality to add, modify and delete plugins to the
 plugins django app. There is also functionality to run and check the execution status of a
-plugin's app.
+plugin app.
 """
 
-import os, sys
-from importlib import import_module
-from argparse import ArgumentParser
-from inspect import getmembers
-
+import os
+import sys
+import json
+import docker
 import time
+from argparse import ArgumentParser
 
 if "DJANGO_SETTINGS_MODULE" not in os.environ:
     # django needs to be loaded (eg. when this script is run from the command line)
@@ -19,12 +19,8 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
     django.setup()
 
 from django.utils import timezone
-
 from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.services import charm
-
-# define the python package for the plugins' apps
-_APPS_PACKAGE = 'plugins.services'
 
 
 class PluginManager(object):
@@ -32,9 +28,9 @@ class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
         group = parser.add_mutually_exclusive_group()
-        group.add_argument("-a", "--add", help="add a new plugin", metavar='PluginName')
+        group.add_argument("-a", "--add", help="add a new plugin", metavar='DockImage')
         group.add_argument("-r", "--remove", help="remove an existing plugin", metavar='PluginName')
-        group.add_argument("-m", "--modify", help="register NOW as modification date", metavar='PluginName')
+        group.add_argument("-m", "--modify", help="register NOW as modification date", metavar='DockImage')
         self.parser = parser
 
         # Debug specifications
@@ -42,37 +38,27 @@ class PluginManager(object):
         self.b_useDebug         = True
         self.str_debugFile      = '%s/tmp/debug-charm.log' % os.environ['HOME']
 
-    def _get_plugin_app_class(self, name):
+    def get_plugin_app_representation(self, dock_image_name):
         """
-        Internal method to get a plugin's app class name given the plugin's name.
+        Get a plugin app representation given its docker image name.
         """
-        # an _apps_package_name.name.name package structure is assumed for the plugin app
-        plugin_app_module_name = "%s.%s.%s" % (_APPS_PACKAGE, name, name)
-        try:
-            plugin_app_module = import_module(plugin_app_module_name)
-        except ImportError as e:
-            raise ImportError("Error: failed to import module %s. Check if the \
-                 plugin's app package was added." % plugin_app_module_name)
-        else:
-            for member in getmembers(plugin_app_module):
-                if (hasattr(member[1], 'run') and
-                    hasattr(member[1], 'define_parameters') and
-                    hasattr(member[1], 'get_json_representation') and
-                    not (member[0]=='ChrisApp')):
-                    return member[1]
-
-    def get_plugin_app_representation(self, name):
-        """
-        Get a plugin's app representation given the plugin's name.
-        """
-        plugin_app_class = self._get_plugin_app_class(name)
-        app = plugin_app_class()
-        app_repr = app.get_json_representation()
+        client = docker.from_env()
+        byte_str = client.containers.run(dock_image_name)
+        app_repr = json.loads(byte_str.decode())
         plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
         if app_repr['type'] not in plugin_types:
             raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
-                             % (plugin_types, plugin_app_class))
+                             % (plugin_types, dock_image))
         return app_repr
+
+    def get_plugin_name(self, app_repr):
+        """
+        Get a plugin app's name fro the plugin app's representation.
+        """
+        # the plugin app executable name stored in 'selfexec' must be the plugin name
+        if 'selfexec' not in app_repr:
+            raise KeyError("Missing 'selfexec' from plugin app's representation")
+        return app_repr['selfexec']
 
     def _save_plugin_param(self, plugin, param):
         """
@@ -92,16 +78,17 @@ class PluginManager(object):
         plugin_param.help = param['help']
         plugin_param.save()
         
-    def add_plugin(self, name):
+    def add_plugin(self, dock_image_name):
         """
         Register/add a new plugin to the system.
         """
+        # get representation from the corresponding app
+        app_repr = self.get_plugin_app_representation(dock_image_name)
+        name = self.get_plugin_name(app_repr)
         # check wether the plugin already exist
         existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
         if name in existing_plugin_names:
             raise ValueError("Plugin '%s' already exists in the system" % name)
-        # get representation from the corresponding app
-        app_repr = self.get_plugin_app_representation(name)
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
@@ -129,14 +116,15 @@ class PluginManager(object):
         plugin = self.get_plugin(name)
         plugin.delete()
 
-    def register_plugin_app_modification(self, name):
+    def register_plugin_app_modification(self, dock_image_name):
         """
         Register/add new parameters to a plugin from the corresponding plugin's app.
         Also add the current date as a new plugin modification date.
         """
+        # get representation from the corresponding app
+        app_repr = self.get_plugin_app_representation(dock_image_name)
+        name = self.get_plugin_name(app_repr)
         plugin = self.get_plugin(name)
-        # get the new representation from the corresponding app
-        app_repr = self.get_plugin_app_representation(name)
         new_params = app_repr['parameters']
         existing_param_names = [parameter.name for parameter in plugin.parameters.all()]
         for param in new_params:
