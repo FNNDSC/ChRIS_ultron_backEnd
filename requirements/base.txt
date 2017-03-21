@@ -7,4 +7,4 @@ pman==0.10.4
 pudb==2016.2
 pytz==2016.7
 # tmp for pacs* plugins (until hooks to run in dock)
-pypx==0.4
+pypx==0.7
