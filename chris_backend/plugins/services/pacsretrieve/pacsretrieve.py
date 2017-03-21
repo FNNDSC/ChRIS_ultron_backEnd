@@ -153,7 +153,7 @@ class PacsRetrieveApp(ChrisApp):
 
             # move series
             pacs_settings['series_uid'] = series['SeriesInstanceUID']['value']
-            # output = pypx.move(pacs_settings)
+            output = pypx.move(pacs_settings)
 
 
         print('Receiving data.')
