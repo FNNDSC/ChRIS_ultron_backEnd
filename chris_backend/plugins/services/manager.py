@@ -29,8 +29,10 @@ class PluginManager(object):
         parser = ArgumentParser(description='Manage plugins')
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-a", "--add", help="add a new plugin", metavar='DockImage')
-        group.add_argument("-r", "--remove", help="remove an existing plugin", metavar='PluginName')
-        group.add_argument("-m", "--modify", help="register NOW as modification date", metavar='DockImage')
+        group.add_argument("-r", "--remove", help="remove an existing plugin",
+                           metavar='PluginName')
+        group.add_argument("-m", "--modify", help="register NOW as modification date",
+                           metavar='DockImage')
         self.parser = parser
 
         # Debug specifications
@@ -53,12 +55,12 @@ class PluginManager(object):
 
     def get_plugin_name(self, app_repr):
         """
-        Get a plugin app's name fro the plugin app's representation.
+        Get a plugin app's name from the plugin app's representation.
         """
-        # the plugin app executable name stored in 'selfexec' must be the plugin name
+        # the plugin app exec name stored in 'selfexec' must be: 'plugin name' + '.py'
         if 'selfexec' not in app_repr:
             raise KeyError("Missing 'selfexec' from plugin app's representation")
-        return app_repr['selfexec']
+        return app_repr['selfexec'].rsplit( ".", 1 )[ 0 ]
 
     def _save_plugin_param(self, plugin, param):
         """
@@ -92,6 +94,7 @@ class PluginManager(object):
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
+        plugin.dock_image = dock_image_name
         plugin.type = app_repr['type']
         plugin.save()
         # add plugin's parameters to the db
@@ -156,10 +159,7 @@ class PluginManager(object):
             if k == 'debugFile':    self.str_debugFile  = v
             if k == 'quiet':        self.b_quiet        = v
 
-        # instantiate the plugin's app
-        plugin_app_class = self._get_plugin_app_class(plugin_inst.plugin.name)
-        app = plugin_app_class()
-        plugin_repr = app.get_json_representation()
+        plugin_repr = self.get_plugin_app_representation(plugin_inst.plugin.dock_image)
         # get input dir
         inputdir = ""
         if plugin_inst.previous:
@@ -192,7 +192,6 @@ class PluginManager(object):
             d_args      = parameter_dict,
             plugin_inst = plugin_inst,
             plugin_repr = plugin_repr,
-            app         = app,
             inputdir    = inputdir,
             outputdir   = outputdir
         )
