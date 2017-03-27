@@ -194,6 +194,8 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         """
         Overloaded method to check a plugin's instance status.
         """
+        # import pudb; pudb.set_trace()
+
         instance = self.get_object()
         pl_manager = PluginManager()
         pl_manager.check_plugin_app_exec_status(instance)
