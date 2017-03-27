@@ -485,7 +485,10 @@ class Charm():
 
         d_pman          = json.loads(purl())
         self.qprint('d_pman = %s' % d_pman)
-        str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        try:
+            str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        except:
+            str_pmanStatus  = 'Error in pman DB. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
         self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
