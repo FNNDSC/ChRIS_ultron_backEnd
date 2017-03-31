@@ -374,6 +374,7 @@ class Charm():
         str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
+        self.qprint("This is a test!!")
         purl    = pman.Purl(
             msg         = json.dumps(d_msg),
             http        = str_http,
@@ -401,9 +402,12 @@ class Charm():
         """
         Attempt to start a remote pman service.
 
-        This method is called is an attempt to speak with a pman service is unsuccessful, and
+        This method is called if an attempt to speak with a pman service is unsuccessful, and
         the assumption is that 'pman' is down. We will attempt to start 'pman' for this
         user in this case.
+        
+        NOTE: This method is historical and no longer used! It remains in the code for 
+        illustrative purposes!
 
         :param args:
         :param kwargs:
