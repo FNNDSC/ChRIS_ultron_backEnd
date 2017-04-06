@@ -8,7 +8,7 @@ COPY ["./requirements", "${REQPATH}"]
 COPY ["./docker-entrypoint.sh", "/usr/src"]
 
 RUN apt-get update \
-  && apt-get install -y libmysqlclient-dev dcmtk \
+  && apt-get install -y libmysqlclient-dev dcmtk imagemagick\
   && apt-get install -y libssl-dev libcurl4-openssl-dev \
   && apt-get install -y apache2 apache2-dev \
   && pip3 install -r ${REQPATH}/local.txt

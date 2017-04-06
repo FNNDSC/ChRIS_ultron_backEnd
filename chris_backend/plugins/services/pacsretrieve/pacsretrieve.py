@@ -10,7 +10,13 @@
 
 
 
-import os, sys, json, time, shutil, pypx
+import os
+import sys
+import json
+import time
+import shutil
+import subprocess
+import pypx
 
 # import the Chris app superclass
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
@@ -175,6 +181,43 @@ class PacsRetrieveApp(ChrisApp):
 
                     # copy series to output
                     shutil.copytree(path['source'], path['destination_series'])
+
+                    # create jpgs directory
+                    destination_jpgs = os.path.join(path['destination_series'], 'jpgs')
+                    if not os.path.exists(destination_jpgs):
+                        os.makedirs(destination_jpgs)
+                    else:
+                        print(destination_jpgs + ' already exists.')
+
+                    # generate jpgs for all dcm files
+                    for filename in os.listdir(path['destination_series']):
+                        name, extension = os.path.splitext(filename)
+                        if extension == '.dcm':
+                            basename = os.path.basename(filename)
+                            source = os.path.join(path['destination_series'], basename)
+                            output = os.path.join(destination_jpgs, basename)
+                            exec_location = os.path.dirname(pacs_settings['executable'])
+                            executable = os.path.join(exec_location, 'dcmj2pnm')
+                            command = executable + ' +oj +Wh 15 +Fa ' + source + ' ' + output + '.jpg';
+                            response = subprocess.run(
+                                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+                    # resize all jpgs
+                    executable = '/usr/bin/mogrify'
+                    options = '-resize 96x96 -background none -gravity center -extent 96x96'
+                    source = os.path.join(destination_jpgs, '*')
+                    command = executable + ' ' + options + ' ' + source
+                    response = subprocess.run(
+                        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+                    # create preview
+                    executable = '/usr/bin/convert'
+                    options = '-append'
+                    output = os.path.join(path['destination_series'], 'preview.jpg')
+                    command = executable + ' ' + options + ' ' + source + ' ' + output
+                    response = subprocess.run(
+                        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
                     # remove from dictionnary
                     path_dict.remove(path)
 
