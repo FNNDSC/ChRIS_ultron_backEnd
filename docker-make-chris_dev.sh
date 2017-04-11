@@ -43,3 +43,8 @@ echo " "
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
 
+echo "9-Restarting Djando development server in interactive mode ..."
+docker-compose stop chris_dev
+docker-compose rm -f chris_dev
+docker-compose run --service-ports chris_dev
+echo " "
