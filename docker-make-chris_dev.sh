@@ -31,9 +31,14 @@ echo "7-Restarting Djando development server ..."
 docker-compose restart chris_dev
 echo " "
 
-echo "8-Now create three chris API users"
+echo "8-Now create two chris API users"
 echo 'Please name one of the users as "chris"'
 echo " "
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
-docker-compose exec chris_dev python manage.py createsuperuser
+
+echo "9-Restarting Djando development server in interactive mode ..."
+docker-compose stop chris_dev
+docker-compose rm -f chris_dev
+docker-compose run --service-ports chris_dev
+echo " "
