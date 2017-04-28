@@ -11,7 +11,7 @@ class RenderedResponse(HttpResponse):
     """
     An HttpResponse that renders its content into Collection+JSON or JSON.
     """
-    def __init__(self, data, **kwargs):        
+    def __init__(self, data, **kwargs):
         kwargs['status'] = data['status']
         del data['status']
         request = data['request']
@@ -27,10 +27,10 @@ class RenderedResponse(HttpResponse):
             self.exception = True
             renderer_context = {}
             renderer_context['request'] = request
-            renderer_context['view'] = None       
+            renderer_context['view'] = None
             renderer_context['response'] = self
             content = CollectionJsonRenderer().render(data,
-                                                      renderer_context=renderer_context)          
+                                                      renderer_context=renderer_context)
         super(RenderedResponse, self).__init__(content, **kwargs)
 
 
@@ -44,7 +44,7 @@ def api_404(request):
 
 def api_500(request):
     return RenderedResponse({'detail': 'Internal server error', 'request':request,
-                       'status': status.HTTP_500_INTERNAL_SERVER_ERROR}) 
+                       'status': status.HTTP_500_INTERNAL_SERVER_ERROR})
 
 
 class ResponseMiddleware(object):

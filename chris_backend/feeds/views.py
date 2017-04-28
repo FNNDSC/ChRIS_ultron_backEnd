@@ -29,9 +29,9 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
         Overriden to append a collection+json template.
         """
         response = super(NoteDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"title": "", "content": ""} 
+        template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)
-    
+
 
 class TagList(generics.ListCreateAPIView):
     """
@@ -60,7 +60,7 @@ class TagList(generics.ListCreateAPIView):
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
-        template_data = {"name": "", "color": ""} 
+        template_data = {"name": "", "color": ""}
         return services.append_collection_template(response, template_data)
 
     def get_tags_queryset(self, user):
@@ -88,7 +88,7 @@ class FullTagList(generics.ListAPIView):
         # if the user is chris then return all the tags in the system
         if (user.username == 'chris'):
             return Tag.objects.all()
-        
+
         return Tag.objects.filter(owner=user)
 
     def list(self, request, *args, **kwargs):
@@ -96,9 +96,9 @@ class FullTagList(generics.ListAPIView):
         Overriden to append document-level link relations.
         """
         response = super(FullTagList, self).list(request, *args, **kwargs)
-        links = {'feeds': reverse('feed-list', request=request)}    
+        links = {'feeds': reverse('feed-list', request=request)}
         return services.append_collection_links(response, links)
-        
+
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -182,7 +182,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to update feed's owners if requested by a PUT request.
         """
         if 'owner' in self.request.data:
-            self.update_owners(serializer)          
+            self.update_owners(serializer)
         super(FeedDetail, self).perform_update(serializer)
         
     def update_owners(self, serializer):
@@ -190,7 +190,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         Custom method to update the feed's owners. Checks whether the new owner
         is a system-registered user.
         """
-        feed = self.get_object() 
+        feed = self.get_object()
         owners = feed.owner.values('username')
         username = self.request.data.pop('owner')
         if {'username': username} not in owners:
@@ -209,7 +209,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"name": "", "owner": ""} 
+        template_data = {"name": "", "owner": ""}
         return services.append_collection_template(response, template_data)
 
 
@@ -239,7 +239,7 @@ class CommentList(generics.ListCreateAPIView):
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
-        template_data = {"title": "", "content": ""} 
+        template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)
 
     def get_comments_queryset(self):
@@ -263,7 +263,7 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(CommentDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"title": "", "content": ""} 
+        template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)
 
 
@@ -284,7 +284,7 @@ class FeedFileList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}   
+                                   kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
 
     def get_feedfiles_queryset(self):

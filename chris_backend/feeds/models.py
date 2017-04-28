@@ -10,7 +10,7 @@ class Feed(models.Model):
     plugin_inst = models.OneToOneField('plugins.PluginInstance',
                                        on_delete=models.CASCADE, related_name='feed')
     owner = models.ManyToManyField('auth.User', related_name='feed')
-    
+
     class Meta:
         ordering = ('-creation_date',)
 
@@ -24,7 +24,7 @@ class Feed(models.Model):
         super(Feed, self).save(*args, **kwargs)
         if not hasattr(self, 'note'):
             self._save_note()
-            
+
     def _save_note(self):
         """
         Custom method to create and save a new note to the DB.
@@ -39,19 +39,19 @@ class FeedFilter(FilterSet):
     max_id = django_filters.NumberFilter(name="id", lookup_expr='lte')
     min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
     max_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='lte')
-    
+
     class Meta:
         model = Feed
         fields = ['name', 'min_id', 'max_id', 'min_creation_date', 'max_creation_date']
-        
-            
+
+
 class Note(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     title = models.CharField(max_length=100, blank=True, default='')
     content = models.TextField(blank=True, default='')
     feed = models.OneToOneField(Feed, on_delete=models.CASCADE, related_name='note')
-    
+
     class Meta:
         ordering = ('creation_date',)
 
@@ -90,6 +90,6 @@ class FeedFile(models.Model):
     plugin_inst = models.ForeignKey('plugins.PluginInstance', on_delete=models.CASCADE, related_name='file')
 
     def __str__(self):
-        return self.fname.name   
+        return self.fname.name
 
 

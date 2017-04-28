@@ -7,14 +7,14 @@ from rest_framework import serializers
 from collectionjson.fields import ItemLinkField
 from .models import Note, Tag, Feed, Comment, FeedFile
 
-        
+
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
 
     class Meta:
         model = Note
         fields = ('url', 'title', 'content', 'feed')
-        
+
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
@@ -24,7 +24,7 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Tag
         fields = ('url', 'name', 'owner', 'color', 'feed')
-        
+
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
@@ -35,7 +35,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                                                       read_only=True)
     owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
                                                 read_only=True)
-    
+
     class Meta:
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner', 'note', 'tags', 'comments',
@@ -60,7 +60,7 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     feed_id = serializers.ReadOnlyField(source='feed.id')
     plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
-    
+
     class Meta:
         model = FeedFile
         fields = ('url', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource', 'feed',
