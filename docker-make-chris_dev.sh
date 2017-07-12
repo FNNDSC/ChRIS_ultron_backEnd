@@ -25,6 +25,8 @@ echo "5-Registering plugins ..."
 docker-compose exec chris_dev /bin/bash -c \
   'declare -a plugins=("fnndsc/pl-simplefsapp"
                        "fnndsc/pl-simpledsapp"
+                       "fnndsc/pl-pacsquery"
+                       "fnndsc/pl-pacsretrieve"
                       )
    for plugin in "${plugins[@]}"; do python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; done'
 echo " "
