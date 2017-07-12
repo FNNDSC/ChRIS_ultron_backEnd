@@ -14,6 +14,6 @@ RUN apt-get update \
   && pip3 install -r ${REQPATH}/local.txt
 
 WORKDIR $APPROOT
-ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
-EXPOSE 8000 5010
-#CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+#ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
+EXPOSE 8000 5005
+CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
