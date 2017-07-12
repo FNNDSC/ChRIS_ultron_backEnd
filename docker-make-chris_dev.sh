@@ -33,7 +33,7 @@ echo "6-Running Django tests ..."
 docker-compose exec chris_dev python manage.py test
 echo " "
 
-echo "7-Restarting Djando development server ..."
+echo "7-Restarting Django development server ..."
 docker-compose restart chris_dev
 echo " "
 
@@ -43,7 +43,7 @@ echo " "
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
 
-echo "9-Restarting Djando development server in interactive mode ..."
+echo "9-Restarting Django development server in interactive mode ..."
 docker-compose stop chris_dev
 docker-compose rm -f chris_dev
 docker-compose run --service-ports chris_dev
