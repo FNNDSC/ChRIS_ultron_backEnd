@@ -16,4 +16,4 @@ RUN apt-get update \
 WORKDIR $APPROOT
 #ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
 EXPOSE 8000 5005
-CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["manage.py", "runserver", "0.0.0.0:8000"]
