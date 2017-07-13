@@ -10,7 +10,7 @@ import  datetime
 import  json
 import  pudb
 import  threading
-import  pman
+import  pfurl
 
 from django.conf import settings
 
@@ -53,27 +53,27 @@ class Charm():
 
         if not self.b_quiet:
             if not self.b_useDebug:
-                if str_comms == 'status':   write(pman.Colors.PURPLE,    end="")
-                if str_comms == 'error':    write(pman.Colors.RED,       end="")
-                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
+                if str_comms == 'status':   write(pfurl.Colors.PURPLE,    end="")
+                if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
+                if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
                 write('%s' % datetime.datetime.now() + " ",       end="")
             write(' | ' + msg)
             if not self.b_useDebug:
-                if str_comms == "tx":       write(pman.Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(pman.Colors.GREEN  + "<----")
-                write(pman.Colors.NO_COLOUR, end="")
+                if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
+                if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
+                write(pfurl.Colors.NO_COLOUR, end="")
 
     def col2_print(self, str_left, str_right):
-        print(pman.Colors.WHITE +
+        print(pfurl.Colors.WHITE +
               ('%*s' % (self.LC, str_left)), end='')
-        print(pman.Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + pman.Colors.NO_COLOUR)
+        print(pfurl.Colors.LIGHT_BLUE +
+              ('%*s' % (self.RC, str_right)) + pfurl.Colors.NO_COLOUR)
 
     def __init__(self, **kwargs):
         # threading.Thread.__init__(self)
 
-        self._log                   = pman.Message()
+        self._log                   = pfurl.Message()
         self._log._b_syslog         = True
         self.__name                 = "Charm"
         self.b_useDebug             = settings.CHRIS_DEBUG['useDebug']
@@ -130,7 +130,7 @@ class Charm():
             if key == 'clearDB':        self.b_clearDB      = val
 
         if self.b_useDebug:
-            self.debug                  = pman.Message(logTo = self.str_debugFile)
+            self.debug                  = pfurl.Message(logTo = self.str_debugFile)
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
@@ -146,13 +146,13 @@ class Charm():
         if not self.b_quiet:
             # pudb.set_trace()
 
-            print(pman.Colors.LIGHT_GREEN)
+            print(pfurl.Colors.LIGHT_GREEN)
             print("""
             \t\t\t+---------------------+
             \t\t\t|  Welcome to charm!  |
             \t\t\t+---------------------+
             """)
-            print(pman.Colors.CYAN + """
+            print(pfurl.Colors.CYAN + """
             'charm' is the interface class/code between ChRIS and a pman process management
             system.
 
@@ -237,7 +237,7 @@ class Charm():
             if k == 'loopctl':  b_loopctl = v
 
         verbosity               = 1
-        shell                   = pman.crunner(
+        shell                   = pfurl.crunner(
                                             verbosity   = verbosity,
                                             debug       = True,
                                             debugTo     = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
@@ -290,7 +290,7 @@ class Charm():
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
 
-        purl    = pman.Purl(
+        purl    = pfurl.Pfurl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -375,7 +375,7 @@ class Charm():
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
         self.qprint("This is a test!!")
-        purl    = pman.Purl(
+        purl    = pfurl.Pfurl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -436,7 +436,7 @@ class Charm():
         self.qprint('pmanArgs = %s' % pmanArgs)
 
         # pudb.set_trace()
-        comm    = pman.pman(
+        comm    = pfurl.Pfurl(
             IP          = pmanArgs['ip'],
             port        = pmanArgs['port'],
             protocol    = pmanArgs['protocol'],
@@ -475,7 +475,7 @@ class Charm():
         str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
-        purl    = pman.Purl(
+        purl    = pfurl.Pfurl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
@@ -489,7 +489,10 @@ class Charm():
 
         d_pman          = json.loads(purl())
         self.qprint('d_pman = %s' % d_pman)
-        str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        try:
+            str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+        except:
+            str_pmanStatus  = 'Error in pman DB. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
         self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
         self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
@@ -538,7 +541,7 @@ class Charm():
         str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
-        purl    = pman.Purl(
+        purl    = pfurl.Pfurl(
             msg         = json.dumps(d_msg),
             http        = str_http,
             verb        = 'POST',
