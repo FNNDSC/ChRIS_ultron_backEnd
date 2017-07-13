@@ -169,7 +169,7 @@ class PluginInstanceListViewTests(ViewTests):
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
         # pl_manager.startup_apps_exec_server()
-        pl_manager.add_plugin('simplefsapp')
+        pl_manager.add_plugin('fnndsc/pl-simplefsapp')
         plugin = Plugin.objects.get(name="simplefsapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(

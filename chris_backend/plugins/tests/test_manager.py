@@ -15,9 +15,11 @@ import pudb
 class PluginManagerTests(TestCase):
     
     def setUp(self):
+        self.plugin_fs_docker_image_name = "fnndsc/pl-simplefsapp"
         self.plugin_fs_name = "simplefsapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         self.plugin_ds_name = "simpledsapp"
+        self.plugin_ds_docker_image_name = "fnndsc/pl-simpledsapp"
         self.username = 'foo'
         self.password = 'foo-pass'
         self.pl_manager = PluginManager()
@@ -42,7 +44,7 @@ class PluginManagerTests(TestCase):
         plugin's name.
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        app_repr = self.pl_manager.get_plugin_app_representation(self.plugin_fs_name)
+        app_repr = self.pl_manager.get_plugin_app_representation(self.plugin_fs_docker_image_name)
         self.assertEquals(plugin.type, app_repr['type'])
         self.assertIn('parameters', app_repr)
 
@@ -57,7 +59,7 @@ class PluginManagerTests(TestCase):
         """
         Test whether the manager can add a new plugin app to the system.
         """
-        self.pl_manager.run(['--add', self.plugin_ds_name])
+        self.pl_manager.run(['--add', self.plugin_ds_docker_image_name])
         self.assertEquals(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
 
@@ -77,7 +79,7 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         initial_modification_date = plugin.modification_date
         time.sleep(2)
-        self.pl_manager.run(['--modify', self.plugin_fs_name])
+        self.pl_manager.run(['--modify', self.plugin_fs_docker_image_name])
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
 

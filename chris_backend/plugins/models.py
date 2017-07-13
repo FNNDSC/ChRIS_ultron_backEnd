@@ -10,10 +10,11 @@ from rest_framework.filters import FilterSet
 from feeds.models import Feed, FeedFile
 
 
+# API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values")]
 
-TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool}
+TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
@@ -23,6 +24,7 @@ class Plugin(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
+    dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
 
     class Meta:
@@ -45,7 +47,7 @@ class PluginFilter(FilterSet):
     
     class Meta:
         model = Plugin
-        fields = ['name', 'type', 'min_creation_date', 'max_creation_date']
+        fields = ['name', 'dock_image', 'type', 'min_creation_date', 'max_creation_date']
 
 
 class PluginParameter(models.Model):

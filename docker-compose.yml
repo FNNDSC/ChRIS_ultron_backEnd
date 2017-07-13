@@ -9,15 +9,15 @@
 #
 
 chris_dev:
-  image:  fnndsc/chris_dev_backend
+  image:  fnndsc/chris_dev_backend:dockerized_plugins
   volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
   volumes_from:
     - dicom_listener
     - chris_dev_files
   ports:
-    - "8050:8000"
-    - "5010:5010"
+    - "8000:8000"
   links:
     - chris_dev_db:mysql
   labels:
@@ -68,3 +68,29 @@ dicom_listener:
   labels:
     name: "dicom_listener"
     role: "Dicom listener"
+
+pfcon_service:
+  image:  fnndsc/pfcon
+  ports:
+    - "5005:5005"
+  labels:
+    name: "pfcon"
+    role: "pfcon service"
+
+pman_service:
+  image:  fnndsc/pman
+  ports:
+    - "5010:5010"
+  labels:
+    name: "pman"
+    role: "pman service"
+
+pfioh_service:
+  image:  fnndsc/pfioh
+  volumes:
+    - /home/tmp/remote
+  ports:
+    - "5055:5055"
+  labels:
+    name: "pfioh"
+    role: "pfioh service"
