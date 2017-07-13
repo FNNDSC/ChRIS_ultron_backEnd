@@ -9,7 +9,7 @@
 #
 
 chris_dev:
-  image:  fnndsc/chris_dev_backend:dockerized_plugins
+  image:  fnndsc/chris_dev_backend
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
