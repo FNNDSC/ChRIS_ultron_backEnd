@@ -71,6 +71,7 @@ dicom_listener:
 
 pfcon_service:
   image:  fnndsc/pfcon
+  command: ["--forever", "--httpResponse"]
   ports:
     - "5005:5005"
   labels:
@@ -79,6 +80,7 @@ pfcon_service:
 
 pman_service:
   image:  fnndsc/pman
+  command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
   ports:
     - "5010:5010"
   labels:
@@ -87,6 +89,7 @@ pman_service:
 
 pfioh_service:
   image:  fnndsc/pfioh
+  command: ["--forever", "--httpResponse", "--storeBase", "/hostFS/storeBase"]
   volumes:
     - /home/tmp/remote
   ports:
