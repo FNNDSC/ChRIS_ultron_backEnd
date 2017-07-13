@@ -9,7 +9,7 @@
 #
 
 chris_dev:
-  image:  fnndsc/chris_dev_backend:dockerized_plugins
+  image:  fnndsc/chris_dev_backend
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
@@ -69,28 +69,31 @@ dicom_listener:
     name: "dicom_listener"
     role: "Dicom listener"
 
-pfcon_service:
-  image:  fnndsc/pfcon
-  ports:
-    - "5005:5005"
-  labels:
-    name: "pfcon"
-    role: "pfcon service"
+#pfcon_service:
+#  image:  fnndsc/pfcon
+#  command:  --forever --httpResponse
+#  ports:
+#    - "5005:5005"
+#  labels:
+#    name: "pfcon"
+#    role: "pfcon service"
 
-pman_service:
-  image:  fnndsc/pman
-  ports:
-    - "5010:5010"
-  labels:
-    name: "pman"
-    role: "pman service"
+#pman_service:
+#  image:  fnndsc/pman
+#  command:  --rawmode 1 --http --port 5010 --listeners 12
+#  ports:
+#    - "5010:5010"
+#  labels:
+#    name: "pman"
+#    role: "pman service"
 
-pfioh_service:
-  image:  fnndsc/pfioh
-  volumes:
-    - /home/tmp/remote
-  ports:
-    - "5055:5055"
-  labels:
-    name: "pfioh"
-    role: "pfioh service"
+#pfioh_service:
+#  image:  fnndsc/pfioh
+#  command:  --forever --httpResponse --storeBase=/hostFS/storeBase
+#  volumes:
+#    - /home/tmp/remote
+#  ports:
+#    - "5055:5055"
+#  labels:
+#    name: "pfioh"
+#    role: "pfioh service"
