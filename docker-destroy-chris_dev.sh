@@ -1,11 +1,11 @@
 #!/bin/bash
 
-echo "Destroying chris containerized development environment from ./docker-compose.yml"
+echo "Destroying ChRIS containerized development environment from ./docker-compose.yml"
 echo " "
 
-echo "1-Stopping services ..."
+echo "1: Stopping services..."
 docker-compose stop
 echo " "
 
-echo "2-Removing all containers ..."
+echo "2: Removing all containers..."
 docker-compose rm -vf 
