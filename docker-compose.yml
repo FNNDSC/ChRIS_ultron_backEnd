@@ -9,7 +9,9 @@
 #
 
 chris_dev:
-  image:  fnndsc/chris_dev_backend
+  environment:
+    - HOST_IP
+  image:  local/chris_dev_backend
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
@@ -24,7 +26,6 @@ chris_dev:
     name: "ChRIS_ultron_backEnd"
     role: "Backend development server"
 
-
 chris_dev_files:
   image:  alpine
   command: echo Files container
@@ -33,7 +34,6 @@ chris_dev_files:
   labels:
     name: "ChRIS_ultron_backEnd feed files"
     role: "Backend development feed files"
-
 
 chris_dev_db:
   image:  mysql:5
@@ -48,7 +48,6 @@ chris_dev_db:
     name: "ChRIS_ultron_backEnd MySQL Database"
     role: "Backend development database"
 
-
 chris_dev_db_data:
   image:  alpine
   command: echo Data container
@@ -57,7 +56,6 @@ chris_dev_db_data:
   labels:
     name: "ChRIS_ultron_backEnd database data"
     role: "Backend development database data"
-
 
 dicom_listener:
   image:  fnndsc/dck-dicom-listener
@@ -70,8 +68,16 @@ dicom_listener:
     role: "Dicom listener"
 
 pfcon_service:
-  image:  fnndsc/pfcon
+  environment:
+    - HOST_IP
+  image:  local/pfcon
   command: ["--forever", "--httpResponse"]
+  volumes_from:
+    - dicom_listener
+    - chris_dev_files
+  volumes:
+    - ~/tmp/local:/hostFS/pfconFS
+    # - /neuro/users/rudolphpienaar/src/pfcon:/usr/local/pfcon
   ports:
     - "5005:5005"
   labels:
@@ -79,8 +85,14 @@ pfcon_service:
     role: "pfcon service"
 
 pman_service:
-  image:  fnndsc/pman
+  environment:
+    - HOST_IP
+  image:  local/pman
   command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    # - /neuro/users/rudolphpienaar/src/pman:/usr/local/pman
+    - ~/tmp/remote:/hostFS/storeBase
   ports:
     - "5010:5010"
   labels:
@@ -88,10 +100,12 @@ pman_service:
     role: "pman service"
 
 pfioh_service:
-  image:  fnndsc/pfioh
-  command: ["--forever", "--httpResponse", "--storeBase", "/hostFS/storeBase"]
+  environment:
+    - HOST_IP
+  image:  local/pfioh
+  command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
   volumes:
-    - /home/tmp/remote
+    - ~/tmp/remote:/hostFS/storeBase
   ports:
     - "5055:5055"
   labels:
