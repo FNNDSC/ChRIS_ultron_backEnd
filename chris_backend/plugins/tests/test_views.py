@@ -199,13 +199,13 @@ class PluginInstanceListViewTests(ViewTests):
 
     def test_plugin_instance_list_success(self):
         pl_manager = PluginManager()
-        pl_manager.startup_apps_exec_server(clearDB = True)
+        pl_manager.check_apps_exec_server(clearDB = True)
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "simplefsapp")
 
-        pl_manager.shutdown_apps_exec_server()
+        # pl_manager.shutdown_apps_exec_server()
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
@@ -268,9 +268,10 @@ class PluginInstanceDetailViewTests(ViewTests):
         (pl_inst, tf)   = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
         # pudb.set_trace()
         pl_manager = PluginManager()
-        pl_manager.startup_apps_exec_server(clearDB = True)
+        pl_manager.check_apps_exec_server(clearDB = True)
 
-        chris2pman   = charm.Charm(
+        pudb.set_trace()
+        chris2service   = charm.Charm(
             d_args      = {'dir': './'},
             plugin_inst = pl_inst,
             plugin_repr = {'selfpath': '/bin',
@@ -278,13 +279,13 @@ class PluginInstanceDetailViewTests(ViewTests):
                            'execshell': ''}
         )
 
-        chris2pman.app_manage(method = 'pman')
+        chris2service.app_manage(method = 'pman')
         time.sleep(5)
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, "pacspull")
-        pl_manager.shutdown_apps_exec_server()
+        # pl_manager.shutdown_apps_exec_server()
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
