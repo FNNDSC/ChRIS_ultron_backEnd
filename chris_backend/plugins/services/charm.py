@@ -1,6 +1,6 @@
 """
 
-charm - ChRIS / pman interface.
+charm - ChRIS / pfcon (and pman) interface.
 
 """
 
@@ -11,6 +11,7 @@ import  json
 import  pudb
 import  threading
 import  pfurl
+import  inspect
 
 from django.conf import settings
 
@@ -51,6 +52,8 @@ class Charm():
 
         # pudb.set_trace()
 
+        str_caller  = inspect.stack()[1][3]
+
         if not self.b_quiet:
             if not self.b_useDebug:
                 if str_comms == 'status':   write(pfurl.Colors.PURPLE,    end="")
@@ -58,7 +61,7 @@ class Charm():
                 if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
                 if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
                 write('%s' % datetime.datetime.now() + " ",       end="")
-            write(' | ' + msg)
+            write(' | ' + self.__name__ + "." + str_caller + '() | ' + msg)
             if not self.b_useDebug:
                 if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
                 if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
@@ -75,7 +78,7 @@ class Charm():
 
         self._log                   = pfurl.Message()
         self._log._b_syslog         = True
-        self.__name                 = "Charm"
+        self.__name__               = "Charm"
         self.b_useDebug             = settings.CHRIS_DEBUG['useDebug']
 
         str_debugDir                = '%s/tmp' % os.environ['HOME']
@@ -153,10 +156,10 @@ class Charm():
             \t\t\t+---------------------+
             """)
             print(pfurl.Colors.CYAN + """
-            'charm' is the interface class/code between ChRIS and a pman process management
-            system.
+            'charm' is the interface class/code between ChRIS and a remote REST-type server,
+            typically 'pfcon' or 'pman'.
 
-            Type 'charm.py --man commands' for more help. """)
+            """)
             if self.b_useDebug:
                 print("""
             Debugging output is directed to the file '%s'.
@@ -189,8 +192,8 @@ class Charm():
         if str_method == 'crunner':
             self.app_crunner()
             b_launched  = True
-        if str_method == 'pman':
-            self.app_pman()
+        if str_method == 'pman' or str_method == 'pfcon':
+            self.app_service(service = str_method)
 
         if b_launched: self.c_pluginInst.register_output_files()
 
@@ -251,12 +254,19 @@ class Charm():
         if b_loopctl:
             shell.jobs_loopctl()
 
-    def app_pman_shutdown(self):
+    def app_service_shutdown(self, **kwargs):
         """
-        This method sends a shutdown command over HTTP to the pman server process.
+        This method sends a shutdown command over HTTP to a server process.
 
         :return:
         """
+
+        # pudb.set_trace()
+
+        str_service     = 'pman'
+
+        for k,v in kwargs.items():
+            if k == 'service':  str_service = v
 
         d_msg = {
             "action": "quit",
@@ -265,51 +275,57 @@ class Charm():
                     "saveDB":       True
                 }
         }
-        d_response = self.app_pman_send(msg = d_msg)
+        d_response = self.app_service_call(msg = d_msg, service = str_service)
 
-    def app_pman_send(self, *args, **kwargs):
+    def app_service_call(self, *args, **kwargs):
         """
-        This method checks if the remote 'pman' service is available by asking
-        'pman' for system status.
+        This method sends the JSON 'msg' argument to the remote service.
 
         :param args:
         :param kwargs:
         :return: True | False
         """
 
-        d_msg = {}
+        d_msg                   = {}
+        str_service             = 'pman'
+        b_httpResponseBodyParse = True
 
         for k,v in kwargs.items():
-            if k == 'msg':  d_msg = v
+            if k == 'msg':      d_msg       = v
+            if k == 'service':  str_service = v
 
         # pudb.set_trace()
 
-        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        str_setting     = 'settings.%s' % str_service.upper()
+        str_http        = '%s:%s' % (eval(str_setting)['host'], 
+                                     eval(str_setting)['port'])
+        if str_service == 'pman': b_httpResponseBodyParse = False
 
         str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
 
-        purl    = pfurl.Pfurl(
-            msg         = json.dumps(d_msg),
-            http        = str_http,
-            verb        = 'POST',
-            contentType = 'application/vnd.collection+json',
-            b_raw       = True,
-            b_quiet     = self.b_quiet,
-            jsonwrapper = 'payload',
-            debugFile   = str_debugFile,
-            useDebug    = self.b_useDebug
+        serviceCall = pfurl.Pfurl(
+            msg                     = json.dumps(d_msg),
+            http                    = str_http,
+            verb                    = 'POST',
+            # contentType             = 'application/json',
+            b_raw                   = True,
+            b_quiet                 = self.b_quiet,
+            b_httpResponseBodyParse = b_httpResponseBodyParse,
+            jsonwrapper             = 'payload',
+            debugFile               = str_debugFile,
+            useDebug                = self.b_useDebug
         )
 
-        # speak to pman...
-        d_response      = json.loads(purl())
+        # speak to the service...
+        d_response      = json.loads(serviceCall())
         return d_response
 
-    def app_pman_checkIfAvailable(self, *args, **kwargs):
+    def app_service_checkIfAvailable(self, *args, **kwargs):
         """
-        This method checks if the remote 'pman' service is available by asking
-        'pman' for system status.
+        This method checks if the remote service is available by asking
+        it for system status.
 
         :param args:
         :param kwargs:
@@ -317,88 +333,170 @@ class Charm():
         """
 
         # pudb.set_trace()
+
+        str_service     = 'pman'
+        str_IOPhost     = 'localhost'
+
+        for k,v in kwargs.items():
+            if k == 'service':  str_service = v
+            if k == 'IOPhost':  str_IOPhost = v
 
         d_msg = {
             "action":   "hello",
             "meta": {
                         "askAbout":     "sysinfo",
-                        "echoBack":     "All's well."
+                        "echoBack":     "All's well.",
+                        "service":      str_IOPhost
             }
         }
 
-        d_response = self.app_pman_send(msg = d_msg)
+        self.qprint('service type: %s' % str_service)
+        d_response = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
-            self.qprint('successful response from purl() in checkIfAvailable: %s ' % json.dumps(d_response, indent=2))
+            self.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
+            ret = True
         else:
-            self.qprint('unsuccessful response from purl(): %s' % d_response)
+            self.qprint('unsuccessful response from serviceCall(): %s' % d_response)
             if "Connection refused" in d_response:
-                self.app_pman_startup()
+                pass
+                # self.app_service_startup()
+            ret = False
+        return ret
 
-    def app_pman(self, *args, **kwargs):
+    def app_service(self, *args, **kwargs):
         """
-        Run the "app" via pman
+        Run the "app" via a call to a service provider.
         """
+
+        str_service     = 'pman'
+        str_IOPhost     = 'localhost'
+
+        for k,v in kwargs.items():
+            if k == 'service':  str_service = v
+            if k == 'IOPhost':  str_IOPhost = v
         
-        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        # First, check if the remote service is available... 
+        self.app_service_checkIfAvailable(**kwargs)
 
-        # First, check if pman is available... and start it if it is not.
-        self.app_pman_checkIfAvailable()
-
-        self.qprint('d_args = %s' % self.d_args)
+        self.qprint('app_service(): d_args = %s' % self.d_args)
         str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
-        self.qprint('in app_pman, cmdLineArg = %s' % str_cmdLineArgs)
+        self.qprint('app_service(): cmdLineArg = %s' % str_cmdLineArgs)
 
-        self.qprint('in app_pman, l_appArgs = %s' % self.l_appArgs)
+        self.qprint('app_service():, l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
-        if len(self.d_pluginRepr['execshell']):
-            str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
+        # if len(self.d_pluginRepr['execshell']):
+        #     str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('in app_pman, cmd = %s' % str_cmd)
+        self.qprint('app_service(): cmd = %s' % str_cmd)
 
-        d_msg = {
-            'action':   'run',
-            'meta': {
-                        'cmd':      str_cmd,
-                        'threaded': True,
-                        'auid':     self.c_pluginInst.owner.username,
-                        'jid':      str(self.d_pluginInst['id'])
+        if str_service == 'pman':
+            d_msg = \
+            {
+                'action':   'run',
+                'meta': 
+                {
+                    'cmd':      str_cmd,
+                    'threaded': True,
+                    'auid':     self.c_pluginInst.owner.username,
+                    'jid':      str(self.d_pluginInst['id'])
+                }       
             }
-        }
 
-        # pudb.set_trace()
+        if str_service == 'pfcon':
+            # pudb.set_trace()
+            # Handle the case for 'fs'-type plugins that don't specify an inputdir.
+            # Passing an empty string through to pfurl will cause it to fail on its 
+            # local directory check, hence here we simply set the inputdir to the 
+            # output dir.
+            if self.str_inputdir == '':
+                self.str_inputdir = '/etc'
+            d_msg = \
+            {   
+                "action": "coordinate",
+                "meta-store": 
+                {
+                        "meta":         "meta-compute",
+                        "key":          "jid"
+                },
 
-        str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
-        if self.str_debugFile == '/dev/null':
-            str_debugFile   = self.str_debugFile
-        self.qprint("This is a test!!")
-        purl    = pfurl.Pfurl(
-            msg         = json.dumps(d_msg),
-            http        = str_http,
-            verb        = 'POST',
-            contentType = 'application/vnd.collection+json',
-            b_raw       = True,
-            b_quiet     = self.b_quiet,
-            jsonwrapper = 'payload',
-            debugFile   = str_debugFile,
-            useDebug    = self.b_useDebug
-        )
+                "meta-data": 
+                {
+                    "remote": 
+                    {
+                        "key":          "%meta-store"
+                    },
+                    "localSource": 
+                    {
+                        "path":         self.str_inputdir
+                    },
+                    "localTarget": 
+                    {
+                        "path":         self.str_outputdir
+                    },
+                    "specialHandling": 
+                    {
+                        "op":           "dsplugin"
+                    },
+                    "transport": 
+                    {
+                        "mechanism":    "compress",
+                        "compress": 
+                        {
+                            "encoding": "none",
+                            "archive":  "zip",
+                            "unpack":   True,
+                            "cleanup":  True
+                        }
+                    },
+                    "service":              str_IOPhost
+                },
 
-        # run the app
-        d_response      = json.loads(purl())
+                "meta-compute":  
+                {
+                    'cmd':      "$execshell " + str_cmd,
+                    'threaded': True,
+                    'auid':     self.c_pluginInst.owner.username,
+                    'jid':      str(self.d_pluginInst['id']),
+                    "container":   
+                    {
+                        "target": 
+                        {
+                            "image":            self.c_pluginInst.plugin.dock_image,
+                            "cmdParse":         True
+                        },
+                        "manager": 
+                        {
+                            "image":            "fnndsc/swarm",
+                            "app":              "swarm.py",
+                            "env":  
+                            {
+                                "meta-store":   "key",
+                                "serviceType":  "docker",
+                                "shareDir":     "%shareDir",
+                                "serviceName":  str(self.d_pluginInst['id'])
+                            }
+                        }
+                    },
+                    "service":              IOPhost
+                }
+            }
+            
+        d_response  = self.app_service_call(msg = d_msg, **kwargs)
+
         if isinstance(d_response, dict):
-            self.qprint("looks like we got a successful response from pman")
+            self.qprint("looks like we got a successful response from %s" % str_service)
             self.qprint('response from purl(): %s ' % json.dumps(d_response, indent=2))
         else:
-            self.qprint("looks like we got an UNSUCCESSFUL response from pman")
+            self.qprint("looks like we got an UNSUCCESSFUL response from %s" % str_service)
             self.qprint('response from purl(): %s' % d_response)
             if "Connection refused" in d_response:
-                self.qprint('in app pman, fatal error in talking to pman', comms = 'error')
+                self.qprint('fatal error in talking to %s' % str_service, comms = 'error')
 
-    def app_pman_startup(self, *args, **kwargs):
+    def app_service_startup(self, *args, **kwargs):
         """
         Attempt to start a remote pman service.
 
@@ -462,7 +560,7 @@ class Charm():
         # First get current status
         str_status  = self.c_pluginInst.status
 
-        # Now ask pman for the job status
+        # Now ask the remote service for the job status
         d_msg   = {
             "action": "status",
             "meta": {
@@ -470,44 +568,27 @@ class Charm():
                     "value":    str(self.d_pluginInst['id'])
             }
         }
-        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
-
-        str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
-        if self.str_debugFile == '/dev/null':
-            str_debugFile   = self.str_debugFile
-        purl    = pfurl.Pfurl(
-            msg         = json.dumps(d_msg),
-            http        = str_http,
-            verb        = 'POST',
-            contentType = 'application/vnd.collection+json',
-            b_raw       = True,
-            b_quiet     = self.b_quiet,
-            jsonwrapper = 'payload',
-            debugFile   = str_debugFile,
-            useDebug    = self.b_useDebug
-        )
-
-        d_pman          = json.loads(purl())
-        self.qprint('d_pman = %s' % d_pman)
+        str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        d_response  = self.app_service_call(msg = d_msg, **kwargs)
+        self.qprint('d_response = %s' % d_response)
         try:
-            str_pmanStatus  = d_pman['d_ret']['l_status'][0]
+            str_responseStatus  = d_response['d_ret']['l_status'][0]
         except:
-            str_pmanStatus  = 'Error in pman DB. No record of job found.'
+            str_responseStatus  = 'Error in response. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
-        self.qprint('Current job DB   status = %s' % str_DBstatus,          comms = 'status')
-        self.qprint('Current job pman status = %s' % str_pmanStatus,        comms = 'status')
-        if 'finished' in str_pmanStatus and str_pmanStatus != str_DBstatus:
+        self.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
+        self.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
+        if 'finished' in str_responseStatus and str_responseStatus != str_DBstatus:
             self.qprint('Registering output files...', comms = 'status')
             self.c_pluginInst.register_output_files()
-            self.c_pluginInst.status    = str_pmanStatus
+            self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = datetime.datetime.now()
             self.c_pluginInst.save()
-            self.qprint("Saving job DB status   as '%s'" %  str_pmanStatus,
+            self.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
                                                             comms = 'status')
             self.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
                                                             comms = 'status')
-        if str_pmanStatus == 'finishedWithError': self.app_handleRemoteError()
-
+        if str_responseStatus == 'finishedWithError': self.app_handleRemoteError(**kwargs)
 
     def app_handleRemoteError(self, *args, **kwargs):
         """
@@ -525,7 +606,7 @@ class Charm():
                     str_deepVal = '%s' % ("{0} : {1}".format(k, v))
                     # str_deepVal = v
 
-        # Collect the 'stderr' from pman for this instance
+        # Collect the 'stderr' from the app service for this instance
         d_msg   = {
             "action": "search",
             "meta": {
@@ -537,29 +618,12 @@ class Charm():
             }
         }
         str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
-
-        str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
-        if self.str_debugFile == '/dev/null':
-            str_debugFile   = self.str_debugFile
-        purl    = pfurl.Pfurl(
-            msg         = json.dumps(d_msg),
-            http        = str_http,
-            verb        = 'POST',
-            contentType = 'application/vnd.collection+json',
-            b_raw       = True,
-            b_quiet     = self.b_quiet,
-            jsonwrapper = 'payload',
-            debugFile   = str_debugFile,
-            useDebug    = self.b_useDebug
-        )
-
+        d_response      = self.app_service_call(msg = d_msg, **kwargs)
         self.str_deep   = ''
-        d_pman          = json.loads(purl())
-        str_deepnest(d_pman['d_ret'])
+        str_deepnest(d_response['d_ret'])
         self.qprint(str_deepVal, comms = 'error')
 
-        purl.d_msg['meta']['field'] = 'returncode'
-        d_pman          = json.loads(purl())
-        str_deepnest(d_pman['d_ret'])
+        d_msg['meta']['field'] = 'returncode'
+        d_response      = self.app_service_call(msg = d_msg, **kwargs)
+        str_deepnest(d_response['d_ret'])
         self.qprint(str_deepVal, comms = 'error')
-
