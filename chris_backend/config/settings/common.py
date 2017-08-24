@@ -25,8 +25,11 @@ ALLOWED_HOSTS = []
 # pman settings
 # Set the pman IP to specific host IP
 try:    
+    # PMAN    = {
+    #     'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    # }
     PMAN    = {
-        'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+        'host': '10.17.24.163'
     }
 except Exception:
     PMAN    = {
@@ -41,8 +44,11 @@ if 'PMAN_PORT_5010_TCP_PORT' in os.environ:
 # pfcon settings
 # Set the pfcon IP to specific host IP
 try:    
-    PFCON   = {
-        'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    # PFCON   = {
+    #     'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+    # }
+    PFCON    = {
+        'host': '10.17.24.163'
     }
 except Exception:
     PFCON   = {
