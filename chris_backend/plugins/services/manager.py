@@ -53,7 +53,7 @@ class PluginManager(object):
         plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
         if app_repr['type'] not in plugin_types:
             raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
-                             % (plugin_types, dock_image))
+                             % (plugin_types, dock_image_name))
         return app_repr
 
     def get_plugin_name(self, app_repr):
