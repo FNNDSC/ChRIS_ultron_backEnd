@@ -22,15 +22,17 @@ chris_dev:
     - "8000:8000"
   links:
     - chris_dev_db:mysql
+    - pfcon_service:pfcon
+    - pman_service:pman
   labels:
     name: "ChRIS_ultron_backEnd"
     role: "Backend development server"
 
 chris_dev_files:
   image:  alpine
-  command: echo Files container
+  command: "chmod 777 /usr/users"
   volumes:
-    - /usr/users
+    - /usr/users:/usr/users
   labels:
     name: "ChRIS_ultron_backEnd feed files"
     role: "Backend development feed files"
@@ -80,6 +82,9 @@ pfcon_service:
     # - /neuro/users/rudolphpienaar/src/pfcon:/usr/local/pfcon
   ports:
     - "5005:5005"
+  links:
+    - pman_service:pman
+    - pfioh_service:pfioh
   labels:
     name: "pfcon"
     role: "pfcon service"
