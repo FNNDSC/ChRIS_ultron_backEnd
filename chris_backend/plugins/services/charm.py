@@ -41,31 +41,45 @@ class Charm():
 
     def qprint(self, msg, **kwargs):
 
+        str_teeFile = ''
+        str_teeMode = 'w+'
+
         str_comms  = "status"
         for k,v in kwargs.items():
-            if k == 'comms':    str_comms  = v
+            if k == 'comms'     :   str_comms   = v
+            if k == 'teeFile'   :   str_teeFile = v
+            if k == 'teeMode'   :   str_teeMode = v  
 
         if self.b_useDebug:
             write   = self.debug
         else:
             write   = print
 
+        if len(str_teeFile):
+            tf      = open(str_teeFile, str_teeMode)
+
         # pudb.set_trace()
 
         str_caller  = inspect.stack()[1][3]
 
+        str_print   = ''
         if not self.b_quiet:
             if not self.b_useDebug:
                 if str_comms == 'status':   write(pfurl.Colors.PURPLE,    end="")
                 if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
                 if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
                 if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
-                write('%s' % datetime.datetime.now() + " ",       end="")
-            write(' | ' + self.__name__ + "." + str_caller + '() | ' + msg)
+                str_print = '%s' % datetime.datetime.now() + " "
+                write(str_print,       end="")
+            str_print += ' | ' + self.__name__ + "." + str_caller + '() | ' + msg
+            write(str_print)
             if not self.b_useDebug:
                 if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
                 if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
                 write(pfurl.Colors.NO_COLOUR, end="")
+            if len(str_teeFile):
+                tf.write(str_print)
+                tf.close()
 
     def col2_print(self, str_left, str_right):
         print(pfurl.Colors.WHITE +
@@ -107,6 +121,8 @@ class Charm():
         self.str_inputdir           = ''
         self.str_outputdir          = ''
 
+        self.str_IOPhost            = ''
+
         self.d_args                 = {}
         self.l_appArgs              = {}
         self.c_pluginInst           = {'contents':  'void'}
@@ -131,6 +147,7 @@ class Charm():
             if key == 'debugFile':      self.str_debugFile  = val
             if key == 'quiet':          self.b_quiet        = val
             if key == 'clearDB':        self.b_clearDB      = val
+            if key == 'IOPhost':        self.str_IOPhost    = val
 
         if self.b_useDebug:
             self.debug                  = pfurl.Message(logTo = self.str_debugFile)
@@ -182,9 +199,12 @@ class Charm():
         Main "manager"/"dispatcher" for running plugins.
         """
         str_method  = 'internal'
+        str_IOPhost = 'localhost'
         b_launched  = False
+
         for k,v in kwargs.items():
             if k == 'method':   str_method  = v
+            if k == 'IOPhost':  str_IOPhost = v
 
         if str_method == 'internal':
             self.app_launchInternal()
@@ -193,7 +213,8 @@ class Charm():
             self.app_crunner()
             b_launched  = True
         if str_method == 'pman' or str_method == 'pfcon':
-            self.app_service(service = str_method)
+            self.app_service(   service = str_method,
+                                IOPhost = str_IOPhost)
 
         if b_launched: self.c_pluginInst.register_output_files()
 
@@ -351,6 +372,8 @@ class Charm():
         }
 
         self.qprint('service type: %s' % str_service)
+        str_dmsg = self.pp.pformat(d_msg).strip()
+        self.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
         d_response = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
@@ -375,6 +398,8 @@ class Charm():
         for k,v in kwargs.items():
             if k == 'service':  str_service = v
             if k == 'IOPhost':  str_IOPhost = v
+
+        # pudb.set_trace()
         
         # First, check if the remote service is available... 
         self.app_service_checkIfAvailable(**kwargs)
@@ -417,6 +442,7 @@ class Charm():
             d_msg = \
             {   
                 "action": "coordinate",
+                "threadAction":   True,
                 "meta-store": 
                 {
                         "meta":         "meta-compute",
@@ -435,11 +461,13 @@ class Charm():
                     },
                     "localTarget": 
                     {
-                        "path":         self.str_outputdir
+                        "path":         self.str_outputdir,
+                        "createDir":    True
                     },
                     "specialHandling": 
                     {
-                        "op":           "dsplugin"
+                        "op":           "plugin",
+                        "cleanup":      True
                     },
                     "transport": 
                     {
@@ -481,10 +509,12 @@ class Charm():
                             }
                         }
                     },
-                    "service":              IOPhost
+                    "service":              str_IOPhost
                 }
             }
-            
+            str_dmsg = self.pp.pformat(d_msg).strip()
+            self.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
+
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
@@ -496,60 +526,60 @@ class Charm():
             if "Connection refused" in d_response:
                 self.qprint('fatal error in talking to %s' % str_service, comms = 'error')
 
-    def app_service_startup(self, *args, **kwargs):
-        """
-        Attempt to start a remote pman service.
+    # def app_service_startup(self, *args, **kwargs):
+    #     """
+    #     Attempt to start a remote pman service.
 
-        This method is called if an attempt to speak with a pman service is unsuccessful, and
-        the assumption is that 'pman' is down. We will attempt to start 'pman' for this
-        user in this case.
+    #     This method is called if an attempt to speak with a pman service is unsuccessful, and
+    #     the assumption is that 'pman' is down. We will attempt to start 'pman' for this
+    #     user in this case.
         
-        NOTE: This method is historical and no longer used! It remains in the code for 
-        illustrative purposes!
+    #     NOTE: This method is historical and no longer used! It remains in the code for 
+    #     illustrative purposes!
 
-        :param args:
-        :param kwargs:
-        :return:
-        """
-        self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
-        self.qprint('pman IP: %s' % settings.PMAN['host'])
+    #     :param args:
+    #     :param kwargs:
+    #     :return:
+    #     """
+    #     self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
+    #     self.qprint('pman IP: %s' % settings.PMAN['host'])
 
-        str_debugFile       = '%s/tmp/debug-charm-internal.log' % os.environ['HOME']
-        if self.str_debugFile == '/dev/null':
-            str_debugFile   = self.str_debugFile
+    #     str_debugFile       = '%s/tmp/debug-charm-internal.log' % os.environ['HOME']
+    #     if self.str_debugFile == '/dev/null':
+    #         str_debugFile   = self.str_debugFile
 
-        pmanArgs        = {
-            'ip':           settings.PMAN['host'],
-            'port':         settings.PMAN['port'],
-            'raw':          '1',
-            'protocol':     'tcp',
-            'listeners':    '12',
-            'http':         True,
-            'debugToFile':  self.b_useDebug,
-            'debugFile':    str_debugFile,
-            'clearDB':      self.b_clearDB
-        }
+    #     pmanArgs        = {
+    #         'ip':           settings.PMAN['host'],
+    #         'port':         settings.PMAN['port'],
+    #         'raw':          '1',
+    #         'protocol':     'tcp',
+    #         'listeners':    '12',
+    #         'http':         True,
+    #         'debugToFile':  self.b_useDebug,
+    #         'debugFile':    str_debugFile,
+    #         'clearDB':      self.b_clearDB
+    #     }
 
-        self.qprint('Calling pman constructor internally.')
-        self.qprint('pmanArgs = %s' % pmanArgs)
+    #     self.qprint('Calling pman constructor internally.')
+    #     self.qprint('pmanArgs = %s' % pmanArgs)
 
-        # pudb.set_trace()
-        comm    = pfurl.Pfurl(
-            IP          = pmanArgs['ip'],
-            port        = pmanArgs['port'],
-            protocol    = pmanArgs['protocol'],
-            raw         = pmanArgs['raw'],
-            listeners   = pmanArgs['listeners'],
-            http        = pmanArgs['http'],
-            debugToFile = pmanArgs['debugToFile'],
-            debugFile   = pmanArgs['debugFile'],
-            clearDB     = pmanArgs['clearDB']
-        )
+    #     # pudb.set_trace()
+    #     comm    = pfurl.Pfurl(
+    #         IP          = pmanArgs['ip'],
+    #         port        = pmanArgs['port'],
+    #         protocol    = pmanArgs['protocol'],
+    #         raw         = pmanArgs['raw'],
+    #         listeners   = pmanArgs['listeners'],
+    #         http        = pmanArgs['http'],
+    #         debugToFile = pmanArgs['debugToFile'],
+    #         debugFile   = pmanArgs['debugFile'],
+    #         clearDB     = pmanArgs['clearDB']
+    #     )
 
-        t_comm = threading.Thread(target = comm.thread_serve)
-        t_comm.start()
+    #     t_comm = threading.Thread(target = comm.thread_serve)
+    #     t_comm.start()
 
-        self.qprint('Called pman constructor internally.')
+    #     self.qprint('Called pman constructor internally.')
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
@@ -559,6 +589,8 @@ class Charm():
 
         # First get current status
         str_status  = self.c_pluginInst.status
+
+        # pudb.set_trace()
 
         # Now ask the remote service for the job status
         d_msg   = {
