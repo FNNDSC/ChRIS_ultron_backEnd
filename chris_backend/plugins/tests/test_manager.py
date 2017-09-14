@@ -108,13 +108,13 @@ class PluginManagerTests(TestCase):
         # pudb.set_trace()
         self.pl_manager.check_apps_exec_server(     clearDB             = True,
                                                     service             = 'pfcon',
-                                                    IOPhost             = 'pangea')
+                                                    IOPhost             = 'host')
         self.pl_manager.run_plugin_app(             pl_inst,
                                                     parameter_dict,
                                                     service             = 'pfcon',
                                                     inputDirOverride    = '/share/incoming',
                                                     outputDirOverride   = '/share/outgoing',
-                                                    IOPhost             = 'pangea'
+                                                    IOPhost             = 'host'
         )
         time.sleep(10)
         # self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
@@ -149,13 +149,13 @@ class PluginManagerTests(TestCase):
         # pudb.set_trace()
         self.pl_manager.check_apps_exec_server(     clearDB             = True,
                                                     service             = 'pfcon',
-                                                    IOPhost             = 'pangea')
+                                                    IOPhost             = 'host')
         self.pl_manager.run_plugin_app(             pl_inst, 
                                                     parameter_dict,
                                                     service             = 'pfcon',
                                                     inputDirOverride    = '/share/incoming',
                                                     outputDirOverride   = '/share/outgoing',
-                                                    IOPhost             = 'pangea'
+                                                    IOPhost             = 'host'
         )
         time.sleep(10)
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
