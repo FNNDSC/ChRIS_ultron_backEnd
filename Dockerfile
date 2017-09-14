@@ -43,15 +43,21 @@ RUN apt-get update \
   && apt-get install -y libssl-dev libcurl4-openssl-dev               \
   && apt-get install -y apache2 apache2-dev bsdmainutils vim net-tools inetutils-ping \
   && pip3 install -r ${REQPATH}/local.txt                             \
-# RUN chmod 777 /usr/src                                                \
-#   && chmod 777 /usr/src/docker-entrypoint.py                          \
+  && chmod 777 /usr/src                                               \
+  # && chmod 777 /usr/src/docker-entrypoint.py                          \
+  && mkdir /usr/users                                                 \
+  && chmod 777 /usr/users                                             \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
+# RUN chmod 777 /usr/users
+
 WORKDIR $APPROOT
-#ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
 EXPOSE 8000 5005
 
 # Start as user $UID
-USER $UID
+# For now this is disabled so the service runs as root to 
+# easily write to the managed db volume.
+# USER $UID
 
-CMD ["manage.py", "runserver", "0.0.0.0:8000"]
+# CMD ["manage.py", "runserver", "0.0.0.0:8000"]
