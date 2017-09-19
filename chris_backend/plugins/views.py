@@ -130,7 +130,12 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameters_dict[parameter.name] = request_data[parameter.name]
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(plugin_inst, parameters_dict)
+        pl_manager.run_plugin_app(  plugin_inst, 
+                                    parameters_dict,
+                                    service             = 'pfcon',
+                                    inputDirOverride    = '/share/incoming',
+                                    outputDirOverride   = '/share/outgoing',
+                                    IOPhost             = 'host')
 
     def list(self, request, *args, **kwargs):
         """
