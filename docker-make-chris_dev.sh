@@ -37,6 +37,10 @@ docker-compose exec chris_dev /bin/bash -c \
                        "fnndsc/pl-simpledsapp"
                        "fnndsc/pl-pacsquery"
                        "fnndsc/pl-pacsretrieve"
+                       "fnndsc/pl-med2img"
+                       "fnndsc/pl-s3retrieve"
+                       "fnndsc/pl-s3push"
+                       "fnndsc/pl-dircopy"
                       )
    for plugin in "${plugins[@]}"; do python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; done'
 echo ""
