@@ -164,8 +164,6 @@ class Charm():
         # pudb.set_trace()
 
         if not self.b_quiet:
-            # pudb.set_trace()
-
             print(pfurl.Colors.LIGHT_GREEN)
             print("""
             \t\t\t+---------------------+
@@ -173,8 +171,8 @@ class Charm():
             \t\t\t+---------------------+
             """)
             print(pfurl.Colors.CYAN + """
-            'charm' is the interface class/code between ChRIS and a remote REST-type server,
-            typically 'pfcon' or 'pman'.
+            'charm' is the interface class/code between ChRIS and a remote 
+            REST-type server, typically 'pfcon' or 'pman'.
 
             """)
             if self.b_useDebug:
@@ -433,12 +431,24 @@ class Charm():
 
         if str_service == 'pfcon':
             # pudb.set_trace()
-            # Handle the case for 'fs'-type plugins that don't specify an inputdir.
-            # Passing an empty string through to pfurl will cause it to fail on its 
-            # local directory check, hence here we simply set the inputdir to the 
-            # output dir.
+            # Handle the case for 'fs'-type plugins that don't specify an 
+            # inputdir.
+            #
+            # Passing an empty string through to pfurl will cause it to fail 
+            # on its local directory check.
+            #
+            # The "hack" here is to set the 'inputdir' to the fs plugin to the
+            # 'dir' argument of its input CLI, if such an argument exists; 
+            # otherwise, set to '/etc'. 
+            #
+            # Also, for 'fs' plugins, we need to set the "incoming" directory 
+            # to /share/incoming.
             if self.str_inputdir == '':
-                self.str_inputdir = '/etc'
+                # pudb.set_trace()
+                if 'dir' in self.d_args:
+                    self.str_inputdir = self.d_args['dir']
+                else:
+                    self.str_inputdir = '/etc'
             d_msg = \
             {   
                 "action": "coordinate",
