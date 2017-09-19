@@ -15,6 +15,7 @@ chris_dev:
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
+    - ~/tmp/local:/hostFS/pfconFS
   volumes_from:
     - dicom_listener
     - chris_dev_files
