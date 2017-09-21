@@ -385,6 +385,45 @@ class Charm():
             ret = False
         return ret
 
+    def app_service_fsplugin_setup(self, *args, **kwargs):
+        """
+        Some fsplugins, esp those that might interact with the local file
+        filesystem can be "massaged" to conform to the existing fileIO 
+        transmission pattern.
+
+        This method edits the cmdLine for fsplugin input to /share/incoming 
+        and sets any --dir to data localSource.
+
+        """
+
+        for k,v in kwargs.items():
+            if k == 'cmd':  str_cmd = v
+
+        if 'dir' in self.d_args:
+            self.str_inputdir = self.d_args['dir']
+            str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
+            i = 0
+            for v in self.l_appArgs:
+                if v == self.str_inputdir:
+                    self.l_appArgs[i] = '/share/incoming'
+                i+=1
+            str_allCmdLineArgs      = ' '.join(self.l_appArgs)
+            str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+            str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)                 
+            self.qprint('cmd = %s' % str_cmd)
+        else:
+            os.makedirs('dummy')
+            os.chdir('dummy')
+            # touch a file
+            with open('dummy.txt', 'a'):
+                os.utime('dummy', None)
+            self.str_inputdir   = os.path.abspath('dummy.txt')
+
+        return {
+            'cmd':      str_cmd,
+            'inputdir': self.str_inputdir
+        }
+
     def app_service(self, *args, **kwargs):
         """
         Run the "app" via a call to a service provider.
@@ -402,11 +441,11 @@ class Charm():
         # First, check if the remote service is available... 
         self.app_service_checkIfAvailable(**kwargs)
 
-        self.qprint('app_service(): d_args = %s' % self.d_args)
+        self.qprint('d_args = %s' % self.d_args)
         str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
-        self.qprint('app_service(): cmdLineArg = %s' % str_cmdLineArgs)
+        self.qprint('cmdLineArg = %s' % str_cmdLineArgs)
 
-        self.qprint('app_service():, l_appArgs = %s' % self.l_appArgs)
+        self.qprint('l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
@@ -414,7 +453,7 @@ class Charm():
         #     str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('app_service(): cmd = %s' % str_cmd)
+        self.qprint('cmd = %s' % str_cmd)
 
         if str_service == 'pman':
             d_msg = \
@@ -443,12 +482,12 @@ class Charm():
             #
             # Also, for 'fs' plugins, we need to set the "incoming" directory 
             # to /share/incoming.
+            # pudb.set_trace()
+            # pudb.set_trace()
             if self.str_inputdir == '':
-                # pudb.set_trace()
-                if 'dir' in self.d_args:
-                    self.str_inputdir = self.d_args['dir']
-                else:
-                    self.str_inputdir = '/etc'
+                d_fs    = self.app_service_fsplugin_setup(cmd = str_cmd)
+                str_cmd = d_fs['cmd']
+            # self.str_inputdir = '/etc'
             d_msg = \
             {   
                 "action": "coordinate",
