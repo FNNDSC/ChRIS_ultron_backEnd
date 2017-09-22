@@ -372,10 +372,10 @@ class Charm():
 
         self.qprint('service type: %s' % str_service)
         str_dmsg = self.pp.pformat(d_msg).strip()
-        if os.path.exists('/hostFS/pfconFS'):
-            if not os.path.exists('/hostFS/pfconFS/tmp'):
-                os.makedirs('/hostFS/pfconFS/tmp')
-            self.qprint(str_dmsg, teeFile = '/hostFS/pfconFS/tmp/dmsg-hello.json', teeMode = 'w+')
+        if os.path.exists('/data'):
+            if not os.path.exists('/data/tmp'):
+                os.makedirs('/data/tmp')
+            self.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
         else:
             self.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
         d_response = self.app_service_call(msg = d_msg, **kwargs)
@@ -399,10 +399,10 @@ class Charm():
         by the file transfer service.
         """
 
-        if os.path.isdir('/hostFS/pfconFS'):
-            if not os.path.exists('/hostFS/pfconFS/dummy'):
-                os.makedirs('/hostFS/pfconFS/dummy')
-            os.chdir('/hostFS/pfconFS/dummy')
+        if os.path.isdir('/data'):
+            if not os.path.exists('/data/dummy'):
+                os.makedirs('/data/dummy')
+            os.chdir('/data/dummy')
             # touch a file
             with open('dummy.txt', 'a'):
                 os.utime('dummy.txt', None)
@@ -577,10 +577,11 @@ class Charm():
                 }
             }
             str_dmsg = self.pp.pformat(d_msg).strip()
-            if os.path.exists('/hostFS/pfconFS'):
-                if not os.path.exists('/hostFS/pfconFS/tmp'):
-                    os.makedirs('/hostFS/pfconFS/tmp')
-                self.qprint(str_dmsg, teeFile = '/hostFS/pfconFS/tmp/dmsg-exec.json', teeMode = 'w+')
+            # pudb.set_trace()
+            if os.path.exists('/data'):
+                if not os.path.exists('/data/tmp'):
+                    os.makedirs('/data/tmp')
+                self.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-exec.json', teeMode = 'w+')
             else:
                 self.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
 
