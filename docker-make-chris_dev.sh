@@ -103,6 +103,7 @@ echo "1.2: Create tree structure for remote services in host filesystem..."
 mkdir -p FS/remote
 # mkdir -p FS/users
 # chmod 777 FS/local
+chmod 777 FS
 chmod 777 FS/remote
 # chmod 777 FS/users
 # echo "1.3: Create tree structure to emulate volume mapping"
