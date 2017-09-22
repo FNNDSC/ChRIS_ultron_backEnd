@@ -75,7 +75,9 @@ printf "%30s\t\t" "pfurl inside ${CREPO}/pfcon"
 echo $CMD | sh | grep Version
 
 echo "$sep"
-echo "Shutting down any running CUBE containers.."
+echo "Shutting down any running CUBE and CUBE related containers.."
+docker-compose stop
+docker-compose rm -vf
 for CONTAINER in ${A_CONTAINER[@]} ; do
     printf "%30s" "$CONTAINER"
     docker ps -a                                                        |\
@@ -94,23 +96,23 @@ chmod -R 755 $(pwd)
 echo ""
 echo "$sep"
 echo "1.0: Creating tmp dirs for volume mounting into containers..."
-echo "1.1: Remove tree root 'FS'.."
-sudo rm -fr ./FS 2>/dev/null
-echo "1.2: Create tree structure in repo filesystem..."
-mkdir -p FS/local
+# echo "1.1: Remove tree root 'FS'.."
+# sudo rm -fr ./FS 2>/dev/null
+echo "1.2: Create tree structure for remote services in host filesystem..."
+# mkdir -p FS/local
 mkdir -p FS/remote
-mkdir -p FS/users
-chmod 777 FS/local
+# mkdir -p FS/users
+# chmod 777 FS/local
 chmod 777 FS/remote
-chmod 777 FS/users
-echo "1.3: Create tree structure to emulate volume mapping"
-echo "1.3: This allows for easy switching/running between"
-echo "1.3: containerized and non-containerized environments."
-sudo rm -fr /hostFS 2>/dev/null
-sudo mkdir -p /hostFS
-cd /hostFS
-sudo ln -s ${HERE}/FS/local   pfconFS
-sudo ln -s ${HERE}/FS/remote  storeBase
+# chmod 777 FS/users
+# echo "1.3: Create tree structure to emulate volume mapping"
+# echo "1.3: This allows for easy switching/running between"
+# echo "1.3: containerized and non-containerized environments."
+# sudo rm -fr /hostFS 2>/dev/null
+# sudo mkdir -p /hostFS
+# cd /hostFS
+# sudo ln -s ${HERE}/FS/local   pfconFS
+# sudo ln -s ${HERE}/FS/remote  storeBase
 cd $HERE
 
 echo "$sep"
