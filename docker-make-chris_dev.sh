@@ -87,7 +87,7 @@ for CONTAINER in ${A_CONTAINER[@]} ; do
     printf "%20s\n" "down"
 done
 
-sudo rm -fr ./FS 2>/dev/null
+rm -fr ./FS 2>/dev/null
 echo "$sep"
 cd $HERE
 echo "0.0: Changing permissions to 755 for $(pwd)..."
