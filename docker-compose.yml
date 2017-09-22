@@ -9,13 +9,13 @@
 #
 
 chris_dev:
-  environment:
-    - HOST_IP
-  image:  local/chris_dev_backend
+  # environment:
+  #   - HOST_IP
+  image:  ${CREPO}/chris_dev_backend
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
-    - ~/tmp/local:/hostFS/pfconFS
+    - ./FS/local:/hostFS/pfconFS
   volumes_from:
     - dicom_listener
     - chris_dev_files
@@ -33,7 +33,7 @@ chris_dev_files:
   image:  alpine
   command: "chmod 777 /usr/users"
   volumes:
-    - /usr/users:/usr/users
+    - ./FS/users:/usr/users
   labels:
     name: "ChRIS_ultron_backEnd feed files"
     role: "Backend development feed files"
@@ -71,16 +71,15 @@ dicom_listener:
     role: "Dicom listener"
 
 pfcon_service:
-  environment:
-    - HOST_IP
-  image:  local/pfcon
+  # environment:
+  #   - HOST_IP
+  image:  ${CREPO}/pfcon
   command: ["--forever", "--httpResponse"]
   volumes_from:
     - dicom_listener
     - chris_dev_files
   volumes:
-    - ~/tmp/local:/hostFS/pfconFS
-    # - /neuro/users/rudolphpienaar/src/pfcon:/usr/local/pfcon
+    - ./FS/local:/hostFS/pfconFS
   ports:
     - "5005:5005"
   links:
@@ -91,14 +90,13 @@ pfcon_service:
     role: "pfcon service"
 
 pman_service:
-  environment:
-    - HOST_IP
-  image:  local/pman
+  # environment:
+  #   - HOST_IP
+  image:  ${CREPO}/pman
   command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
-    # - /neuro/users/rudolphpienaar/src/pman:/usr/local/pman
-    - ~/tmp/remote:/hostFS/storeBase
+    - ./FS//remote:/hostFS/storeBase
   ports:
     - "5010:5010"
   labels:
@@ -106,12 +104,12 @@ pman_service:
     role: "pman service"
 
 pfioh_service:
-  environment:
-    - HOST_IP
-  image:  local/pfioh
+  # environment:
+  #   - HOST_IP
+  image:  ${CREPO}/pfioh
   command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
   volumes:
-    - ~/tmp/remote:/hostFS/storeBase
+    - ./FS/remote:/hostFS/storeBase
   ports:
     - "5055:5055"
   labels:
