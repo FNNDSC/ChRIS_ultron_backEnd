@@ -118,11 +118,12 @@ class Charm():
         self.b_raw                  = False
         self.auth                   = ''
         self.str_jsonwrapper        = ''
-        self.str_inputdir           = ''
-        self.str_outputdir          = ''
 
         self.str_IOPhost            = ''
 
+        self.str_cmd                = ''
+        self.str_inputdir           = ''
+        self.str_outputdir          = ''
         self.d_args                 = {}
         self.l_appArgs              = {}
         self.c_pluginInst           = {'contents':  'void'}
@@ -237,10 +238,10 @@ class Charm():
         if len(self.d_pluginRepr['execshell']):
             str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
-        str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('cmd = %s' % str_cmd)
+        self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
+        self.qprint('cmd = %s' % self.str_cmd)
 
-        self.app_crunner(str_cmd, loopctl = True)
+        self.app_crunner(self.str_cmd, loopctl = True)
         self.c_pluginInst.register_output_files()
 
     def app_crunner(self, str_cmd, **kwargs):
@@ -371,7 +372,12 @@ class Charm():
 
         self.qprint('service type: %s' % str_service)
         str_dmsg = self.pp.pformat(d_msg).strip()
-        self.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
+        if os.path.exists('/hostFS/pfconFS'):
+            if not os.path.exists('/hostFS/pfconFS/tmp'):
+                os.makedirs('/hostFS/pfconFS/tmp')
+            self.qprint(str_dmsg, teeFile = '/hostFS/pfconFS/tmp/dmsg-hello.json', teeMode = 'w+')
+        else:
+            self.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
         d_response = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
@@ -385,6 +391,26 @@ class Charm():
             ret = False
         return ret
 
+    def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
+        """
+        NB: HACK ALERT! Relies on volume mapping meta info!
+
+        This method creates a "fake" inputdir for fsplugins that is used
+        by the file transfer service.
+        """
+
+        if os.path.isdir('/hostFS/pfconFS'):
+            if not os.path.exists('/hostFS/pfconFS/dummy'):
+                os.makedirs('/hostFS/pfconFS/dummy')
+            os.chdir('/hostFS/pfconFS/dummy')
+            # touch a file
+            with open('dummy.txt', 'a'):
+                os.utime('dummy.txt', None)
+            os.chdir('../')
+            self.str_inputdir   = os.path.abspath('dummy')
+        else:
+            self.str_inputdir   = '/etc'
+
     def app_service_fsplugin_setup(self, *args, **kwargs):
         """
         Some fsplugins, esp those that might interact with the local file
@@ -396,9 +422,6 @@ class Charm():
 
         """
 
-        for k,v in kwargs.items():
-            if k == 'cmd':  str_cmd = v
-
         if 'dir' in self.d_args:
             self.str_inputdir = self.d_args['dir']
             str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
@@ -409,18 +432,14 @@ class Charm():
                 i+=1
             str_allCmdLineArgs      = ' '.join(self.l_appArgs)
             str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
-            str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)                 
-            self.qprint('cmd = %s' % str_cmd)
-        else:
-            os.makedirs('dummy')
-            os.chdir('dummy')
-            # touch a file
-            with open('dummy.txt', 'a'):
-                os.utime('dummy', None)
-            self.str_inputdir   = os.path.abspath('dummy.txt')
+            self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
+            self.qprint('cmd = %s' % self.str_cmd)
+        if self.str_inputdir == './' or self.str_inputdir == '':
+            self.app_service_fsplugin_inputdirManage()
 
         return {
-            'cmd':      str_cmd,
+            'status':   True,
+            'cmd':      self.str_cmd,
             'inputdir': self.str_inputdir
         }
 
@@ -452,8 +471,8 @@ class Charm():
         # if len(self.d_pluginRepr['execshell']):
         #     str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
-        str_cmd                 = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('cmd = %s' % str_cmd)
+        self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
+        self.qprint('cmd = %s' % self.str_cmd)
 
         if str_service == 'pman':
             d_msg = \
@@ -461,7 +480,7 @@ class Charm():
                 'action':   'run',
                 'meta': 
                 {
-                    'cmd':      str_cmd,
+                    'cmd':      self.str_cmd,
                     'threaded': True,
                     'auid':     self.c_pluginInst.owner.username,
                     'jid':      str(self.d_pluginInst['id'])
@@ -469,7 +488,6 @@ class Charm():
             }
 
         if str_service == 'pfcon':
-            # pudb.set_trace()
             # Handle the case for 'fs'-type plugins that don't specify an 
             # inputdir.
             #
@@ -483,11 +501,8 @@ class Charm():
             # Also, for 'fs' plugins, we need to set the "incoming" directory 
             # to /share/incoming.
             # pudb.set_trace()
-            # pudb.set_trace()
             if self.str_inputdir == '':
-                d_fs    = self.app_service_fsplugin_setup(cmd = str_cmd)
-                str_cmd = d_fs['cmd']
-            # self.str_inputdir = '/etc'
+                d_fs    = self.app_service_fsplugin_setup()
             d_msg = \
             {   
                 "action": "coordinate",
@@ -534,7 +549,7 @@ class Charm():
 
                 "meta-compute":  
                 {
-                    'cmd':      "$execshell " + str_cmd,
+                    'cmd':      "$execshell " + self.str_cmd,
                     'threaded': True,
                     'auid':     self.c_pluginInst.owner.username,
                     'jid':      str(self.d_pluginInst['id']),
@@ -562,7 +577,12 @@ class Charm():
                 }
             }
             str_dmsg = self.pp.pformat(d_msg).strip()
-            self.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
+            if os.path.exists('/hostFS/pfconFS'):
+                if not os.path.exists('/hostFS/pfconFS/tmp'):
+                    os.makedirs('/hostFS/pfconFS/tmp')
+                self.qprint(str_dmsg, teeFile = '/hostFS/pfconFS/tmp/dmsg-exec.json', teeMode = 'w+')
+            else:
+                self.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
 
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
 
