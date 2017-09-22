@@ -148,7 +148,7 @@ docker-compose exec chris_dev /bin/bash -c \
                       )
   declare -i i=1
   for plugin in "${plugins[@]}"; do 
-      echo "5.1.$i: Registering $plugin..."
+      echo "5.0.$i: Registering $plugin..."
       python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
       ((i++))
   done'
