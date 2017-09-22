@@ -15,7 +15,7 @@ chris_dev:
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
-    - ./FS/local:/hostFS/pfconFS
+    # - ./FS/local:/hostFS/pfconFS
   volumes_from:
     - dicom_listener
     - chris_dev_files
@@ -33,7 +33,9 @@ chris_dev_files:
   image:  alpine
   command: "chmod 777 /usr/users"
   volumes:
-    - ./FS/users:/usr/users
+    # - ./FS/users:/usr/users
+    - /usr/users
+    - /data
   labels:
     name: "ChRIS_ultron_backEnd feed files"
     role: "Backend development feed files"
@@ -78,8 +80,8 @@ pfcon_service:
   volumes_from:
     - dicom_listener
     - chris_dev_files
-  volumes:
-    - ./FS/local:/hostFS/pfconFS
+  # volumes:
+  #   - ./FS/local:/hostFS/pfconFS
   ports:
     - "5005:5005"
   links:
@@ -96,7 +98,9 @@ pman_service:
   command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
-    - ./FS//remote:/hostFS/storeBase
+    - ./FS/remote:/hostFS/storeBase
+  # volumes_from:
+  #   - chris_remote_files
   ports:
     - "5010:5010"
   labels:
@@ -110,8 +114,20 @@ pfioh_service:
   command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
   volumes:
     - ./FS/remote:/hostFS/storeBase
+  # volumes_from:
+  #   - chris_remote_files
   ports:
     - "5055:5055"
   labels:
     name: "pfioh"
     role: "pfioh service"
+
+# chris_remote_files:
+#   image:  alpine
+#   # command: "chmod 777 /usr/users"
+#   volumes:
+#     # - ./FS/users:/usr/users
+#     - /hostFS
+#   labels:
+#     name: "RemoteFS"
+#     role: "Simulate remote FS for pfioh and pman"
