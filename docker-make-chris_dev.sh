@@ -96,8 +96,8 @@ chmod -R 755 $(pwd)
 echo ""
 echo "$sep"
 echo "1.0: Creating tmp dirs for volume mounting into containers..."
-# echo "1.1: Remove tree root 'FS'.."
-# sudo rm -fr ./FS 2>/dev/null
+echo "1.1: Remove tree root 'FS'.."
+rm -fr ./FS 2>/dev/null
 echo "1.2: Create tree structure for remote services in host filesystem..."
 # mkdir -p FS/local
 mkdir -p FS/remote
