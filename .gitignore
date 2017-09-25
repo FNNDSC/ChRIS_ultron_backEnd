@@ -8,3 +8,4 @@ secrets.json
 htmlcov
 .docker
 .idea
+FS/
