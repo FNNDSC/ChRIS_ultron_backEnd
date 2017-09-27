@@ -162,7 +162,7 @@ if [[ $CREPO == "fnndsc" ]] ; then
     for CONTAINER in ${A_CONTAINER[@]} ; do
         echo ""
         CMD="docker pull ${CREPO}/$CONTAINER"
-        echo -e "\t\t\t$CMD"
+        echo -e "\t\t\t${White}$CMD${NC}"
         echo $sep
         echo $CMD | sh
         echo $sep
