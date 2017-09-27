@@ -9,13 +9,10 @@
 #
 
 chris_dev:
-  # environment:
-  #   - HOST_IP
   image:  ${CREPO}/chris_dev_backend
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./chris_backend:/usr/src/chris_backend
-    # - ./FS/local:/hostFS/pfconFS
   volumes_from:
     - dicom_listener
     - chris_dev_files
@@ -33,7 +30,6 @@ chris_dev_files:
   image:  alpine
   command: "chmod 777 /usr/users"
   volumes:
-    # - ./FS/users:/usr/users
     - /usr/users
     - /data
   labels:
@@ -73,15 +69,11 @@ dicom_listener:
     role: "Dicom listener"
 
 pfcon_service:
-  # environment:
-  #   - HOST_IP
   image:  ${CREPO}/pfcon
   command: ["--forever", "--httpResponse"]
   volumes_from:
     - dicom_listener
     - chris_dev_files
-  # volumes:
-  #   - ./FS/local:/hostFS/pfconFS
   ports:
     - "5005:5005"
   links:
@@ -91,43 +83,43 @@ pfcon_service:
     name: "pfcon"
     role: "pfcon service"
 
-pman_service:
-  # environment:
-  #   - HOST_IP
-  image:  ${CREPO}/pman
-  command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    - ./FS/remote:/hostFS/storeBase
-  # volumes_from:
-  #   - chris_remote_files
-  ports:
-    - "5010:5010"
-  labels:
-    name: "pman"
-    role: "pman service"
-
 pfioh_service:
-  # environment:
-  #   - HOST_IP
+  # The following is a bit complicated... Basically we need to map a physical dir
+  # in the HOST to the key store in pfioh. The keystore is specified by the 
+  # --storeBase flag.
   image:  ${CREPO}/pfioh
   command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
   volumes:
     - ./FS/remote:/hostFS/storeBase
-  # volumes_from:
-  #   - chris_remote_files
   ports:
     - "5055:5055"
   labels:
     name: "pfioh"
     role: "pfioh service"
 
-# chris_remote_files:
-#   image:  alpine
-#   # command: "chmod 777 /usr/users"
-#   volumes:
-#     # - ./FS/users:/usr/users
-#     - /hostFS
-#   labels:
-#     name: "RemoteFS"
-#     role: "Simulate remote FS for pfioh and pman"
+pman_service:
+  # pman also needs access to the pfioh storeBase folder (and hence the volume)
+  # mapping from the HOST file system space.
+  #
+  # There is however an extra twist. Since pman spins off containers of its
+  # own, it needs to mount this storeBase dir into the spawned container.
+  # However, it can't mount a dir inside itself to the spawned container, 
+  # it has to mount an actaul existing directory. This directory is
+  # passed in the SHAREDIRBASE env variable, and will override the base 
+  # mapping of SHAREDIR inside pman to the swarm manager. Note that the
+  # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
+  environment:
+    - STOREBASE
+  image:  ${CREPO}/pman
+  command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./FS/remote:/hostFS/storeBase
+    # - ../pman:/usr/local/pman
+  ports:
+    - "5010:5010"
+  labels:
+    name: "pman"
+    role: "pman service"
+
+
