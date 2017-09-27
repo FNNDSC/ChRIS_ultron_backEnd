@@ -31,24 +31,81 @@
 #       developed/debugged.
 #
 
+   ESC(){ echo -en "\033";}                            # escape character
+ CLEAR(){ echo -en "\033c";}                           # the same as 'tput clear'
+ CIVIS(){ echo -en "\033[?25l";}                       # the same as 'tput civis'
+ CNORM(){ echo -en "\033[?12l\033[?25h";}              # the same as 'tput cnorm'
+  TPUT(){ echo -en "\033[${1};${2}H";}                 # the same as 'tput cup'
+COLPUT(){ echo -en "\033[${1}G";}                      # put text in the same line as the specified column
+  MARK(){ echo -en "\033[7m";}                         # the same as 'tput smso'
+UNMARK(){ echo -en "\033[27m";}                        # the same as 'tput rmso'
+  DRAW(){ echo -en "\033%@";echo -en "\033(0";}        # switch to 'garbage' mode
+ WRITE(){ echo -en "\033(B";}                          # return to normal mode from 'garbage' on the screen
+  BLUE(){ echo -en "\033c\033[0;1m\033[37;44m\033[J";} # reset screen, set background to blue and font to white
+
+RED='\033[0;31m'
+NC='\033[m' # No Color
+Black='\033[0;30m'     
+DarkGray='\033[1;30m'
+Red='\033[0;31m'     
+LightRed='\033[1;31m'
+Green='\033[0;32m'     
+LightGreen='\033[1;32m'
+Brown='\033[0;33m'     
+Yellow='\033[1;33m'
+Blue='\033[0;34m'     
+LightBlue='\033[1;34m'
+Purple='\033[0;35m'     
+LightPurple='\033[1;35m'
+Cyan='\033[0;36m'     
+LightCyan='\033[1;36m'
+LightGray='\033[0;37m'     
+White='\033[1;37m'
+
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
-sep="_______________________________________________________________________________"
-sepu=" _____________________________________________________________________________"
-sepv="/                                                                             \\"
-sepb="\_____________________________________________________________________________/"
-sepd="-------------------------------------------------------------------------------"
 
 declare -i STEP=0
 
 function title {
     STEP=$(expr $STEP + 1 )
     MSG="$1"
+    MSG2="$2"
+    TITLE=$(echo " $STEP.0: $MSG ")
+    LEN=$(echo "$TITLE" | awk -F\| {'printf("%s", length($1));'})
+    MSG=$(echo -e "$TITLE" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
+    if (( ${#MSG2} )) ; then
+        TITLE2=$(echo " $MSG2 ")
+        LEN2=$(echo "$TITLE2" | awk -F\| {'printf("%s", length($1));'})
+        MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
+    fi
     printf "\n"
-    printf " $sepu\n $sepv \n"
-    LEN=$(echo " $STEP.0: $MSG" | awk -F\| {'printf("%s", length($1));'})
-    echo " $STEP.0: $MSG" | awk -F\| {'printf("|%*s%*s|\n", 39+length($1)/2, $1, 40-length($1)/2, "");'}
-    printf " $sepb \n"
+    DRAW
+    printf "${Yellow}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+    printf "x"
+    WRITE
+    printf "${LightPurple}$MSG${Yellow}"
+    if (( ${#MSG2} )) ; then
+        DRAW
+        printf "x\nx"
+        WRITE
+        printf "${LightPurple}$MSG2${Yellow}"
+    fi
+    DRAW
+    printf "x\n"
+    printf "${Yellow}mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
+    WRITE
+    printf "${NC}"
+}
+
+function windowBottom {
+    DRAW
+    printf "${Yellow}"
+    printf "mwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvqk\n"
+    printf "${Brown}"
+    printf " mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
+    WRITE
+    printf "${NC}"
 }
 
 function title2 {
@@ -87,26 +144,29 @@ if [[ $CREPO == "fnndsc" ]] ; then
         echo $sep
     done
 fi
-echo " $sepb"
+windowBottom
 
 title "Will use containers with following version info:"
 for CONTAINER in ${A_CONTAINER[@]} ; do
     if [[ $CONTAINER != "chris_dev_backend" ]] ; then
         CMD="docker run ${CREPO}/$CONTAINER --version"
-        printf "%30s\t\t" "${CREPO}/$CONTAINER"
-        echo $CMD | sh | grep Version
+        printf "${White}%30s\t\t" "${CREPO}/$CONTAINER"
+        Ver=$(echo $CMD | sh | grep Version)
+        echo -e "$Green$Ver"
     fi
 done
 # And for the version of pfurl *inside* pfcon!
 CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon --version"
-printf "%30s\t\t" "pfurl inside ${CREPO}/pfcon"
-echo $CMD | sh | grep Version
+printf "${White}%30s\t\t" "pfurl inside ${CREPO}/pfcon"
+Ver=$(echo $CMD | sh | grep Version)
+echo -e "$Green$Ver"
 CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
-printf "%30s\t\t" "pfurl inside ${CREPO}/CUBE"
-echo $CMD | sh | grep Version
-echo " $sepb"
+printf "${White}%30s\t\t" "pfurl inside ${CREPO}/CUBE"
+Ver=$(echo $CMD | sh | grep Version)
+echo -e "$Green$Ver"
+windowBottom
 
-title "Shutting down any running CUBE and CUBE related containers..."
+title "Shutting down any running CUBE and CUBE related containers... "
 docker-compose stop
 docker-compose rm -vf
 for CONTAINER in ${A_CONTAINER[@]} ; do
@@ -115,15 +175,15 @@ for CONTAINER in ${A_CONTAINER[@]} ; do
         grep $CONTAINER                                                 |\
         awk '{printf("docker stop %s && docker rm -vf %s\n", $1, $1);}' |\
         sh >/dev/null
-    printf "%20s\n" "down"
+    printf "${Green}%20s${NC}\n" "done"
 done
-echo " $sepb"
+windowBottom
 
 cd $HERE
-title "Changing permissions to 755 for $(pwd)..."
+title "Changing permissions to 755 on" "$(pwd)"
 echo "chmod -R 755 $(pwd)"
 chmod -R 755 $(pwd)
-echo " $sepb"
+windowBottom
 
 title "Creating tmp dirs for volume mounting into containers..."
 echo "${STEP}.1: Remove tree root 'FS'.."
@@ -136,7 +196,7 @@ chmod 777 FS/remote
 # chmod 777 FS/local
 chmod 777 FS
 cd FS/remote
-echo "${STEP}.3 For pman override to swarm containers, exporting STOREBASE=$(pwd)... "
+echo -e "${STEP}.3 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
 export STOREBASE=$(pwd)
 # chmod 777 FS/users
 # echo "1.3: Create tree structure to emulate volume mapping"
@@ -148,24 +208,24 @@ export STOREBASE=$(pwd)
 # sudo ln -s ${HERE}/FS/local   pfconFS
 # sudo ln -s ${HERE}/FS/remote  storeBase
 cd $HERE
-echo " $sepb"
+windowBottom
 
-title "Starting CUBE containerized development environment from ./docker-compose.yml..."
+title "Starting CUBE containerized development environment using" "./docker-compose.yml"
 # export HOST_IP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
 # echo "Exporting HOST_IP=$HOST_IP as environment var..."
 echo "docker-compose up -d"
 docker-compose up -d
-echo " $sepb"
+windowBottom
 
 title "Waiting until mysql server is ready to accept connections..."
 docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
 # Give all permissions to chris user in the DB. This is required for the Django tests:
 docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
-echo " $sepb"
+windowBottom
 
 title "Making migrations..."
 docker-compose exec chris_dev python manage.py migrate
-echo " $sepb"
+windowBottom
 
 title "Registering plugins..."
 # Declare an array variable for the list of plugin dock images
@@ -187,27 +247,27 @@ docker-compose exec chris_dev /bin/bash -c \
       python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
       ((i++))
   done'
-echo " $sepb"
+windowBottom
 
 title "Running Django tests..."
 docker-compose exec chris_dev python manage.py test
-echo " $sepb"
+windowBottom
 
 title "Restarting Django development server..."
 docker-compose restart chris_dev
-echo " $sepb"
+windowBottom
 
-title "ChRIS API users creation"
+title "ChRIS API user creation"
 echo 'Now create two users. Please name one of the users "chris"'
 echo ""
 docker-compose exec chris_dev python manage.py createsuperuser
 docker-compose exec chris_dev python manage.py createsuperuser
-echo " $sepb"
+windowBottom
 
 title "Restarting Django development server in interactive mode..."
 docker-compose stop chris_dev
 docker-compose rm -f chris_dev
 docker-compose run --service-ports chris_dev
 echo ""
-echo " $sepb"
+windowBottom
 
