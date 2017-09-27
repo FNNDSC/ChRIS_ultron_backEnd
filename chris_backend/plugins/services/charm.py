@@ -671,6 +671,7 @@ class Charm():
             }
         }
         str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
         self.qprint('d_response = %s' % d_response)
         try:
