@@ -43,6 +43,7 @@ UNMARK(){ echo -en "\033[27m";}                        # the same as 'tput rmso'
  WRITE(){ echo -en "\033(B";}                          # return to normal mode from 'garbage' on the screen
   BLUE(){ echo -en "\033c\033[0;1m\033[37;44m\033[J";} # reset screen, set background to blue and font to white
 
+# Foreground
 RED='\033[0;31m'
 NC='\033[m' # No Color
 Black='\033[0;30m'     
@@ -61,6 +62,26 @@ Cyan='\033[0;36m'
 LightCyan='\033[1;36m'
 LightGray='\033[0;37m'     
 White='\033[1;37m'
+
+# Background
+NC='\033[m' # No Color
+BlackBG='\033[0;40m'     
+DarkGrayBG='\033[1;40m'
+RedBG='\033[0;41m'     
+LightRedBG='\033[1;41m'
+GreenBG='\033[0;42m'     
+LightGreenBG='\033[1;42m'
+BrownBG='\033[0;43m'     
+YellowBG='\033[1;43m'
+BlueBG='\033[0;44m'     
+LightBlueBG='\033[1;44m'
+PurpleBG='\033[0;45m'     
+LightPurpleBG='\033[1;45m'
+CyanBG='\033[0;46m'     
+LightCyanBG='\033[1;46m'
+LightGrayBG='\033[0;47m'     
+WhiteBG='\033[1;47m'
+
 
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
@@ -93,15 +114,18 @@ function title {
     fi
     DRAW
     printf "x\n"
-    printf "${Yellow}mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
+    printf "${Yellow}tqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqu\n"
     WRITE
     printf "${NC}"
 }
 
 function windowBottom {
+    # printf "a b c d f e f g h i j k l m n o p q r s t u v w x y z]\n"
     DRAW
+    # printf "a b c d f e f g h i j k l m n o p q r s t u v w x y z]\n"
     printf "${Yellow}"
-    printf "mwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvqk\n"
+    printf "mwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv${Brown}qk\n"
+    # printf "mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
     printf "${Brown}"
     printf " mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
     WRITE
