@@ -204,7 +204,7 @@ done
 windowBottom
 
 cd $HERE
-title "Changing permissions to 755 on" "$(pwd)"
+title "Changing permissions to 755 on" " $(pwd)"
 echo "chmod -R 755 $(pwd)"
 chmod -R 755 $(pwd)
 windowBottom
@@ -234,7 +234,7 @@ export STOREBASE=$(pwd)
 cd $HERE
 windowBottom
 
-title "Starting CUBE containerized development environment using" "./docker-compose.yml"
+title "Starting CUBE containerized development environment using " " ./docker-compose.yml"
 # export HOST_IP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
 # echo "Exporting HOST_IP=$HOST_IP as environment var..."
 echo "docker-compose up -d"
