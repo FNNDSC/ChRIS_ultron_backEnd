@@ -83,17 +83,43 @@ LightGrayBG='\033[0;47m'
 WhiteBG='\033[1;47m'
 
 
+declare -i STEP=0
+declare -i b_restart=0
+RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
+CREPO=fnndsc
+if (( $# == 1 )) ; then
+    CREPO=$1
+fi
+export CREPO=$CREPO
 
-declare -i STEP=0
+declare -a A_CONTAINER=(
+    "chris_dev_backend"
+    "pfcon"
+    "pfurl"
+    "pfioh"
+    "pman"
+)
 
 function title {
+    declare -i b_date=0
+    local OPTIND
+    while getopts "d:" opt; do
+        case $opt in 
+            d) b_date=$OPTARG ;;
+        esac
+    done
+    shift $(($OPTIND - 1))
+
     STEP=$(expr $STEP + 1 )
     MSG="$1"
     MSG2="$2"
     TITLE=$(echo " $STEP.0: $MSG ")
     LEN=$(echo "$TITLE" | awk -F\| {'printf("%s", length($1));'})
+    if ! (( LEN % 2 )) ; then
+        TITLE="$TITLE "
+    fi
     MSG=$(echo -e "$TITLE" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
     if (( ${#MSG2} )) ; then
         TITLE2=$(echo " $MSG2 ")
@@ -101,8 +127,18 @@ function title {
         MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
     fi
     printf "\n"
+    DATE=$(date)
     DRAW
-    printf "${Yellow}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+    if (( b_date )) ; then
+        printf "${LightBlue}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\nx"
+        WRITE
+        printf "%-30s" "$DATE"
+        DRAW 
+        printf "x\n"
+        printf "${Yellow}tqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+    else
+        printf "${Yellow}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+    fi
     printf "x"
     WRITE
     printf "${LightPurple}$MSG${Yellow}"
@@ -132,31 +168,15 @@ function windowBottom {
     printf "${NC}"
 }
 
-function title2 {
+while getopts "d:" opt; do
+    case $opt in 
+        d) b_restart=1
+           RESTART=$OPTARG  ;;
+    esac
+done
+shift $(($OPTIND - 1))
 
-    STEP=$(expr $STEP + 1 )
-    MSG="$1"
-    printf "\n"
-    printf "$sepu\n$sepv \n"
-    printf " $STEP $MSG \n"
-    printf "$sepb \n"
-}
-
-CREPO=fnndsc
-if (( $# == 1 )) ; then
-    CREPO=$1
-fi
-export CREPO=$CREPO
-
-declare -a A_CONTAINER=(
-    "chris_dev_backend"
-    "pfcon"
-    "pfurl"
-    "pfioh"
-    "pman"
-)
-
-title "Using containers from <$CREPO>."
+title -d 1 "Using <$CREPO> containers..."
 if [[ $CREPO == "fnndsc" ]] ; then
     echo "Pulling latest version of all containers..."
     for CONTAINER in ${A_CONTAINER[@]} ; do
@@ -170,128 +190,133 @@ if [[ $CREPO == "fnndsc" ]] ; then
 fi
 windowBottom
 
-title "Will use containers with following version info:"
-for CONTAINER in ${A_CONTAINER[@]} ; do
-    if [[ $CONTAINER != "chris_dev_backend" ]] ; then
-        CMD="docker run ${CREPO}/$CONTAINER --version"
-        printf "${White}%30s\t\t" "${CREPO}/$CONTAINER"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -e "$Green$Ver"
-    fi
-done
-# And for the version of pfurl *inside* pfcon!
-CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon --version"
-printf "${White}%30s\t\t" "pfurl inside ${CREPO}/pfcon"
-Ver=$(echo $CMD | sh | grep Version)
-echo -e "$Green$Ver"
-CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
-printf "${White}%30s\t\t" "pfurl inside ${CREPO}/CUBE"
-Ver=$(echo $CMD | sh | grep Version)
-echo -e "$Green$Ver"
-windowBottom
+if (( b_restart )) ; then
+    docker-compose stop ${RESTART}_service && docker compose rm -f ${RESTART}_service
+    dokcer-compose run --service-ports ${RESTART}_service
+else
+    title -d 1 "Will use containers with following version info:"
+    for CONTAINER in ${A_CONTAINER[@]} ; do
+        if [[ $CONTAINER != "chris_dev_backend" ]] ; then
+            CMD="docker run ${CREPO}/$CONTAINER --version"
+            printf "${White}%30s\t\t" "${CREPO}/$CONTAINER"
+            Ver=$(echo $CMD | sh | grep Version)
+            echo -e "$Green$Ver"
+        fi
+    done
+    # And for the version of pfurl *inside* pfcon!
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon --version"
+    printf "${White}%30s\t\t" "pfurl inside ${CREPO}/pfcon"
+    Ver=$(echo $CMD | sh | grep Version)
+    echo -e "$Green$Ver"
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
+    printf "${White}%30s\t\t" "pfurl inside ${CREPO}/CUBE"
+    Ver=$(echo $CMD | sh | grep Version)
+    echo -e "$Green$Ver"
+    windowBottom
 
-title "Shutting down any running CUBE and CUBE related containers... "
-docker-compose stop
-docker-compose rm -vf
-for CONTAINER in ${A_CONTAINER[@]} ; do
-    printf "%30s" "$CONTAINER"
-    docker ps -a                                                        |\
-        grep $CONTAINER                                                 |\
-        awk '{printf("docker stop %s && docker rm -vf %s\n", $1, $1);}' |\
-        sh >/dev/null
-    printf "${Green}%20s${NC}\n" "done"
-done
-windowBottom
+    title -d 1 "Shutting down any running CUBE and CUBE related containers... "
+    docker-compose stop
+    docker-compose rm -vf
+    for CONTAINER in ${A_CONTAINER[@]} ; do
+        printf "%30s" "$CONTAINER"
+        docker ps -a                                                        |\
+            grep $CONTAINER                                                 |\
+            awk '{printf("docker stop %s && docker rm -vf %s\n", $1, $1);}' |\
+            sh >/dev/null
+        printf "${Green}%20s${NC}\n" "done"
+    done
+    windowBottom
 
-cd $HERE
-title "Changing permissions to 755 on" " $(pwd)"
-echo "chmod -R 755 $(pwd)"
-chmod -R 755 $(pwd)
-windowBottom
+    cd $HERE
+    title -d 1 "Changing permissions to 755 on" " $(pwd)"
+    echo "chmod -R 755 $(pwd)"
+    chmod -R 755 $(pwd)
+    windowBottom
 
-title "Creating tmp dirs for volume mounting into containers..."
-echo "${STEP}.1: Remove tree root 'FS'.."
-rm -fr ./FS 2>/dev/null
-echo "${STEP}.2: Create tree structure for remote services in host filesystem..."
-# mkdir -p FS/local
-mkdir -p FS/remote
-chmod 777 FS/remote
-# mkdir -p FS/users
-# chmod 777 FS/local
-chmod 777 FS
-cd FS/remote
-echo -e "${STEP}.3 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
-export STOREBASE=$(pwd)
-# chmod 777 FS/users
-# echo "1.3: Create tree structure to emulate volume mapping"
-# echo "1.3: This allows for easy switching/running between"
-# echo "1.3: containerized and non-containerized environments."
-# sudo rm -fr /hostFS 2>/dev/null
-# sudo mkdir -p /hostFS
-# cd /hostFS
-# sudo ln -s ${HERE}/FS/local   pfconFS
-# sudo ln -s ${HERE}/FS/remote  storeBase
-cd $HERE
-windowBottom
+    title -d 1 "Creating tmp dirs for volume mounting into containers..."
+    echo "${STEP}.1: Remove tree root 'FS'.."
+    rm -fr ./FS 
+    echo "${STEP}.2: Create tree structure for remote services in host filesystem..."
+    mkdir -p FS/local
+    chmod 777 FS/local
+    mkdir -p FS/remote
+    chmod 777 FS/remote
+    # mkdir -p FS/users
+    # chmod 777 FS/users
+    chmod 777 FS
+    cd FS/remote
+    echo -e "${STEP}.3 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
+    export STOREBASE=$(pwd)
+    # chmod 777 FS/users
+    # echo "1.3: Create tree structure to emulate volume mapping"
+    # echo "1.3: This allows for easy switching/running between"
+    # echo "1.3: containerized and non-containerized environments."
+    # sudo rm -fr /hostFS 2>/dev/null
+    # sudo mkdir -p /hostFS
+    # cd /hostFS
+    # sudo ln -s ${HERE}/FS/local   pfconFS
+    # sudo ln -s ${HERE}/FS/remote  storeBase
+    cd $HERE
+    windowBottom
 
-title "Starting CUBE containerized development environment using " " ./docker-compose.yml"
-# export HOST_IP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
-# echo "Exporting HOST_IP=$HOST_IP as environment var..."
-echo "docker-compose up -d"
-docker-compose up -d
-windowBottom
+    title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
+    # export HOST_IP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
+    # echo "Exporting HOST_IP=$HOST_IP as environment var..."
+    echo "docker-compose up -d"
+    docker-compose up -d
+    windowBottom
 
-title "Waiting until mysql server is ready to accept connections..."
-docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
-# Give all permissions to chris user in the DB. This is required for the Django tests:
-docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
-windowBottom
+    title -d 1 "Waiting until mysql server is ready to accept connections..."
+    docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
+    # Give all permissions to chris user in the DB. This is required for the Django tests:
+    docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
+    windowBottom
 
-title "Making migrations..."
-docker-compose exec chris_dev python manage.py migrate
-windowBottom
+    title -d 1 "Making migrations..."
+    docker-compose exec chris_dev python manage.py migrate
+    windowBottom
 
-title "Registering plugins..."
-# Declare an array variable for the list of plugin dock images
-# Add a new plugin image name to the list if you want it to be automatically registered
-docker-compose exec chris_dev /bin/bash -c \
-  'declare -a plugins=("fnndsc/pl-simplefsapp"
-                       "fnndsc/pl-simpledsapp"
-                       "fnndsc/pl-pacsquery"
-                       "fnndsc/pl-pacsretrieve"
-                       "fnndsc/pl-med2img"
-                       "fnndsc/pl-s3retrieve"
-                       "fnndsc/pl-s3push"
-                       "fnndsc/pl-dircopy"
-                      )
-  declare -i i=1
-  declare -i STEP=9
-  for plugin in "${plugins[@]}"; do 
-      echo "${STEP}.$i: Registering $plugin..."
-      python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
-      ((i++))
-  done'
-windowBottom
+    title -d 1 "Registering plugins..."
+    # Declare an array variable for the list of plugin dock images
+    # Add a new plugin image name to the list if you want it to be automatically registered
+    docker-compose exec chris_dev /bin/bash -c \
+    'declare -a plugins=("fnndsc/pl-simplefsapp"
+                        "fnndsc/pl-simpledsapp"
+                        "fnndsc/pl-pacsquery"
+                        "fnndsc/pl-pacsretrieve"
+                        "fnndsc/pl-med2img"
+                        "fnndsc/pl-s3retrieve"
+                        "fnndsc/pl-s3push"
+                        "fnndsc/pl-dircopy"
+                        )
+    declare -i i=1
+    declare -i STEP=9
+    for plugin in "${plugins[@]}"; do 
+        echo "${STEP}.$i: Registering $plugin..."
+        python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
+        ((i++))
+    done'
+    windowBottom
 
-title "Running Django tests..."
-docker-compose exec chris_dev python manage.py test
-windowBottom
+    title -d 1 "Running Django tests..."
+    docker-compose exec chris_dev python manage.py test
+    windowBottom
 
-title "Restarting Django development server..."
-docker-compose restart chris_dev
-windowBottom
+    title -d 1 "Restarting Django development server..."
+    docker-compose restart chris_dev
+    windowBottom
 
-title "ChRIS API user creation"
-echo 'Now create two users. Please name one of the users "chris"'
-echo ""
-docker-compose exec chris_dev python manage.py createsuperuser
-docker-compose exec chris_dev python manage.py createsuperuser
-windowBottom
+    title -d 1 "ChRIS API user creation"
+    echo 'Now create two users. Please name one of the users "chris"'
+    echo ""
+    docker-compose exec chris_dev python manage.py createsuperuser
+    docker-compose exec chris_dev python manage.py createsuperuser
+    windowBottom
 
-title "Restarting Django development server in interactive mode..."
-docker-compose stop chris_dev
-docker-compose rm -f chris_dev
-docker-compose run --service-ports chris_dev
-echo ""
-windowBottom
-
+    title -d 1 "Restarting Django development server in interactive mode..."
+    docker-compose stop chris_dev
+    docker-compose rm -f chris_dev
+    docker-compose run --service-ports chris_dev
+    echo ""
+    windowBottom
+fi
