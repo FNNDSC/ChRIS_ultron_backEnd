@@ -192,7 +192,7 @@ windowBottom
 
 if (( b_restart )) ; then
     docker-compose stop ${RESTART}_service && docker compose rm -f ${RESTART}_service
-    dokcer-compose run --service-ports ${RESTART}_service
+    docker-compose run --service-ports ${RESTART}_service
 else
     title -d 1 "Will use containers with following version info:"
     for CONTAINER in ${A_CONTAINER[@]} ; do
