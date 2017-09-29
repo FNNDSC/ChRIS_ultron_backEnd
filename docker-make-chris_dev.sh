@@ -168,9 +168,9 @@ function windowBottom {
     printf "${NC}"
 }
 
-while getopts "d:" opt; do
+while getopts "r:" opt; do
     case $opt in 
-        d) b_restart=1
+        r) b_restart=1
            RESTART=$OPTARG  ;;
     esac
 done
