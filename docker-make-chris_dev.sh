@@ -221,8 +221,6 @@ else
     windowBottom
 
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
-    docker swarm leave --force
-    docker swarm init
     docker-compose stop
     docker-compose rm -vf
     for CONTAINER in ${A_CONTAINER[@]} ; do
