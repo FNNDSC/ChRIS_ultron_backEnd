@@ -9,3 +9,6 @@ echo " "
 
 echo "2: Removing all containers..."
 docker-compose rm -vf 
+
+echo "3: Stopping the swarm..."
+docker swarm leave --force
