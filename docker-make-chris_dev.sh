@@ -100,6 +100,7 @@ declare -a A_CONTAINER=(
     "pfurl"
     "pfioh"
     "pman"
+    "swarm"
 )
 
 function title {
@@ -214,7 +215,14 @@ else
     echo -e "$Green$Ver"
     windowBottom
 
+    title -d 1 "Stopping and restarting the docker swarm... "
+    docker swarm leave --force
+    docker swarm init
+    windowBottom
+
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
+    docker swarm leave --force
+    docker swarm init
     docker-compose stop
     docker-compose rm -vf
     for CONTAINER in ${A_CONTAINER[@]} ; do
@@ -290,7 +298,7 @@ else
                         "fnndsc/pl-dircopy"
                         )
     declare -i i=1
-    declare -i STEP=9
+    declare -i STEP=10
     for plugin in "${plugins[@]}"; do 
         echo "${STEP}.$i: Registering $plugin..."
         python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
