@@ -60,11 +60,12 @@ chris_dev_db_data:
     role: "Backend development database data"
 
 dicom_listener:
-  image:  fnndsc/dck-dicom-listener
+  image:  fnndsc/pfdcm
   volumes:
     - /incoming
+    - ./FS/remote:/hostFS/storeBase
   ports:
-    - "10403:10402"
+    - "10402:10402"
   labels:
     name: "dicom_listener"
     role: "Dicom listener"
