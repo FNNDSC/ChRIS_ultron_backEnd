@@ -101,6 +101,7 @@ declare -a A_CONTAINER=(
     "pfioh"
     "pman"
     "swarm"
+    "pfdcm"
 )
 
 function title {
