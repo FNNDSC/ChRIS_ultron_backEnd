@@ -89,10 +89,6 @@ RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
 CREPO=fnndsc
-if (( $# == 1 )) ; then
-    CREPO=$1
-fi
-export CREPO=$CREPO
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
@@ -177,6 +173,10 @@ while getopts "r:" opt; do
     esac
 done
 shift $(($OPTIND - 1))
+if (( $# == 1 )) ; then
+    CREPO=$1
+fi
+export CREPO=$CREPO
 
 title -d 1 "Using <$CREPO> containers..."
 if [[ $CREPO == "fnndsc" ]] ; then
