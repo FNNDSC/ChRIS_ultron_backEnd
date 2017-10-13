@@ -321,7 +321,7 @@ class Charm():
                                      eval(str_setting)['port'])
         if str_service == 'pman': b_httpResponseBodyParse = False
 
-        str_debugFile       = '%s/tmp/debug-purl.log' % os.environ['HOME']
+        str_debugFile       = '%s/tmp/debug-pfurl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
             str_debugFile   = self.str_debugFile
 
@@ -589,10 +589,10 @@ class Charm():
 
         if isinstance(d_response, dict):
             self.qprint("looks like we got a successful response from %s" % str_service)
-            self.qprint('response from purl(): %s ' % json.dumps(d_response, indent=2))
+            self.qprint('response from pfurl(): %s ' % json.dumps(d_response, indent=2))
         else:
             self.qprint("looks like we got an UNSUCCESSFUL response from %s" % str_service)
-            self.qprint('response from purl(): %s' % d_response)
+            self.qprint('response from pfurl(): %s' % d_response)
             if "Connection refused" in d_response:
                 self.qprint('fatal error in talking to %s' % str_service, comms = 'error')
 
