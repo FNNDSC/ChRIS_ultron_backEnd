@@ -270,7 +270,6 @@ class PluginInstanceDetailViewTests(ViewTests):
         pl_manager = PluginManager()
         pl_manager.check_apps_exec_server(clearDB = True)
 
-        # pudb.set_trace()
         chris2service   = charm.Charm(
             d_args      = {'dir': './'},
             plugin_inst = pl_inst,
