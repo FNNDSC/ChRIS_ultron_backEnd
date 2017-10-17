@@ -12,9 +12,12 @@ from feeds.models import Feed, FeedFile
 
 # API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
-                ("boolean", "Boolean values"), ("integer", "Integer values")]
+                ("boolean", "Boolean values"), ("integer", "Integer values"),
+                ("path", "Path values")]
 
-TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool'}
+# table of equivalence between front-end types and back-end types
+TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
+         'path': 'path'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
