@@ -1,6 +1,6 @@
-==========================
-String Parameter instance
-==========================
+=======================
+Path Parameter instance
+=======================
 
 .. _Collection+JSON: http://amundsen.com/media-types/collection/
 
@@ -10,23 +10,23 @@ String Parameter instance
 **Read-only**
 
 
-This resource type refers to a string plugin parameter's instance.
+This resource type refers to a path plugin parameter's instance.
 
 In other Collection+JSON_ resource representations this resource type is linked by any
 `link relation`_ with attribute:
 
-``"rel": "string_inst"``
+``"rel": "path_inst"``
 
 
-.. http:get:: /api/v1/plugins/string-parameter/(int:parameterinstance_id)/
+.. http:get:: /api/v1/plugins/path-parameter/(int:parameterinstance_id)/
 
-   :synopsis: Gets a string plugin parameter's instance.
+   :synopsis: Gets a path plugin parameter's instance.
 
    **Example request**:
 
    .. sourcecode:: http
 
-      GET /api/v1/plugins/string-parameter/56/ HTTP/1.1
+      GET /api/v1/plugins/path-parameter/56/ HTTP/1.1
       Host: localhost:8000
       Accept: application/vnd.collection+json
 
@@ -41,7 +41,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
       {
           "collection": {
-              "href": "https://localhost:8000/api/v1/plugins/string-parameter/56/",
+              "href": "https://localhost:8000/api/v1/plugins/path-parameter/56/",
               "items": [
                   {
                       "data": [
@@ -54,7 +54,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
                               "value": "~/"
                           }
                       ],
-                      "href": "https://localhost:8000/api/v1/plugins/string-parameter/56/",
+                      "href": "https://localhost:8000/api/v1/plugins/path-parameter/56/",
                       "links": [
                           {
                               "href": "https://localhost:8000/api/v1/plugins/instances/60/",
@@ -87,7 +87,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
    Properties_ (API semantic descriptors):
 
     - **param_name** (`string`) |--| name of the corresponding `plugin parameter`_
-    - **value** (`string`) |--| parameter instance's value
+    - **value** (`string`) |--| a string representing a relative path
 
    `Link Relations`_:
 

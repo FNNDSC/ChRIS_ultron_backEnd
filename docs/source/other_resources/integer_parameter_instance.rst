@@ -20,7 +20,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
 .. http:get:: /api/v1/plugins/int-parameter/(int:parameterinstance_id)/
 
-   :synopsis: Gets an intger plugin parameter's instance.
+   :synopsis: Gets an integer plugin parameter's instance.
 
    **Example request**:
 
