@@ -223,4 +223,15 @@ class BoolParameter(models.Model):
         return str(self.value)
 
 
+class PathParameter(models.Model):
+    value = models.CharField(max_length=200, blank=True)
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='path_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='path_inst')
+
+    def __str__(self):
+        return self.value
+
+
 
