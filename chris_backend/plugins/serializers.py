@@ -46,12 +46,15 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     bool_param = serializers.HyperlinkedRelatedField(many=True,
                                                     view_name='boolparameter-detail',
                                                     read_only=True)
+    path_param = serializers.HyperlinkedRelatedField(many=True,
+                                                       view_name='pathparameter-detail',
+                                                       read_only=True)
     
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
                   'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
-                  'float_param', 'bool_param')
+                  'float_param', 'bool_param', 'path_param')
 
     def validate_previous(self, previous_id, plugin):
         """
