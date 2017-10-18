@@ -6,7 +6,8 @@ from collectionjson import services
 
 from .models import Plugin, PluginFilter, PluginParameter 
 from .models import PluginInstance, PluginInstanceFilter
-from .models import StringParameter, FloatParameter, IntParameter, BoolParameter
+from .models import StringParameter, FloatParameter, IntParameter
+from .models import BoolParameter, PathParameter
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
@@ -230,7 +231,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     A float parameter view.
     """
     serializer_class = PARAMETER_SERIALIZERS['float']
-    queryset = IntParameter.objects.all()
+    queryset = FloatParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
     
 
@@ -240,4 +241,13 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+
+
+class PathParameterDetail(generics.RetrieveAPIView):
+    """
+    A path parameter view.
+    """
+    serializer_class = PARAMETER_SERIALIZERS['path']
+    queryset = PathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
