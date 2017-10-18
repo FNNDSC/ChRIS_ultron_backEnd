@@ -82,6 +82,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/bool-parameter/(?P<pk>[0-9]+)/$',
         pl_views.BoolParameterDetail.as_view(), name='boolparameter-detail'),
 
+    url(r'^v1/plugins/path-parameter/(?P<pk>[0-9]+)/$',
+        pl_views.PathParameterDetail.as_view(), name='pathparameter-detail'),
+
     url(r'^v1/users/$',
         views.UserList.as_view(), name='user-list'),
 
