@@ -92,3 +92,4 @@ Following are the actuall lists of resource types:
    other_resources/integer_parameter_instance
    other_resources/float_parameter_instance
    other_resources/boolean_parameter_instance
+   other_resources/path_parameter_instance

@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Boolean Parameter instance &#8212; chris ultron backend 0.0.1 documentation</title>
+    <title>Path Parameter instance &#8212; chris ultron backend 0.0.1 documentation</title>
     
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -28,8 +28,7 @@
     <link rel="search" title="Search" href="../search.html" />
     <link rel="top" title="chris ultron backend 0.0.1 documentation" href="../index.html" />
     <link rel="up" title="REST API Reference" href="../api.html" />
-    <link rel="next" title="Path Parameter instance" href="path_parameter_instance.html" />
-    <link rel="prev" title="Float Parameter instance" href="float_parameter_instance.html" />
+    <link rel="prev" title="Boolean Parameter instance" href="boolean_parameter_instance.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -45,16 +44,16 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="boolean-parameter-instance">
-<h1>Boolean Parameter instance<a class="headerlink" href="#boolean-parameter-instance" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="path-parameter-instance">
+<h1>Path Parameter instance<a class="headerlink" href="#path-parameter-instance" title="Permalink to this headline">¶</a></h1>
 <p><strong>Read-only</strong></p>
-<p>This resource type refers to a boolean plugin parameter&#8217;s instance.</p>
+<p>This resource type refers to a path plugin parameter&#8217;s instance.</p>
 <p>In other <a class="reference external" href="http://amundsen.com/media-types/collection/">Collection+JSON</a> resource representations this resource type is linked by any
 <a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">link relation</a> with attribute:</p>
-<p><code class="docutils literal"><span class="pre">&quot;rel&quot;:</span> <span class="pre">&quot;bool_inst&quot;</span></code></p>
+<p><code class="docutils literal"><span class="pre">&quot;rel&quot;:</span> <span class="pre">&quot;path_inst&quot;</span></code></p>
 <dl class="get">
-<dt id="get--api-v1-plugins-bool-parameter-(int-parameterinstance_id)-">
-<code class="descname">GET </code><code class="descname">/api/v1/plugins/bool-parameter/</code><span class="sig-paren">(</span><em class="property">int: </em><em>parameterinstance_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-plugins-bool-parameter-(int-parameterinstance_id)-" title="Permalink to this definition">¶</a></dt>
+<dt id="get--api-v1-plugins-path-parameter-(int-parameterinstance_id)-">
+<code class="descname">GET </code><code class="descname">/api/v1/plugins/path-parameter/</code><span class="sig-paren">(</span><em class="property">int: </em><em>parameterinstance_id</em><span class="sig-paren">)</span><code class="descname">/</code><a class="headerlink" href="#get--api-v1-plugins-path-parameter-(int-parameterinstance_id)-" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -64,7 +63,7 @@
 </tbody>
 </table>
 <p><strong>Example request</strong>:</p>
-<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/plugins/bool-parameter/30/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+<div class="highlight-http"><div class="highlight"><pre><span></span><span class="nf">GET</span> <span class="nn">/api/v1/plugins/path-parameter/56/</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
 <span class="na">Host</span><span class="o">:</span> <span class="l">localhost:8000</span>
 <span class="na">Accept</span><span class="o">:</span> <span class="l">application/vnd.collection+json</span>
 </pre></div>
@@ -76,27 +75,27 @@
 
 <span class="p">{</span>
     <span class="nt">&quot;collection&quot;</span><span class="p">:</span> <span class="p">{</span>
-        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/bool-parameter/30/&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/path-parameter/56/&quot;</span><span class="p">,</span>
         <span class="nt">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span>
             <span class="p">{</span>
                 <span class="nt">&quot;data&quot;</span><span class="p">:</span> <span class="p">[</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;param_name&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;local&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;dir&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
                         <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span>
-                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;True&quot;</span>
+                        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;~/&quot;</span>
                     <span class="p">}</span>
                 <span class="p">],</span>
-                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/bool-parameter/30/&quot;</span><span class="p">,</span>
+                <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/path-parameter/56/&quot;</span><span class="p">,</span>
                 <span class="nt">&quot;links&quot;</span><span class="p">:</span> <span class="p">[</span>
                     <span class="p">{</span>
-                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/40/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/instances/60/&quot;</span><span class="p">,</span>
                         <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_inst&quot;</span>
                     <span class="p">},</span>
                     <span class="p">{</span>
-                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/parameters/8/&quot;</span><span class="p">,</span>
+                        <span class="nt">&quot;href&quot;</span><span class="p">:</span> <span class="s2">&quot;https://localhost:8000/api/v1/plugins/parameters/12/&quot;</span><span class="p">,</span>
                         <span class="nt">&quot;rel&quot;</span><span class="p">:</span> <span class="s2">&quot;plugin_param&quot;</span>
                     <span class="p">}</span>
                 <span class="p">]</span>
@@ -137,7 +136,7 @@
 <blockquote>
 <div><ul class="simple">
 <li><strong>param_name</strong> (<cite>string</cite>) – name of the corresponding <a class="reference external" href="../items/plugin_parameter.html">plugin parameter</a></li>
-<li><strong>value</strong> (<cite>boolean</cite>) – parameter instance&#8217;s value</li>
+<li><strong>value</strong> (<cite>string</cite>) – a string representing a relative path</li>
 </ul>
 </div></blockquote>
 <p><a class="reference external" href="http://amundsen.com/media-types/collection/format/#link-relations">Link Relations</a>:</p>
@@ -161,8 +160,7 @@
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="../api.html">REST API Reference</a><ul>
-      <li>Previous: <a href="float_parameter_instance.html" title="previous chapter">Float Parameter instance</a></li>
-      <li>Next: <a href="path_parameter_instance.html" title="next chapter">Path Parameter instance</a></li>
+      <li>Previous: <a href="boolean_parameter_instance.html" title="previous chapter">Boolean Parameter instance</a></li>
   </ul></li>
   </ul></li>
 </ul>
@@ -170,7 +168,7 @@
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
-      <li><a href="../_sources/other_resources/boolean_parameter_instance.txt"
+      <li><a href="../_sources/other_resources/path_parameter_instance.txt"
             rel="nofollow">Show Source</a></li>
     </ul>
    </div>
@@ -196,7 +194,7 @@
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
       
       |
-      <a href="../_sources/other_resources/boolean_parameter_instance.txt"
+      <a href="../_sources/other_resources/path_parameter_instance.txt"
           rel="nofollow">Page source</a>
     </div>
 
