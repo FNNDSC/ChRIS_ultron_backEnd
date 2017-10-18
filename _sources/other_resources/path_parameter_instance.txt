@@ -20,7 +20,7 @@ In other Collection+JSON_ resource representations this resource type is linked 
 
 .. http:get:: /api/v1/plugins/path-parameter/(int:parameterinstance_id)/
 
-   :synopsis: Gets a boolean plugin parameter's instance.
+   :synopsis: Gets a path plugin parameter's instance.
 
    **Example request**:
 
