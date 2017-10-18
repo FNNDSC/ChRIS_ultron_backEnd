@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
-from .models import FloatParameter, IntParameter, BoolParameter
+from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
 
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
@@ -118,10 +118,22 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = BoolParameter
         fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+
+
+class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                 read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                 read_only=True)
+    class Meta:
+        model = PathParameter
+        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
         
 
 PARAMETER_SERIALIZERS={'string': StringParameterSerializer,
                        'integer': IntParameterSerializer,
                        'float': FloatParameterSerializer,
-                       'boolean': BoolParameterSerializer}
+                       'boolean': BoolParameterSerializer,
+                       'path': PathParameterSerializer }
 
