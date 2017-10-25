@@ -91,6 +91,15 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/users/(?P<pk>[0-9]+)/$',
         views.UserDetail.as_view(), name='user-detail'),
 
+    url(r'^v1/sandboxedfiles/$',
+        views.UserFileList.as_view(), name='userfile-list'),
+
+    url(r'^v1/sandboxedfiles/(?P<pk>[0-9]+)/$',
+        views.UserFileDetail.as_view(), name='userfile-detail'),
+
+    url(r'^v1/sandboxedfiles/(?P<pk>[0-9]+)/.*$',
+        views.UserFileResource.as_view(), name='userfile-resource'),
+
 ])
 
 # Login and logout views for Djangos' browsable API

@@ -9,9 +9,9 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import Note, Tag, Feed, FeedFilter, Comment, FeedFile
+from .models import Note, Tag, Feed, FeedFilter, Comment, FeedFile, UserFile
 from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
-from .serializers import NoteSerializer, TagSerializer, CommentSerializer
+from .serializers import NoteSerializer, TagSerializer, CommentSerializer, UserFileSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
 
@@ -145,7 +145,8 @@ class FeedList(generics.ListAPIView):
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'plugins': reverse('plugin-list', request=request),
-                 'tags': reverse('full-tag-list', request=request)}    
+                 'tags': reverse('full-tag-list', request=request),
+                 'sandboxedfiles': reverse('userfile-list', request=request)}
         return services.append_collection_links(response, links)
 
 
@@ -336,4 +337,70 @@ class UserList(generics.ListAPIView):
 class UserDetail(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+
+class UserFileList(generics.ListCreateAPIView):
+    """
+    A view for the collection of sandboxed user files.
+    """
+    queryset = UserFile.objects.all()
+    serializer_class = UserFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the files
+        owned by the currently authenticated user.
+        """
+        user = self.request.user
+        # if the user is chris then return all the files in the sandboxed filesystem
+        if (user.username == 'chris'):
+            return UserFile.objects.all()
+        return UserFile.objects.filter(owner=user)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate an owner with the sandboxed file before first
+        saving to the DB.
+        """
+        request_data = serializer.context['request'].data
+        path = '/'
+        if 'path' in request_data:
+            path = request_data['path']
+        user = self.request.user
+        path = serializer.validate_user_path(user, path)
+        serializer.save(owner=user, path=path)
+
+
+class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A feed's file view.
+    """
+    queryset = UserFile.objects.all()
+    serializer_class = UserFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(UserFileDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"fname": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class UserFileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource .
+    """
+    queryset = UserFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Overriden to be able to make a GET request to an actual file resource.
+        """
+        user_file = self.get_object()
+        return Response(user_file.fname)
 
