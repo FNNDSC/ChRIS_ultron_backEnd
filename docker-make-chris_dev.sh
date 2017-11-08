@@ -295,6 +295,8 @@ else
                         "fnndsc/pl-s3retrieve"
                         "fnndsc/pl-s3push"
                         "fnndsc/pl-dircopy"
+                        "local/pl-geretrieve"
+                        "local/pl-gepush"
                         )
     declare -i i=1
     declare -i STEP=10
