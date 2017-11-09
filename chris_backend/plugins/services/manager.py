@@ -48,10 +48,14 @@ class PluginManager(object):
         Get a plugin app representation given its docker image name.
         """
         client = docker.from_env()
-        # first pull the latest image
-        img = client.images.pull(dock_image_name)
-        # 'remove' option automatically remove container when finished
-        byte_str = client.containers.run(img, remove=True)
+        # first try to pull the latest image
+        try:
+            img = client.images.pull(dock_image_name)
+        except docker.errors.APIError:
+            # use local image ('remove' option automatically removes container when finished)
+            byte_str = client.containers.run(dock_image_name, remove=True)
+        else:
+            byte_str = client.containers.run(img, remove=True)
         app_repr = json.loads(byte_str.decode())
         plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
         if app_repr['type'] not in plugin_types:
