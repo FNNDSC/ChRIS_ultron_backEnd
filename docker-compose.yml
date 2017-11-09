@@ -65,7 +65,7 @@ dicom_listener:
     - /incoming
     - ./FS/remote:/hostFS/storeBase
   ports:
-    - "10402:10402"
+    - "10403:10402"
   labels:
     name: "dicom_listener"
     role: "Dicom listener"
