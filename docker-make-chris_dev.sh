@@ -92,12 +92,14 @@ CREPO=fnndsc
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
-    "pfcon"
-    "pfurl"
-    "pfioh"
-    "pman"
+    "pfcon:dev"
+    "pfurl:dev"
+    "pfioh:dev"
+    "pman:dev"
     "swarm"
-    "pfdcm"
+    "pfdcm:dev"
+    "pl-pacsquery"
+    "pl-pacsretrieve"
 )
 
 function title {
@@ -193,25 +195,36 @@ fi
 windowBottom
 
 if (( b_restart )) ; then
-    docker-compose stop ${RESTART}_service && docker compose rm -f ${RESTART}_service
+    docker-compose stop ${RESTART}_service && docker-compose rm -f ${RESTART}_service
     docker-compose run --service-ports ${RESTART}_service
 else
     title -d 1 "Will use containers with following version info:"
     for CONTAINER in ${A_CONTAINER[@]} ; do
-        if [[ $CONTAINER != "chris_dev_backend" ]] ; then
+        if [[   $CONTAINER != "chris_dev_backend"   && \
+                $CONTAINER != "pl-pacsretrieve"     && \
+                $CONTAINER != "pl-pacsquery"        && \
+                $CONTAINER != "swarm" ]] ; then
             CMD="docker run ${CREPO}/$CONTAINER --version"
-            printf "${White}%30s\t\t" "${CREPO}/$CONTAINER"
+            printf "${White}%40s\t\t" "${CREPO}/$CONTAINER"
             Ver=$(echo $CMD | sh | grep Version)
             echo -e "$Green$Ver"
         fi
     done
     # And for the version of pfurl *inside* pfcon!
     CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon --version"
-    printf "${White}%30s\t\t" "pfurl inside ${CREPO}/pfcon"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
     CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
-    printf "${White}%30s\t\t" "pfurl inside ${CREPO}/CUBE"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
+    Ver=$(echo $CMD | sh | grep Version)
+    echo -e "$Green$Ver"
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
+    Ver=$(echo $CMD | sh | grep Version)
+    echo -e "$Green$Ver"
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
     windowBottom
