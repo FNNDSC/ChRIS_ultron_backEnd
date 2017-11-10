@@ -12,6 +12,7 @@ import  pudb
 import  threading
 import  pfurl
 import  inspect
+import  pfmisc
 
 from django.conf import settings
 
@@ -111,6 +112,13 @@ class Charm():
         self.str_msg                = ""
         self.d_msg                  = {}
         self.str_protocol           = "http"
+
+        self.dp                         = pfmisc.debug(    
+                                            verbosity   = 0,
+                                            level       = -1,
+                                            within      = self.__name__ 
+                                            )
+
         self.pp                     = pprint.PrettyPrinter(indent=4)
         self.b_man                  = False
         self.str_man                = ''
@@ -185,13 +193,13 @@ class Charm():
             Debugging output will appear in *this* console.
                 """)
 
-        self.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
-        self.qprint('app_args       = %s'   % self.l_appArgs)
-        self.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
-        self.qprint('d_pluginRepr   = %s'   % self.pp.pformat(self.d_pluginRepr).strip())
-        self.qprint('app            = %s'   % self.app)
-        self.qprint('inputdir       = %s'   % self.str_inputdir)
-        self.qprint('outputdir      = %s'   % self.str_outputdir)
+        self.dp.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
+        self.dp.qprint('app_args       = %s'   % self.l_appArgs)
+        self.dp.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
+        self.dp.qprint('d_pluginRepr   = %s'   % self.pp.pformat(self.d_pluginRepr).strip())
+        self.dp.qprint('app            = %s'   % self.app)
+        self.dp.qprint('inputdir       = %s'   % self.str_inputdir)
+        self.dp.qprint('outputdir      = %s'   % self.str_outputdir)
 
     def app_manage(self, **kwargs):
         """
@@ -230,7 +238,7 @@ class Charm():
         """
 
         str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
-        self.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
+        self.dp.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
 
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
@@ -239,7 +247,7 @@ class Charm():
             str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('cmd = %s' % self.str_cmd)
+        self.dp.qprint('cmd = %s' % self.str_cmd)
 
         self.app_crunner(self.str_cmd, loopctl = True)
         self.c_pluginInst.register_output_files()
@@ -370,21 +378,21 @@ class Charm():
             }
         }
 
-        self.qprint('service type: %s' % str_service)
+        self.dp.qprint('service type: %s' % str_service)
         str_dmsg = self.pp.pformat(d_msg).strip()
         if os.path.exists('/data'):
             if not os.path.exists('/data/tmp'):
                 os.makedirs('/data/tmp')
-            self.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
+            self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
         else:
-            self.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
+            self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
         d_response = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
-            self.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
+            self.dp.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
             ret = True
         else:
-            self.qprint('unsuccessful response from serviceCall(): %s' % d_response)
+            self.dp.qprint('unsuccessful response from serviceCall(): %s' % d_response)
             if "Connection refused" in d_response:
                 pass
                 # self.app_service_startup()
@@ -433,7 +441,7 @@ class Charm():
             str_allCmdLineArgs      = ' '.join(self.l_appArgs)
             str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
             self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
-            self.qprint('cmd = %s' % self.str_cmd)
+            self.dp.qprint('cmd = %s' % self.str_cmd)
         if self.str_inputdir == './' or self.str_inputdir == '':
             self.app_service_fsplugin_inputdirManage()
 
@@ -460,11 +468,11 @@ class Charm():
         # First, check if the remote service is available... 
         self.app_service_checkIfAvailable(**kwargs)
 
-        self.qprint('d_args = %s' % self.d_args)
+        self.dp.qprint('d_args = %s' % self.d_args)
         str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
-        self.qprint('cmdLineArg = %s' % str_cmdLineArgs)
+        self.dp.qprint('cmdLineArg = %s' % str_cmdLineArgs)
 
-        self.qprint('l_appArgs = %s' % self.l_appArgs)
+        self.dp.qprint('l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
 
@@ -472,7 +480,7 @@ class Charm():
         #     str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.qprint('cmd = %s' % self.str_cmd)
+        self.dp.qprint('cmd = %s' % self.str_cmd)
 
         if str_service == 'pman':
             d_msg = \
@@ -581,20 +589,20 @@ class Charm():
             if os.path.exists('/data'):
                 if not os.path.exists('/data/tmp'):
                     os.makedirs('/data/tmp')
-                self.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-exec.json', teeMode = 'w+')
+                self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-exec.json', teeMode = 'w+')
             else:
-                self.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
+                self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
 
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
 
         if isinstance(d_response, dict):
-            self.qprint("looks like we got a successful response from %s" % str_service)
-            self.qprint('response from pfurl(): %s ' % json.dumps(d_response, indent=2))
+            self.dp.qprint("looks like we got a successful response from %s" % str_service)
+            self.dp.qprint('response from pfurl(): %s ' % json.dumps(d_response, indent=2))
         else:
-            self.qprint("looks like we got an UNSUCCESSFUL response from %s" % str_service)
-            self.qprint('response from pfurl(): %s' % d_response)
+            self.dp.qprint("looks like we got an UNSUCCESSFUL response from %s" % str_service)
+            self.dp.qprint('response from pfurl(): %s' % d_response)
             if "Connection refused" in d_response:
-                self.qprint('fatal error in talking to %s' % str_service, comms = 'error')
+                self.dp.qprint('fatal error in talking to %s' % str_service, comms = 'error')
 
     # def app_service_startup(self, *args, **kwargs):
     #     """
@@ -611,8 +619,8 @@ class Charm():
     #     :param kwargs:
     #     :return:
     #     """
-    #     self.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
-    #     self.qprint('pman IP: %s' % settings.PMAN['host'])
+    #     self.dp.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
+    #     self.dp.qprint('pman IP: %s' % settings.PMAN['host'])
 
     #     str_debugFile       = '%s/tmp/debug-charm-internal.log' % os.environ['HOME']
     #     if self.str_debugFile == '/dev/null':
@@ -630,8 +638,8 @@ class Charm():
     #         'clearDB':      self.b_clearDB
     #     }
 
-    #     self.qprint('Calling pman constructor internally.')
-    #     self.qprint('pmanArgs = %s' % pmanArgs)
+    #     self.dp.qprint('Calling pman constructor internally.')
+    #     self.dp.qprint('pmanArgs = %s' % pmanArgs)
 
     #     # pudb.set_trace()
     #     comm    = pfurl.Pfurl(
@@ -649,7 +657,7 @@ class Charm():
     #     t_comm = threading.Thread(target = comm.thread_serve)
     #     t_comm.start()
 
-    #     self.qprint('Called pman constructor internally.')
+    #     self.dp.qprint('Called pman constructor internally.')
 
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
@@ -673,23 +681,23 @@ class Charm():
         str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
         # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
-        self.qprint('d_response = %s' % d_response)
+        self.dp.qprint('d_response = %s' % d_response)
         try:
             str_responseStatus  = d_response['d_ret']['l_status'][0]
         except:
             str_responseStatus  = 'Error in response. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
-        self.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
-        self.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
+        self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
+        self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'finished' in str_responseStatus and str_responseStatus != str_DBstatus:
-            self.qprint('Registering output files...', comms = 'status')
+            self.dp.qprint('Registering output files...', comms = 'status')
             self.c_pluginInst.register_output_files()
             self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = datetime.datetime.now()
             self.c_pluginInst.save()
-            self.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
+            self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
                                                             comms = 'status')
-            self.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
+            self.dp.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
                                                             comms = 'status')
         if str_responseStatus == 'finishedWithError': self.app_handleRemoteError(**kwargs)
 
@@ -724,9 +732,9 @@ class Charm():
         d_response      = self.app_service_call(msg = d_msg, **kwargs)
         self.str_deep   = ''
         str_deepnest(d_response['d_ret'])
-        self.qprint(str_deepVal, comms = 'error')
+        self.dp.qprint(str_deepVal, comms = 'error')
 
         d_msg['meta']['field'] = 'returncode'
         d_response      = self.app_service_call(msg = d_msg, **kwargs)
         str_deepnest(d_response['d_ret'])
-        self.qprint(str_deepVal, comms = 'error')
+        self.dp.qprint(str_deepVal, comms = 'error')
