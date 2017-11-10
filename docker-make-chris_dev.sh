@@ -211,8 +211,8 @@ else
         fi
     done
     # And for the version of pfurl *inside* pfcon!
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon"
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon:dev --version"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon:dev"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
     CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
