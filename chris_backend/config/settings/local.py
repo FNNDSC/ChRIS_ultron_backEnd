@@ -8,7 +8,6 @@ Local settings
 - Add django-extensions as app
 """
 
-import os
 from .common import *  # noqa
 
 # Quick-start development settings - unsuitable for production
@@ -26,10 +25,8 @@ DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
 DATABASES['default']['TEST'] = {'CHARSET': 'utf8'}
-if 'MYSQL_PORT_3306_TCP_ADDR' in os.environ:
-    DATABASES['default']['HOST'] = os.environ['MYSQL_PORT_3306_TCP_ADDR']
-if 'MYSQL_PORT_3306_TCP_PORT' in os.environ:
-    DATABASES['default']['PORT'] = os.environ['MYSQL_PORT_3306_TCP_PORT']
+DATABASES['default']['HOST'] = 'chris_dev_db'
+DATABASES['default']['PORT'] = '3306'
 
 # Feed file storage
 MEDIA_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))) + '/users'

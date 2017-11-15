@@ -11,7 +11,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.9/ref/settings/
 """
 
-import os, socket
+import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,54 +22,22 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOWED_HOSTS = []
 
-# pman settings
-# Set the pman IP to specific host IP
-try:    
-    PMAN    = {
-        'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    }
-    # PMAN    = {
-    #     'host': '10.17.24.163'
-    # }
-except Exception:
-    PMAN    = {
-        'host': '127.0.0.1'
-    }
-PMAN['port'] = 5010
-if 'PMAN_PORT_5010_TCP_ADDR' in os.environ:
-    PMAN['host'] = os.environ['PMAN_PORT_5010_TCP_ADDR']
-if 'HOST_IP' in os.environ:
-    PMAN['host'] = os.environ['HOST_IP']
-if 'PMAN_PORT_5010_TCP_PORT' in os.environ:
-    PMAN['port'] = os.environ['PMAN_PORT_5010_TCP_PORT']
+# pman service settings
+PMAN = {
+    'host': 'pman_service',
+    'port': '5010'
+}
 
-# pfcon settings
-# Set the pfcon IP to specific host IP
-try:    
-    PFCON   = {
-        'host': [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-    }
-    # PFCON    = {
-    #     'host': '127.0.0.1'
-    # }
-except Exception:
-    PFCON   = {
-        'host': '127.0.0.1'
-    }
-PFCON['port'] = 5005
-if 'PFCON_PORT_5005_TCP_ADDR' in os.environ:
-    PFCON['host'] = os.environ['PFCON_PORT_5005_TCP_ADDR']
-if 'HOST_IP' in os.environ:
-    PFCON['host'] = os.environ['HOST_IP']
-if 'PFCON_PORT_5005_TCP_PORT' in os.environ:
-    PFCON['port'] = os.environ['PFCON_PORT_5005_TCP_PORT']
-    
+# pfcon service settings
+PFCON = {
+    'host': 'pfcon_service',
+    'port': '5005'
+}
 
 # debug control output
-CHRIS_DEBUG   = {'quiet': False, 'debugFile': '/dev/null', 'useDebug': False}
+CHRIS_DEBUG = {'quiet': False, 'debugFile': '/dev/null', 'useDebug': False}
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
