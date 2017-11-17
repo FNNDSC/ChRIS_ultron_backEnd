@@ -671,19 +671,30 @@ class Charm():
         # pudb.set_trace()
 
         # Now ask the remote service for the job status
+        # d_msg   = {
+        #     "action": "status",
+        #     "meta": {
+        #             "key":      "jid",
+        #             "value":    str(self.d_pluginInst['id'])
+        #     }
+        # }
+
         d_msg   = {
             "action": "status",
             "meta": {
-                    "key":      "jid",
-                    "value":    str(self.d_pluginInst['id'])
+                    "remote": {
+                        "key":       str(self.d_pluginInst['id'])
+                    }
             }
         }
-        str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
-        # pudb.set_trace()
+        
+        # str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
+        str_http    = '%s:%s' % (settings.PFCON['host'], settings.PFCON['port'])
+        pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
-            str_responseStatus  = d_response['d_ret']['l_status'][0]
+            str_responseStatus  = d_response['jobOperationSummary']['compute']['l_status'][0]
         except:
             str_responseStatus  = 'Error in response. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
@@ -691,9 +702,10 @@ class Charm():
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'finished' in str_responseStatus and str_responseStatus != str_DBstatus:
             self.dp.qprint('Registering output files...', comms = 'status')
-            self.c_pluginInst.register_output_files()
+            registeredFiles             = self.c_pluginInst.register_output_files()
             self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = datetime.datetime.now()
+            self.dp.qprint('Registered %d files...' % registeredFiles)
             self.c_pluginInst.save()
             self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
                                                             comms = 'status')
