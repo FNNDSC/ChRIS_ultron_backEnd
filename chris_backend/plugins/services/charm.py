@@ -689,12 +689,12 @@ class Charm():
         }
         
         # str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
-        str_http    = '%s:%s' % (settings.PFCON['host'], settings.PFCON['port'])
-        pudb.set_trace()
-        d_response  = self.app_service_call(msg = d_msg, **kwargs)
+        # str_http    = '%s:%s' % (settings.PFCON['host'], settings.PFCON['port'])
+        # pudb.set_trace()
+        d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
-            str_responseStatus  = d_response['jobOperationSummary']['compute']['l_status'][0]
+            str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
         except:
             str_responseStatus  = 'Error in response. No record of job found.'
         str_DBstatus    = self.c_pluginInst.status
