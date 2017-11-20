@@ -31,7 +31,7 @@ class Plugin(models.Model):
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
 
     class Meta:
-        ordering = ('type',)reig
+        ordering = ('type',)
 
     def __str__(self):
         return self.name
