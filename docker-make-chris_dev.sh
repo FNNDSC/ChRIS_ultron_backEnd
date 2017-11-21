@@ -23,7 +23,7 @@
 #       If specified, denotes the container "family" to use.
 #
 #       If a colon suffix exists, then this is interpreted to further
-#       specify the release.
+#       specify the TAG.
 #
 #       The 'fnndsc' family are the containers as hosted on docker hub. 
 #       Using 'fnndsc' will always attempt to pull the latest container first.
@@ -45,7 +45,7 @@ HERE=$(pwd)
 echo "Starting script in dir $HERE"
 
 CREPO=fnndsc
-REL=:dev
+TAG=:dev
 
 while getopts "r:" opt; do
     case $opt in 
@@ -58,16 +58,16 @@ if (( $# == 1 )) ; then
     REPO=$1
 fi
 export CREPO=$(echo $REPO | awk -F \: '{print $1}')
-export RELEASE=$(echo $REPO | awk -F \: '{print ":"$2}')
+export TAG=$(echo $REPO | awk -F \: '{print ":"$2}')
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
-    "pfcon${RELEASE}"
-    "pfurl${RELEASE}"
-    "pfioh${RELEASE}"
-    "pman${RELEASE}"
+    "pfcon${TAG}"
+    "pfurl${TAG}"
+    "pfioh${TAG}"
+    "pman${TAG}"
     "swarm"
-    "pfdcm${RELEASE}"
+    "pfdcm${TAG}"
     "pl-pacsquery"
     "pl-pacsretrieve"
 )
@@ -102,9 +102,9 @@ else
             echo -e "$Green$Ver"
         fi
     done
-    # And for the version of pfurl *inside* pfcon!
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${RELEASE} --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon${RELEASE}"
+    # Determine the versions of pfurl *inside* pfcon/chris_dev_backend/pl-pacs*
+    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${TAG} --version"
+    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon${TAG}"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
     CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
