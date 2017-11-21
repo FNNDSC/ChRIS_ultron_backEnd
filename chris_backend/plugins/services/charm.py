@@ -361,43 +361,43 @@ class Charm():
         """
 
         # pudb.set_trace()
-
-        str_service     = 'pman'
-        str_IOPhost     = 'localhost'
-
-        for k,v in kwargs.items():
-            if k == 'service':  str_service = v
-            if k == 'IOPhost':  str_IOPhost = v
-
-        d_msg = {
-            "action":   "hello",
-            "meta": {
-                        "askAbout":     "sysinfo",
-                        "echoBack":     "All's well.",
-                        "service":      str_IOPhost
-            }
-        }
-
-        self.dp.qprint('service type: %s' % str_service)
-        str_dmsg = self.pp.pformat(d_msg).strip()
-        if os.path.exists('/data'):
-            if not os.path.exists('/data/tmp'):
-                os.makedirs('/data/tmp')
-            self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
-        else:
-            self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
-        d_response = self.app_service_call(msg = d_msg, **kwargs)
-
-        if isinstance(d_response, dict):
-            self.dp.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
-            ret = True
-        else:
-            self.dp.qprint('unsuccessful response from serviceCall(): %s' % d_response)
-            if "Connection refused" in d_response:
-                pass
-                # self.app_service_startup()
-            ret = False
-        return ret
+        return True
+        # str_service     = 'pman'
+        # str_IOPhost     = 'localhost'
+        #
+        # for k,v in kwargs.items():
+        #     if k == 'service':  str_service = v
+        #     if k == 'IOPhost':  str_IOPhost = v
+        #
+        # d_msg = {
+        #     "action":   "hello",
+        #     "meta": {
+        #                 "askAbout":     "sysinfo",
+        #                 "echoBack":     "All's well.",
+        #                 "service":      str_IOPhost
+        #     }
+        # }
+        #
+        # self.dp.qprint('service type: %s' % str_service)
+        # str_dmsg = self.pp.pformat(d_msg).strip()
+        # if os.path.exists('/data'):
+        #     if not os.path.exists('/data/tmp'):
+        #         os.makedirs('/data/tmp')
+        #     self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
+        # else:
+        #     self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
+        # d_response = self.app_service_call(msg = d_msg, **kwargs)
+        #
+        # if isinstance(d_response, dict):
+        #     self.dp.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
+        #     ret = True
+        # else:
+        #     self.dp.qprint('unsuccessful response from serviceCall(): %s' % d_response)
+        #     if "Connection refused" in d_response:
+        #         pass
+        #         # self.app_service_startup()
+        #     ret = False
+        # return ret
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
         """
