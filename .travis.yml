@@ -3,20 +3,10 @@ dist: xenial
 services:
   - docker
 before_script:
-  - echo "Starting CUBE containerized development environment using ./docker-compose.yml"
   - docker-compose up -d
-  - echo " "
-  - echo "Waiting until mysql server is ready to accept connections..."
   - docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
-  - echo " "
-  - echo "Making migrations..."
   - docker-compose exec chris_dev python manage.py migrate
-  - echo " "
-  - echo "Registering plugins..."
-  - docker-compose exec chris_dev /bin/bash -c 'python plugins/services/manager.py --add fnndsc/pl-simplefsapp 2> /dev/null;'
-  - docker-compose exec chris_dev /bin/bash -c 'python plugins/services/manager.py --add fnndsc/pl-simpledsapp 2> /dev/null;'
-  - echo "Running Django tests..."
 # command to run tests
 script:
   - docker-compose exec chris_dev python manage.py test
