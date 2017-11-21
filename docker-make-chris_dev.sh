@@ -56,9 +56,9 @@ done
 shift $(($OPTIND - 1))
 if (( $# == 1 )) ; then
     REPO=$1
+    export CREPO=$(echo $REPO | awk -F \: '{print $1}')
+    export TAG=$(echo $REPO | awk -F \: '{print ":"$2}')
 fi
-export CREPO=$(echo $REPO | awk -F \: '{print $1}')
-export TAG=$(echo $REPO | awk -F \: '{print ":"$2}')
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
