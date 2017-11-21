@@ -10,7 +10,7 @@
 #
 # DESC
 # 
-#   'dockeer-make-chris_dev.sh' is the main entry point for instantiating a 
+#   'docker-make-chris_dev.sh' is the main entry point for instantiating a 
 #   complete backend dev environment.
 #
 #   It creates a pattern of directories and symbolic links that reflect the
@@ -23,7 +23,7 @@
 #       If specified, denotes the container "family" to use.
 #
 #       If a colon suffix exists, then this is interpreted to further
-#       specify the TAG.
+#       specify the TAG, i.e :dev in the example above.
 #
 #       The 'fnndsc' family are the containers as hosted on docker hub. 
 #       Using 'fnndsc' will always attempt to pull the latest container first.
