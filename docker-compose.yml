@@ -42,7 +42,7 @@ services:
       role: "Backend development database"
 
   pfcon_service:
-    image:  ${CREPO}/pfcon${RELEASE}
+    image:  ${CREPO}/pfcon${TAG}
     command: ["--forever", "--httpResponse"]
     volumes:
       - chris_dev_users:/usr/users
@@ -60,7 +60,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image:  ${CREPO}/pfioh${RELEASE}
+    image:  ${CREPO}/pfioh${TAG}
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -83,7 +83,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image:  ${CREPO}/pman${RELEASE}
+    image:  ${CREPO}/pman${TAG}
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
