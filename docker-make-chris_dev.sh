@@ -210,10 +210,12 @@ else
     windowBottom
 
     title -d 1 "ChRIS API user creation"
-    echo 'Now create two users. Please name one of the users "chris"'
     echo ""
-    docker-compose exec chris_dev python manage.py createsuperuser
-    docker-compose exec chris_dev python manage.py createsuperuser
+    echo "Setting user chris ..."
+    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username chris --email dev@babymri.org 2> /dev/null;'
+    echo ""
+    echo "Setting user cube ..."
+    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username cube --email dev@babymri.org 2> /dev/null;'
     windowBottom
 
     title -d 1 "Restarting Django development server in interactive mode..."
