@@ -1,6 +1,6 @@
 """
 
-charm - ChRIS / pfcon (and pman) interface.
+charm - ChRIS / pfcon interface.
 
 """
 
@@ -9,7 +9,6 @@ import  pprint
 import  datetime
 import  json
 import  pudb
-import  threading
 import  pfurl
 import  inspect
 import  pfmisc
@@ -141,9 +140,6 @@ class Charm():
         self.LC                     = 40
         self.RC                     = 40
 
-        # If True, will clear the pman DB on each call to pman.
-        self.b_clearDB              = False
-
         for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs      = val
             if key == 'd_args':         self.d_args         = val
@@ -155,7 +151,6 @@ class Charm():
             if key == 'useDebug':       self.b_useDebug     = val
             if key == 'debugFile':      self.str_debugFile  = val
             if key == 'quiet':          self.b_quiet        = val
-            if key == 'clearDB':        self.b_clearDB      = val
             if key == 'IOPhost':        self.str_IOPhost    = val
 
         if self.b_useDebug:
@@ -164,7 +159,7 @@ class Charm():
             self.debug._b_flushNewLine  = True
 
         # This for the case when Charm is instantiated w/o a plugin instance, eg
-        # as a dispatcher to simply send a pman instance a message.
+        # as a dispatcher to simply send a pfcon instance a message.
         try:
             self.d_pluginInst   = vars(self.c_pluginInst)
         except:
@@ -181,7 +176,7 @@ class Charm():
             """)
             print(pfurl.Colors.CYAN + """
             'charm' is the interface class/code between ChRIS and a remote 
-            REST-type server, typically 'pfcon' or 'pman'.
+            REST-type server, typically 'pfcon'.
 
             """)
             if self.b_useDebug:
@@ -219,7 +214,7 @@ class Charm():
         if str_method == 'crunner':
             self.app_crunner()
             b_launched  = True
-        if str_method == 'pman' or str_method == 'pfcon':
+        if str_method == 'pfcon':
             self.app_service(   service = str_method,
                                 IOPhost = str_IOPhost)
 
@@ -291,7 +286,7 @@ class Charm():
 
         # pudb.set_trace()
 
-        str_service     = 'pman'
+        str_service     = 'pfcon'
 
         for k,v in kwargs.items():
             if k == 'service':  str_service = v
@@ -315,7 +310,7 @@ class Charm():
         """
 
         d_msg                   = {}
-        str_service             = 'pman'
+        str_service             = 'pfcon'
         b_httpResponseBodyParse = True
 
         for k,v in kwargs.items():
@@ -327,7 +322,7 @@ class Charm():
         str_setting     = 'settings.%s' % str_service.upper()
         str_http        = '%s:%s' % (eval(str_setting)['host'], 
                                      eval(str_setting)['port'])
-        if str_service == 'pman': b_httpResponseBodyParse = False
+        if str_service == 'pfcon': b_httpResponseBodyParse = False
 
         str_debugFile       = '%s/tmp/debug-pfurl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
@@ -362,7 +357,7 @@ class Charm():
 
         # pudb.set_trace()
         return True
-        # str_service     = 'pman'
+        # str_service     = 'pfcon'
         # str_IOPhost     = 'localhost'
         #
         # for k,v in kwargs.items():
@@ -427,12 +422,10 @@ class Charm():
 
         This method edits the cmdLine for fsplugin input to /share/incoming 
         and sets any --dir to data localSource.
-
         """
 
         if 'dir' in self.d_args:
             self.str_inputdir = self.d_args['dir']
-            str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
             i = 0
             for v in self.l_appArgs:
                 if v == self.str_inputdir:
@@ -456,7 +449,7 @@ class Charm():
         Run the "app" via a call to a service provider.
         """
 
-        str_service     = 'pman'
+        str_service     = 'pfcon'
         str_IOPhost     = 'localhost'
 
         for k,v in kwargs.items():
@@ -481,19 +474,6 @@ class Charm():
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)
-
-        if str_service == 'pman':
-            d_msg = \
-            {
-                'action':   'run',
-                'meta': 
-                {
-                    'cmd':      self.str_cmd,
-                    'threaded': True,
-                    'auid':     self.c_pluginInst.owner.username,
-                    'jid':      str(self.d_pluginInst['id'])
-                }       
-            }
 
         if str_service == 'pfcon':
             # Handle the case for 'fs'-type plugins that don't specify an 
@@ -604,81 +584,15 @@ class Charm():
             if "Connection refused" in d_response:
                 self.dp.qprint('fatal error in talking to %s' % str_service, comms = 'error')
 
-    # def app_service_startup(self, *args, **kwargs):
-    #     """
-    #     Attempt to start a remote pman service.
-
-    #     This method is called if an attempt to speak with a pman service is unsuccessful, and
-    #     the assumption is that 'pman' is down. We will attempt to start 'pman' for this
-    #     user in this case.
-        
-    #     NOTE: This method is historical and no longer used! It remains in the code for 
-    #     illustrative purposes!
-
-    #     :param args:
-    #     :param kwargs:
-    #     :return:
-    #     """
-    #     self.dp.qprint("It seems that 'pman' is not running... I will attempt to start it.\n\n")
-    #     self.dp.qprint('pman IP: %s' % settings.PMAN['host'])
-
-    #     str_debugFile       = '%s/tmp/debug-charm-internal.log' % os.environ['HOME']
-    #     if self.str_debugFile == '/dev/null':
-    #         str_debugFile   = self.str_debugFile
-
-    #     pmanArgs        = {
-    #         'ip':           settings.PMAN['host'],
-    #         'port':         settings.PMAN['port'],
-    #         'raw':          '1',
-    #         'protocol':     'tcp',
-    #         'listeners':    '12',
-    #         'http':         True,
-    #         'debugToFile':  self.b_useDebug,
-    #         'debugFile':    str_debugFile,
-    #         'clearDB':      self.b_clearDB
-    #     }
-
-    #     self.dp.qprint('Calling pman constructor internally.')
-    #     self.dp.qprint('pmanArgs = %s' % pmanArgs)
-
-    #     # pudb.set_trace()
-    #     comm    = pfurl.Pfurl(
-    #         IP          = pmanArgs['ip'],
-    #         port        = pmanArgs['port'],
-    #         protocol    = pmanArgs['protocol'],
-    #         raw         = pmanArgs['raw'],
-    #         listeners   = pmanArgs['listeners'],
-    #         http        = pmanArgs['http'],
-    #         debugToFile = pmanArgs['debugToFile'],
-    #         debugFile   = pmanArgs['debugFile'],
-    #         clearDB     = pmanArgs['clearDB']
-    #     )
-
-    #     t_comm = threading.Thread(target = comm.thread_serve)
-    #     t_comm.start()
-
-    #     self.dp.qprint('Called pman constructor internally.')
-
     def app_statusCheckAndRegister(self, *args, **kwargs):
         """
         Check on the status of the job, and if just finished without error,
         register output files.
         """
 
-        # First get current status
-        str_status  = self.c_pluginInst.status
-
         # pudb.set_trace()
 
         # Now ask the remote service for the job status
-        # d_msg   = {
-        #     "action": "status",
-        #     "meta": {
-        #             "key":      "jid",
-        #             "value":    str(self.d_pluginInst['id'])
-        #     }
-        # }
-
         d_msg   = {
             "action": "status",
             "meta": {
@@ -687,10 +601,7 @@ class Charm():
                     }
             }
         }
-        
-        # str_http    = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
-        # str_http    = '%s:%s' % (settings.PFCON['host'], settings.PFCON['port'])
-        # pudb.set_trace()
+
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
@@ -740,7 +651,6 @@ class Charm():
                 "field":    "stderr"
             }
         }
-        str_http        = '%s:%s' % (settings.PMAN['host'], settings.PMAN['port'])
         d_response      = self.app_service_call(msg = d_msg, **kwargs)
         self.str_deep   = ''
         str_deepnest(d_response['d_ret'])
