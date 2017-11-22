@@ -19,6 +19,9 @@ SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# debug control output
+CHRIS_DEBUG = {'quiet': False, 'debugFile': '/dev/null', 'useDebug': False}
+
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
