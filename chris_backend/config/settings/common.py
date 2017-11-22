@@ -16,26 +16,16 @@ import os
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
 
 ALLOWED_HOSTS = []
-
-# pman service settings
-PMAN = {
-    'host': 'pman_service',
-    'port': '5010'
-}
 
 # pfcon service settings
 PFCON = {
     'host': 'pfcon_service',
     'port': '5005'
 }
-
-# debug control output
-CHRIS_DEBUG = {'quiet': False, 'debugFile': '/dev/null', 'useDebug': False}
 
 # Application definition
 INSTALLED_APPS = [
