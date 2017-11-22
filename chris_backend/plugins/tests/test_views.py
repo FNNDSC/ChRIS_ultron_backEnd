@@ -278,7 +278,7 @@ class PluginInstanceDetailViewTests(ViewTests):
                            'execshell': ''}
         )
 
-        chris2service.app_manage(method = 'pman')
+        chris2service.app_manage(method = 'pfcon')
         time.sleep(5)
 
         self.client.login(username=self.username, password=self.password)
