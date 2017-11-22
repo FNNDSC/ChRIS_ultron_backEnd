@@ -23,7 +23,6 @@ services:
     depends_on:
       - chris_dev_db
       - pfcon_service
-      - pman_service
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
