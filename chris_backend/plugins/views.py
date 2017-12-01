@@ -183,7 +183,7 @@ class PluginInstanceListQuerySearch(generics.ListAPIView):
         """
         user = self.request.user
         # if the user is chris then return all the plugin instances in the system
-        if (user.username == 'chris'):
+        if user.username == 'chris':
             return PluginInstance.objects.all()
         return PluginInstance.objects.filter(owner=user)
 
@@ -200,13 +200,12 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         """
         Overloaded method to check a plugin's instance status.
         """
-        # import pudb; pudb.set_trace()
-
         instance = self.get_object()
         pl_manager = PluginManager()
         pl_manager.check_plugin_app_exec_status(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         return  response
+
 
 class StringParameterDetail(generics.RetrieveAPIView):
     """
