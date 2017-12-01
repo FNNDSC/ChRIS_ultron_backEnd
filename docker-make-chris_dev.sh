@@ -177,6 +177,14 @@ else
     docker-compose exec chris_dev python manage.py migrate
     windowBottom
 
+    title -d 1 "Running Django Unit tests..."
+    docker-compose exec chris_dev python manage.py test --exclude-tag integration
+    windowBottom
+
+    title -d 1 "Running Django Integration tests..."
+    docker-compose exec chris_dev python manage.py test --tag integration
+    windowBottom
+
     title -d 1 "Registering plugins..."
     # Declare an array variable for the list of plugin dock images
     # Add a new plugin image name to the list if you want it to be automatically registered
@@ -194,19 +202,11 @@ else
                         )
     declare -i i=1
     declare -i STEP=10
-    for plugin in "${plugins[@]}"; do 
+    for plugin in "${plugins[@]}"; do
         echo "${STEP}.$i: Registering $plugin..."
-        python3 plugins/services/manager.py --add ${plugin} 2> /dev/null; 
+        python3 plugins/services/manager.py --add ${plugin} 2> /dev/null;
         ((i++))
     done'
-    windowBottom
-
-    title -d 1 "Running Django tests..."
-    docker-compose exec chris_dev python manage.py test
-    windowBottom
-
-    title -d 1 "Restarting Django development server..."
-    docker-compose restart chris_dev
     windowBottom
 
     title -d 1 "ChRIS API user creation"
@@ -218,7 +218,7 @@ else
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username cube --email dev@babymri.org 2> /dev/null;'
     windowBottom
 
-    title -d 1 "Restarting Django development server in interactive mode..."
+    title -d 1 "Restarting CUBE's Django development server in interactive mode..."
     docker-compose stop chris_dev
     docker-compose rm -f chris_dev
     docker-compose run --service-ports chris_dev

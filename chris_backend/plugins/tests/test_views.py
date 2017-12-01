@@ -1,7 +1,7 @@
 
 import os, json, shutil
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.core.urlresolvers import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -10,7 +10,6 @@ from rest_framework import status
 
 from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
 from plugins.services.manager import PluginManager
-from plugins import views
 from plugins.services import charm
 
 import pudb
@@ -164,8 +163,6 @@ class PluginInstanceListViewTests(ViewTests):
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
 
-        # pudb.set_trace()
-
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
         # pl_manager.startup_apps_exec_server()
@@ -181,12 +178,11 @@ class PluginInstanceListViewTests(ViewTests):
 
     def tearDown(self):
         # remove test directory
-        # shutil.rmtree(self.test_dir, ignore_errors=True)
-        # print('removing dir %s...' % self.test_dir)
         shutil.rmtree(self.test_dir, ignore_errors=True)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
-    def test_plugin_instance_create_success(self):
+    @tag('integration')
+    def test_integration_plugin_instance_create_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
@@ -198,14 +194,9 @@ class PluginInstanceListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_instance_list_success(self):
-        pl_manager = PluginManager()
-        pl_manager.check_apps_exec_server(clearDB = True)
-
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "simplefsapp")
-
-        # pl_manager.shutdown_apps_exec_server()
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
@@ -260,8 +251,9 @@ class PluginInstanceDetailViewTests(ViewTests):
         (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
         self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
-         
-    def test_plugin_instance_detail_success(self):
+
+    @tag('integration')
+    def test_integration_plugin_instance_detail_success(self):
 
         user            = User.objects.get(username=self.username)
         plugin          = Plugin.objects.get(name="pacspull")

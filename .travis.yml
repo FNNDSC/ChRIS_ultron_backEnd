@@ -7,7 +7,7 @@ before_script:
   - docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
   - docker-compose exec chris_dev python manage.py migrate
-# command to run tests
+# command to run both Unit and Integration tests
 script:
   - docker-compose exec chris_dev python manage.py test
 notifications:
