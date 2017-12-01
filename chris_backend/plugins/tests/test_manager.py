@@ -1,7 +1,7 @@
 
 import os, shutil
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
@@ -36,7 +36,7 @@ class PluginManagerTests(TestCase):
             optional=self.plugin_fs_parameters['dir']['optional'])
 
         # create user
-        user = User.objects.create_user(username=self.username,
+        User.objects.create_user(username=self.username,
                                         password=self.password)
 
     def test_mananger_can_get_plugin_app_representation(self):
@@ -84,7 +84,8 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
 
-    def test_mananger_can_run_registered_plugin_app(self):
+    @tag('integration')
+    def test_integration_mananger_can_run_registered_plugin_app(self):
         """
         Test whether the manager can run an already registered plugin app.
 
@@ -94,7 +95,7 @@ class PluginManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
-         # create test directory where files are created
+        # create test directory where files are created
         test_dir = settings.MEDIA_ROOT + '/test'
         settings.MEDIA_ROOT = test_dir
         if not os.path.exists(test_dir):
@@ -116,16 +117,15 @@ class PluginManagerTests(TestCase):
                                                     outputDirOverride   = '/share/outgoing',
                                                     IOPhost             = 'host'
         )
-        time.sleep(10)
+        time.sleep(5)
         # self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         # remove test directory 
         shutil.rmtree(test_dir)
-        # and shutdown apps_exec_server -- not necessary in new design.
-        # self.pl_manager.shutdown_apps_exec_server()
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
-    def test_mananger_can_check_plugin_app_exec_status(self):
+    @tag('integration')
+    def test_integration_mananger_can_check_plugin_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
 
@@ -157,15 +157,13 @@ class PluginManagerTests(TestCase):
                                                     outputDirOverride   = '/share/outgoing',
                                                     IOPhost             = 'host'
         )
-        time.sleep(10)
+        time.sleep(5)
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
-        possibleStatus =  ['started', 'finishedSuccessfully']
-        self.assertTrue(pl_inst.status in possibleStatus)
+        possible_status = ['started', 'finishedSuccessfully']
+        self.assertTrue(pl_inst.status in possible_status)
 
         # remove test directory 
         shutil.rmtree(test_dir)
-        # and shutdown apps_exec_server -- not necessary in new design.
-        # self.pl_manager.shutdown_apps_exec_server()
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
 
