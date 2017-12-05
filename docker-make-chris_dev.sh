@@ -68,8 +68,6 @@ declare -a A_CONTAINER=(
     "pman${TAG}"
     "swarm"
     "pfdcm${TAG}"
-    "pl-pacsquery"
-    "pl-pacsretrieve"
 )
 
 title -d 1 "Using <$REPO> family containers..."
@@ -173,7 +171,7 @@ else
     docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
     windowBottom
 
-    title -d 1 "Making migrations..."
+    title -d 1 "Applying migrations..."
     docker-compose exec chris_dev python manage.py migrate
     windowBottom
 

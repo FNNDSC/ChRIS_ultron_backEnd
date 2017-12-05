@@ -1,5 +1,8 @@
 
-import os, json, shutil
+import os
+import json
+import shutil
+from unittest import mock
 
 from django.test import TestCase, tag
 from django.core.urlresolvers import reverse
@@ -157,6 +160,16 @@ class PluginInstanceListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceListViewTests, self).setUp()
+        plugin = Plugin.objects.get(name="pacspull")
+        self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "dir", "value": "./"}]}})
+
+    def tearDown(self):
+        pass
+
+    @tag('integration')
+    def test_integration_plugin_instance_create_success(self):
         # create test directory where files are created
         self.test_dir = settings.MEDIA_ROOT + '/test'
         settings.MEDIA_ROOT = self.test_dir
@@ -165,28 +178,21 @@ class PluginInstanceListViewTests(ViewTests):
 
         # add a plugin to the system though the plugin manager
         pl_manager = PluginManager()
-        # pl_manager.startup_apps_exec_server()
         pl_manager.add_plugin('fnndsc/pl-simplefsapp')
         plugin = Plugin.objects.get(name="simplefsapp")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
-        self.post = json.dumps(
-            {"template": {"data": [{"name": "dir", "value": "./"}]}})
 
-        # create a plugin instance
+        # create a simplefsapp plugin instance
         user = User.objects.get(username=self.username)
         PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-
-    def tearDown(self):
-        # remove test directory
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
-
-    @tag('integration')
-    def test_integration_plugin_instance_create_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # remove test directory
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -194,12 +200,74 @@ class PluginInstanceListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_instance_list_success(self):
+        # create a pacspull plugin instance
+        plugin = Plugin.objects.get(name="pacspull")
+        user = User.objects.get(username=self.username)
+        PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "simplefsapp")
+        self.assertContains(response, "pacspull")
 
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceDetailViewTests(ViewTests):
+    """
+    Test the plugininstance-detail view
+    """
+
+    def setUp(self):
+        super(PluginInstanceDetailViewTests, self).setUp()
+        plugin = Plugin.objects.get(name="pacspull")
+
+        # create a pacspull plugin instance
+        user = User.objects.get(username=self.username)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
+
+    @tag('integration')
+    def test_integration_plugin_instance_detail_success(self):
+
+        # create test directory where files are created
+        self.test_dir = settings.MEDIA_ROOT + '/test'
+        settings.MEDIA_ROOT = self.test_dir
+        if not os.path.exists(self.test_dir):
+            os.makedirs(self.test_dir)
+
+        # add a plugin to the system though the plugin manager
+        pl_manager = PluginManager()
+        pl_manager.add_plugin('fnndsc/pl-simplefsapp')
+
+        # create a simplefsapp plugin instance
+        plugin = Plugin.objects.get(name='simplefsapp')
+        user = User.objects.get(username=self.username)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
+
+        # run the plugin instance
+        pl_manager.run_plugin_app(  pl_inst,
+                                    {'dir': './'},
+                                    service             = 'pfcon',
+                                    inputDirOverride    = '/share/incoming',
+                                    outputDirOverride   = '/share/outgoing',
+                                    IOPhost             = 'host')
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "simplefsapp")
+
+        # give time to execute the plugin and repeat request
+        time.sleep(10)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "finishedSuccessfully")
+
+        # remove test directory
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+
+    def test_plugin_instance_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -210,20 +278,23 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceListQuerySearchViewTests, self).setUp()
-        
+
         user = User.objects.get(username=self.username)
-        
+
         # create two plugin instances
-        plugin = Plugin.objects.get(name="pacspull") 
-        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        plugin = Plugin.objects.get(name="pacspull")
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
+                                                          owner=user)
         # set first instance's status
         inst.status = STATUS_TYPES[0]
-        plugin = Plugin.objects.get(name="mri_convert") 
-        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        plugin = Plugin.objects.get(name="mri_convert")
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
+                                                          owner=user)
         # set second instance's status
         inst.status = STATUS_TYPES[2]
 
-        self.list_url = reverse("plugininstance-list-query-search") + '?status='+ STATUS_TYPES[0]
+        self.list_url = reverse("plugininstance-list-query-search") + '?status=' + \
+                        STATUS_TYPES[0]
 
     def test_plugin_instance_query_search_list_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -235,50 +306,3 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
     def test_plugin_instance_query_search_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        
-
-class PluginInstanceDetailViewTests(ViewTests):
-    """
-    Test the plugininstance-detail view
-    """
-
-    def setUp(self):
-        super(PluginInstanceDetailViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
-
-        # create a plugin instance
-        user = User.objects.get(username=self.username)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-
-        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
-
-    @tag('integration')
-    def test_integration_plugin_instance_detail_success(self):
-
-        user            = User.objects.get(username=self.username)
-        plugin          = Plugin.objects.get(name="pacspull")
-        (pl_inst, tf)   = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-        # pudb.set_trace()
-        pl_manager = PluginManager()
-        pl_manager.check_apps_exec_server(clearDB = True)
-
-        chris2service   = charm.Charm(
-            d_args      = {'dir': './'},
-            plugin_inst = pl_inst,
-            plugin_repr = {'selfpath': '/bin',
-                           'selfexec': 'ls',
-                           'execshell': ''}
-        )
-
-        chris2service.app_manage(method = 'pfcon')
-        time.sleep(5)
-
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
-        self.assertContains(response, "pacspull")
-        # pl_manager.shutdown_apps_exec_server()
-
-    def test_plugin_instance_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-

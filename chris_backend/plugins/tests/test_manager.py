@@ -110,6 +110,7 @@ class PluginManagerTests(TestCase):
         self.pl_manager.check_apps_exec_server(     clearDB             = True,
                                                     service             = 'pfcon',
                                                     IOPhost             = 'host')
+
         self.pl_manager.run_plugin_app(             pl_inst,
                                                     parameter_dict,
                                                     service             = 'pfcon',
@@ -117,8 +118,9 @@ class PluginManagerTests(TestCase):
                                                     outputDirOverride   = '/share/outgoing',
                                                     IOPhost             = 'host'
         )
-        time.sleep(5)
-        # self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
+
+        self.assertEqual(pl_inst.status, 'started')
+        time.sleep(10)
 
         # remove test directory 
         shutil.rmtree(test_dir)
@@ -150,6 +152,7 @@ class PluginManagerTests(TestCase):
         self.pl_manager.check_apps_exec_server(     clearDB             = True,
                                                     service             = 'pfcon',
                                                     IOPhost             = 'host')
+
         self.pl_manager.run_plugin_app(             pl_inst, 
                                                     parameter_dict,
                                                     service             = 'pfcon',
@@ -157,10 +160,15 @@ class PluginManagerTests(TestCase):
                                                     outputDirOverride   = '/share/outgoing',
                                                     IOPhost             = 'host'
         )
-        time.sleep(5)
+
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
-        possible_status = ['started', 'finishedSuccessfully']
-        self.assertTrue(pl_inst.status in possible_status)
+        self.assertEqual(pl_inst.status, 'started')
+
+        # give time to execute the plugin and check status again
+        time.sleep(10)
+        self.pl_manager.check_plugin_app_exec_status(pl_inst)
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
+        self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         # remove test directory 
         shutil.rmtree(test_dir)
