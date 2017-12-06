@@ -13,7 +13,7 @@ from rest_framework import status
 
 from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
 from plugins.services.manager import PluginManager
-from plugins.services import charm
+from plugins import views
 
 import pudb
 import time
@@ -168,6 +168,29 @@ class PluginInstanceListViewTests(ViewTests):
     def tearDown(self):
         pass
 
+    def test_plugin_instance_create_success(self):
+        with mock.patch.object(views.PluginManager, 'run_plugin_app',
+                               return_value=None) as run_plugin_app_mock:
+            # add parameters to the plugin before the POST request
+            plugin = Plugin.objects.get(name="pacspull")
+            PluginParameter.objects.get_or_create(plugin=plugin, name='dir', type='string',
+                                                  optional=False)
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(self.create_read_url, data=self.post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that manager's run_plugin_app method was called with appropriate args
+            (plugin_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin)
+            parameters_dict = {'dir': './'}
+            run_plugin_app_mock.assert_called_with( plugin_inst,
+                                    parameters_dict,
+                                    service             = 'pfcon',
+                                    inputDirOverride    = '/share/incoming',
+                                    outputDirOverride   = '/share/outgoing',
+                                    IOPhost             = 'host')
+
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
         # create test directory where files are created
@@ -185,6 +208,8 @@ class PluginInstanceListViewTests(ViewTests):
         # create a simplefsapp plugin instance
         user = User.objects.get(username=self.username)
         PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+
+        # make API request
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
@@ -220,23 +245,33 @@ class PluginInstanceDetailViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
-
         # create a pacspull plugin instance
+        plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
+        (self.pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": self.pl_inst.id})
+
+    def test_plugin_instance_detail_success(self):
+        with mock.patch.object(views.PluginManager, 'check_plugin_app_exec_status',
+                               return_value=None) as check_plugin_app_exec_status_mock:
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.get(self.read_url)
+            self.assertContains(response, "pacspull")
+
+            # check that manager's check_plugin_app_exec_status method was called with
+            # appropriate args
+            check_plugin_app_exec_status_mock.assert_called_with(self.pl_inst)
 
     @tag('integration')
     def test_integration_plugin_instance_detail_success(self):
-
         # create test directory where files are created
         self.test_dir = settings.MEDIA_ROOT + '/test'
         settings.MEDIA_ROOT = self.test_dir
         if not os.path.exists(self.test_dir):
             os.makedirs(self.test_dir)
 
-        # add a plugin to the system though the plugin manager
+        # add a plugin to the system through the plugin manager
         pl_manager = PluginManager()
         pl_manager.add_plugin('fnndsc/pl-simplefsapp')
 
@@ -253,6 +288,8 @@ class PluginInstanceDetailViewTests(ViewTests):
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
                                     IOPhost             = 'host')
+
+        # make API request
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, "simplefsapp")
