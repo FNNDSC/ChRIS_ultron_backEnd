@@ -1,14 +1,14 @@
 
 import os, shutil
+import time
+from unittest import mock
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
 from plugins.models import Plugin, PluginParameter, PluginInstance
-from plugins.services.manager import PluginManager
-
-import time
+from plugins.services import manager
 
 import pudb
 
@@ -22,7 +22,7 @@ class PluginManagerTests(TestCase):
         self.plugin_ds_docker_image_name = "fnndsc/pl-simpledsapp"
         self.username = 'foo'
         self.password = 'foo-pass'
-        self.pl_manager = PluginManager()
+        self.pl_manager = manager.PluginManager()
 
         # create a plugin
         (plugin_fs, tf) = Plugin.objects.get_or_create( name        = self.plugin_fs_name,
@@ -84,6 +84,30 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
 
+    def test_mananger_can_run_registered_plugin_app(self):
+        """
+        Test whether the manager can run an already registered plugin app.
+        """
+        with mock.patch.object(manager.charm.Charm, '__init__',
+                               return_value=None) as charm_init_mock:
+            with mock.patch.object(manager.charm.Charm, 'app_manage',
+                                   return_value=None) as charm_app_manage_mock:
+                user = User.objects.get(username=self.username)
+                plugin = Plugin.objects.get(name=self.plugin_fs_name)
+                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+                parameter_dict = {'dir': './'}
+
+                self.pl_manager.run_plugin_app(pl_inst,
+                                               parameter_dict,
+                                               service='pfcon',
+                                               inputDirOverride='/share/incoming',
+                                               outputDirOverride='/share/outgoing',
+                                               IOPhost='host'
+                                               )
+                self.assertEqual(pl_inst.status, 'started')
+                assert charm_init_mock.called
+                charm_app_manage_mock.assert_called_with(method='pfcon', IOPhost='host')
+
     @tag('integration')
     def test_integration_mananger_can_run_registered_plugin_app(self):
         """
@@ -107,24 +131,37 @@ class PluginManagerTests(TestCase):
         parameter_dict = {'dir': './'}
 
         # pudb.set_trace()
-        self.pl_manager.check_apps_exec_server(     clearDB             = True,
-                                                    service             = 'pfcon',
-                                                    IOPhost             = 'host')
-
-        self.pl_manager.run_plugin_app(             pl_inst,
-                                                    parameter_dict,
-                                                    service             = 'pfcon',
-                                                    inputDirOverride    = '/share/incoming',
-                                                    outputDirOverride   = '/share/outgoing',
-                                                    IOPhost             = 'host'
+        self.pl_manager.run_plugin_app(pl_inst,
+                                       parameter_dict,
+                                       service             = 'pfcon',
+                                       inputDirOverride    = '/share/incoming',
+                                       outputDirOverride   = '/share/outgoing',
+                                       IOPhost             = 'host'
         )
-
         self.assertEqual(pl_inst.status, 'started')
         time.sleep(10)
 
         # remove test directory 
         shutil.rmtree(test_dir)
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
+
+    def test_mananger_can_check_plugin_app_exec_status(self):
+        """
+        Test whether the manager can check a plugin's app execution status
+        """
+        with mock.patch.object(manager.charm.Charm, '__init__',
+                               return_value=None) as charm_init_mock:
+            with mock.patch.object(manager.charm.Charm, 'app_statusCheckAndRegister',
+                                   return_value=None) as app_statusCheckAndRegister_mock:
+
+                user = User.objects.get(username=self.username)
+                plugin = Plugin.objects.get(name=self.plugin_fs_name)
+                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+
+                self.pl_manager.check_plugin_app_exec_status(pl_inst)
+                self.assertEqual(pl_inst.status, 'started')
+                charm_init_mock.assert_called_with(plugin_inst=pl_inst)
+                app_statusCheckAndRegister_mock.assert_called_with()
 
     @tag('integration')
     def test_integration_mananger_can_check_plugin_app_exec_status(self):
@@ -148,19 +185,13 @@ class PluginManagerTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
 
-        # pudb.set_trace()
-        self.pl_manager.check_apps_exec_server(     clearDB             = True,
-                                                    service             = 'pfcon',
-                                                    IOPhost             = 'host')
-
-        self.pl_manager.run_plugin_app(             pl_inst, 
-                                                    parameter_dict,
-                                                    service             = 'pfcon',
-                                                    inputDirOverride    = '/share/incoming',
-                                                    outputDirOverride   = '/share/outgoing',
-                                                    IOPhost             = 'host'
+        self.pl_manager.run_plugin_app(pl_inst,
+                                       parameter_dict,
+                                       service             = 'pfcon',
+                                       inputDirOverride    = '/share/incoming',
+                                       outputDirOverride   = '/share/outgoing',
+                                       IOPhost             = 'host'
         )
-
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
         self.assertEqual(pl_inst.status, 'started')
 
@@ -173,5 +204,3 @@ class PluginManagerTests(TestCase):
         # remove test directory 
         shutil.rmtree(test_dir)
         settings.MEDIA_ROOT = os.path.dirname(test_dir)
-
-
