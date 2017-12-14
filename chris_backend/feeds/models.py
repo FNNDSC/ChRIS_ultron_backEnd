@@ -1,6 +1,4 @@
 
-import os
-
 from django.db import models
 
 import django_filters
