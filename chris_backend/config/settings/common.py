@@ -21,18 +21,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOWED_HOSTS = []
 
-# pfcon service settings
-PFCON = {
-    'host': 'pfcon_service',
-    'port': '5005'
-}
-
-# swift service settings
-SWIFT = {
-    'host': 'swift_service',
-    'port': '8080'
-}
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
