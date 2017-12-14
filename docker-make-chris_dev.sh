@@ -111,11 +111,11 @@ else
     printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
+    CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
     printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
+    CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
     printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
     Ver=$(echo $CMD | sh | grep Version)
     echo -e "$Green$Ver"
