@@ -22,6 +22,7 @@ title -d 1 "Destroying persistent volumes..."
         "chrisultronbackend_chris_dev_data_files"
         "chrisultronbackend_chris_dev_db_data"
         "chrisultronbackend_chris_dev_users"
+        "chrisultronbackend_swift_storage"
     )
     for VOL in ${a_PVOLS[@]} ; do 
         read -p  "Do you want to remove persistent volume $VOL? " -n 1 -r

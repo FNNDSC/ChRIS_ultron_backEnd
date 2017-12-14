@@ -22,6 +22,7 @@ services:
       - "8000:8000"
     depends_on:
       - chris_dev_db
+      - swift_service
       - pfcon_service
     labels:
       name: "ChRIS_ultron_backEnd"
@@ -39,6 +40,18 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Backend development database"
+
+  swift_service:
+    image:  fnndsc/docker-swift-onlyone
+    volumes:
+      - swift_storage:/srv
+    environment:
+      - SWIFT_DEFAULT_CONTAINER=user_uploads
+    ports:
+      - "8080:8080"
+    labels:
+      name: "swift"
+      role: "swift object storage service"
 
   pfcon_service:
     image:  ${CREPO}/pfcon${TAG}
@@ -97,3 +110,4 @@ volumes:
   chris_dev_users:
   chris_dev_data_files:
   chris_dev_db_data:
+  swift_storage:

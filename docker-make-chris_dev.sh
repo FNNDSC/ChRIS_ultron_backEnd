@@ -68,6 +68,7 @@ declare -a A_CONTAINER=(
     "pman${TAG}"
     "swarm"
     "pfdcm${TAG}"
+    "docker-swift-onlyone"
 )
 
 title -d 1 "Using <$REPO> family containers..."
@@ -93,6 +94,7 @@ else
         if [[   $CONTAINER != "chris_dev_backend"   && \
                 $CONTAINER != "pl-pacsretrieve"     && \
                 $CONTAINER != "pl-pacsquery"        && \
+                $CONTAINER != "docker-swift-onlyone"     && \
                 $CONTAINER != "swarm" ]] ; then
             CMD="docker run ${CREPO}/$CONTAINER --version"
             printf "${White}%40s\t\t" "${CREPO}/$CONTAINER"
