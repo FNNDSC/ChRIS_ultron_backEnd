@@ -16,6 +16,18 @@ from .common import *  # noqa
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
+# pfcon service settings
+PFCON = {
+    'host': 'pfcon_service',
+    'port': '5005'
+}
+
+# swift service settings
+SWIFT = {
+    'host': 'swift_service',
+    'port': '8080'
+}
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
