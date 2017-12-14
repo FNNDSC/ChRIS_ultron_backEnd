@@ -27,6 +27,12 @@ PFCON = {
     'port': '5005'
 }
 
+# swift service settings
+SWIFT = {
+    'host': 'swift_service',
+    'port': '8080'
+}
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
