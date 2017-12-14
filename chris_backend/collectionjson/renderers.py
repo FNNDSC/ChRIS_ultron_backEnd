@@ -93,6 +93,7 @@ class CollectionJsonRenderer(JSONRenderer):
         return data.get('results')
 
     def _get_error(self, data):
+        print('Error data:', data)
         return {
             'error': {
                 'message': data['detail']
