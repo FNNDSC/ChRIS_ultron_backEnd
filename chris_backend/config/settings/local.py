@@ -28,6 +28,13 @@ SWIFT = {
     'port': '8080'
 }
 
+DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
+SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
+SWIFT_USERNAME = 'chris:chris1234'
+SWIFT_KEY = 'testing'
+SWIFT_CONTAINER_NAME = 'users'
+SWIFT_AUTO_CREATE_CONTAINER = True
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

@@ -95,7 +95,7 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail',
                                                read_only=True)
     file_resource = ItemLinkField('_get_file_link')
-    fname = serializers.FileField()
+    fname = serializers.FileField(use_url=False)
     path = serializers.CharField(allow_blank=True)
 
     class Meta:
