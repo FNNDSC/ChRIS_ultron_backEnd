@@ -34,7 +34,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'feeds',
     'collectionjson',
-    'plugins'
+    'plugins',
+    'uploadedfiles'
 ]
 
 # Pagination

@@ -4,6 +4,7 @@ from django.db import models
 import django_filters
 from rest_framework.filters import FilterSet
 
+
 class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
@@ -95,25 +96,3 @@ class FeedFile(models.Model):
 
     def get_file_relative_path(self):
         return self.fname.name.replace(self.plugin_inst.get_output_path(), "")
-
-
-def user_sandboxed_path(instance, filename):
-    # file will be stored to:
-    # MEDIA_ROOT/sandboxed/<username>/<filename>
-    owner = instance.owner
-    username = owner.username
-    path = instance.path
-    if path == '/':
-        return 'sandboxed/{0}/{1}'.format(username, filename)
-    else:
-        return 'sandboxed/{0}/{1}'.format(username, path)
-
-
-class UserFile(models.Model):
-    creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=512, upload_to=user_sandboxed_path)
-    path = models.CharField(max_length=512, blank=True, default='/')
-    owner = models.ForeignKey('auth.User')
-
-    def __str__(self):
-        return self.path

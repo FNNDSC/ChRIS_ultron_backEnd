@@ -753,7 +753,7 @@ class FileResourceViewTests(FeedFileViewTests):
         feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file1.txt'
         feedfile.save()
-        self.download_url = reverse("file-resource",
+        self.download_url = reverse("feedfile-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'
 
           
