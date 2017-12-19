@@ -16,8 +16,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./chris_backend:/usr/src/chris_backend
-      - chris_dev_users:/usr/users
-      - chris_dev_data_files:/data
     ports:
       - "8000:8000"
     depends_on:
@@ -45,8 +43,6 @@ services:
     image:  fnndsc/docker-swift-onlyone
     volumes:
       - swift_storage:/srv
-    environment:
-      - SWIFT_DEFAULT_CONTAINER=user_uploads
     ports:
       - "8080:8080"
     labels:
@@ -56,12 +52,10 @@ services:
   pfcon_service:
     image:  ${CREPO}/pfcon${TAG}
     command: ["--forever", "--httpResponse"]
-    volumes:
-      - chris_dev_users:/usr/users
-      - chris_dev_data_files:/data
     ports:
       - "5005:5005"
     depends_on:
+      - swift_service
       - pman_service
       - pfioh_service
     labels:
@@ -107,7 +101,5 @@ services:
       role: "pman service"
 
 volumes:
-  chris_dev_users:
-  chris_dev_data_files:
   chris_dev_db_data:
   swift_storage:
