@@ -123,9 +123,8 @@ class PluginInstanceModelTests(TestCase):
         plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst_fs = PluginInstance.objects.create(plugin=plugin_fs, owner=user)
         # 'fs' plugins will output files to:
-        # MEDIA_ROOT/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
-        fs_output_path = '{0}/{1}/feed_{2}/{3}_{4}/data'.format(self.test_dir,
-                                                                self.username,
+        # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
+        fs_output_path = '{0}/feed_{1}/{2}_{3}/data'.format( self.username,
                                                              pl_inst_fs.feed.id,
                                                              pl_inst_fs.plugin.name,
                                                              pl_inst_fs.id) 
@@ -138,28 +137,22 @@ class PluginInstanceModelTests(TestCase):
         pl_inst_ds = PluginInstance.objects.create(plugin=plugin_ds,
                                                    owner=user, previous=pl_inst_fs)
         # 'ds' plugins will output files to:
-        # MEDIA_ROOT/<username>/feed_<id>/...
+        # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
         #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
         ds_output_path = os.path.join(os.path.dirname(fs_output_path),
                                       '{0}_{1}/data'.format(pl_inst_ds.plugin.name,
                                                             pl_inst_ds.id))
         self.assertEquals(pl_inst_ds.get_output_path(), ds_output_path)
-        self.assertTrue(os.path.isdir(ds_output_path))
 
     def test_register_output_files(self):
         """
         Test whether custom register_output_files method properly register a plugin's
         output file with the REST API.
         """
-        # create aplugin instance 
+        # create a plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
-        root = settings.MEDIA_ROOT
-        output_path = '{0}/{1}/feed_{2}/{3}_{4}/data'.format(root, self.username,
-                                                             pl_inst.feed.id,
-                                                             pl_inst.plugin.name,
-                                                             pl_inst.id)
         output_path = pl_inst.get_output_path()
 
         # create a test file 
@@ -167,7 +160,7 @@ class PluginInstanceModelTests(TestCase):
         file = open(test_file, "w")
         file.write("test file")
         file.close()
-        pl_inst.register_output_files()
+        pl_inst.register_output_files([test_file])
         self.assertEquals(FeedFile.objects.count(), 1)
 
         
