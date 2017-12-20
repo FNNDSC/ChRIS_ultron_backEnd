@@ -93,6 +93,3 @@ class FeedFile(models.Model):
 
     def __str__(self):
         return self.fname.name
-
-    def get_file_relative_path(self):
-        return self.fname.name.replace(self.plugin_inst.get_output_path(), "")
