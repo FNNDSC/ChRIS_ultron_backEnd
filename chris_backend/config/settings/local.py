@@ -23,11 +23,6 @@ PFCON = {
 }
 
 # swift service settings
-SWIFT = {
-    'host': 'swift_service',
-    'port': '8080'
-}
-
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
 SWIFT_USERNAME = 'chris:chris1234'
