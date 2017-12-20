@@ -160,7 +160,7 @@ class PluginInstanceModelTests(TestCase):
         file = open(test_file, "w")
         file.write("test file")
         file.close()
-        pl_inst.register_output_files([test_file])
+        pl_inst.register_output_files()
         self.assertEquals(FeedFile.objects.count(), 1)
 
         
