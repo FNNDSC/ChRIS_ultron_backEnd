@@ -1,13 +1,15 @@
 
 import os, json, shutil
+from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.core.urlresolvers import reverse
-from django.core.files import File
 from django.contrib.auth.models import User
 from django.conf import settings
 
 from rest_framework import status
+
+import swiftclient
 
 from plugins.models import Plugin, PluginInstance
 from feeds.models import Note, Tag, Feed, Comment, FeedFile
@@ -740,6 +742,7 @@ class FileResourceViewTests(FeedFileViewTests):
     def setUp(self):
         super(FileResourceViewTests, self).setUp()
         feed = Feed.objects.get(name=self.feedname)
+        pl_inst = PluginInstance.objects.all()[0]
 
         # create a test file 
         test_file_path = self.test_dir
@@ -747,16 +750,28 @@ class FileResourceViewTests(FeedFileViewTests):
         file = open(self.test_file, "w")
         file.write("test file")
         file.close()
-            
+
+        # initiate a Swift service connection
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+
+        # upload file to Swift storage
+        output_path = pl_inst.get_output_path()
+        with open(self.test_file, 'r') as file1:
+            conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
+                            contents=file1.read(),
+                            content_type='text/plain')
+
         # create a file in the DB "already uploaded" to the server
-        pl_inst = PluginInstance.objects.all()[0]
         feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = 'file1.txt'
+        feedfile.fname.name = output_path + '/file1.txt'
         feedfile.save()
         self.download_url = reverse("feedfile-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'
 
-          
     def test_fileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
