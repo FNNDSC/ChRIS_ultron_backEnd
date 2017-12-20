@@ -1,9 +1,12 @@
 
 import os, shutil
+from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
+
+import swiftclient
 
 from feeds.models import Feed, FeedFile
 from plugins.models import Plugin, PluginParameter, PluginInstance
@@ -59,19 +62,8 @@ class PluginInstanceModelTests(TestCase):
             optional=self.plugin_ds_parameters['prefix']['optional'])
 
         # create user
-        user = User.objects.create_user(username=self.username,
+        User.objects.create_user(username=self.username,
                                         password=self.password)
-
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
-
-    def tearDown(self):
-        #remove test directory
-        shutil.rmtree(self.test_dir)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_save_creates_new_feed_just_after_fs_plugininstance_is_created(self):
         """
@@ -144,23 +136,49 @@ class PluginInstanceModelTests(TestCase):
                                                             pl_inst_ds.id))
         self.assertEquals(pl_inst_ds.get_output_path(), ds_output_path)
 
-    def test_register_output_files(self):
+    @tag('integration')
+    def test_integration_register_output_files(self):
         """
         Test whether custom register_output_files method properly register a plugin's
         output file with the REST API.
         """
-        # create a plugin instance
+        # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
-        output_path = pl_inst.get_output_path()
+        pl_inst.feed.name = 'Feed1'
+        pl_inst.feed.save()
 
-        # create a test file 
-        test_file = output_path + '/file1.txt'
+        # initiate a Swift service connection
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+
+        # create test directory where files are created
+        self.test_dir = settings.MEDIA_ROOT + '/test'
+        if not os.path.exists(self.test_dir):
+            os.makedirs(self.test_dir)
+
+        # create a test file
+        test_file = self.test_dir + '/file1.txt'
         file = open(test_file, "w")
         file.write("test file")
         file.close()
+
+        # upload file to Swift storage
+        output_path = pl_inst.get_output_path()
+        with open(test_file, 'r') as file1:
+            conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
+                            contents=file1.read(),
+                            content_type='text/plain')
+        # remove test directory
+        shutil.rmtree(self.test_dir)
+
         pl_inst.register_output_files()
         self.assertEquals(FeedFile.objects.count(), 1)
+        feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
+        self.assertEquals(feedfile.fname.name, output_path + '/file1.txt')
 
         
