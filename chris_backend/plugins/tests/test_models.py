@@ -155,6 +155,8 @@ class PluginInstanceModelTests(TestCase):
             key=settings.SWIFT_KEY,
             authurl=settings.SWIFT_AUTH_URL,
         )
+        # create container in case it doesn't already exist
+        conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # create test directory where files are created
         self.test_dir = settings.MEDIA_ROOT + '/test'
@@ -180,5 +182,9 @@ class PluginInstanceModelTests(TestCase):
         self.assertEquals(FeedFile.objects.count(), 1)
         feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
         self.assertEquals(feedfile.fname.name, output_path + '/file1.txt')
+
+        # delete file from Swift storage
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')
+
 
         

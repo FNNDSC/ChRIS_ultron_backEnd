@@ -736,15 +736,24 @@ class FeedFileDetailViewTests(FeedFileViewTests):
 
 class FileResourceViewTests(FeedFileViewTests):
     """
-    Test the tag-detail view
+    Test the feedfile-resource view
     """
 
     def setUp(self):
         super(FileResourceViewTests, self).setUp()
         feed = Feed.objects.get(name=self.feedname)
         pl_inst = PluginInstance.objects.all()[0]
+        self.pl_inst = pl_inst
+        # create a file in the DB "already uploaded" to the server
+        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
+        feedfile.fname.name = '/tests/file1.txt'
+        feedfile.save()
+        self.download_url = reverse("feedfile-resource",
+                                    kwargs={"pk": feedfile.id}) + 'file1.txt'
 
-        # create a test file 
+    @tag('integration')
+    def test_fileresource_download_success(self):
+        # create a test file
         test_file_path = self.test_dir
         self.test_file = test_file_path + '/file1.txt'
         file = open(self.test_file, "w")
@@ -757,26 +766,22 @@ class FileResourceViewTests(FeedFileViewTests):
             key=settings.SWIFT_KEY,
             authurl=settings.SWIFT_AUTH_URL,
         )
+        # create container in case it doesn't already exist
+        conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # upload file to Swift storage
-        output_path = pl_inst.get_output_path()
         with open(self.test_file, 'r') as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
+            conn.put_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt',
                             contents=file1.read(),
                             content_type='text/plain')
 
-        # create a file in the DB "already uploaded" to the server
-        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = output_path + '/file1.txt'
-        feedfile.save()
-        self.download_url = reverse("feedfile-resource",
-                                    kwargs={"pk": feedfile.id}) + 'file1.txt'
-
-    def test_fileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEquals(response.status_code, 200)
         self.assertEquals(str(response.content,'utf-8'), "test file")
+
+        # delete file from Swift storage
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt')
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
