@@ -9,7 +9,7 @@ from django.conf import settings
 import swiftclient
 
 from feeds.models import Feed, FeedFile
-from plugins.models import Plugin, PluginParameter, PluginInstance
+from plugins.models import Plugin, PluginParameter, PluginInstance, swiftclient
 
 
 class PluginModelTests(TestCase):
@@ -135,6 +135,35 @@ class PluginInstanceModelTests(TestCase):
                                       '{0}_{1}/data'.format(pl_inst_ds.plugin.name,
                                                             pl_inst_ds.id))
         self.assertEquals(pl_inst_ds.get_output_path(), ds_output_path)
+
+    def test_register_output_files(self):
+        """
+        Test whether custom register_output_files method properly register a plugin's
+        output file with the REST API.
+        """
+        # create an 'fs' plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst.feed.name = 'Feed1'
+        pl_inst.feed.save()
+        output_path = pl_inst.get_output_path()
+        object_list = [{'name': output_path + '/file1.txt'}]
+        container_data = ['', object_list]
+
+        with mock.patch.object(swiftclient.Connection, '__init__',
+                               return_value=None) as conn_init_mock:
+            with mock.patch.object(swiftclient.Connection, 'get_container',
+                                   return_value=container_data) as conn_get_container_mock:
+                pl_inst.register_output_files()
+                conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
+                                                  key=settings.SWIFT_KEY,
+                                                  authurl=settings.SWIFT_AUTH_URL,)
+                conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
+                                                   prefix=output_path, full_listing=True)
+                self.assertEquals(FeedFile.objects.count(), 1)
+                feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
+                self.assertEquals(feedfile.fname.name, output_path + '/file1.txt')
 
     @tag('integration')
     def test_integration_register_output_files(self):
