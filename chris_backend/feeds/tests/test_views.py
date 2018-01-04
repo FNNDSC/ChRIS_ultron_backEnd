@@ -751,8 +751,17 @@ class FileResourceViewTests(FeedFileViewTests):
         self.download_url = reverse("feedfile-resource",
                                     kwargs={"pk": feedfile.id}) + 'file1.txt'
 
+    def test_fileresource_get(self):
+        feedfile = FeedFile.objects.get(fname="/tests/file1.txt")
+        fileresource_view_inst = mock.Mock()
+        fileresource_view_inst.get_object = mock.Mock(return_value=feedfile)
+        request_mock = mock.Mock()
+        with mock.patch('feeds.views.Response') as response_mock:
+            views.FileResource.get(fileresource_view_inst, request_mock)
+            response_mock.assert_called_with(feedfile.fname)
+
     @tag('integration')
-    def test_fileresource_download_success(self):
+    def test_integration_fileresource_download_success(self):
         # create a test file
         test_file_path = self.test_dir
         self.test_file = test_file_path + '/file1.txt'
