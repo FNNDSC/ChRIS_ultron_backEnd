@@ -1,8 +1,6 @@
 
 import os
 
-from django.contrib.auth.models import User
-
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
@@ -80,12 +78,3 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
         url = url_field.get_url(obj, view, request, format)
         # return url = current url + file name
         return url + os.path.basename(obj.fname.name)
-
-
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
-                                               read_only=True)
-
-    class Meta:
-        model = User
-        fields = ('url', 'username', 'feed')

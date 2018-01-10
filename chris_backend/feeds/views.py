@@ -10,7 +10,7 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
 from .models import Note, Tag, Feed, FeedFilter, Comment, FeedFile
-from .serializers import UserSerializer, FeedSerializer, FeedFileSerializer
+from .serializers import FeedSerializer, FeedFileSerializer
 from .serializers import NoteSerializer, TagSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
@@ -327,13 +327,3 @@ class FileResource(generics.GenericAPIView):
         """
         feed_file = self.get_object()
         return Response(feed_file.fname)
-
-
-class UserList(generics.ListAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-
-
-class UserDetail(generics.RetrieveAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
