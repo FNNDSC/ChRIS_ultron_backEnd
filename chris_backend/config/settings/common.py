@@ -35,7 +35,8 @@ INSTALLED_APPS = [
     'feeds',
     'collectionjson',
     'plugins',
-    'uploadedfiles'
+    'uploadedfiles',
+    'users'
 ]
 
 # Pagination

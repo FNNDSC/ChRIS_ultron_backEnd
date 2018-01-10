@@ -6,12 +6,20 @@ from rest_framework.authtoken.views import obtain_auth_token
 from feeds import views as feed_views
 from plugins import views as plugin_views
 from uploadedfiles import views as uploaded_file_views
+from users import views as user_views
 
 # API v1 endpoints
 urlpatterns = format_suffix_patterns([
 
     url(r'^v1/auth-token/$',
         obtain_auth_token),
+
+
+    url(r'^v1/users/$',
+        user_views.UserList.as_view(), name='user-list'),
+
+    url(r'^v1/users/(?P<pk>[0-9]+)/$',
+        user_views.UserDetail.as_view(), name='user-detail'),
 
 
     url(r'^v1/$',
@@ -49,12 +57,6 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
         feed_views.FileResource.as_view(), name='feedfile-resource'),
-
-    url(r'^v1/users/$',
-        feed_views.UserList.as_view(), name='user-list'),
-
-    url(r'^v1/users/(?P<pk>[0-9]+)/$',
-        feed_views.UserDetail.as_view(), name='user-detail'),
 
 
     url(r'^v1/plugins/$',
