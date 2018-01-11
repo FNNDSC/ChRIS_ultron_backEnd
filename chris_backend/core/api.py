@@ -16,7 +16,7 @@ urlpatterns = format_suffix_patterns([
 
 
     url(r'^v1/users/$',
-        user_views.UserList.as_view(), name='user-list'),
+        user_views.UserCreate.as_view(), name='user-create'),
 
     url(r'^v1/users/(?P<pk>[0-9]+)/$',
         user_views.UserDetail.as_view(), name='user-detail'),
