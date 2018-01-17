@@ -1,9 +1,10 @@
 
 from django.contrib.auth.models import User
 
-from rest_framework import generics
+from rest_framework import generics, permissions
 
 from .serializers import UserSerializer
+from .permissions import IsUserOrChris
 
 
 class UserCreate(generics.CreateAPIView):
@@ -16,19 +17,12 @@ class UserCreate(generics.CreateAPIView):
         the newly created plugin instance before first saving to the DB. All the plugin
         instace's parameters in the resquest are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
-
-        plugin = self.get_object()
-        request_data = serializer.context['request'].data
-        # get previous plugin instance
-        previous_id = ""
-        if 'previous_id' in request_data:
-            previous_id = request_data['previous_id']
-        previous = serializer.validate_previous(previous_id, plugin)
-        # create plugin instance with corresponding owner, plugin and previous instances
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous)
         """
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+
 
 class UserDetail(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = (permissions.IsAuthenticated, IsUserOrChris)
