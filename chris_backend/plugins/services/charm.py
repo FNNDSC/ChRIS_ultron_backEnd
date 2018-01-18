@@ -602,6 +602,7 @@ class Charm():
             }
         }
 
+        # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
