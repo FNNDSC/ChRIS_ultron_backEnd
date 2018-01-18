@@ -185,6 +185,7 @@ class PluginManagerTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
 
+        # pudb.set_trace()
         self.pl_manager.run_plugin_app(pl_inst,
                                        parameter_dict,
                                        service             = 'pfcon',
