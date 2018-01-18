@@ -47,6 +47,10 @@ echo "Starting script in dir $HERE"
 CREPO=fnndsc
 TAG=:dev
 
+if [[ -f .env ]] ; then
+    source .env 
+fi
+
 while getopts "r:" opt; do
     case $opt in 
         r) b_restart=1
@@ -57,7 +61,10 @@ shift $(($OPTIND - 1))
 if (( $# == 1 )) ; then
     REPO=$1
     export CREPO=$(echo $REPO | awk -F \: '{print $1}')
-    export TAG=$(echo $REPO | awk -F \: '{print ":"$2}')
+    export TAG=$(echo $REPO | awk -F \: '{print $2}')
+    if $(( ${#TAG} )) ; then
+        TAG=":$TAG"
+    fi
 fi
 
 declare -a A_CONTAINER=(
@@ -71,7 +78,7 @@ declare -a A_CONTAINER=(
     "docker-swift-onlyone"
 )
 
-title -d 1 "Using <$REPO> family containers..."
+title -d 1 "Using <$CREPO> family containers..."
 if [[ $CREPO == "fnndsc" ]] ; then
     echo "Pulling latest version of all containers..."
     for CONTAINER in ${A_CONTAINER[@]} ; do
