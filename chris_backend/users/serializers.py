@@ -18,6 +18,15 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         user.save()
         return user
 
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        valid = super(UserSerializer, self).is_valid()
+        if raise_exception and not valid:
+            raise serializers.ValidationError({'detail': str(self._errors)})
+        return valid
+
     class Meta:
         model = User
         fields = ('url', 'username', 'feed', 'password')
