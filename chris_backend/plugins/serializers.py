@@ -58,8 +58,9 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_previous(self, previous_id, plugin):
         """
-        Check that an id is provided for previous instance when corresponding plugin is
-        of type 'ds'. Then check that the provided id exists in the DB.
+        Custom method to check that an id is provided for previous instance when
+        corresponding plugin is of type 'ds'. Then check that the provided id exists in
+        the DB.
         """
         previous = None
         if plugin.type=='ds':
