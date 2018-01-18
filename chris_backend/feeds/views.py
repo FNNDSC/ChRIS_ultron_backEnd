@@ -1,7 +1,4 @@
 
-from django.core.exceptions import ObjectDoesNotExist
-from django.contrib.auth.models import User
-
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -188,22 +185,16 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         
     def update_owners(self, serializer):
         """
-        Custom method to update the feed's owners. Checks whether the new owner
-        is a system-registered user.
+        Custom method to update the feed's owners.
         """
         feed = self.get_object()
         owners = feed.owner.values('username')
         username = self.request.data.pop('owner')
         if {'username': username} not in owners:
-            try:
-                # check if user is a system-registered user
-                owner = User.objects.get(username=username)
-            except ObjectDoesNotExist:
-                pass
-            else:
-                owners = [o for o in feed.owner.all()]
-                owners.append(owner)
-                serializer.save(owner=owners)
+            new_owner = serializer.validate_new_owner(username)
+            owners = [o for o in feed.owner.all()]
+            owners.append(new_owner)
+            serializer.save(owner=owners)
 
     def retrieve(self, request, *args, **kwargs):
         """

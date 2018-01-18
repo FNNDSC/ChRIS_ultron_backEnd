@@ -1,6 +1,9 @@
 
 import os
 
+from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
+
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
@@ -37,8 +40,20 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner', 'note', 'tags', 'comments',
-                  'files', 'plugin_inst')
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner',
+                  'note', 'tags', 'comments', 'files', 'plugin_inst')
+
+    def validate_new_owner(self, username):
+        """
+        Custom method to check whether a new feef owner is a system-registered user.
+        """
+        try:
+            # check if user is a system-registered user
+            new_owner = User.objects.get(username=username)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError(
+                {'detail': "%s is not a registered user" % username})
+        return new_owner
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):
