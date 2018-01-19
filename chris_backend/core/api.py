@@ -21,6 +21,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/users/(?P<pk>[0-9]+)/$',
         user_views.UserDetail.as_view(), name='user-detail'),
 
+    url(r'^v1/user/$',
+        user_views.UserList.as_view(), name='user-list'),
+
 
     url(r'^v1/$',
         feed_views.FeedList.as_view(), name='feed-list'),
