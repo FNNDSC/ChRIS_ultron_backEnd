@@ -13,7 +13,9 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = Plugin
-        fields = ('url', 'name', 'dock_image', 'type', 'parameters', 'instances')
+        fields = ('url', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
+                  'description', 'documentation', 'license', 'version',
+                  'parameters', 'instances')
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
