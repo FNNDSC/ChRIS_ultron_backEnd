@@ -57,7 +57,8 @@ class PluginFilter(FilterSet):
     
     class Meta:
         model = Plugin
-        fields = ['name', 'dock_image', 'type', 'min_creation_date', 'max_creation_date']
+        fields = ['name', 'dock_image', 'type', 'category', 'authors',
+                  'min_creation_date', 'max_creation_date', ]
 
 
 class PluginParameter(models.Model):
