@@ -29,6 +29,13 @@ class Plugin(models.Model):
     name = models.CharField(max_length=100, unique=True)
     dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
+    authors = models.CharField(max_length=200, blank=True)
+    title = models.CharField(max_length=400, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    description = models.CharField(max_length=800, blank=True)
+    documentation = models.CharField(max_length=800, blank=True)
+    license = models.CharField(max_length=50, blank=True)
+    version = models.CharField(max_length=10, blank=True)
 
     class Meta:
         ordering = ('type',)
@@ -50,7 +57,8 @@ class PluginFilter(FilterSet):
     
     class Meta:
         model = Plugin
-        fields = ['name', 'dock_image', 'type', 'min_creation_date', 'max_creation_date']
+        fields = ['name', 'dock_image', 'type', 'category', 'authors',
+                  'min_creation_date', 'max_creation_date', ]
 
 
 class PluginParameter(models.Model):

@@ -97,16 +97,26 @@ class PluginManager(object):
         # get representation from the corresponding app
         app_repr = self.get_plugin_app_representation(dock_image_name)
         name = self.get_plugin_name(app_repr)
+
         # check wether the plugin already exist
         existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
         if name in existing_plugin_names:
             raise ValueError("Plugin '%s' already exists in the system" % name)
+
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
         plugin.dock_image = dock_image_name
         plugin.type = app_repr['type']
+        plugin.authors = app_repr['authors']
+        plugin.title = app_repr['title']
+        plugin.category = app_repr['category']
+        plugin.description = app_repr['description']
+        plugin.documentation = app_repr['documentation']
+        plugin.license = app_repr['license']
+        plugin.version = app_repr['version']
         plugin.save()
+
         # add plugin's parameters to the db
         params = app_repr['parameters']
         for param in params:
@@ -132,17 +142,31 @@ class PluginManager(object):
     def register_plugin_app_modification(self, dock_image_name):
         """
         Register/add new parameters to a plugin from the corresponding plugin's app.
-        Also add the current date as a new plugin modification date.
+        Also update plugin's fields and add the current date as a new plugin modification
+        date.
         """
         # get representation from the corresponding app
         app_repr = self.get_plugin_app_representation(dock_image_name)
         name = self.get_plugin_name(app_repr)
+
+        # update plugin fields (type cannot be changed as 'ds' plugins cannot have created
+        # a feed in the DB)
         plugin = self.get_plugin(name)
+        plugin.authors = app_repr['authors']
+        plugin.title = app_repr['title']
+        plugin.category = app_repr['category']
+        plugin.description = app_repr['description']
+        plugin.documentation = app_repr['documentation']
+        plugin.license = app_repr['license']
+        plugin.version = app_repr['version']
+
+        # add there are new parameters then add them
         new_params = app_repr['parameters']
         existing_param_names = [parameter.name for parameter in plugin.parameters.all()]
         for param in new_params:
             if param['name'] not in existing_param_names:
                 self._save_plugin_param(plugin, param)
+
         plugin.modification_date = timezone.now()
         plugin.save()
 
