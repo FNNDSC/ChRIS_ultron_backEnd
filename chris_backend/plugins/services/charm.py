@@ -12,7 +12,9 @@ import  pudb
 import  pfurl
 import  inspect
 import  pfmisc
+import  webob
 
+from urllib.parse import urlparse, parse_qs
 from django.conf import settings
 
 
@@ -322,7 +324,7 @@ class Charm():
         str_setting     = 'settings.%s' % str_service.upper()
         str_http        = '%s:%s' % (eval(str_setting)['host'], 
                                      eval(str_setting)['port'])
-        if str_service == 'pfcon': b_httpResponseBodyParse = False
+        if str_service == 'pman': b_httpResponseBodyParse = False
 
         str_debugFile       = '%s/tmp/debug-pfurl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
@@ -343,6 +345,8 @@ class Charm():
 
         # speak to the service...
         d_response      = json.loads(serviceCall())
+        if not b_httpResponseBodyParse:
+            d_response  = parse_qs(d_response)
         return d_response
 
     def app_service_checkIfAvailable(self, *args, **kwargs):
@@ -402,7 +406,7 @@ class Charm():
         by the file transfer service.
         """
 
-        if os.path.isdir('/data'):
+        try:
             if not os.path.exists('/data/dummy'):
                 os.makedirs('/data/dummy')
             os.chdir('/data/dummy')
@@ -411,7 +415,7 @@ class Charm():
                 os.utime('dummy.txt', None)
             os.chdir('../')
             self.str_inputdir   = os.path.abspath('dummy')
-        else:
+        except:
             self.str_inputdir   = '/etc'
 
     def app_service_fsplugin_setup(self, *args, **kwargs):
@@ -602,7 +606,7 @@ class Charm():
             }
         }
 
-        # pudb.set_trace()
+        pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
