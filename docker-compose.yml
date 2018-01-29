@@ -16,8 +16,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./chris_backend:/usr/src/chris_backend
+      - /data:/data
     ports:
-      - "8000:8000"
+      - "8050:8000"
     depends_on:
       - chris_dev_db
       - swift_service
@@ -51,6 +52,8 @@ services:
 
   pfcon_service:
     image:  ${CREPO}/pfcon${TAG}
+    volumes:
+      - /data:/data
     command: ["--forever", "--httpResponse"]
     ports:
       - "5005:5005"
