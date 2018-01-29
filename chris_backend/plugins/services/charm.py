@@ -606,13 +606,14 @@ class Charm():
             }
         }
 
-        pudb.set_trace()
+        # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
         try:
             str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
         except:
             str_responseStatus  = 'Error in response. No record of job found.'
+            # pudb.set_trace()
         str_DBstatus    = self.c_pluginInst.status
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
