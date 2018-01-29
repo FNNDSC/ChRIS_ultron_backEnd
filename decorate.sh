@@ -16,7 +16,8 @@
 COLPUT(){ echo -en "\033[${1}G";}                       # put text in the same line as the specified column
   MARK(){ echo -en "\033[7m";}                          # the same as 'tput smso'
 UNMARK(){ echo -en "\033[27m";}                         # the same as 'tput rmso'
-  DRAW(){ echo -en "\033%";echo -en "\033(0";}          # switch to 'garbage' mode
+  DRAW(){ echo -en "\033%@";echo -en "\033(0";}         # switch to 'garbage' mode
+ # DRAW(){ echo -en "\033%";echo -en "\033(0";}          # switch to 'garbage' mode
  WRITE(){ echo -en "\033(B";}                           # return to normal mode from 'garbage' on the screen
   BLUE(){ echo -en "\033c\033[0;1m\033[37;44m\033[J";}  # reset screen, set background to blue and font to white
 
