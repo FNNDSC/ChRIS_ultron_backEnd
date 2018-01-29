@@ -6,7 +6,7 @@
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh [local|fnndsc[:dev]]
+#   docker-make-chris_dev.sh [-r <service>] [-p] [local|fnndsc[:dev]]
 #
 # DESC
 # 
@@ -17,6 +17,18 @@
 #   declarative environment of the docker-compose.yml contents.
 #
 # ARGS
+#
+#   -r <service>
+#   
+#       Restart <service> in interactive mode.
+#
+#   -p
+#   
+#       Optional pause after instantiating system to allow user to stop
+#       and restart services in interactive mode. User stops and restarts
+#       services explicitly with
+#
+#               docker stop <ID> && docker rm -vf <ID> && *make* -r <service> 
 #
 #   [local|fnndsc[:dev]] (optional, default = 'fnndsc')
 #
@@ -40,6 +52,7 @@ source ./decorate.sh
 
 declare -i STEP=0
 declare -i b_restart=0
+declare -i b_pause=0
 RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
@@ -51,12 +64,14 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:" opt; do
+while getopts "r:p" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG  ;;
+        p) b_pause=1 ;;
     esac
 done
+
 shift $(($OPTIND - 1))
 if (( $# == 1 )) ; then
     REPO=$1
@@ -172,6 +187,12 @@ else
     # echo "Exporting HOST_IP=$HOST_IP as environment var..."
     echo "docker-compose up -d"
     docker-compose up -d
+    windowBottom
+
+    title -d 1 "Pause for manual restart of services?"
+    if (( b_pause )) ; then
+        read -n 1 -p "Hit ANY key to continue..." anykey
+    fi
     windowBottom
 
     title -d 1 "Waiting until mysql server is ready to accept connections..."
