@@ -198,8 +198,26 @@ class PluginManagerTests(TestCase):
 
         # give time to execute the plugin and check status again
         time.sleep(10)
-        self.pl_manager.check_plugin_app_exec_status(pl_inst)
+        loopTries    = 1
+        b_checkAgain = True
+        while b_checkAgain:
+            str_responseStatus = self.pl_manager.check_plugin_app_exec_status(pl_inst)
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            if 'compute:True' in str_responseStatus and loopTries < 3:
+                # pudb.set_trace()
+                # In this case, the computation has completed, but the pull back 
+                # is incomplete. The job might have failed completely, in which 
+                # there is no return pull, or the return pull might be executing 
+                # and not completed. In this case, we call wait and call again
+                # for a maximum of a few times.
+                time.sleep(5)
+                loopTries += 1
+            if loopTries == 3:
+                b_checkAgain = False
+        
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
+        # self.assertEqual(pl_inst.status, 'pushPath:True;compute:True;pullPath:True;')
         self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
 
         # remove test directory 
