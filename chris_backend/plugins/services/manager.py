@@ -301,12 +301,14 @@ class PluginManager(object):
         Check a plugin's app execution status. It connects to the remote
         service to determine job status.
         """
+        str_responseStatus  = ''
         # pudb.set_trace()
         chris2service   = charm.Charm(
             plugin_inst = plugin_inst,
             **kwargs
         )
-        chris2service.app_statusCheckAndRegister()        
+        str_responseStatus = chris2service.app_statusCheckAndRegister()
+        return str_responseStatus
 
 
 # ENTRYPOINT
