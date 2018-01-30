@@ -609,17 +609,25 @@ class Charm():
         # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
-        try:
-            str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
-        except:
-            str_responseStatus  = 'Error in response. No record of job found.'
-            # pudb.set_trace()
+
+        str_responseStatus  = ""
+        for str_action in ['pushPath', 'compute', 'pullPath']:
+            str_actionStatus = str(d_response['jobOperationSummary'][str_action]['status'])
+            str_actionStatus = ''.join(str_actionStatus.split())
+            str_responseStatus += str_action + ':' + str_actionStatus + ';'
+
+        # try:
+        #     str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
+        # except:
+        #     str_responseStatus  = 'Error in response. No record of job found.'
+        #     pudb.set_trace()
         str_DBstatus    = self.c_pluginInst.status
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
-        if 'finished' in str_responseStatus and str_responseStatus != str_DBstatus:
+        if 'pullPath:True' in str_responseStatus and str_responseStatus != str_DBstatus:
             self.dp.qprint('Registering output files...', comms = 'status')
             registeredFiles             = self.c_pluginInst.register_output_files()
+            str_responseStatus          = 'finishedSuccessfully'
             self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = datetime.datetime.now()
             self.dp.qprint('Registered %d files...' % registeredFiles)
@@ -628,7 +636,10 @@ class Charm():
                                                             comms = 'status')
             self.dp.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
                                                             comms = 'status')
+
+        # NB: Improve error handling!!
         if str_responseStatus == 'finishedWithError': self.app_handleRemoteError(**kwargs)
+        return str_responseStatus
 
     def app_handleRemoteError(self, *args, **kwargs):
         """
