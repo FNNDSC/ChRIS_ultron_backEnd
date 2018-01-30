@@ -296,7 +296,18 @@ class PluginInstanceDetailViewTests(ViewTests):
 
         # give time to execute the plugin and repeat request
         time.sleep(10)
-        response = self.client.get(self.read_url)
+        loopTries       = 1
+        b_checkAgain    = True
+        while b_checkAgain:
+            response = self.client.get(self.read_url)
+            if response == 'finishedSuccessfullly':
+                b_checkAgain    = False
+            elif loopTries < 3:
+                time.sleep(2)
+                loopTries += 1
+            if loopTries == 3:
+                b_checkAgain = False
+
         self.assertContains(response, "finishedSuccessfully")
 
         # remove test directory
