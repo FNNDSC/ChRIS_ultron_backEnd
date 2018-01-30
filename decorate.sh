@@ -73,7 +73,7 @@ function title {
     STEP=$(expr $STEP + 1 )
     MSG="$1"
     MSG2="$2"
-    TITLE=$(echo " $STEP.0: $MSG ")
+    TITLE=$(echo " $STEP: $MSG ")
     LEN=$(echo "$TITLE" | awk -F\| {'printf("%s", length($1));'})
     if ! (( LEN % 2 )) ; then
         TITLE="$TITLE "
