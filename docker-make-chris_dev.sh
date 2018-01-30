@@ -6,7 +6,7 @@
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh [-r <service>] [-p] [local|fnndsc[:dev]]
+#   docker-make-chris_dev.sh [-r <service>] [-p] [-s] [-i] [local|fnndsc[:dev]]
 #
 # DESC
 # 
@@ -20,7 +20,23 @@
 #
 #   -r <service>
 #   
-#       Restart <service> in interactive mode.
+#       Restart <service> in interactive mode. This is mainly for debugging
+#       and is typically used to restart the 'pfcon', 'pfioh', and 'pman' 
+#       services.
+#
+#   -i 
+#
+#       Optional do not restart final chris_dev in interactive mode. If any
+#       sub services have been restarted in interactive mode then this will
+#       break the final restart of the chris_dev container. Thus, if any
+#       services have been restarted with '-r <service>' it is recommended
+#       to also use this flag to avoid the chris_dev restart.
+#
+#   -s
+#
+#       Optional skip intro steps. This skips the check on latest versions
+#       of containers and the interval version number printing. Makes for
+#       slightly faster startup.
 #
 #   -p
 #   
@@ -53,6 +69,8 @@ source ./decorate.sh
 declare -i STEP=0
 declare -i b_restart=0
 declare -i b_pause=0
+declare -i b_skip=0
+declare -i b_norestartinteractive_chris_dev=0
 RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
@@ -64,11 +82,13 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:p" opt; do
+while getopts "r:psi" opt; do
     case $opt in 
         r) b_restart=1
-           RESTART=$OPTARG  ;;
-        p) b_pause=1 ;;
+           RESTART=$OPTARG                      ;;
+        p) b_pause=1                            ;;
+        s) b_skip=1                             ;;
+        i) b_norestartinteractive_chris_dev=1   ;;
     esac
 done
 
@@ -93,55 +113,60 @@ declare -a A_CONTAINER=(
     "docker-swift-onlyone"
 )
 
-title -d 1 "Using <$CREPO> family containers..."
-if [[ $CREPO == "fnndsc" ]] ; then
-    echo "Pulling latest version of all containers..."
-    for CONTAINER in ${A_CONTAINER[@]} ; do
-        echo ""
-        CMD="docker pull ${CREPO}/$CONTAINER"
-        echo -e "\t\t\t${White}$CMD${NC}"
-        echo $sep
-        echo $CMD | sh
-        echo $sep
-    done
-fi
-windowBottom
 
 if (( b_restart )) ; then
     docker-compose stop ${RESTART}_service && docker-compose rm -f ${RESTART}_service
     docker-compose run --service-ports ${RESTART}_service
 else
-    title -d 1 "Will use containers with following version info:"
-    for CONTAINER in ${A_CONTAINER[@]} ; do
-        if [[   $CONTAINER != "chris_dev_backend"   && \
-                $CONTAINER != "pl-pacsretrieve"     && \
-                $CONTAINER != "pl-pacsquery"        && \
-                $CONTAINER != "docker-swift-onlyone"     && \
-                $CONTAINER != "swarm" ]] ; then
-            CMD="docker run ${CREPO}/$CONTAINER --version"
-            printf "${White}%40s\t\t" "${CREPO}/$CONTAINER"
-            Ver=$(echo $CMD | sh | grep Version)
-            echo -e "$Green$Ver"
+    title -d 1 "Using <$CREPO> family containers..."
+    if (( ! b_skip )) ; then 
+    if [[ $CREPO == "fnndsc" ]] ; then
+            echo "Pulling latest version of all containers..."
+            for CONTAINER in ${A_CONTAINER[@]} ; do
+                echo ""
+                CMD="docker pull ${CREPO}/$CONTAINER"
+                echo -e "\t\t\t${White}$CMD${NC}"
+                echo $sep
+                echo $CMD | sh
+                echo $sep
+            done
         fi
-    done
-    # Determine the versions of pfurl *inside* pfcon/chris_dev_backend/pl-pacs*
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${TAG} --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon${TAG}"
-    Ver=$(echo $CMD | sh | grep Version)
-    echo -e "$Green$Ver"
-    CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
-    Ver=$(echo $CMD | sh | grep Version)
-    echo -e "$Green$Ver"
-    CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
-    Ver=$(echo $CMD | sh | grep Version)
-    echo -e "$Green$Ver"
-    CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
-    printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
-    Ver=$(echo $CMD | sh | grep Version)
-    echo -e "$Green$Ver"
+    fi
     windowBottom
+
+    if (( ! b_skip )) ; then 
+        title -d 1 "Will use containers with following version info:"
+        for CONTAINER in ${A_CONTAINER[@]} ; do
+            if [[   $CONTAINER != "chris_dev_backend"   && \
+                    $CONTAINER != "pl-pacsretrieve"     && \
+                    $CONTAINER != "pl-pacsquery"        && \
+                    $CONTAINER != "docker-swift-onlyone"     && \
+                    $CONTAINER != "swarm" ]] ; then
+                CMD="docker run ${CREPO}/$CONTAINER --version"
+                printf "${White}%40s\t\t" "${CREPO}/$CONTAINER"
+                Ver=$(echo $CMD | sh | grep Version)
+                echo -e "$Green$Ver"
+            fi
+        done
+        # Determine the versions of pfurl *inside* pfcon/chris_dev_backend/pl-pacs*
+        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${TAG} --version"
+        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon${TAG}"
+        Ver=$(echo $CMD | sh | grep Version)
+        echo -e "$Green$Ver"
+        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
+        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
+        Ver=$(echo $CMD | sh | grep Version)
+        echo -e "$Green$Ver"
+        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
+        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
+        Ver=$(echo $CMD | sh | grep Version)
+        echo -e "$Green$Ver"
+        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
+        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
+        Ver=$(echo $CMD | sh | grep Version)
+        echo -e "$Green$Ver"
+        windowBottom
+    fi
 
     title -d 1 "Stopping and restarting the docker swarm... "
     docker swarm leave --force
@@ -247,10 +272,12 @@ else
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username cube --email dev@babymri.org 2> /dev/null;'
     windowBottom
 
-    title -d 1 "Restarting CUBE's Django development server in interactive mode..."
-    docker-compose stop chris_dev
-    docker-compose rm -f chris_dev
-    docker-compose run --service-ports chris_dev
-    echo ""
-    windowBottom
+    if (( !  b_norestartinteractive_chris_dev )) ; then
+        title -d 1 "Restarting CUBE's Django development server in interactive mode..."
+        docker-compose stop chris_dev
+        docker-compose rm -f chris_dev
+        docker-compose run --service-ports chris_dev
+        echo ""
+        windowBottom
+    fi
 fi
