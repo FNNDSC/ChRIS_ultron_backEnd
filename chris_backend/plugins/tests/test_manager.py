@@ -20,7 +20,7 @@ class PluginManagerTests(TestCase):
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_docker_image_name = "fnndsc/pl-simpledsapp"
-        self.username = 'foo'
+        self.username = 'data/foo'
         self.password = 'foo-pass'
         self.pl_manager = manager.PluginManager()
 
@@ -38,7 +38,7 @@ class PluginManagerTests(TestCase):
         # create user
         User.objects.create_user(username=self.username,
                                         password=self.password)
-
+        
     def test_mananger_can_get_plugin_app_representation(self):
         """
         Test whether the manager can return a plugin's app representation given the
@@ -139,7 +139,7 @@ class PluginManagerTests(TestCase):
                                        IOPhost             = 'host'
         )
         self.assertEqual(pl_inst.status, 'started')
-        time.sleep(10)
+        # time.sleep(10)
 
         # remove test directory 
         shutil.rmtree(test_dir)
@@ -185,7 +185,6 @@ class PluginManagerTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
         parameter_dict = {'dir': './'}
 
-        # pudb.set_trace()
         self.pl_manager.run_plugin_app(pl_inst,
                                        parameter_dict,
                                        service             = 'pfcon',
@@ -196,29 +195,27 @@ class PluginManagerTests(TestCase):
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
         self.assertEqual(pl_inst.status, 'started')
 
-        # give time to execute the plugin and check status again
-        time.sleep(10)
-        loopTries    = 1
-        b_checkAgain = True
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 2 second intervals.
+        maxLoopTries    = 10
+        currentLoop     = 1
+        b_checkAgain    = True
         while b_checkAgain:
             str_responseStatus = self.pl_manager.check_plugin_app_exec_status(pl_inst)
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
-            if 'compute:True' in str_responseStatus and loopTries < 3:
-                # pudb.set_trace()
-                # In this case, the computation has completed, but the pull back 
-                # is incomplete. The job might have failed completely, in which 
-                # there is no return pull, or the return pull might be executing 
-                # and not completed. In this case, we call wait and call again
-                # for a maximum of a few times.
-                time.sleep(5)
-                loopTries += 1
-            if loopTries == 3:
+            else:
+                time.sleep(2)
+            currentLoop += 1
+            if currentLoop == maxLoopTries:
                 b_checkAgain = False
         
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
         # self.assertEqual(pl_inst.status, 'pushPath:True;compute:True;pullPath:True;')
-        self.assertTrue(os.path.isfile(os.path.join(pl_inst.get_output_path(), 'out.txt')))
+        str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')
+        str_ABSfileCreatedByPlugin  = '/' + str_fileCreatedByPlugin
+        self.assertTrue(os.path.isfile(str_ABSfileCreatedByPlugin))
 
         # remove test directory 
         shutil.rmtree(test_dir)
