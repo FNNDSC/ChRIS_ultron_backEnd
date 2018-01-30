@@ -192,6 +192,7 @@ else
     title -d 1 "Pause for manual restart of services?"
     if (( b_pause )) ; then
         read -n 1 -p "Hit ANY key to continue..." anykey
+        echo ""
     fi
     windowBottom
 
