@@ -23,7 +23,7 @@ class ViewTests(TestCase):
     def setUp(self):
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
-        self.username = 'foo'
+        self.username = 'data/foo'
         self.password = 'bar'
         self.content_type='application/vnd.collection+json'
         
@@ -294,18 +294,21 @@ class PluginInstanceDetailViewTests(ViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, "simplefsapp")
 
-        # give time to execute the plugin and repeat request
-        time.sleep(10)
-        loopTries       = 1
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 2 second intervals.
+        maxLoopTries    = 10
+        currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
-            response = self.client.get(self.read_url)
-            if response == 'finishedSuccessfullly':
-                b_checkAgain    = False
-            elif loopTries < 3:
+            response            = self.client.get(self.read_url)
+            str_responseStatus  = response.data['status']
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            else:
                 time.sleep(2)
-                loopTries += 1
-            if loopTries == 3:
+            currentLoop += 1
+            if currentLoop == maxLoopTries:
                 b_checkAgain = False
 
         self.assertContains(response, "finishedSuccessfully")
