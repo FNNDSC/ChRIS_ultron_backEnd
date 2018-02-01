@@ -263,13 +263,19 @@ else
     done'
     windowBottom
 
-    title -d 1 "ChRIS API user creation"
+    title -d 1 "Creating two ChRIS API users"
     echo ""
-    echo "Setting user chris ..."
-    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username chris --email dev@babymri.org 2> /dev/null;'
+    echo "Setting superuser chris:chris1234 ..."
+    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;'
+    docker-compose exec chris_dev /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
     echo ""
-    echo "Setting user cube ..."
-    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --username cube --email dev@babymri.org 2> /dev/null;'
+    echo "Setting normal user cube:cube1234 ..."
+    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
+    docker-compose exec chris_dev /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
+    echo ""
+
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then
