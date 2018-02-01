@@ -113,6 +113,14 @@ declare -a A_CONTAINER=(
     "docker-swift-onlyone"
 )
 
+title -d 1 "Setting global exports..."
+    cd FS/remote
+    echo -e "${STEP}.1 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
+    export STOREBASE=$(pwd)
+    cd $HERE
+windowBottom
+
+
 
 if (( b_restart )) ; then
     docker-compose stop ${RESTART}_service && docker-compose rm -f ${RESTART}_service
@@ -201,10 +209,6 @@ else
     mkdir -p FS/remote
     chmod 777 FS/remote
     chmod 777 FS
-    cd FS/remote
-    echo -e "${STEP}.3 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
-    export STOREBASE=$(pwd)
-    cd $HERE
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
