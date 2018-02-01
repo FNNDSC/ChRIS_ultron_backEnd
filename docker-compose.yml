@@ -18,7 +18,7 @@ services:
       - ./chris_backend:/usr/src/chris_backend
       - /data:/data
     ports:
-      - "8050:8000"
+      - "8000:8000"
     depends_on:
       - chris_dev_db
       - swift_service
