@@ -495,6 +495,7 @@ class Charm():
             # pudb.set_trace()
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
+            str_serviceName = str(self.d_pluginInst['id'])
             d_msg = \
             {   
                 "action": "coordinate",
