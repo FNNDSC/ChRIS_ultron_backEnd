@@ -3,6 +3,7 @@ dist: xenial
 services:
   - docker
 before_script:
+  - docker build -t fnndsc/chris_dev_backend . #TODO: ravig, Remove this.Tagging local image as fnndsc to avoid confusion in docker compose
   - docker-compose up -d
   - docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
