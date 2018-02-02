@@ -160,6 +160,9 @@ class Charm():
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
+        if self.b_quiet:
+            self.dp.verbosity = -10
+
         # This for the case when Charm is instantiated w/o a plugin instance, eg
         # as a dispatcher to simply send a pfcon instance a message.
         try:

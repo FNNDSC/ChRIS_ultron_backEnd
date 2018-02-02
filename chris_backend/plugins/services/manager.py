@@ -245,7 +245,8 @@ class PluginManager(object):
             plugin_repr = plugin_repr,
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
-            IOPhost     = self.str_IOPhost
+            IOPhost     = self.str_IOPhost,
+            quiet       = True
         )
 
         # Some dev notes...
