@@ -78,24 +78,30 @@ function title {
     if ! (( LEN % 2 )) ; then
         TITLE="$TITLE "
     fi
-    MSG=$(echo -e "$TITLE" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
+    MSG=$(echo -e "$TITLE" | awk -F\| {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
     if (( ${#MSG2} )) ; then
         TITLE2=$(echo " $MSG2 ")
         LEN2=$(echo "$TITLE2" | awk -F\| {'printf("%s", length($1));'})
         MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
     fi
     printf "\n"
-    DATE=$(date)
+    DATE=" $(date) [$(hostname)] "
+    lDATE=${#DATE}
     DRAW
     if (( b_date )) ; then
-        printf "${LightBlue}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\nx"
+        printf "${LightBlue}l" ;  for c in $(seq 1 $lDATE); do printf "q" ; done ; 
+        printf "k\nx"
         WRITE
         printf "%-30s" "$DATE"
         DRAW 
         printf "x\n"
-        printf "${Yellow}tqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+        printf "${Yellow}t" ; for c in $(seq 1 $lDATE); do printf "q";  done ; printf "v"
+        REM=$(expr 79 - $lDATE)
+        for c in $(seq 1 $REM); do printf "q" ; done ; printf "k\n"
     else
-        printf "${Yellow}lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk\n"
+        printf "${Yellow}l"
+        for c in $(seq 1 80); do printf "q" ; done
+        printf "k\n"
     fi
     printf "x"
     WRITE
@@ -108,7 +114,7 @@ function title {
     fi
     DRAW
     printf "x\n"
-    printf "${Yellow}tqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqu\n"
+    printf "${Yellow}t" ;  for c in $(seq 1 80); do printf "q" ; done ; printf "u\n"
     WRITE
     printf "${NC}"
 }
@@ -117,11 +123,11 @@ function windowBottom {
     # printf "a b c d f e f g h i j k l m n o p q r s t u v w x y z]\n"
     DRAW
     # printf "a b c d f e f g h i j k l m n o p q r s t u v w x y z]\n"
-    printf "${Yellow}"
-    printf "mwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv${Brown}qk\n"
+    printf "${Yellow}mw" ;  for c in $(seq 1 79); do printf "q" ; done ; printf "v${Brown}qk\n"
+    # printf "mwqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv${Brown}qk\n"
     # printf "mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
-    printf "${Brown}"
-    printf " mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
+    printf "${Brown} m" ; for c in $(seq 1 81); do printf "q" ; done ; printf "j\n"
+    # printf " mqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj\n"
     WRITE
     printf "${NC}"
 }
