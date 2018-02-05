@@ -573,7 +573,7 @@ class Charm():
                 }
             }
             str_dmsg = self.pp.pformat(d_msg).strip()
-            # pudb.set_trace()
+            pudb.set_trace()
             if os.path.exists('/data'):
                 if not os.path.exists('/data/tmp'):
                     os.makedirs('/data/tmp')
@@ -610,15 +610,21 @@ class Charm():
             }
         }
 
-        # pudb.set_trace()
+        pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
 
         str_responseStatus  = ""
         for str_action in ['pushPath', 'compute', 'pullPath']:
-            str_actionStatus = str(d_response['jobOperationSummary'][str_action]['status'])
-            str_actionStatus = ''.join(str_actionStatus.split())
-            str_responseStatus += str_action + ':' + str_actionStatus + ';'
+            if str_action == 'compute':
+                for str_part in ['submit', 'return']:
+                    str_actionStatus = str(d_response['jobOperationSummary'][str_action][str_part]['status'])
+                    str_actionStatus = ''.join(str_actionStatus.split())
+                    str_responseStatus += str_action + '.' + str_part + ':' + str_actionStatus + ';'
+            else:
+                str_actionStatus = str(d_response['jobOperationSummary'][str_action]['status'])
+                str_actionStatus = ''.join(str_actionStatus.split())
+                str_responseStatus += str_action + ':' + str_actionStatus + ';'
 
         # try:
         #     str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
