@@ -573,7 +573,7 @@ class Charm():
                 }
             }
             str_dmsg = self.pp.pformat(d_msg).strip()
-            pudb.set_trace()
+            # pudb.set_trace()
             if os.path.exists('/data'):
                 if not os.path.exists('/data/tmp'):
                     os.makedirs('/data/tmp')
