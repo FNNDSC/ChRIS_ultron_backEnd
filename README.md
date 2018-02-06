@@ -66,7 +66,7 @@ pip install django-storage-swift
 pip install docker
 ```
 
-You can also install some python libraries (not all of them) specified in the ``requirements/local.txt`` and 
+You can also install some python libraries (not all of them) specified in the ``requirements/base.txt`` and 
 ``requirements/local.txt`` files in the source repo
 
 
