@@ -9,6 +9,7 @@ Local settings
 """
 
 from .common import *  # noqa
+import  os
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
@@ -34,7 +35,10 @@ SWIFT_AUTO_CREATE_CONTAINER = True
 DEBUG = True
 
 # debug control output
-CHRIS_DEBUG = {'quiet': False, 'debugFile': '/dev/null', 'useDebug': False}
+CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
+
+if 'CHRIS_DEBUG_QUIET' in os.environ:
+    CHRIS_DEBUG['quiet']  = bool(int(os.environ['CHRIS_DEBUG_QUIET']))
 
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
