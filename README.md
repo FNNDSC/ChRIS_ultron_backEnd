@@ -12,7 +12,7 @@ This page describes how to quickly get the set of services comprising the backen
 
 ### Preconditions
 
-#### Currently tested platforms
+#### Install latest Docker and Docker Compose. Currently tested platforms
 * ``Docker 17.04.0+``
 * ``Docker Compose 1.10.0+``
 * ``Ubuntu (16.04/17.04/17.10) and MAC OS X 10.11+``
@@ -144,21 +144,21 @@ http -a cube:cube1234 POST http://localhost:8000/api/v1/plugins/1/instances/ Con
 ```
 
 ### Using swift client to list files in the users bucket
+```bash
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
-
+```
 
 ### REST API Documentation
+
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
 
 Install Sphinx and the http extension (useful to document the REST API)
-
 ```
 pip install Sphinx
 pip install sphinxcontrib-httpdomain
 ```
 
 Build the html documentation
-
 ```
 cd docs/
 make html
