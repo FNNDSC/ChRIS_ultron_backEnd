@@ -41,47 +41,56 @@ class Charm():
         else:
             return self.__name
 
-    def qprint(self, msg, **kwargs):
-
-        str_teeFile = ''
-        str_teeMode = 'w+'
-
-        str_comms  = "status"
-        for k,v in kwargs.items():
-            if k == 'comms'     :   str_comms   = v
-            if k == 'teeFile'   :   str_teeFile = v
-            if k == 'teeMode'   :   str_teeMode = v  
-
-        if self.b_useDebug:
-            write   = self.debug
+    def verbosity(self, *args):
+        """
+        get/set the descriptive name text of this object.
+        """
+        if len(args):
+            self.dp.verbosity = args[0]
         else:
-            write   = print
+            return self.dp.verbosity
 
-        if len(str_teeFile):
-            tf      = open(str_teeFile, str_teeMode)
+    # def qprint(self, msg, **kwargs):
 
-        # pudb.set_trace()
+    #     str_teeFile = ''
+    #     str_teeMode = 'w+'
 
-        str_caller  = inspect.stack()[1][3]
+    #     str_comms  = "status"
+    #     for k,v in kwargs.items():
+    #         if k == 'comms'     :   str_comms   = v
+    #         if k == 'teeFile'   :   str_teeFile = v
+    #         if k == 'teeMode'   :   str_teeMode = v  
 
-        str_print   = ''
-        if not self.b_quiet:
-            if not self.b_useDebug:
-                if str_comms == 'status':   write(pfurl.Colors.PURPLE,    end="")
-                if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
-                if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
-                str_print = '%s' % datetime.datetime.now() + " "
-                write(str_print,       end="")
-            str_print += ' | ' + self.__name__ + "." + str_caller + '() | ' + msg
-            write(str_print)
-            if not self.b_useDebug:
-                if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
-                if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
-                write(pfurl.Colors.NO_COLOUR, end="")
-            if len(str_teeFile):
-                tf.write(str_print)
-                tf.close()
+    #     if self.b_useDebug:
+    #         write   = self.debug
+    #     else:
+    #         write   = print
+
+    #     if len(str_teeFile):
+    #         tf      = open(str_teeFile, str_teeMode)
+
+    #     # pudb.set_trace()
+
+    #     str_caller  = inspect.stack()[1][3]
+
+    #     str_print   = ''
+    #     if not self.b_quiet:
+    #         if not self.b_useDebug:
+    #             if str_comms == 'status':   write(pfurl.Colors.PURPLE,    end="")
+    #             if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
+    #             if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
+    #             if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
+    #             str_print = '%s' % datetime.datetime.now() + " "
+    #             write(str_print,       end="")
+    #         str_print += ' | ' + self.__name__ + "." + str_caller + '() | ' + msg
+    #         write(str_print)
+    #         if not self.b_useDebug:
+    #             if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
+    #             if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
+    #             write(pfurl.Colors.NO_COLOUR, end="")
+    #         if len(str_teeFile):
+    #             tf.write(str_print)
+    #             tf.close()
 
     def col2_print(self, str_left, str_right):
         print(pfurl.Colors.WHITE +
@@ -114,7 +123,7 @@ class Charm():
         self.d_msg                  = {}
         self.str_protocol           = "http"
 
-        self.dp                         = pfmisc.debug(    
+        self.dp                     = pfmisc.debug(    
                                             verbosity   = 0,
                                             level       = -1,
                                             within      = self.__name__ 
