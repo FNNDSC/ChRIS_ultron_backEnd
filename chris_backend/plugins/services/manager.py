@@ -304,11 +304,10 @@ class PluginManager(object):
         """
         str_responseStatus  = ''
         # pudb.set_trace()
-        chris2service   = charm.Charm(
-            plugin_inst = plugin_inst,
-            **kwargs
+        chris_service   = charm.Charm(
+            plugin_inst = plugin_inst
         )
-        str_responseStatus = chris2service.app_statusCheckAndRegister()
+        str_responseStatus = chris_service.app_statusCheckAndRegister()
         return str_responseStatus
 
 
