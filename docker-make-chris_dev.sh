@@ -6,7 +6,9 @@
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh [-r <service>] [-p] [-s] [-i] [local|fnndsc[:dev]]
+#   docker-make-chris_dev.sh    [-r <service>]      \
+#                               [-p] [-s] [-i] [-d] \
+#                               [local|fnndsc[:dev]]
 #
 # DESC
 # 
@@ -46,6 +48,11 @@
 #
 #               docker stop <ID> && docker rm -vf <ID> && *make* -r <service> 
 #
+#   -d
+#
+#       Optional debug ON. If specified, trigger verbose output during
+#       run, especially during testing. Useful for debugging.
+#
 #   [local|fnndsc[:dev]] (optional, default = 'fnndsc')
 #
 #       If specified, denotes the container "family" to use.
@@ -71,6 +78,7 @@ declare -i b_restart=0
 declare -i b_pause=0
 declare -i b_skip=0
 declare -i b_norestartinteractive_chris_dev=0
+declare -i b_debug=0
 RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
@@ -82,13 +90,14 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psi" opt; do
+while getopts "r:psid" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
         p) b_pause=1                            ;;
         s) b_skip=1                             ;;
         i) b_norestartinteractive_chris_dev=1   ;;
+        d) b_debug=1                            ;;
     esac
 done
 
@@ -118,6 +127,10 @@ title -d 1 "Setting global exports..."
     echo -e "${STEP}.1 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
     export STOREBASE=$(pwd)
     cd $HERE
+    if (( b_debug )) ; then
+        echo -e "${STEP}.2 Setting debug quiet to OFF. Note this is noisy!"
+        export CHRIS_DEBUG_QUIET=0
+    fi
 windowBottom
 
 
