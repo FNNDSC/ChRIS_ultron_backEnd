@@ -32,7 +32,13 @@ mkdir ~/Python_Envs
 
 You might want to add to your .bashrc file these two lines:
 ```bash
-source .bashrc
+export WORKON_HOME=~/Python_Envs
+source /usr/local/bin/virtualenvwrapper.sh
+```
+
+Then you can source your ``.bashrc`` and create a new Python3 virtual environment:
+
+```bash
 mkvirtualenv --python=python3 chris_env
 ```
 
@@ -53,13 +59,15 @@ git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 
 #### Install useful python tools in your virtual environment
 ```bash
+cd ChRIS_ultron_backEnd
+workon chris_env
 pip install httpie
 pip install django-storage-swift
 pip install docker
 ```
 
 You can also install some python libraries (not all of them) specified in the ``requirements/local.txt`` and 
-``requirements/local.txt`` files within the source repo
+``requirements/local.txt`` files in the source repo
 
 
 To list installed dependencies in chris_env:
@@ -78,7 +86,6 @@ pip freeze --local
 Start CUBE from the repository source directory by running the make bash script
 
 ```bash
-cd ChRIS_ultron_backEnd
 ./docker-make-chris_dev.sh
 ```
 All the steps performed by the above script are properly documented in the script itself. 
