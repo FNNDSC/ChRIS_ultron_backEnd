@@ -17,6 +17,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./chris_backend:/usr/src/chris_backend
       - /data:/data
+    environment:
+      - CHRIS_DEBUG_QUIET
     ports:
       - "8000:8000"
     depends_on:
