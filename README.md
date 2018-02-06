@@ -2,187 +2,156 @@
 [![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
 [![Code Climate](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd/badges/gpa.svg)](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd)
 
-Back end for ChRIS Ultron.
+Back end for ChRIS Ultron. This is a Django-MySQL project.
 
-## Development environment
-This is a Django-MySQL project.
+## ChRIS development and testing
 
-On ubuntu:
+### Abstract
 
-**NB: do NOT set a root password for the mysql data base in the following!**
+This page describes how to quickly get the set of services comprising the backend up and running for development and how to run the automated tests.
 
-````
-sudo apt-get update
-sudo apt-get install git
-sudo apt-get install mysql-server
-sudo apt-get install apache2 apache2-dev
-sudo apt-get install python-pip python3-dev libmysqlclient-dev
-sudo apt-get install libssl-dev libcurl4-openssl-dev
-sudo pip install virtualenv virtualenvwrapper
-````
+### Preconditions
 
+#### Currently tested platforms
+* ``Docker 17.04.0+``
+* ``Docker Compose 1.10.0+``
+* ``Ubuntu (16.04/17.04/17.10) and MAC OS X 10.11+``
+
+#### Make sure to add your computer user to the ``docker group`` in your machine
+
+#### Install virtualenv
+```bash
+pip install virtualenv virtualenvwrapper
+```
+
+#### Setup your virtual environments
 Create a directory for your virtual environments e.g.:
-
-````
+```bash
 mkdir ~/Python_Envs
-````
+```
 
 You might want to add to your .bashrc file these two lines:
-
-````
-export WORKON_HOME=~/Python_Envs
-source /usr/local/bin/virtualenvwrapper.sh
-````
-
-Then you can source your .bashrc and create a new Python3 virtual environment:
-
-````
+```bash
 source .bashrc
 mkvirtualenv --python=python3 chris_env
-````
+```
 
 To activate chris_env:
-
-````
+```bash
 workon chris_env
-````
+```
 
 To deactivate chris_env:
-
-````
+```bash
 deactivate
-````
-
-### Development database:
-
-To create the development database, do
-
-```
-sudo mysql
 ```
 
-Now create a local database on MySQL's shell:
-
-````
-CREATE DATABASE chris_dev CHARACTER SET utf8;
-````
-
-This ensures all tables and columns will use UTF-8 by default
-
-Grant all privileges to user chris on the database:
-
-````
-GRANT ALL ON chris_dev.* TO 'chris'@'localhost' IDENTIFIED BY 'Chris1234';
-````
-
-### Check out the repo
-
-Now, check out the repo:
-
-```
+#### Checkout the Github repo
+```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 ```
 
-### Dependencies:
-This project uses requirement files to install dependencies in chris_env through pip:
+#### Install useful python tools in your virtual environment
+```bash
+pip install httpie
+pip install django-storage-swift
+pip install docker
+```
 
-````
-cd ChRIS_ultron_backEnd
-pip install -r requirements/local.txt
-````
+You can also install some python libraries (not all of them) specified in the ``requirements/local.txt`` and 
+``requirements/local.txt`` files within the source repo
+
 
 To list installed dependencies in chris_env:
-
-````
+```
 pip freeze --local
-````
-
-### Testing:
-````
-cd chris_backend
-python manage.py migrate
-python manage.py test
-````
-If errors are gotten because of user chris not having enough database privilages then
-just give it all privilages in mysql:
-
-````
-GRANT ALL PRIVILEGES ON *.* TO 'chris'@'localhost';
-````
-
-### First steps
-
-(See here for detailed instructions:
-
-First, create two users (one called 'chris' and one called <yourusername>)
-
-```
-# for user 'chris'
-python manage.py createsuperuser
 ```
 
-and again:
+#### Containerized data/processing services:
 
+* ``pfcon``
+* ``pfioh``
+* ``pman``
+
+### Instantiate CUBE
+
+Start CUBE from the repository source directory by running the make bash script
+
+```bash
+cd ChRIS_ultron_backEnd
+./docker-make-chris_dev.sh
 ```
-# for user <yourusername>
-python manage.py createsuperuser
+All the steps performed by the above script are properly documented in the script itself. 
+
+After running this script all the automated tests should have successfully run and a Django development server should be running in interactive mode in this terminal.
+
+### Rerun automated tests after modifying source code
+
+Open another terminal and run 
+```bash
+docker ps
 ```
+Find out from the previous output the name of the container running the Django server in interactive mode (usually *chrisultronbackend_chris_dev_run_1*) and run the Unit tests and Integration tests within that container. For instance to run only the Unit tests:
 
-Now you can start the backend server
-
-```
-python manage.py runserver
-```
-
-Perform a simple GET request:
-
-```
-http http://127.0.0.1:8000/api/v1/
-```
-
-#### Troubleshooting
-
-You might experience some issues with localhost/actual IP depending on local setup and possibly if you have a proxy. In that case, start the server with an actual <IP>:<port> 
-
-```
-python manage.py runserver XXX.YYY.ZZZ.WWW:8000
-```
-
-and connect to it explicitly:
-
-```
-http http://XXX.YYY.ZZZ.WWW:8000/
+```bash
+docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test --exclude-tag integration
 ```
 
-### Testing the API over HTTPS
+To run only the Integration tests:
 
-Run modwsgi Apache-based server:
-```
-python manage.py runmodwsgi --host 0.0.0.0 --port 8001 --https-port 8000 --ssl-certificate-file ../utils/ssl_cert/local.crt --ssl-certificate-key-file ../utils/ssl_cert/local.key --processes 8 --server-name localhost --https-only --reload-on-changes
-```
-
-Make requests over https with the self-signed SSL certificate:
-
-```
-http https://localhost:8000/api/v1/ --verify=../utils/ssl_cert/local.crt
+```bash
+docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test --tag integration
 ```
 
-Self-signed "localhost" certificates can be generated again if necessary:
-```
-openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days 365 -keyout local.key -out local.crt  (server name should be set to "localhost" in the interactive questions)
+To run only the Integration tests if the environment has not been restarted in interactive mode (usual for debugging when the make script has been passed a ``-i``:
+
+```bash
+docker exec -it chrisultronbackend_chris_dev_1 python manage.py test --tag integration
 ```
 
-### Documentation
 
+To run all the tests:
+
+```bash
+docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test 
+```
+
+After running the Integration tests the ./FS/remote directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
+
+### Check code coverage of the automated tests
+Make sure the **chris_backend/** dir is world writable. Then type:
+
+```bash
+docker exec -it chrisultronbackend_chris_dev_run_1 coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
+docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
+```
+
+### Using httpie to play with the REST API 
+A simple GET request:
+```bash
+http http://localhost:8000/api/v1/
+```
+A simple POST request:
+```bash
+http -a cube:cube1234 POST http://localhost:8000/api/v1/plugins/1/instances/ Content-Type:application/vnd.collection+json Accept:application/vnd.collection+json template:='{"data":[{"name":"dir","value":"./"}]}'
+```
+
+### Using swift client to list files in the users bucket
+swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
+
+
+### REST API Documentation
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
 
 Install Sphinx and the http extension (useful to document the REST API)
+
 ```
 pip install Sphinx
 pip install sphinxcontrib-httpdomain
 ```
 
 Build the html documentation
+
 ```
 cd docs/
 make html
