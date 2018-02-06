@@ -1,4 +1,3 @@
-language: python
 dist: xenial
 services:
   - docker
