@@ -16,7 +16,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./chris_backend:/usr/src/chris_backend
-      - /data:/data
+      - ./FS/data:/data
     environment:
       - CHRIS_DEBUG_QUIET
     ports:
@@ -55,7 +55,7 @@ services:
   pfcon_service:
     image:  ${CREPO}/pfcon${TAG}
     volumes:
-      - /data:/data
+      - ./FS/data:/data
     command: ["--forever", "--httpResponse"]
     ports:
       - "5005:5005"
