@@ -10,6 +10,6 @@ before_script:
   - docker-compose exec chris_dev python manage.py migrate
 # command to run both Unit and Integration tests
 script:
-  - travis_wait 30 docker-compose exec -T chris_dev python manage.py test --exclude-tag integration
+  - docker-compose exec chris_dev python manage.py test --exclude-tag integration; echo "done"
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
