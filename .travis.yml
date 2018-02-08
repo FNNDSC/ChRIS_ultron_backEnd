@@ -17,7 +17,7 @@ before_install:
    stable"
   - sudo apt-get update
   - sudo apt-cache madison docker-ce
-  - sudo apt-get install docker-ce=<DOCKER_VERSION>
+  - sudo apt-get install docker-ce=${DOCKER_VERSION}
   # update docker compose
   - sudo curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
   - sudo chmod +x docker-compose
