@@ -3,7 +3,7 @@ services:
   - docker
   
 env:
-  DOCKER_VERSION: 17.09
+  DOCKER_VERSION: 18.02.0~ce-0~ubuntu
   DOCKER_COMPOSE_VERSION: 1.17.0
   
 before_install:
@@ -33,7 +33,7 @@ before_script:
   - docker-compose exec chris_dev python manage.py migrate
 
 script:
-  - docker-compose exec chris_dev python manage.py test feeds --exclude-tag integration
+  - docker-compose exec chris_dev python manage.py test --exclude-tag integration
 
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
