@@ -2,6 +2,9 @@ sudo: required
 services:
   - docker
   
+env:
+  COMPOSE_VERSION: 1.4.1
+  
 before_install:
  - curl -L https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
  - chmod +x docker-compose
