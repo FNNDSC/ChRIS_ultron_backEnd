@@ -192,13 +192,17 @@ class PluginManagerTests(TestCase):
                                        outputDirOverride   = '/share/outgoing',
                                        IOPhost             = 'host'
         )
+
+        # After submitting run request, wait before checking status
+        # time.sleep(5)
+
         self.pl_manager.check_plugin_app_exec_status(pl_inst)
         self.assertEqual(pl_inst.status, 'started')
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 2 second intervals.
-        maxLoopTries    = 10
+        maxLoopTries    = 20
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
@@ -211,6 +215,8 @@ class PluginManagerTests(TestCase):
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
         
+        # if pl_inst.status != 'finishedSuccessfully':
+        #     pudb.set_trace()
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
         # self.assertEqual(pl_inst.status, 'pushPath:True;compute:True;pullPath:True;')
         str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')
