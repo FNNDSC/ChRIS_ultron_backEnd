@@ -6,7 +6,7 @@ services:
 before_install:
   - docker-compose -v
   - docker -v
-  - travis_wait 30 docker build -t fnndsc/chris_dev_backend . #TODO: ravig, Remove this.Tagging local image as fnndsc to avoid confusion in docker compose
+  - travis_wait 30 docker build -t fnndsc/chris_dev_backend .
 before_script:
   - docker-compose up -d
   - docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
@@ -14,6 +14,6 @@ before_script:
   - docker-compose exec chris_dev python manage.py migrate
 # command to run both Unit and Integration tests
 script:
-  - docker-compose exec chris_dev python manage.py test --exclude-tag integration; echo "done"
+  - docker-compose exec chris_dev python manage.py test feeds --exclude-tag integration
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
