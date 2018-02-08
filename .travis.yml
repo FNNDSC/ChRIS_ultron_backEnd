@@ -1,17 +1,18 @@
-language: python
-dist: xenial
+sudo: required
 services:
   - docker
+  
 before_install:
-  - sudo rm /usr/local/bin/docker-compose
-  - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
-  - chmod +x docker-compose
-  - sudo mv docker-compose /usr/local/bin
+ - curl -L https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+ - chmod +x docker-compose
+ - sudo mv docker-compose /usr/local/bin
+
 before_script:
   - /usr/local/bin/docker-compose up -d
   - /usr/local/bin/docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - /usr/local/bin/docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
   - /usr/local/bin/docker-compose exec chris_dev python manage.py migrate
+
 # command to run both Unit and Integration tests
 script:
   - echo "hi"
