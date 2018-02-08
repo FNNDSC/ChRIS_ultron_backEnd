@@ -14,6 +14,6 @@ before_script:
   - docker-compose exec chris_dev python manage.py migrate
 # command to run both Unit and Integration tests
 script:
-  - docker-compose exec chris_dev python manage.py test
+  - echo "hi"
 notifications:
   slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
