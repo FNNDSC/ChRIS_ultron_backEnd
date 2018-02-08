@@ -37,7 +37,7 @@ before_script:
 
 # command to run both Unit and Integration tests
 script:
-  - docker-compose exec chris_dev python manage.py test --exclude-tag integration
+  - docker-compose exec chris_dev python manage.py test
 
 notifications:
 slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
