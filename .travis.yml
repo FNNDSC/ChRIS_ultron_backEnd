@@ -1,19 +1,43 @@
 sudo: required
-language: Python
-dist: xenial
+
 services:
   - docker
+
+env:
+  DOCKER_VERSION: 18.02.0~ce-0~ubuntu
+  DOCKER_COMPOSE_VERSION: 1.17.0
+
 before_install:
-  - docker-compose -v
+  # update docker
+  - sudo apt-get remove docker docker-engine docker.io
+  - sudo apt-get update
+  - sudo apt-get install linux-image-extra-$(uname -r) linux-image-extra-virtual
+  - sudo apt-get install apt-transport-https ca-certificates curl software-properties-common
+  - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) \
+   stable"
+  - sudo apt-get update
+  - sudo apt-cache madison docker-ce
+  - sudo apt-get install docker-ce=${DOCKER_VERSION}
+  # update docker compose
+  - sudo curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - sudo chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin
   - docker -v
-  - travis_wait 30 docker build -t fnndsc/chris_dev_backend .
+  - docker-compose -v
+
+install:
+  - travis_wait docker build -t fnndsc/chris_dev_backend .
+
 before_script:
   - docker-compose up -d
   - docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
   - docker-compose exec chris_dev python manage.py migrate
+
 # command to run both Unit and Integration tests
 script:
-  - docker-compose exec chris_dev python manage.py test feeds --exclude-tag integration
+  - docker-compose exec chris_dev python manage.py test --exclude-tag integration
+
 notifications:
-  slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
+slack: fnndsc:gGPIVAOtMikWomA1EKrVYIjO
