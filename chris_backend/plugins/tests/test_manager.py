@@ -20,8 +20,8 @@ class PluginManagerTests(TestCase):
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_docker_image_name = "fnndsc/pl-simpledsapp"
-        self.username = 'datafoo'
-        self.password = 'foopass'
+        self.username = 'data/foo'
+        self.password = 'foo-pass'
         self.pl_manager = manager.PluginManager()
 
         # create a plugin
