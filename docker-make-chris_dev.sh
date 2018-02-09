@@ -6,15 +6,10 @@
 #
 # SYNPOSIS
 #
-<<<<<<< HEAD
 #   docker-make-chris_dev.sh    [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
-=======
-#   docker-make-chris_dev.sh    [-r <service>]      \
-#                               [-p] [-s] [-i] [-d] \
-#                               [-U] [-I]           \
->>>>>>> 5d50e725889729f7215931374a47ca55e65644a7
+#                               [-U] [-I]                       \
 #                               [local|fnndsc[:dev]]
 #
 # DESC
