@@ -106,7 +106,7 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psidUIa" opt; do
+while getopts "r:psidUIa:" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
