@@ -6,8 +6,9 @@
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh    [-r <service>]      \
-#                               [-p] [-s] [-i] [-d] \
+#   docker-make-chris_dev.sh    [-r <service>]                  \
+#                               [-a <swarm-advertise-adr>]      \
+#                               [-p] [-s] [-i] [-d]             \
 #                               [local|fnndsc[:dev]]
 #
 # DESC
@@ -25,6 +26,10 @@
 #       Restart <service> in interactive mode. This is mainly for debugging
 #       and is typically used to restart the 'pfcon', 'pfioh', and 'pman' 
 #       services.
+#
+#   -a <swarm-advertise-adr>
+#
+#       If specified, pass <swarm-advertise-adr> to swarm init.
 #
 #   -i 
 #
@@ -79,6 +84,8 @@ declare -i b_pause=0
 declare -i b_skip=0
 declare -i b_norestartinteractive_chris_dev=0
 declare -i b_debug=0
+declare -i b_swarmAdvertiseAdr=0
+SWARMADVERTISEADDR=""
 RESTART=""
 HERE=$(pwd)
 echo "Starting script in dir $HERE"
@@ -90,13 +97,15 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psid" opt; do
+while getopts "r:psida:" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
         p) b_pause=1                            ;;
         s) b_skip=1                             ;;
         i) b_norestartinteractive_chris_dev=1   ;;
+        a) b_swarmAdvertiseAdr=1
+            SWARMADVERTISEADDR=$OPTARG          ;;
         d) b_debug=1                            ;;
     esac
 done
@@ -191,7 +200,11 @@ else
 
     title -d 1 "Stopping and restarting the docker swarm... "
     docker swarm leave --force
-    docker swarm init
+    if (( b_swarmAdvertiseAdr )) ; then
+        docker swarm init --advertise-addr=$SWARMADVERTISEADDR
+    else
+        docker swarm init
+    fi
     windowBottom
 
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
