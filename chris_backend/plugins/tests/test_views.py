@@ -294,10 +294,13 @@ class PluginInstanceDetailViewTests(ViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, "simplefsapp")
 
+        # After submitting run request, wait before checking status
+        # time.sleep(5)
+
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 2 second intervals.
-        maxLoopTries    = 10
+        maxLoopTries    = 20
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:

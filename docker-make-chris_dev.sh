@@ -6,9 +6,15 @@
 #
 # SYNPOSIS
 #
+<<<<<<< HEAD
 #   docker-make-chris_dev.sh    [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
+=======
+#   docker-make-chris_dev.sh    [-r <service>]      \
+#                               [-p] [-s] [-i] [-d] \
+#                               [-U] [-I]           \
+>>>>>>> 5d50e725889729f7215931374a47ca55e65644a7
 #                               [local|fnndsc[:dev]]
 #
 # DESC
@@ -20,6 +26,14 @@
 #   declarative environment of the docker-compose.yml contents.
 #
 # ARGS
+#
+#   -U
+#
+#       Skip the UNIT tests.
+#
+#   -I
+#
+#       Skip the INTEGRATION tests.
 #
 #   -r <service>
 #   
@@ -81,7 +95,7 @@ source ./decorate.sh
 declare -i STEP=0
 declare -i b_restart=0
 declare -i b_pause=0
-declare -i b_skip=0
+declare -i b_skipIntro=0
 declare -i b_norestartinteractive_chris_dev=0
 declare -i b_debug=0
 declare -i b_swarmAdvertiseAdr=0
@@ -97,16 +111,18 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psida:" opt; do
+while getopts "r:psidUIa" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
         p) b_pause=1                            ;;
-        s) b_skip=1                             ;;
+        s) b_skipIntro=1                        ;;
         i) b_norestartinteractive_chris_dev=1   ;;
         a) b_swarmAdvertiseAdr=1
             SWARMADVERTISEADDR=$OPTARG          ;;
         d) b_debug=1                            ;;
+        U) b_skipUnitTests=1                    ;;
+        I) b_skipIntegrationTests=1             ;;
     esac
 done
 
@@ -142,14 +158,12 @@ title -d 1 "Setting global exports..."
     fi
 windowBottom
 
-
-
 if (( b_restart )) ; then
     docker-compose stop ${RESTART}_service && docker-compose rm -f ${RESTART}_service
     docker-compose run --service-ports ${RESTART}_service
 else
     title -d 1 "Using <$CREPO> family containers..."
-    if (( ! b_skip )) ; then 
+    if (( ! b_skipIntro )) ; then 
     if [[ $CREPO == "fnndsc" ]] ; then
             echo "Pulling latest version of all containers..."
             for CONTAINER in ${A_CONTAINER[@]} ; do
@@ -164,7 +178,7 @@ else
     fi
     windowBottom
 
-    if (( ! b_skip )) ; then 
+    if (( ! b_skipIntro )) ; then 
         title -d 1 "Will use containers with following version info:"
         for CONTAINER in ${A_CONTAINER[@]} ; do
             if [[   $CONTAINER != "chris_dev_backend"   && \
@@ -234,6 +248,8 @@ else
     chmod 777 FS/local
     mkdir -p FS/remote
     chmod 777 FS/remote
+    mkdir -p FS/data 
+    chmod 777 FS/data
     chmod 777 FS
     windowBottom
 
@@ -261,13 +277,17 @@ else
     docker-compose exec chris_dev python manage.py migrate
     windowBottom
 
-    title -d 1 "Running Django Unit tests..."
-    docker-compose exec chris_dev python manage.py test --exclude-tag integration
-    windowBottom
+    if (( ! b_skipUnitTests )) ; then
+        title -d 1 "Running Django Unit tests..."
+        docker-compose exec chris_dev python manage.py test --exclude-tag integration
+        windowBottom
+    fi
 
-    title -d 1 "Running Django Integration tests..."
-    docker-compose exec chris_dev python manage.py test --tag integration
-    windowBottom
+    if (( ! b_skipIntegrationTests )) ; then
+        title -d 1 "Running Django Integration tests..."
+        docker-compose exec chris_dev python manage.py test --tag integration
+        windowBottom
+    fi
 
     title -d 1 "Registering plugins..."
     # Declare an array variable for the list of plugin dock images

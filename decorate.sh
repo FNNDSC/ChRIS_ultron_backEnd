@@ -82,7 +82,7 @@ function title {
     if (( ${#MSG2} )) ; then
         TITLE2=$(echo " $MSG2 ")
         LEN2=$(echo "$TITLE2" | awk -F\| {'printf("%s", length($1));'})
-        MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 39+length($1)/2, $1, 40-length($1)/2, "");'})
+        MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
     fi
     printf "\n"
     DATE=" $(date) [$(hostname)] "
