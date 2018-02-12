@@ -212,7 +212,7 @@ else
     if (( b_swarmAdvertiseAdr )) ; then
         docker swarm init --advertise-addr=$SWARMADVERTISEADDR
     else
-        docker swarm init
+        docker swarm init --advertise-addr 127.0.0.1
     fi
     windowBottom
 
