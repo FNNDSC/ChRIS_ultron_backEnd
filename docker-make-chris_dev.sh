@@ -10,6 +10,7 @@
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
+#                               [-S <storeBaseOverride>]        \
 #                               [local|fnndsc[:dev]]
 #
 # DESC
@@ -29,6 +30,13 @@
 #   -I
 #
 #       Skip the INTEGRATION tests.
+#
+#   -S <storeBaseOverride>
+#
+#       Explicitly set the STOREBASE dir to <storeBaseOverride>. This is useful
+#       mostly in non-Linux hosts (like macOS) where there might be a mismatch
+#       between the actual STOREBASE path and the text of the path shared between 
+#       the macOS host and the docker VM. 
 #
 #   -r <service>
 #   
@@ -94,6 +102,7 @@ declare -i b_skipIntro=0
 declare -i b_norestartinteractive_chris_dev=0
 declare -i b_debug=0
 declare -i b_swarmAdvertiseAdr=0
+declare -i b_storeBaseOverride=0
 SWARMADVERTISEADDR=""
 RESTART=""
 HERE=$(pwd)
@@ -106,7 +115,7 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psidUIa:" opt; do
+while getopts "r:psidUIa:S:" opt; do
     case $opt in 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
@@ -118,6 +127,8 @@ while getopts "r:psidUIa:" opt; do
         d) b_debug=1                            ;;
         U) b_skipUnitTests=1                    ;;
         I) b_skipIntegrationTests=1             ;;
+        S) b_storeBaseOverride=1
+           STOREBASE=$OPTARG                    ;;
     esac
 done
 
@@ -143,10 +154,16 @@ declare -a A_CONTAINER=(
 )
 
 title -d 1 "Setting global exports..."
-    cd FS/remote
-    echo -e "${STEP}.1 For pman override to swarm containers, exporting\n\tSTOREBASE=$(pwd)... "
-    export STOREBASE=$(pwd)
-    cd $HERE
+    if (( ! b_storeBaseOverride )) ; then
+        if [[ ! -d FS/remote ]] ; then
+            mkdir -p FS/remote
+        fi
+        cd FS/remote
+        STOREBASE=$(pwd)
+        cd $HERE
+    fi
+    echo -e "${STEP}.1 For pman override to swarm containers, exporting\n\tSTOREBASE=$STOREBASE... "
+    export STOREBASE=$STOREBASE
     if (( b_debug )) ; then
         echo -e "${STEP}.2 Setting debug quiet to OFF. Note this is noisy!"
         export CHRIS_DEBUG_QUIET=0
@@ -246,6 +263,10 @@ else
     mkdir -p FS/data 
     chmod 777 FS/data
     chmod 777 FS
+    type -all tree >/dev/null 2>/dev/null
+    if (( ! $? )) ; then
+        tree FS
+    fi
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
