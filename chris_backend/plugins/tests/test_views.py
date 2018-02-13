@@ -193,31 +193,32 @@ class PluginInstanceListViewTests(ViewTests):
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+        try:
+            # create test directory where files are created
+            self.test_dir = settings.MEDIA_ROOT + '/test'
+            settings.MEDIA_ROOT = self.test_dir
+            if not os.path.exists(self.test_dir):
+                os.makedirs(self.test_dir)
 
-        # add a plugin to the system though the plugin manager
-        pl_manager = PluginManager()
-        pl_manager.add_plugin('fnndsc/pl-simplefsapp')
-        plugin = Plugin.objects.get(name="simplefsapp")
-        self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+            # add a plugin to the system though the plugin manager
+            pl_manager = PluginManager()
+            pl_manager.add_plugin('fnndsc/pl-simplefsapp')
+            plugin = Plugin.objects.get(name="simplefsapp")
+            self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
 
-        # create a simplefsapp plugin instance
-        user = User.objects.get(username=self.username)
-        PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+            # create a simplefsapp plugin instance
+            user = User.objects.get(username=self.username)
+            PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
 
-        # make API request
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        # remove test directory
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(self.create_read_url, data=self.post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        finally:
+            # remove test directory
+            shutil.rmtree(self.test_dir, ignore_errors=True)
+            settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -265,60 +266,61 @@ class PluginInstanceDetailViewTests(ViewTests):
 
     @tag('integration')
     def test_integration_plugin_instance_detail_success(self):
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+        try:
+            # create test directory where files are created
+            self.test_dir = settings.MEDIA_ROOT + '/test'
+            settings.MEDIA_ROOT = self.test_dir
+            if not os.path.exists(self.test_dir):
+                os.makedirs(self.test_dir)
 
-        # add a plugin to the system through the plugin manager
-        pl_manager = PluginManager()
-        pl_manager.add_plugin('fnndsc/pl-simplefsapp')
+            # add a plugin to the system through the plugin manager
+            pl_manager = PluginManager()
+            pl_manager.add_plugin('fnndsc/pl-simplefsapp')
 
-        # create a simplefsapp plugin instance
-        plugin = Plugin.objects.get(name='simplefsapp')
-        user = User.objects.get(username=self.username)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
-        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
+            # create a simplefsapp plugin instance
+            plugin = Plugin.objects.get(name='simplefsapp')
+            user = User.objects.get(username=self.username)
+            (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+            self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
 
-        # run the plugin instance
-        pl_manager.run_plugin_app(  pl_inst,
-                                    {'dir': './'},
-                                    service             = 'pfcon',
-                                    inputDirOverride    = '/share/incoming',
-                                    outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = 'host')
+            # run the plugin instance
+            pl_manager.run_plugin_app(  pl_inst,
+                                        {'dir': './'},
+                                        service             = 'pfcon',
+                                        inputDirOverride    = '/share/incoming',
+                                        outputDirOverride   = '/share/outgoing',
+                                        IOPhost             = 'host')
 
-        # make API request
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
-        self.assertContains(response, "simplefsapp")
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.get(self.read_url)
+            self.assertContains(response, "simplefsapp")
 
-        # After submitting run request, wait before checking status
-        # time.sleep(5)
+            # After submitting run request, wait before checking status
+            # time.sleep(5)
 
-        # In the following we keep checking the status until the job ends with
-        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 2 second intervals.
-        maxLoopTries    = 20
-        currentLoop     = 1
-        b_checkAgain    = True
-        while b_checkAgain:
-            response            = self.client.get(self.read_url)
-            str_responseStatus  = response.data['status']
-            if str_responseStatus == 'finishedSuccessfully':
-                b_checkAgain = False
-            else:
-                time.sleep(2)
-            currentLoop += 1
-            if currentLoop == maxLoopTries:
-                b_checkAgain = False
+            # In the following we keep checking the status until the job ends with
+            # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+            # max number of attempts at 2 second intervals.
+            maxLoopTries    = 20
+            currentLoop     = 1
+            b_checkAgain    = True
+            while b_checkAgain:
+                response            = self.client.get(self.read_url)
+                str_responseStatus  = response.data['status']
+                if str_responseStatus == 'finishedSuccessfully':
+                    b_checkAgain = False
+                else:
+                    time.sleep(2)
+                currentLoop += 1
+                if currentLoop == maxLoopTries:
+                    b_checkAgain = False
 
-        self.assertContains(response, "finishedSuccessfully")
-
-        # remove test directory
-        shutil.rmtree(self.test_dir, ignore_errors=True)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+            self.assertContains(response, "finishedSuccessfully")
+        finally:
+            # remove test directory
+            shutil.rmtree(self.test_dir, ignore_errors=True)
+            settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)

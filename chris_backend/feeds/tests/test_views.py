@@ -409,6 +409,7 @@ class TagListViewTests(ViewTests):
         (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
         tag.feed = [feed]
         tag.save()
+        
     def test_tag_create_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,

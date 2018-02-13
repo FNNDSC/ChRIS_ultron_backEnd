@@ -205,7 +205,7 @@ class PluginInstanceModelTests(TestCase):
                             contents=file1.read(),
                             content_type='text/plain')
         # remove test directory
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
         pl_inst.register_output_files()
         self.assertEquals(FeedFile.objects.count(), 1)
