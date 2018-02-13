@@ -263,10 +263,29 @@ else
     mkdir -p FS/data 
     chmod 777 FS/data
     chmod 777 FS
+    b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
         tree FS
+        report=$(tree FS | tail -n 1)
+        if [[ "$report" != "3 directories, 0 files" ]] ; then 
+            b_FSOK=0
+        fi
+    else
+        report=$(find FS 2>/dev/null)
+        lines=$(cat "report" | wc -l)
+        if (( lines != 4 )) ; then
+            b_FSOK=0
+        fi
     fi
+    if (( ! b_FSOK )) ; then 
+        printf "\n${Red}There should only be 3 directories and no files in the FS tree!\n"
+        printf "${Yellow}Please manually clean/delete the entire FS tree and re-run.\n"
+        printf "${Yellow}\nThis script will now exit with code '1'.\n\n"
+        exit 1
+    fi
+
+
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
