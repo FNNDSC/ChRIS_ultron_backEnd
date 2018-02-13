@@ -273,7 +273,7 @@ else
         fi
     else
         report=$(find FS 2>/dev/null)
-        lines=$(cat "report" | wc -l)
+        lines=$(echo "$report" | wc -l)
         if (( lines != 4 )) ; then
             b_FSOK=0
         fi
