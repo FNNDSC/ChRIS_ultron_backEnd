@@ -6,7 +6,6 @@ charm - ChRIS / pfcon interface.
 
 import  os
 import  pprint
-import  datetime
 import  json
 import  pudb
 import  pfurl
@@ -15,6 +14,7 @@ import  pfmisc
 import  webob
 
 from urllib.parse import urlparse, parse_qs
+from django.utils import timezone
 from django.conf import settings
 
 
@@ -80,7 +80,7 @@ class Charm():
     #             if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
     #             if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
     #             if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
-    #             str_print = '%s' % datetime.datetime.now() + " "
+    #             str_print = '%s' % timezone.now() + " "
     #             write(str_print,       end="")
     #         str_print += ' | ' + self.__name__ + "." + str_caller + '() | ' + msg
     #         write(str_print)
@@ -648,7 +648,7 @@ class Charm():
             registeredFiles             = self.c_pluginInst.register_output_files()
             str_responseStatus          = 'finishedSuccessfully'
             self.c_pluginInst.status    = str_responseStatus
-            self.c_pluginInst.end_date  = datetime.datetime.now()
+            self.c_pluginInst.end_date  = timezone.now()
             self.dp.qprint('Registered %d files...' % registeredFiles)
             self.c_pluginInst.save()
             self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
