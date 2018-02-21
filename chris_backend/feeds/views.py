@@ -141,9 +141,11 @@ class FeedList(generics.ListAPIView):
         query_list = [reverse('feed-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
+        user = self.request.user
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request),
-                 'uploadedfiles': reverse('uploadedfile-list', request=request)}
+                 'uploadedfiles': reverse('uploadedfile-list', request=request),
+                 'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
         return services.append_collection_links(response, links)
 
 
