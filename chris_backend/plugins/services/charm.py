@@ -150,21 +150,19 @@ class Charm():
 
         self.LC                     = 40
         self.RC                     = 40
-        self.gpu_limit              = 0
 
         for key, val in kwargs.items():
-            if key == 'app_args':       self.l_appArgs      = val
-            if key == 'd_args':         self.d_args         = val
-            if key == 'plugin_inst':    self.c_pluginInst   = val
-            if key == 'plugin_repr':    self.d_pluginRepr   = val
-            if key == 'app':            self.app            = val
-            if key == 'inputdir':       self.str_inputdir   = val
-            if key == 'outputdir':      self.str_outputdir  = val
-            if key == 'useDebug':       self.b_useDebug     = val
-            if key == 'debugFile':      self.str_debugFile  = val
-            if key == 'quiet':          self.b_quiet        = val
-            if key == 'IOPhost':        self.str_IOPhost    = val
-            if key == 'gpu_limit':      self.gpu_limit      = val
+            if key == 'app_args':       self.l_appArgs         = val
+            if key == 'd_args':         self.d_args            = val
+            if key == 'plugin_inst':    self.c_pluginInst      = val
+            if key == 'plugin_repr':    self.d_pluginRepr      = val
+            if key == 'app':            self.app               = val
+            if key == 'inputdir':       self.str_inputdir      = val
+            if key == 'outputdir':      self.str_outputdir     = val
+            if key == 'useDebug':       self.b_useDebug        = val
+            if key == 'debugFile':      self.str_debugFile     = val
+            if key == 'quiet':          self.b_quiet           = val
+            if key == 'IOPhost':        self.str_IOPhost       = val
 
         if self.b_useDebug:
             self.debug                  = pfurl.Message(logTo = self.str_debugFile)
@@ -554,25 +552,28 @@ class Charm():
                     "service":              str_IOPhost
                 },
 
-                "meta-compute":  
+                "meta-compute":
                 {
-                    'cmd':      "$execshell " + self.str_cmd,
-                    'threaded': True,
-                    'auid':     self.c_pluginInst.owner.username,
-                    'jid':      str(self.d_pluginInst['id']),
-                    'gpu_limit':  self.gpu_limit,
-                    "container":   
+                    'cmd':               "$execshell " + self.str_cmd,
+                    'threaded':          True,
+                    'auid':              self.c_pluginInst.owner.username,
+                    'jid':               str(self.d_pluginInst['id']),
+                    'number_of_workers': str(self.d_pluginInst['number_of_workers']),
+                    'cpu_limit':         str(self.d_pluginInst['cpu_limit']),
+                    'memory_limit':      str(self.d_pluginInst['memory_limit']),
+                    'gpu_limit':         self.d_pluginInst['gpu_limit'],
+                    "container":
                     {
                         "target": 
                         {
                             "image":            self.c_pluginInst.plugin.dock_image,
                             "cmdParse":         True
                         },
-                        "manager": 
+                        "manager":
                         {
                             "image":            "fnndsc/swarm",
                             "app":              "swarm.py",
-                            "env":  
+                            "env":
                             {
                                 "meta-store":   "key",
                                 "serviceType":  "docker",

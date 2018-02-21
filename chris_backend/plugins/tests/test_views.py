@@ -189,7 +189,6 @@ class PluginInstanceListViewTests(ViewTests):
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    gpu_limit            = 0,
                                     IOPhost             = 'host')
 
     @tag('integration')

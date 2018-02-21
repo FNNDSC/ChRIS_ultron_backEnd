@@ -21,11 +21,11 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 
 from django.utils import timezone
 from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
+from plugins.models import CPUInt, MemoryInt
 from plugins.services import charm
 
 
 class PluginManager(object):
-
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
         group = parser.add_mutually_exclusive_group()
@@ -97,48 +97,44 @@ class PluginManager(object):
         # get representation from the corresponding app
         app_repr = self.get_plugin_app_representation(dock_image_name)
         name = self.get_plugin_name(app_repr)
+        max_cpu_limit, min_cpu_limit                 = self.get_cpu_limit(app_repr)
+        max_memory_limit, min_memory_limit           = self.get_memory_limit(app_repr)
+        max_number_of_workers, min_number_of_workers = self.get_number_of_workers(app_repr)
+        max_gpu_limit, min_gpu_limit                 = self.get_gpu_limit(app_repr)
 
         # check wether the plugin already exist
         existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
         if name in existing_plugin_names:
             raise ValueError("Plugin '%s' already exists in the system" % name)
 
-        # Validation for gpu limits.
-        min_gpu_limit = app_repr.get('min_gpu_limit')
-        max_gpu_limit = app_repr.get('max_gpu_limit')
-        if min_gpu_limit and max_gpu_limit and min_gpu_limit > max_gpu_limit:
-            raise ValueError("min value for gpu should be less than max value")
-
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
         plugin.dock_image = dock_image_name
-        plugin.type = app_repr['type']
-        plugin.authors = app_repr['authors']
-        plugin.title = app_repr['title']
-        plugin.category = app_repr['category']
-        plugin.description = app_repr['description']
+        plugin.type          = app_repr['type']
+        plugin.authors       = app_repr['authors']
+        plugin.title         = app_repr['title']
+        plugin.category      = app_repr['category']
+        plugin.description   = app_repr['description']
         plugin.documentation = app_repr['documentation']
-        plugin.license = app_repr['license']
-        plugin.version = app_repr['version']
-        plugin.min_gpu_limit = self.check_for_gpu_limits(min_gpu_limit)
-        plugin.max_gpu_limit = self.check_for_gpu_limits(max_gpu_limit)
+        plugin.license       = app_repr['license']
+        plugin.version       = app_repr['version']
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.maxint))
+        plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
+                                                           Plugin.defaults['cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.maxint))
+        plugin.min_memory_limit      = self.insert_default(min_memory_limit,
+                                                           Plugin.defaults['memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+        plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
         plugin.save()
 
         # add plugin's parameters to the db
         params = app_repr['parameters']
         for param in params:
             self._save_plugin_param(plugin, param)
-
-    def check_for_gpu_limits(self, limit):
-        """
-        Check for gpu limits and validates the input limits
-        :param limit Integer_gpu_limit: 
-        :return: 
-        """
-        if not limit or limit < 0:
-            return 0
-        return limit
 
     def get_plugin(self, name):
         """
@@ -166,17 +162,31 @@ class PluginManager(object):
         # get representation from the corresponding app
         app_repr = self.get_plugin_app_representation(dock_image_name)
         name = self.get_plugin_name(app_repr)
+        max_cpu_limit, min_cpu_limit                 = self.get_cpu_limit(app_repr)
+        max_memory_limit, min_memory_limit           = self.get_memory_limit(app_repr)
+        max_number_of_workers, min_number_of_workers = self.get_number_of_workers(app_repr)
+        max_gpu_limit, min_gpu_limit                 = self.get_gpu_limit(app_repr)
 
         # update plugin fields (type cannot be changed as 'ds' plugins cannot have created
         # a feed in the DB)
         plugin = self.get_plugin(name)
-        plugin.authors = app_repr['authors']
-        plugin.title = app_repr['title']
-        plugin.category = app_repr['category']
-        plugin.description = app_repr['description']
+        plugin.authors       = app_repr['authors']
+        plugin.title         = app_repr['title']
+        plugin.category      = app_repr['category']
+        plugin.description   = app_repr['description']
         plugin.documentation = app_repr['documentation']
-        plugin.license = app_repr['license']
-        plugin.version = app_repr['version']
+        plugin.license       = app_repr['license']
+        plugin.version       = app_repr['version']
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.maxint)
+        plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
+                                                           Plugin.defaults['cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.maxint)
+        plugin.min_memory_limit      = self.insert_default(min_memory_limit,
+                                                           Plugin.defaults['memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+        plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
 
         # add there are new parameters then add them
         new_params = app_repr['parameters']
@@ -187,6 +197,86 @@ class PluginManager(object):
 
         plugin.modification_date = timezone.now()
         plugin.save()
+
+    def get_gpu_limit(self, app_repr):
+        """
+        Validation for gpu limits.
+        """
+        min_gpu_limit = app_repr.get('min_gpu_limit')
+        max_gpu_limit = app_repr.get('max_gpu_limit')
+        try:
+            if max_gpu_limit:
+                max_gpu_limit = int(max_gpu_limit)
+                assert max_gpu_limit > 0
+            if min_gpu_limit:
+                min_gpu_limit = int(min_gpu_limit)
+                assert min_gpu_limit > 0
+        except (ValueError, AssertionError):
+            raise ValueError("gpu limit must be positive integer")
+        if min_gpu_limit and max_gpu_limit and min_gpu_limit > max_gpu_limit:
+            raise ValueError("min value for gpu should be less than max value")
+        return max_gpu_limit, min_gpu_limit
+
+    def get_cpu_limit(self, app_repr):
+        """
+        Validation for cpu limits.
+        """
+        min_cpu_limit = app_repr.get('min_cpu_limit')
+        max_cpu_limit = app_repr.get('max_cpu_limit')
+        if max_cpu_limit:
+            max_cpu_limit = CPUInt(max_cpu_limit)
+            if max_cpu_limit < Plugin.defaults['cpu_limit']:
+                max_cpu_limit = MemoryInt(Plugin.defaults['cpu_limit'])
+        if min_cpu_limit:
+            min_cpu_limit = CPUInt(min_cpu_limit)
+        if max_cpu_limit and min_cpu_limit and max_cpu_limit < min_cpu_limit:
+                raise ValueError("min cpu Limit should be less than max cpu limit.")
+        return max_cpu_limit, min_cpu_limit
+
+    def get_memory_limit(self, app_repr):
+        """
+        Validation for memory limits.
+        """
+        min_memory_limit = app_repr.get('min_memory_limit')
+        max_memory_limit = app_repr.get('max_memory_limit')
+        if max_memory_limit:
+            max_memory_limit = MemoryInt(max_memory_limit)
+            if max_memory_limit < Plugin.defaults['memory_limit']:
+                max_memory_limit = MemoryInt(Plugin.defaults['memory_limit'])
+        if min_memory_limit:
+            min_memory_limit = MemoryInt(min_memory_limit)
+        if max_memory_limit and min_memory_limit and max_memory_limit < min_memory_limit:
+                raise ValueError("min memory Limit should be less than max memory limit.")
+        return max_memory_limit, min_memory_limit
+
+    def get_number_of_workers(self, app_repr):
+        """
+        Validation for number of worker limits.
+        """
+        max_number_of_workers = app_repr.get('max_number_of_workers')
+        min_number_of_workers = app_repr.get('min_number_of_workers')
+        try:
+            if max_number_of_workers:
+                max_number_of_workers = int(max_number_of_workers)
+                assert max_number_of_workers > 0
+            if min_number_of_workers:
+                min_number_of_workers = int(min_number_of_workers)
+                assert min_number_of_workers > 0
+        except (ValueError, AssertionError):
+            raise ValueError("number of workers must be positive integer")
+        if max_number_of_workers and min_number_of_workers:
+            if max_number_of_workers < min_number_of_workers:
+                raise ValueError("min number of workers should be less than max number of workers.")
+        return max_number_of_workers, min_number_of_workers
+
+    def insert_default(self, value, default):
+        """
+        Return default if bool(value) is false. Else return the value.
+        """
+        if value:
+            return value
+        else:
+            return default
 
     def run(self, args=None):
         """
@@ -210,7 +300,6 @@ class PluginManager(object):
         # to the plugin input and output dir spaces.
         str_inputDirOverride        = ''
         str_outputDirOverride       = ''
-        int_gpuLimit = 0
 
         for k, v in kwargs.items():
             if k == 'useDebug':             self.b_useDebug         = v
@@ -220,7 +309,6 @@ class PluginManager(object):
             if k == 'inputDirOverride':     str_inputDirOverride    = v
             if k == 'outputDirOverride':    str_outputDirOverride   = v
             if k == 'IOPhost':              self.str_IOPhost        = v
-            if k == 'gpu_limit':            int_gpuLimit            = v
 
         plugin_repr = self.get_plugin_app_representation(plugin_inst.plugin.dock_image)
         # get input dir
@@ -266,7 +354,6 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            gpuLimit    = int_gpuLimit,
             quiet       = True
         )
 
@@ -336,5 +423,3 @@ class PluginManager(object):
 if __name__ == "__main__":
     manager = PluginManager()
     manager.run()
-
-
