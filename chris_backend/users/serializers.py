@@ -10,10 +10,13 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
                                                read_only=True)
     username = serializers.CharField(max_length=32,
                                      validators=[UniqueValidator(queryset=User.objects.all())])
+    email = serializers.EmailField(required=True,
+                                   validators=[UniqueValidator(queryset=User.objects.all())]
+    )
     password = serializers.CharField(min_length=6, max_length=100, write_only=True)
 
     def create(self, validated_data):
-        user = User(username=validated_data['username'])
+        user = User(username=validated_data['username'], email=validated_data['email'])
         user.set_password(validated_data['password'])
         user.save()
         return user
@@ -29,4 +32,4 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('url', 'username', 'feed', 'password')
+        fields = ('url', 'username', 'email', 'password', 'feed')
