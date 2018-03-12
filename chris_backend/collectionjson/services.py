@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 from django.core.urlresolvers import resolve
 
 from rest_framework.response import Response
+from rest_framework import serializers
+
 
 def get_list_response(list_view_instance, queryset):
     """
@@ -58,3 +60,17 @@ def append_collection_querylist(response, query_url_list):
         queries.append({'href': query_url, 'rel': 'search', "data": data})
     response.data["queries"] = queries
     return response
+
+
+def collection_serializer_is_valid(is_valid_method):
+    """
+    Convenience 'is_valid' method decorator to generate a properly formatted message
+    for serializers' validation errors.
+    """
+    def new_is_valid(*args, **kwargs):
+        try:
+            valid = is_valid_method(*args, **kwargs)
+        except serializers.ValidationError as error:
+            raise serializers.ValidationError({'detail': error})
+        return valid
+    return new_is_valid
