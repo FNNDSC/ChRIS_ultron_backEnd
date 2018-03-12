@@ -18,9 +18,10 @@ title -d 1 "Stopping the swarm..."
 windowBottom
 
 title -d 1 "Destroying persistent volumes..."
+    basedir=`pwd | xargs basename | awk '{print tolower($0)}'`
     a_PVOLS=(
-        "chrisultronbackend_chris_dev_db_data"
-        "chrisultronbackend_swift_storage"
+        "${basedir//_}_chris_dev_db_data"
+        "${basedir//_}_swift_storage"
     )
     for VOL in ${a_PVOLS[@]} ; do 
         read -p  "Do you want to remove persistent volume $VOL? " -n 1 -r

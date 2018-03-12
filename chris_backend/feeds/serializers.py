@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
+from collectionjson.services import collection_serializer_is_valid
 from .models import Note, Tag, Feed, Comment, FeedFile
 
 
@@ -17,6 +18,13 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
         model = Note
         fields = ('url', 'title', 'content', 'feed')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(NoteSerializer, self).is_valid(raise_exception=raise_exception)
+
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
@@ -26,6 +34,13 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Tag
         fields = ('url', 'name', 'owner', 'color', 'feed')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(TagSerializer, self).is_valid(raise_exception=raise_exception)
 
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
@@ -42,6 +57,13 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner',
                   'note', 'tags', 'comments', 'files', 'plugin_inst')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(FeedSerializer, self).is_valid(raise_exception=raise_exception)
 
     def validate_new_owner(self, username):
         """
@@ -63,6 +85,13 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Comment
         fields = ('url', 'title', 'owner', 'content', 'feed')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(CommentSerializer, self).is_valid(raise_exception=raise_exception)
 
 
 class FeedFileSerializer(serializers.HyperlinkedModelSerializer):

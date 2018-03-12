@@ -719,21 +719,6 @@ class FeedFileDetailViewTests(FeedFileViewTests):
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_feedfile_delete_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(FeedFile.objects.count(), 0)
-
-    def test_feedfile_delete_failure_unauthenticated(self):
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_feedfile_delete_failure_access_denied(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
 
 class FileResourceViewTests(FeedFileViewTests):
     """
