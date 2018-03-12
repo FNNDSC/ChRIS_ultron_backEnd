@@ -2,6 +2,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework import serializers
+from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
@@ -57,6 +58,13 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
                   'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
                   'float_param', 'bool_param', 'path_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
 
     def validate_previous(self, previous_id, plugin):
         """
