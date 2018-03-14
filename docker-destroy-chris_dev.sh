@@ -21,6 +21,7 @@ title -d 1 "Destroying persistent volumes..."
     basedir=`pwd | xargs basename | awk '{print tolower($0)}'`
     a_PVOLS=(
         "${basedir//_}_chris_dev_db_data"
+        "${basedir//_}_chris_store_dev_db_data"
         "${basedir//_}_swift_storage"
     )
     for VOL in ${a_PVOLS[@]} ; do 
