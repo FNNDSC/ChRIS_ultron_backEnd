@@ -103,6 +103,12 @@ class PluginManager(object):
         if name in existing_plugin_names:
             raise ValueError("Plugin '%s' already exists in the system" % name)
 
+        # Validation for gpu limits.
+        min_gpu_limit = app_repr.get('min_gpu_limit')
+        max_gpu_limit = app_repr.get('max_gpu_limit')
+        if min_gpu_limit and max_gpu_limit and min_gpu_limit > max_gpu_limit:
+            raise ValueError("min value for gpu should be less than max value")
+
         # add plugin to the db
         plugin = Plugin()
         plugin.name = name
@@ -115,12 +121,24 @@ class PluginManager(object):
         plugin.documentation = app_repr['documentation']
         plugin.license = app_repr['license']
         plugin.version = app_repr['version']
+        plugin.min_gpu_limit = self.check_for_gpu_limits(min_gpu_limit)
+        plugin.max_gpu_limit = self.check_for_gpu_limits(max_gpu_limit)
         plugin.save()
 
         # add plugin's parameters to the db
         params = app_repr['parameters']
         for param in params:
             self._save_plugin_param(plugin, param)
+
+    def check_for_gpu_limits(self, limit):
+        """
+        Check for gpu limits and validates the input limits
+        :param limit Integer_gpu_limit: 
+        :return: 
+        """
+        if not limit or limit < 0:
+            return 0
+        return limit
 
     def get_plugin(self, name):
         """
@@ -192,6 +210,7 @@ class PluginManager(object):
         # to the plugin input and output dir spaces.
         str_inputDirOverride        = ''
         str_outputDirOverride       = ''
+        int_gpuLimit = 0
 
         for k, v in kwargs.items():
             if k == 'useDebug':             self.b_useDebug         = v
@@ -201,6 +220,7 @@ class PluginManager(object):
             if k == 'inputDirOverride':     str_inputDirOverride    = v
             if k == 'outputDirOverride':    str_outputDirOverride   = v
             if k == 'IOPhost':              self.str_IOPhost        = v
+            if k == 'gpu_limit':            int_gpuLimit            = v
 
         plugin_repr = self.get_plugin_app_representation(plugin_inst.plugin.dock_image)
         # get input dir
@@ -246,6 +266,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
+            gpuLimit    = int_gpuLimit,
             quiet       = True
         )
 
