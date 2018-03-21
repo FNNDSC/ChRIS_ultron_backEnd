@@ -17,6 +17,7 @@ from urllib.parse import urlparse, parse_qs
 from django.utils import timezone
 from django.conf import settings
 
+import swiftclient
 
 class Charm():
 
@@ -366,69 +367,306 @@ class Charm():
         This method checks if the remote service is available by asking
         it for system status.
 
+        It is currently deprecated.
+
         :param args:
         :param kwargs:
         :return: True | False
         """
-
-        # pudb.set_trace()
         return True
-        # str_service     = 'pfcon'
-        # str_IOPhost     = 'localhost'
-        #
-        # for k,v in kwargs.items():
-        #     if k == 'service':  str_service = v
-        #     if k == 'IOPhost':  str_IOPhost = v
-        #
-        # d_msg = {
-        #     "action":   "hello",
-        #     "meta": {
-        #                 "askAbout":     "sysinfo",
-        #                 "echoBack":     "All's well.",
-        #                 "service":      str_IOPhost
-        #     }
-        # }
-        #
-        # self.dp.qprint('service type: %s' % str_service)
-        # str_dmsg = self.pp.pformat(d_msg).strip()
-        # if os.path.exists('/data'):
-        #     if not os.path.exists('/data/tmp'):
-        #         os.makedirs('/data/tmp')
-        #     self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-hello.json', teeMode = 'w+')
-        # else:
-        #     self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-hello.json', teeMode = 'w+')
-        # d_response = self.app_service_call(msg = d_msg, **kwargs)
-        #
-        # if isinstance(d_response, dict):
-        #     self.dp.qprint('successful response from serviceCall(): %s ' % json.dumps(d_response, indent=2))
-        #     ret = True
-        # else:
-        #     self.dp.qprint('unsuccessful response from serviceCall(): %s' % d_response)
-        #     if "Connection refused" in d_response:
-        #         pass
-        #         # self.app_service_startup()
-        #     ret = False
-        # return ret
+
+
+    def swiftstorage_connect(self, *args, **kwargs):
+        """
+        Connect to swift storage and return the connection object,
+        as well an optional "prepend" string to fully qualify 
+        object location in swift storage.
+        """
+
+        b_status                = True
+        b_prependBucketPath     = False
+
+        for k,v in kwargs.items():
+            if k == 'prependBucketPath':    b_prependBucketPath = v
+
+        d_ret       = {
+            'status':               b_status,
+            'conn':                 None,
+            'prependBucketPath':    ""
+        }
+
+        # initiate a swift service connection, based on internal
+        # settings already available in the django variable space.
+        try:
+            d_ret['conn'] = swiftclient.Connection(
+                user    = settings.SWIFT_USERNAME,
+                key     = settings.SWIFT_KEY,
+                authurl = settings.SWIFT_AUTH_URL,
+            )
+        except:
+            d_ret['status'] = False
+
+        if b_prependBucketPath:
+            d_ret['prependBucketPath']  = self.c_pluginInst.owner.username
+
+        return d_ret
+
+    def swiftstorage_ls(self, *args, **kwargs):
+        """
+        Return a list of objects in the swiftstorage
+        """
+        l_ls                    = []    # The listing of names to return
+        ld_obj                  = {}    # List of dictionary objects in swift
+        str_path                = '/'
+        b_prependBucketPath     = False
+        b_status                = False
+
+        pudb.set_trace()
+
+        for k,v in kwargs.items():
+            if k == 'path':                 str_path            = v
+            if k == 'prependBucketPath':    b_prependBucketPath = v
+
+        # Remove any leading noise on the str_path, specifically
+        # any leading '.' characters.
+        # This is probably not very robust!
+        while str_path[:1] == '.':  str_path    = str_path[1:]
+
+        d_conn          = self.swiftstorage_connect(**kwargs)
+        if d_conn['status']:
+            conn        = d_conn['conn']
+            if b_prependBucketPath:
+                str_fullPath    = '%s%s' % (d_conn['prependBucketPath'], str_path)
+            else:
+                str_fullPath    = str_path
+
+            # get the full list of objects in Swift storage with given prefix
+            ld_obj = conn.get_container( settings.SWIFT_CONTAINER_NAME, 
+                                        prefix          = str_fullPath,
+                                        full_listing    = True)[1]        
+
+            for d_obj in ld_obj:
+                l_ls.append(d_obj['name'])
+                b_status    = True
+        
+        return {
+            'status':       b_status,
+            'objectDict':   ld_obj,
+            'lsList':       l_ls
+        }
+
+    def swiftstorage_objExists(self, *args, **kwargs):
+        """
+        Return True/False if passed object exists in swift storage
+        """        
+        b_exists    = False
+        str_obj     = ''
+
+        for k,v in kwargs.items():
+            if k == 'obj':                  str_obj             = v
+            if k == 'prependBucketPath':    b_prependBucketPath = v
+
+        kwargs['path']  = str_obj
+        d_swift_ls  = self.swiftstorage_ls(*args, **kwargs)
+        
+        # Check if dummy file exists in swift
+        if d_swift_ls['status']:
+            for obj in d_swift_ls['lsList']:
+                if obj == str_obj:
+                    b_exists = True
+
+        return b_exists
+
+    def swiftstorage_objPut(self, *args, **kwargs):
+        """
+        Put an object (or list of objects) into swift storage.
+
+        This method also "maps" tree locations in the local storage
+        to new locations in the object storage. For example, assume
+        a list of local locations starting with:
+
+                /home/user/project/data/ ...
+
+        and we want to pack everything in the 'data' dir to 
+        object storage, at location '/storage'. In this case, the
+        pattern of kwargs specifying this would be:
+
+                    fileList = ['/home/user/project/data/file1',
+                                '/home/user/project/data/dir1/file_d1',
+                                '/home/user/project/data/dir2/file_d2'],
+                    inLocation      = '/storage',
+                    mapLocationOver = '/home/user/project/data'
+
+        will replace, for each file in <fileList>, the <mapLocationOver> with
+        <inLocation>, resulting in a new list
+
+                    '/storage/file1', 
+                    '/storage/dir1/file_d1',
+                    '/storage/dir2/file_d2'
+
+        Note that the <inLocation> is subject to <b_prependBucketPath>!
+
+        """
+        b_status                = True
+        l_localfile             = []    # Name on the local file system
+        l_objectfile            = []    # Name in the object storage
+        str_swiftLocation       = ''
+        str_mapLocationOver     = ''
+        str_localfilename       = ''
+        str_storagefilename     = ''
+        str_prependBucketPath   = ''
+        d_ret                   = {
+            'status':           b_status,
+            'localFileList':    [],
+            'objectFileList':   []
+        }
+
+        d_conn  = self.swiftstorage_connect(*args, **kwargs)
+        if d_conn['status']:
+            str_prependBucketPath       = d_conn['prependBucketPath']
+
+        str_swiftLocation               = str_prependBucketPath
+
+        for k,v in kwargs.items():
+            if k == 'file':             l_localfile.append(v)
+            if k == 'fileList':         l_localfile         = v
+            if k == 'inLocation':       str_swiftLocation   = '%s%s' % (str_prependBucketPath, v)
+            if k == 'mapLocationOver':  str_mapLocationOver = v
+
+        if len(str_mapLocationOver):
+            # replace the local file path with object store path
+            l_objectfile    = [w.replace(str_mapLocationOver, str_swiftLocation) \
+                                for w in l_localfile]
+        else:
+            # Prepend the swiftlocation to each element in the localfile list:
+            l_objectfile    = [str_swiftLocation + '{0}'.format(i) for i in l_localfile]
+
+        if d_conn['status']:
+            for str_localfilename, str_storagefilename in zip(l_localfile, l_objectfile): 
+                try:
+                    d_ret['status'] = True and d_ret['status']
+                    with open(str_localfilename, 'r') as fp:
+                        d_conn['conn'].put_object(
+                            settings.SWIFT_CONTAINER_NAME,
+                            str_storagefilename,
+                            contents=fp.read()
+                        )
+                except:
+                    d_ret['status'] = False
+                d_ret['localFileList'].append(str_localfilename)
+                d_ret['objectFileList'].append(str_swiftLocation)
+        return d_ret
+
+    def app_service_fsplugin_dummyFileHandle(self, *args, **kwargs):
+        """
+        NB: HACK ALERT! Relies on volume mapping meta info!
+
+        This method is used for certain FS plugins that don't really
+        require data from some input directory, but need to have a least 
+        something to push to the remote compute environment.
+
+        In these cases, this method checks on the existence of a 
+        'dummy' file in object storage. If this file doesn't exist, 
+        it creates it.
+
+        This input file's parent directory is used as the 'input' 
+        directory for pfcon and transmission to the compute environemnt.
+
+        Typically, this method is used by the simplefs-app 
+
+        This method appends the correct username for swift purposes to
+        the 'inputdir'. 
+
+        """
+
+        b_status            = False
+        d_ret               = {
+            'status':       b_status,
+            'b_dummyFound': False,
+            'inputDir':     '',
+            'd_swiftput':   {}
+        }
+
+        # Check if dummy file exists in swift
+        d_ret['b_dummyFound']   = self.swiftstorage_objExists(
+                                    obj                 = '/data/dummy/dummy.txt',
+                                    prependBucketPath   = True
+        )
+
+        # If not, create and push...
+        if not d_ret['b_dummyFound']:
+            # Create a dummy file...
+            try:
+                if not os.path.exists('/data/dummy'):
+                    os.makedirs('/data/dummy')
+                os.chdir('/data/dummy')
+                # touch a file
+                with open('dummy.txt', 'a'):
+                    os.utime('dummy.txt', None)
+                # self.str_inputdir   = os.path.abspath('dummy')
+                # and push to swift...
+                d_ret['d_swiftput'] = self.swiftstorage_objPut(
+                    file                = '/data/dummy/dummy.txt',
+                    prependBucketPath   = True
+                )
+                str_swiftLocation       = d_ret['objectFileList'][0]
+                d_ret['inputDir']       = os.path.dirname(str_swiftLocation)
+                d_ret['status']         = True
+            except:
+                d_ret['status']         = False
+        return d_ret
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
         """
         NB: HACK ALERT! Relies on volume mapping meta info!
 
         This method creates a "fake" inputdir for fsplugins that is used
-        by the file transfer service.
+        by the file transfer service. The underlying system does require
+        an actual input path to send to the remote service. In the case of 
+        FS plugins 
+
+        This method appends the correct username for swift purposes to
+        the 'inputdir'. 
+
+        Also, if the inputdir is './' then this method will create a small
+        'dummy' file, push to swift, and use that as the input to send.
+
+        NOTE: This "dummy" behaviour is triggered 
+
         """
 
-        try:
-            if not os.path.exists('/data/dummy'):
-                os.makedirs('/data/dummy')
-            os.chdir('/data/dummy')
-            # touch a file
-            with open('dummy.txt', 'a'):
-                os.utime('dummy.txt', None)
-            os.chdir('../')
-            self.str_inputdir   = os.path.abspath('dummy')
-        except:
-            self.str_inputdir   = '/etc'
+        b_dummyFound        = False
+        b_status            = False
+        d_ret               = {
+            'status':       b_status,
+            'b_dummyFound': b_dummyFound,
+
+        }
+
+        # Check if dummy file exists in swift
+        b_dummyFound        = self.swiftstorage_objExists(
+                                    obj                 = '/data/dummy/dummy.txt',
+                                    prependBucketPath   = True
+        )
+
+        # If not, create and push...
+        if not b_dummyFound:
+            # Create a dummy file...
+            try:
+                if not os.path.exists('/data/dummy'):
+                    os.makedirs('/data/dummy')
+                os.chdir('/data/dummy')
+                # touch a file
+                with open('dummy.txt', 'a'):
+                    os.utime('dummy.txt', None)
+                # self.str_inputdir   = os.path.abspath('dummy')
+                # and push to swift...
+                d_put = self.swiftstorage_objPut(
+                    file                = '/data/dummy/dummy.txt',
+                    prependBucketPath   = True
+                )
+            except:
+                pass
 
     def app_service_fsplugin_setup(self, *args, **kwargs):
         """
@@ -440,19 +678,39 @@ class Charm():
         and sets any --dir to data localSource.
         """
 
-        if 'dir' in self.d_args:
-            self.str_inputdir = self.d_args['dir']
-            i = 0
-            for v in self.l_appArgs:
-                if v == self.str_inputdir:
-                    self.l_appArgs[i] = '/share/incoming'
-                i+=1
-            str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-            str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
-            self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
-            self.dp.qprint('cmd = %s' % self.str_cmd)
-        if self.str_inputdir == './' or self.str_inputdir == '':
-            self.app_service_fsplugin_inputdirManage()
+        pudb.set_trace()
+        l_pathArgs  = []
+
+        # Loop over the plugin parameters and search for any that have type
+        # 'path'. Ideally speaking there should be only one, however for now
+        # we won't assume that -- we'll lay the groundwork for more than 'path'
+        # type parameter, but will process things as if there was only one...
+        for d_param in self.d_pluginRepr['parameters']:
+            if d_param['type'] == 'path':
+                l_pathArgs.append(d_param['name'])
+
+        # The 'path' type parameter refers to some location (ideally in the 
+        # swift storage). We need to replace this location referring to some
+        # 'local' path with a hard code '/share/incoming' since that is where
+        # the data will be located in the remote compute env.
+        #
+        # We then need to pass this local input parameter as the inputdir to
+        # pfcon, with appropriate pre-massaging for bucket prepending.
+        if len(l_pathArgs):
+            for argName in l_pathArgs:
+                self.str_inputdir = self.d_args[argName]
+                i = 0
+                for v in self.l_appArgs:
+                    if v == self.str_inputdir:
+                        self.l_appArgs[i] = '/share/incoming'
+                    i+=1
+                str_allCmdLineArgs      = ' '.join(self.l_appArgs)
+                str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+                self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
+                self.dp.qprint('cmd = %s' % self.str_cmd)
+
+        # Manage args with type 'path' for FS type plugins
+        d_fsdir = self.app_service_fsplugin_inputdirManage(*args, **kwargs)
 
         return {
             'status':   True,
@@ -492,7 +750,7 @@ class Charm():
         self.dp.qprint('cmd = %s' % self.str_cmd)
         if str_service == 'pfcon':
             # Handle the case for 'fs'-type plugins that don't specify an 
-            # inputdir.
+            # inputdir, in which case the self.str_inputdir is empty.
             #
             # Passing an empty string through to pfurl will cause it to fail 
             # on its local directory check.
@@ -525,7 +783,8 @@ class Charm():
                     },
                     "localSource": 
                     {
-                        "path":         self.str_inputdir
+                        "path":         self.str_inputdir,
+                        "storageType":  "swift"
                     },
                     "localTarget": 
                     {
@@ -642,7 +901,7 @@ class Charm():
         #     str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
         # except:
         #     str_responseStatus  = 'Error in response. No record of job found.'
-        #     pudb.set_trace()
+        # pudb.set_trace()
         str_DBstatus    = self.c_pluginInst.status
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
