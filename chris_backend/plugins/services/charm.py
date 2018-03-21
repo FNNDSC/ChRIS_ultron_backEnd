@@ -642,7 +642,7 @@ class Charm():
             d_ret['inputdir']   = os.path.dirname(
                                         d_ret['d_objExists']['objPath']
                                     )
-        return d_ret
+        return d_retchris_backend/plugins/services/charm.py
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
         """
