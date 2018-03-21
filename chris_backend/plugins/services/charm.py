@@ -17,12 +17,8 @@ from    urllib.parse    import urlparse, parse_qs
 from    django.utils    import timezone
 from    django.conf     import settings
 
-<<<<<<< HEAD
 import  swiftclient
 import  time
-=======
-import swiftclient
->>>>>>> WIP swift integration and middle-layer methods.
 
 class Charm():
 
