@@ -1046,7 +1046,7 @@ class Charm():
                     d_register['outputPath'],
                     d_register['total']
             )
-            for obj in d_register['l_object']:
+=            for obj in d_register['l_object']:
                 str_registrationMsg += obj['name'] + '\n'
             self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
                             teeFile = '/data/tmp/registrationMsg-%s.txt' %  str(self.d_pluginInst['id']),
