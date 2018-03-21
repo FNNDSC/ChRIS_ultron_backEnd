@@ -591,14 +591,15 @@ class Charm():
             squashFileMessage
         """
 
-        b_status                = False
-        str_squashFilePath      = '/squash/unspecifiedSquashFile.txt'
-        str_squashFileMessage   = 'Unspecified message.'
-        d_ret                   = {
+        b_status            = False
+        d_objExists         = {}
+        str_squashFilePath  = '/data/squash/unspecifiedSquashFile.txt'
+        str_squashMessage   = 'Unspecified message.'
+        d_ret               = {
             'status':               b_status,
             'b_squashFileFound':    False,
-            'inputdir':             '',
-            'd_objPut':             {},
+            'inputDir':             '',
+            'd_swiftput':           {}
             'd_objExists':          {}
         }
 
