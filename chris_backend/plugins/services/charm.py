@@ -418,6 +418,7 @@ class Charm():
         l_ls                    = []    # The listing of names to return
         ld_obj                  = {}    # List of dictionary objects in swift
         str_path                = '/'
+        str_fullPath            = ''
         b_prependBucketPath     = False
         b_status                = False
 
@@ -452,7 +453,8 @@ class Charm():
         return {
             'status':       b_status,
             'objectDict':   ld_obj,
-            'lsList':       l_ls
+            'lsList':       l_ls,
+            'fullPath':     str_fullPath
         }
 
     def swiftstorage_objExists(self, *args, **kwargs):
@@ -468,14 +470,17 @@ class Charm():
 
         kwargs['path']  = str_obj
         d_swift_ls  = self.swiftstorage_ls(*args, **kwargs)
-        
-        # Check if dummy file exists in swift
+        str_obj     = d_swift_ls['fullPath']
+
         if d_swift_ls['status']:
             for obj in d_swift_ls['lsList']:
                 if obj == str_obj:
                     b_exists = True
 
-        return b_exists
+        return {
+            'status':   b_exists,
+            'objPath':  str_obj
+        }
 
     def swiftstorage_objPut(self, *args, **kwargs):
         """
@@ -557,116 +562,175 @@ class Charm():
                 d_ret['objectFileList'].append(str_swiftLocation)
         return d_ret
 
-    def app_service_fsplugin_dummyFileHandle(self, *args, **kwargs):
+    def app_service_fsplugin_squashFileHandle(self, *args, **kwargs):
         """
-        NB: HACK ALERT! Relies on volume mapping meta info!
+        This method is used under certain conditions:
 
-        This method is used for certain FS plugins that don't really
-        require data from some input directory, but need to have a least 
-        something to push to the remote compute environment.
+            * An FS plugin has specified an "illegal" directory in 
+              the object store:
+                    * /     root of store
+                    * ./    relative "current" dir
 
-        In these cases, this method checks on the existence of a 
-        'dummy' file in object storage. If this file doesn't exist, 
-        it creates it.
+            * An FS plugin has specified a non-existent directory/file
+              in the object store.
 
-        This input file's parent directory is used as the 'input' 
-        directory for pfcon and transmission to the compute environemnt.
+        In each case, this method creates an appropriately named "dummy"
+        file in the object store and specifies its parent directory as
+        the directory to pull from the store. 
 
-        Typically, this method is used by the simplefs-app 
+        The effect is that if an FS plugin specifies one of these "illegal"
+        conditions, a file is created in the FS plugin output that contains
+        this somewhat descriptive filename.
 
         This method appends the correct username for swift purposes to
         the 'inputdir'. 
 
+        **kwargs:
+            squashFilePath
+            squashFileMessage
         """
 
         b_status            = False
+        d_objExists         = {}
+        str_squashFilePath  = '/data/squash/unspecifiedSquashFile.txt'
+        str_squashMessage   = 'Unspecified message.'
         d_ret               = {
-            'status':       b_status,
-            'b_dummyFound': False,
-            'inputDir':     '',
-            'd_swiftput':   {}
+            'status':               b_status,
+            'b_squashFileFound':    False,
+            'inputDir':             '',
+            'd_swiftput':           {}
+            'd_objExists':          {}
         }
 
-        # Check if dummy file exists in swift
-        d_ret['b_dummyFound']   = self.swiftstorage_objExists(
-                                    obj                 = '/data/dummy/dummy.txt',
-                                    prependBucketPath   = True
-        )
+        for k,v in kwargs.items():
+            if k == 'squashFilePath':   str_squashFilePath  = v
+            if k == 'squashMessage':    str_squashMessage   = v
+
+        str_squashParentPath, str_squashFile = os.path.split(str_squashFilePath)
+
+        # Check if squash file exists in swift
+        d_objExists = self.swiftstorage_objExists(
+                            obj                 = str_squashFilePath,
+                            prependBucketPath   = True
+                            )
+        d_ret['b_squashFileFound']  = d_objExists['status']
 
         # If not, create and push...
-        if not d_ret['b_dummyFound']:
-            # Create a dummy file...
+        if not d_ret['b_squashFileFound']:
+            # Create a squash file...
             try:
-                if not os.path.exists('/data/dummy'):
-                    os.makedirs('/data/dummy')
-                os.chdir('/data/dummy')
-                # touch a file
-                with open('dummy.txt', 'a'):
-                    os.utime('dummy.txt', None)
-                # self.str_inputdir   = os.path.abspath('dummy')
+                if not os.path.exists(str_squashParentPath):
+                    os.makedirs(str_squashParentPath)
+                os.chdir(str_squashParentPath)
+                # Create a squashfile with possibly descriptive message
+                with open(str_squashFile, 'w') as f:
+                    print(str_squashMessage, file=f)
                 # and push to swift...
                 d_ret['d_swiftput'] = self.swiftstorage_objPut(
-                    file                = '/data/dummy/dummy.txt',
+                    file                = str_squashFilePath,
                     prependBucketPath   = True
                 )
                 str_swiftLocation       = d_ret['objectFileList'][0]
-                d_ret['inputDir']       = os.path.dirname(str_swiftLocation)
+                d_ret['inputdir']       = os.path.dirname(str_swiftLocation)
                 d_ret['status']         = True
             except:
                 d_ret['status']         = False
+        else:
+            d_ret['status']     = True
+            d_ret['inputdir']   = d_objExists['objPath']
         return d_ret
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
         """
-        NB: HACK ALERT! Relies on volume mapping meta info!
+        This method is responsible for managing the 'inputdir' in the
+        case of FS plugins.
 
-        This method creates a "fake" inputdir for fsplugins that is used
-        by the file transfer service. The underlying system does require
-        an actual input path to send to the remote service. In the case of 
-        FS plugins 
+        Typically, an FS plugin does not have an inputdir spec, since this
+        is a requirement for DS plugins. Nonetheless, the underlying management
+        system (pfcon/pfurl) do require some non-zero inputdir spec in order
+        to operate correctly.
 
-        This method appends the correct username for swift purposes to
-        the 'inputdir'. 
+        However, this operational requirement allows us a convenient 
+        mechanism to inject data into an FS processing stream by storing
+        data in swift and accessing this as a "pseudo" inputdir for FS
+        plugins.
 
-        Also, if the inputdir is './' then this method will create a small
-        'dummy' file, push to swift, and use that as the input to send.
+        For example, if an FS plugin has no arguments of type 'path', then
+        we create a "dummy" inputdir with a small dummy text file in swift
+        storage. This is then transmitted as an 'inputdir' to the compute
+        environment, and can be completely ignored by the plugin.
 
-        NOTE: This "dummy" behaviour is triggered 
+        Importantly, one major exception to the normal FS processing scheme
+        exists: an FS plugin that collects data from object storage. This
+        storage location is not an 'inputdir' in the traditional sense, and is 
+        thus specified in the FS plugin argument list as argument of type 
+        'path' (i.e. there is no positional argument for inputdir as in DS
+        plugins. Thus, if a type 'path' argument is specified, this 'path'
+        is assumed to denote a location in object storage.
+
+        In the case then that a 'path' type argument is specified, there 
+        are certain important caveats:
+
+            1. Only one 'path' type argument is assumed / fully supported.
+            2. Open ended (or relative) path arguments are not supported
+               (otherwise an entire object storage tree could be exposed):
+                * directory specifcations of '/' are not supported and
+                  are squashed;
+                * directory specification of './' are not supported and
+                  are squashed;
+            3. If an invalid object location is specified, this is squashed.
+
+        (squashed means that the system will still execute, but the returned
+        output directory from the FS plugin will contain only a single file
+        with the text 'squash' in its filename and the file will contain
+        some descriptive message)
 
         """
 
-        b_dummyFound        = False
         b_status            = False
+        str_inputdir        = ''
         d_ret               = {
             'status':       b_status,
-            'b_dummyFound': b_dummyFound,
-
+            'd_handle':     {}
         }
 
-        # Check if dummy file exists in swift
-        b_dummyFound        = self.swiftstorage_objExists(
-                                    obj                 = '/data/dummy/dummy.txt',
-                                    prependBucketPath   = True
-        )
+        for k,v in kwargs.items():
+            if k == 'inputdir': str_inputdir    = v
 
-        # If not, create and push...
-        if not b_dummyFound:
-            # Create a dummy file...
-            try:
-                if not os.path.exists('/data/dummy'):
-                    os.makedirs('/data/dummy')
-                os.chdir('/data/dummy')
-                # touch a file
-                with open('dummy.txt', 'a'):
-                    os.utime('dummy.txt', None)
-                # self.str_inputdir   = os.path.abspath('dummy')
-                # and push to swift...
-                d_put = self.swiftstorage_objPut(
-                    file                = '/data/dummy/dummy.txt',
-                    prependBucketPath   = True
-                )
-            except:
-                pass
+        # First, check and return on illegal dir specs
+        if str_inputdir == '/' or str_inputdir == './':
+            if str_inputdir == '/':
+                str_squashFile  = '/data/squashRoot/squashRoot.txt'
+                str_squashMsg   = 'Illegal dir spec, "/", passed to plugin.'
+            if str_inputdir == './':
+                str_squashFile  = '/data/squashHereDir/squashHereDir.txt'
+                str_squashMsg   = 'Illegal dir spec, "./", passed to plugin.'
+            d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
+                squashFilePath      = str_squashFile,
+                squashFileMessage   = str_squashMsg
+            )
+            d_ret['status'] = True
+            return d_ret
+
+        # Check if dir spec exists in swift
+        d_objExists     = self.swiftstorage_objExists(
+                            obj                 = str_inputdir,
+                            prependBucketPath   = True
+                        )
+        b_pathValid     = d_objExists['status']
+        if not b_pathValid:
+            str_squashFile  = '/data/squashInvalidDir/squashInvalidDir.txt'
+            str_squashMsg   = 'Path specified in object storage does not exist!'
+            d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
+                squashFilePath      = str_squashFile,
+                squashFileMessage   = str_squashMsg
+            )
+            d_ret['status'] = True
+            return d_ret
+        else:
+            d_ret['status'] = True
+            d_ret['d_handle']['inputdir']  = d_objExists['objPath']
+        return d_ret
 
     def app_service_fsplugin_setup(self, *args, **kwargs):
         """
@@ -675,7 +739,7 @@ class Charm():
         transmission pattern.
 
         This method edits the cmdLine for fsplugin input to /share/incoming 
-        and sets any --dir to data localSource.
+        and sets any --dir to data location in local object storage.
         """
 
         pudb.set_trace()
@@ -710,12 +774,12 @@ class Charm():
                 self.dp.qprint('cmd = %s' % self.str_cmd)
 
         # Manage args with type 'path' for FS type plugins
-        d_fsdir = self.app_service_fsplugin_inputdirManage(*args, **kwargs)
+        d_manage = self.app_service_fsplugin_inputdirManage(*args, **kwargs)
 
         return {
             'status':   True,
             'cmd':      self.str_cmd,
-            'inputdir': self.str_inputdir
+            'd_manage': d_manage
         }
 
     def app_service(self, *args, **kwargs):
@@ -764,6 +828,7 @@ class Charm():
             # pudb.set_trace()
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
+                self.str_inputdir   = d_fs['d_manage']['d_handle']['inputdir']
             str_serviceName = str(self.d_pluginInst['id'])
             d_msg = \
             {   
