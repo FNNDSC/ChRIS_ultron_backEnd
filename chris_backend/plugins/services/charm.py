@@ -1002,7 +1002,7 @@ class Charm():
                 str_responseStatus += str_action + ':' + str_actionStatus + ';'
 
         # try:
-        #     str_responseStatus  = d_response['jobOperationSummary']['compute']['return']['l_status'][0]
+        #     str_responseStatus  = d_    response['jobOperationSummary']['compute']['return']['l_status'][0]
         # except:
         #     str_responseStatus  = 'Error in response. No record of job found.'
         # pudb.set_trace()
