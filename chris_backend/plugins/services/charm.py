@@ -422,8 +422,6 @@ class Charm():
         b_prependBucketPath     = False
         b_status                = False
 
-        pudb.set_trace()
-
         for k,v in kwargs.items():
             if k == 'path':                 str_path            = v
             if k == 'prependBucketPath':    b_prependBucketPath = v
@@ -590,30 +588,29 @@ class Charm():
             squashFileMessage
         """
 
-        b_status            = False
-        d_objExists         = {}
-        str_squashFilePath  = '/data/squash/unspecifiedSquashFile.txt'
-        str_squashMessage   = 'Unspecified message.'
-        d_ret               = {
+        b_status                = False
+        str_squashFilePath      = '/data/squash/unspecifiedSquashFile.txt'
+        str_squashFileMessage   = 'Unspecified message.'
+        d_ret                   = {
             'status':               b_status,
             'b_squashFileFound':    False,
-            'inputDir':             '',
-            'd_swiftput':           {}
+            'inputdir':             '',
+            'd_objPut':             {},
             'd_objExists':          {}
         }
 
         for k,v in kwargs.items():
-            if k == 'squashFilePath':   str_squashFilePath  = v
-            if k == 'squashMessage':    str_squashMessage   = v
+            if k == 'squashFilePath':       str_squashFilePath      = v
+            if k == 'squashFileMessage':    str_squashFileMessage   = v
 
         str_squashParentPath, str_squashFile = os.path.split(str_squashFilePath)
 
-        # Check if squash file exists in swift
-        d_objExists = self.swiftstorage_objExists(
-                            obj                 = str_squashFilePath,
-                            prependBucketPath   = True
-                            )
-        d_ret['b_squashFileFound']  = d_objExists['status']
+        # Check if squash file exists in object storage
+        d_ret['d_objExists'] = self.swiftstorage_objExists(
+                                        obj                 = str_squashFilePath,
+                                        prependBucketPath   = True
+                                )
+        d_ret['b_squashFileFound']  = d_ret['d_objExists']['status']
 
         # If not, create and push...
         if not d_ret['b_squashFileFound']:
@@ -624,12 +621,12 @@ class Charm():
                 os.chdir(str_squashParentPath)
                 # Create a squashfile with possibly descriptive message
                 with open(str_squashFile, 'w') as f:
-                    print(str_squashMessage, file=f)
+                    print(str_squashFileMessage, file=f)
                 # and push to swift...
-                d_ret['d_swiftput'] = self.swiftstorage_objPut(
-                    file                = str_squashFilePath,
-                    prependBucketPath   = True
-                )
+                d_ret['d_objPut']       = self.swiftstorage_objPut(
+                                            file                = str_squashFilePath,
+                                            prependBucketPath   = True
+                                        )
                 str_swiftLocation       = d_ret['objectFileList'][0]
                 d_ret['inputdir']       = os.path.dirname(str_swiftLocation)
                 d_ret['status']         = True
@@ -637,7 +634,7 @@ class Charm():
                 d_ret['status']         = False
         else:
             d_ret['status']     = True
-            d_ret['inputdir']   = d_objExists['objPath']
+            d_ret['inputdir']   = d_ret['d_objExists']['objPath']
         return d_ret
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
@@ -647,7 +644,7 @@ class Charm():
 
         Typically, an FS plugin does not have an inputdir spec, since this
         is a requirement for DS plugins. Nonetheless, the underlying management
-        system (pfcon/pfurl) do require some non-zero inputdir spec in order
+        system (pfcon/pfurl) does require some non-zero inputdir spec in order
         to operate correctly.
 
         However, this operational requirement allows us a convenient 
@@ -774,6 +771,10 @@ class Charm():
                 self.dp.qprint('cmd = %s' % self.str_cmd)
 
         # Manage args with type 'path' for FS type plugins
+        # At the point the 'self.str_inputdir' now points to the location
+        # of the 'path' type variable in the arg list of the FS app.
+        # We will pass this new location on to be managed via kwargs
+        kwargs['inputdir']  = self.str_inputdir
         d_manage = self.app_service_fsplugin_inputdirManage(*args, **kwargs)
 
         return {
