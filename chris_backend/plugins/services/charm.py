@@ -591,11 +591,10 @@ class Charm():
             squashFileMessage
         """
 
-        b_status            = False
-        d_objExists         = {}
-        str_squashFilePath  = '/data/squash/unspecifiedSquashFile.txt'
-        str_squashMessage   = 'Unspecified message.'
-        d_ret               = {
+        b_status                = False
+        str_squashFilePath      = '/squash/unspecifiedSquashFile.txt'
+        str_squashFileMessage   = 'Unspecified message.'
+        d_ret                   = {
             'status':               b_status,
             'b_squashFileFound':    False,
             'inputDir':             '',
@@ -834,7 +833,7 @@ class Charm():
             #
             # Also, for 'fs' plugins, we need to set the "incoming" directory 
             # to /share/incoming.
-            # pudb.set_trace()
+            pudb.set_trace()
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
                 self.str_inputdir   = d_fs['d_manage']['d_handle']['inputdir']
