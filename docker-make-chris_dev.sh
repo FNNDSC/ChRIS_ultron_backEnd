@@ -137,7 +137,7 @@ if (( $# == 1 )) ; then
     REPO=$1
     export CREPO=$(echo $REPO | awk -F \: '{print $1}')
     export TAG=$(echo $REPO | awk -F \: '{print $2}')
-    if $(( ${#TAG} )) ; then
+    if (( ${#TAG} )) ; then
         TAG=":$TAG"
     fi
 fi
