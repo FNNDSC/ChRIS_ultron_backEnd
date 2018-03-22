@@ -407,7 +407,7 @@ class Charm():
             d_ret['status'] = False
 
         if b_prependBucketPath:
-            d_ret['prependBucketPath']  = self.c_pluginInst.owner.username
+            d_ret['prependBucketPath']  = self.c_pluginInst.owner.username + '/uploads'
 
         return d_ret
 
@@ -484,8 +484,10 @@ class Charm():
         """
         Put an object (or list of objects) into swift storage.
 
-        This method also "maps" tree locations in the local storage
-        to new locations in the object storage. For example, assume
+        By default, to location in storage will map 1:1 to the
+        location name string in the local filesytem. This storage
+        location can be remapped by using the '<toLocation>' and
+        '<mapLocationOver>' kwargs. For example, assume
         a list of local locations starting with:
 
                 /home/user/project/data/ ...
@@ -497,17 +499,17 @@ class Charm():
                     fileList = ['/home/user/project/data/file1',
                                 '/home/user/project/data/dir1/file_d1',
                                 '/home/user/project/data/dir2/file_d2'],
-                    inLocation      = '/storage',
+                    toLocation      = '/storage',
                     mapLocationOver = '/home/user/project/data'
 
         will replace, for each file in <fileList>, the <mapLocationOver> with
-        <inLocation>, resulting in a new list
+        <toLocation>, resulting in a new list
 
                     '/storage/file1', 
                     '/storage/dir1/file_d1',
                     '/storage/dir2/file_d2'
 
-        Note that the <inLocation> is subject to <b_prependBucketPath>!
+        Note that the <toLocation> is subject to <b_prependBucketPath>!
 
         """
         b_status                = True
@@ -533,7 +535,7 @@ class Charm():
         for k,v in kwargs.items():
             if k == 'file':             l_localfile.append(v)
             if k == 'fileList':         l_localfile         = v
-            if k == 'inLocation':       str_swiftLocation   = '%s%s' % (str_prependBucketPath, v)
+            if k == 'toLocation':       str_swiftLocation   = '%s%s' % (str_prependBucketPath, v)
             if k == 'mapLocationOver':  str_mapLocationOver = v
 
         if len(str_mapLocationOver):
@@ -589,7 +591,7 @@ class Charm():
         """
 
         b_status                = False
-        str_squashFilePath      = '/data/squash/unspecifiedSquashFile.txt'
+        str_squashFilePath      = '/squash/unspecifiedSquashFile.txt'
         str_squashFileMessage   = 'Unspecified message.'
         d_ret                   = {
             'status':               b_status,
@@ -633,8 +635,12 @@ class Charm():
             except:
                 d_ret['status']         = False
         else:
+            # Here the file was found, so 'objPath' is a file spec.
+            # We need to prune this into a path spec...
             d_ret['status']     = True
-            d_ret['inputdir']   = d_ret['d_objExists']['objPath']
+            d_ret['inputdir']   = os.path.dirname(
+                                        d_ret['d_objExists']['objPath']
+                                    )
         return d_ret
 
     def app_service_fsplugin_inputdirManage(self, *args, **kwargs):
@@ -697,10 +703,10 @@ class Charm():
         # First, check and return on illegal dir specs
         if str_inputdir == '/' or str_inputdir == './':
             if str_inputdir == '/':
-                str_squashFile  = '/data/squashRoot/squashRoot.txt'
+                str_squashFile  = '/squashRoot/squashRoot.txt'
                 str_squashMsg   = 'Illegal dir spec, "/", passed to plugin.'
             if str_inputdir == './':
-                str_squashFile  = '/data/squashHereDir/squashHereDir.txt'
+                str_squashFile  = '/squashHereDir/squashHereDir.txt'
                 str_squashMsg   = 'Illegal dir spec, "./", passed to plugin.'
             d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
                 squashFilePath      = str_squashFile,
@@ -739,7 +745,7 @@ class Charm():
         and sets any --dir to data location in local object storage.
         """
 
-        pudb.set_trace()
+        # pudb.set_trace()
         l_pathArgs  = []
 
         # Loop over the plugin parameters and search for any that have type
@@ -827,7 +833,7 @@ class Charm():
             #
             # Also, for 'fs' plugins, we need to set the "incoming" directory 
             # to /share/incoming.
-            # pudb.set_trace()
+            pudb.set_trace()
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
                 self.str_inputdir   = d_fs['d_manage']['d_handle']['inputdir']
