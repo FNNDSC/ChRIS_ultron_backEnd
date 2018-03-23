@@ -472,7 +472,7 @@ class Charm():
 
         if d_swift_ls['status']:
             for obj in d_swift_ls['lsList']:
-                if obj == str_obj:
+                if str_obj in obj:
                     b_exists = True
 
         return {
@@ -629,7 +629,7 @@ class Charm():
                                             file                = str_squashFilePath,
                                             prependBucketPath   = True
                                         )
-                str_swiftLocation       = d_ret['objectFileList'][0]
+                str_swiftLocation       = d_ret['d_objPut']['objectFileList'][0]
                 d_ret['inputdir']       = os.path.dirname(str_swiftLocation)
                 d_ret['status']         = True
             except:
