@@ -559,7 +559,7 @@ class Charm():
                 except:
                     d_ret['status'] = False
                 d_ret['localFileList'].append(str_localfilename)
-                d_ret['objectFileList'].append(str_swiftLocation)
+                d_ret['objectFileList'].append(str_storagefilename)
         return d_ret
 
     def app_service_fsplugin_squashFileHandle(self, *args, **kwargs):
