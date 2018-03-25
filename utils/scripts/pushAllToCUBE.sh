@@ -3,8 +3,8 @@
 EXT=""
 CUBEIP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
 CUBEPORT=8000
-UPLOADPATHPREFIX="/externalData"
-
+UPLOADPATHPREFIX="externalData"
+PUSHDIR="./"
 G_SYNOPSIS="
 
  NAME
@@ -14,6 +14,7 @@ G_SYNOPSIS="
  SYNOPSIS
 
 	pushAllToCube.sh         -E <extension>                         \\
+                                [-D <pushDir>]                          \\
 	                        [-P <uploadPathPrefix>]                 \\
                                 [-C <CUBE_IP>]                          \\
                                 [-p <CUBE_port>]
@@ -22,16 +23,21 @@ G_SYNOPSIS="
  
         -E <extension>
         The extension of files to PUSH to CUBE swift storage
+
+        -D <pushDir>
+        The directory containing files to PUSH.
         
         -P <uploadPathPrefix>
         The upload prefix to use for swift storage. Note that the backend
-        prepends this is the pattern:
+        prepends the following pattern to <uploadPathPrefix>:
         
                 <cubeUser>/uploads
                 
         so the path in swift is:
         
                 <cubeUser>/uploads/<uploadPathPrefix>
+
+        DO NOT PREPEND THIS PATH WITH A '/'!
         
         -C <CUBE_IP>
         The IP address of the CUBE instance to which files are pushed.
@@ -58,9 +64,10 @@ function synopsis_show
         echo "$G_SYNOPSIS"
 }
 
-while getopts E:C:P:p: option ; do 
+while getopts E:C:P:p:D: option ; do 
 	case "$option"
 	in
+                D)      PUSHDIR=$OPTARG                 ;;
 	        P)      UPLOADPATHPREFIX=$OPTARG        ;;
 	        p)      CUBEPORT=$OPTARG                ;;
 	        E)      EXT=$OPTARG                     ;;
@@ -70,10 +77,13 @@ while getopts E:C:P:p: option ; do
 	esac
 done
 
+here=$(pwd)
+cd $PUSHDIR
 for FILE in *${EXT} ; do
     printf "%s\n" $FILE
     http -a cube:cube1234 -f POST http://${CUBEIP}:${CUBEPORT}/api/v1/uploadedfiles/ upload_path=/${UPLOADPATHPREFIX}/$FILE fname@$FILE
 done
+cd $here
 
 printf "Files pushed to swift service.\n"
 swiftQuery="
@@ -98,15 +108,15 @@ pfurl --auth cube:cube1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugi
 
 registerOutputFilesCmd="
 
-pfurl --auth chris:chris1234                               \
-      --verb GET                                           \
-      --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/instances/1/   \
-      --content-type application/vnd.collection+json       \
+pfurl --auth chris:chris1234                               \\
+      --verb GET                                           \\
+      --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/instances/1/   \\
+      --content-type application/vnd.collection+json       \\
       --quiet --jsonpprintindent 4
 "
 
 
-printf "Run the pl-dircopy plugin to pull this data from swift storage:\n"
+printf "Run the pl-dircopy plugin to pull this data from swift storage into CUBE:\n"
 printf "$runPluginCmd"
 printf "\n"
 printf "Trigger output file registration in CUBE with:\n"
