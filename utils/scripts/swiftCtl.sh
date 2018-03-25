@@ -5,8 +5,8 @@ SWIFTIP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
 SWIFTPORT=8080
 SWIFTPATHPREFIX=""
 PULLDIR="./"
-PUSHDIR=""
-ACTION="push"
+PUSHDIR="./"
+ACTION="list"
 
 declare -i Gb_verbose=0
 
@@ -36,14 +36,37 @@ G_SYNOPSIS="
         -V 
         Be verbose. Typically this means echo the actual swift command.
 
-        -A <action>
+        -A <action> (Default >> $ACTION <<)
         The action to perform. One of:
 
-                o push
-                o pull
-                o list
-
-                o push:
+          +-----o push
+          | +---o pull
+          | | +-o list
+          | | |
+          | | +-> list
+          | |          
+          | |   List files in swift storage.
+          | |
+          | |   All actions understand:
+          | | 
+          | |   -P <SwiftPathPrefix>
+          | |   The path prefix to use for swift storage. Note that to conform 
+          | |   to CUBE-style conventions, this must be
+          | |   
+          | |           <cubeUser>/uploads
+          | |           
+          | |   so the path in swift is:
+          | |   
+          | |           <cubeUser>/uploads/<uploadPathPrefix>
+          | |
+          | +---> pull:
+          | 
+          |     Pull files from swift storage.
+          | 
+          |             -O <pullDir>
+          |             Pull objects from swift to <pullDir>.
+          | 
+          +----> push:
 
                 Push files to swift storage.
 
@@ -54,25 +77,7 @@ G_SYNOPSIS="
                         The extension of files in <pushDir> to PUSH 
                         to swift storage.
                 
-                o pull:
 
-                Pull files from swift storage.
-
-                o list:
-
-                List files in swift storage.
-
-                All actions understand:
-
-                -P <SwiftPathPrefix>
-                The path prefix to use for swift storage. Note that to conform 
-                to CUBE-style conventions, this must be
-                
-                        <cubeUser>/uploads
-                        
-                so the path in swift is:
-                
-                        <cubeUser>/uploads/<uploadPathPrefix>
 
         -S <SWIFTIP>
         The IP address of the CUBE instance to which files are pushed.
