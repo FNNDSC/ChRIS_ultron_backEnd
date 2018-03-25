@@ -5,13 +5,8 @@ SWIFTIP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
 SWIFTPORT=8080
 SWIFTPATHPREFIX=""
 PULLDIR="./"
-<<<<<<< HEAD
 PUSHDIR="./"
 ACTION="list"
-=======
-PUSHDIR=""
-ACTION="push"
->>>>>>> Add util/helper scripts.
 
 declare -i Gb_verbose=0
 
@@ -41,7 +36,6 @@ G_SYNOPSIS="
         -V 
         Be verbose. Typically this means echo the actual swift command.
 
-<<<<<<< HEAD
         -A <action> (Default >> $ACTION <<)
         The action to perform. One of:
 
@@ -73,16 +67,6 @@ G_SYNOPSIS="
           |             Pull objects from swift to <pullDir>.
           | 
           +----> push:
-=======
-        -A <action>
-        The action to perform. One of:
-
-                o push
-                o pull
-                o list
-
-                o push:
->>>>>>> Add util/helper scripts.
 
                 Push files to swift storage.
 
@@ -93,7 +77,6 @@ G_SYNOPSIS="
                         The extension of files in <pushDir> to PUSH 
                         to swift storage.
                 
-<<<<<<< HEAD
 
 
         -S <SWIFTIP>
@@ -102,34 +85,6 @@ G_SYNOPSIS="
 
         -p <SWIFTPORT>
         The port address of the swift instance to which files are pushed.
-=======
-                o pull:
-
-                Pull files from swift storage.
-
-                o list:
-
-                List files in swift storage.
-
-                All actions understand:
-
-                -P <SwiftPathPrefix>
-                The path prefix to use for swift storage. Note that to conform 
-                to CUBE-style conventions, this must be
-                
-                        <cubeUser>/uploads
-                        
-                so the path in swift is:
-                
-                        <cubeUser>/uploads/<uploadPathPrefix>
-
-        -S <SWIFTIP>
-        The IP address of the CUBE instance to which files are pushed.
-        If not specified will default to >> $SWIFTIP <<.
-
-        -p <SWIFTPORT>
-        The port address of the CUBE instance to which files are pushed.
->>>>>>> Add util/helper scripts.
         If not specified will default to >> $SWIFTPORT <<.
         
  DESCRIPTION
