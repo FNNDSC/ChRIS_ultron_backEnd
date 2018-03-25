@@ -116,7 +116,11 @@ pfurl --auth chris:chris1234                               \\
 "
 
 
+<<<<<<< HEAD
 printf "Run the pl-dircopy plugin to pull this data from swift storage into CUBE:\n"
+=======
+printf "Run the pl-dircopy plugin to pull this data from swift storage:\n"
+>>>>>>> Add example call for status check via API.
 printf "$runPluginCmd"
 printf "\n"
 printf "Trigger output file registration in CUBE with:\n"
