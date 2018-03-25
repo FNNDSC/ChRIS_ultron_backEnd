@@ -22,6 +22,7 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
 from django.utils import timezone
 from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.services import charm
+from django.conf import settings
 
 
 class PluginManager(object):
@@ -246,7 +247,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            quiet       = True
+            quiet       = settings.CHRIS_DEBUG['quiet']
         )
 
         # Some dev notes...
