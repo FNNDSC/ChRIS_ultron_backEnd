@@ -27,7 +27,6 @@ from plugins.models import ComputeResource
 from django.conf import settings
 
 
-
 class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
