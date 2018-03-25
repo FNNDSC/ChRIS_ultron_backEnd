@@ -116,6 +116,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
         if 'previous_id' in request_data:
             previous_id = request_data['previous_id']
         previous = serializer.validate_previous(previous_id, plugin)
+        gpu_limit = 0
+        if request_data.get('gpu_limit'):
+            gpu_limit = serializer.validate_gpu_limit(request_data['gpu_limit'], plugin)
         # create plugin instance with corresponding owner, plugin and previous instances
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous)
@@ -124,11 +127,14 @@ class PluginInstanceList(generics.ListCreateAPIView):
         parameters_dict = {}
         for parameter in parameters:
             if parameter.name in request_data:
-                data = {'value': request_data[parameter.name]}
+                requested_value = request_data[parameter.name]
+                data = {'value': requested_value}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
+                if parameter.name == 'gpu_limit':
+                    requested_value = serializer.validate_gpu_limit(request_data['gpu_limit'], plugin)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
-                parameters_dict[parameter.name] = request_data[parameter.name]
+                parameters_dict[parameter.name] = requested_value
         # run the plugin's app
         pl_manager = PluginManager()
         pl_manager.run_plugin_app(  plugin_inst, 
@@ -136,7 +142,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = 'host')
+                                    IOPhost             = 'host',
+                                    gpu_limit = gpu_limit
+                                    )
 
     def list(self, request, *args, **kwargs):
         """

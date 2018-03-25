@@ -2,6 +2,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework import serializers
+from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
@@ -15,7 +16,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         model = Plugin
         fields = ('url', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
                   'description', 'documentation', 'license', 'version',
-                  'parameters', 'instances')
+                  'parameters', 'instances', 'min_gpu_limit', 'max_gpu_limit')
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -51,12 +52,19 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     path_param = serializers.HyperlinkedRelatedField(many=True,
                                                        view_name='pathparameter-detail',
                                                        read_only=True)
-    
+
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
                   'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
-                  'float_param', 'bool_param', 'path_param')
+                  'float_param', 'bool_param', 'path_param', 'gpu_limit')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
 
     def validate_previous(self, previous_id, plugin):
         """
@@ -77,6 +85,19 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                     {'detail':
                      "Couldn't find any 'previous' plugin instance with id %s" % previous_id})
         return previous
+
+    def validate_gpu_limit(self, gpu_limit, plugin):
+        """
+        Validates GPU limits for the requested plugin.
+        :param Int gpu_limit: value that was requested.
+        :param Plugin plugin: The plugin which needs gpu requests.
+        :return: Int 
+        """
+        if gpu_limit > plugin.max_gpu_limit:
+            gpu_limit = plugin.max_gpu_limit
+        elif gpu_limit < plugin.min_gpu_limit:
+            gpu_limit = plugin.min_gpu_limit
+        return gpu_limit
 
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):

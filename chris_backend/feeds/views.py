@@ -289,21 +289,13 @@ class FeedFileList(generics.ListAPIView):
         return self.filter_queryset(feed.files.all())
 
 
-class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
+class FeedFileDetail(generics.RetrieveAPIView):
     """
     A feed's file view.
     """
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overriden to append a collection+json template.
-        """
-        response = super(FeedFileDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"fname": ""}
-        return services.append_collection_template(response, template_data)
 
 
 class FileResource(generics.GenericAPIView):

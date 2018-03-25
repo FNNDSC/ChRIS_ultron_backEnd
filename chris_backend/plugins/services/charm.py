@@ -151,6 +151,7 @@ class Charm():
 
         self.LC                     = 40
         self.RC                     = 40
+        self.gpu_limit              = 0
 
         for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs      = val
@@ -164,6 +165,7 @@ class Charm():
             if key == 'debugFile':      self.str_debugFile  = val
             if key == 'quiet':          self.b_quiet        = val
             if key == 'IOPhost':        self.str_IOPhost    = val
+            if key == 'gpu_limit':      self.gpu_limit      = val
 
         if self.b_useDebug:
             self.debug                  = pfurl.Message(logTo = self.str_debugFile)
@@ -889,6 +891,7 @@ class Charm():
                     'threaded': True,
                     'auid':     self.c_pluginInst.owner.username,
                     'jid':      str(self.d_pluginInst['id']),
+                    'gpu_limit':  self.gpu_limit,
                     "container":   
                     {
                         "target": 

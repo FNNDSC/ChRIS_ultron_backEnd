@@ -81,6 +81,7 @@ pip freeze --local
 * ``pfioh``
 * ``pman``
 
+
 ### Instantiate CUBE
 
 Start CUBE from the repository source directory by running the make bash script
@@ -91,6 +92,7 @@ Start CUBE from the repository source directory by running the make bash script
 All the steps performed by the above script are properly documented in the script itself. 
 
 After running this script all the automated tests should have successfully run and a Django development server should be running in interactive mode in this terminal.
+
 
 ### Rerun automated tests after modifying source code
 
@@ -125,6 +127,7 @@ docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test
 
 After running the Integration tests the ./FS/remote directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
 
+
 ### Check code coverage of the automated tests
 Make sure the **chris_backend/** dir is world writable. Then type:
 
@@ -132,6 +135,7 @@ Make sure the **chris_backend/** dir is world writable. Then type:
 docker exec -it chrisultronbackend_chris_dev_run_1 coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
 docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
 ```
+
 
 ### Using httpie to play with the REST API 
 A simple GET request:
@@ -143,10 +147,21 @@ A simple POST request:
 http -a cube:cube1234 POST http://localhost:8000/api/v1/plugins/1/instances/ Content-Type:application/vnd.collection+json Accept:application/vnd.collection+json template:='{"data":[{"name":"dir","value":"./"}]}'
 ```
 
+
 ### Using swift client to list files in the users bucket
 ```bash
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
 ```
+
+
+### Destroy CUBE
+
+Stop and remove CUBE services and storage space by running the destroy bash script from the repository source directory
+
+```bash
+./docker-destroy-chris_dev.sh
+```
+
 
 ### REST API Documentation
 

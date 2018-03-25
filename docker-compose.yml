@@ -11,6 +11,7 @@
 version: '3'
 
 services:
+
   chris_dev:
     image:  ${CREPO}/chris_dev_backend
     volumes:
@@ -23,6 +24,7 @@ services:
       - "8000:8000"
     depends_on:
       - chris_dev_db
+      - chris_store
       - swift_service
       - pfcon_service
     labels:
@@ -41,6 +43,33 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Backend development database"
+
+  chris_store:
+    image:  ${CREPO}/chris_store
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8010:8010"
+    depends_on:
+      - chris_store_dev_db
+      - swift_service
+    labels:
+      name: "ChRIS_store"
+      role: "Chris store service"
+
+  chris_store_dev_db:
+    # using the dev DB temporary until we switch to a truly production Chris Store
+    image:  mysql:5
+    volumes:
+      - chris_store_dev_db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootp
+      - MYSQL_DATABASE=chris_store_dev
+      - MYSQL_USER=chris
+      - MYSQL_PASSWORD=Chris1234
+    labels:
+      name: "ChRIS_store MySQL Database"
+      role: "Chris store database"
 
   swift_service:
     image:  fnndsc/docker-swift-onlyone
@@ -107,4 +136,5 @@ services:
 
 volumes:
   chris_dev_db_data:
+  chris_store_dev_db_data:
   swift_storage:

@@ -24,6 +24,7 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 STATUS_TYPES = ['started', 'running-on-remote', 'finished-on-remote']
 
 class Plugin(models.Model):
+    
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
@@ -36,7 +37,8 @@ class Plugin(models.Model):
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50, blank=True)
     version = models.CharField(max_length=10, blank=True)
-
+    min_gpu_limit = models.IntegerField(null=True)
+    max_gpu_limit = models.IntegerField(null=True)
     class Meta:
         ordering = ('type',)
 
@@ -85,7 +87,8 @@ class PluginInstance(models.Model):
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     owner = models.ForeignKey('auth.User')
-    
+    gpu_limit = models.IntegerField(null=True)
+
     class Meta:
         ordering = ('start_date',)
 

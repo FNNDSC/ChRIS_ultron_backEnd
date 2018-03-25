@@ -144,6 +144,7 @@ fi
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
+    "chris_store"
     "pfcon${TAG}"
     "pfurl${TAG}"
     "pfioh${TAG}"
@@ -302,14 +303,18 @@ else
     fi
     windowBottom
 
-    title -d 1 "Waiting until mysql server is ready to accept connections..."
+    title -d 1 "Waiting until mysql servers are ready to accept connections..."
+    # CUBE dev DB
     docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
+    # Chris store DB
+    docker-compose exec chris_store_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     title -d 1 "Applying migrations..."
     docker-compose exec chris_dev python manage.py migrate
+    docker-compose exec chris_store python manage.py migrate # temporary until we switch to truly production Chris store
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
@@ -360,7 +365,17 @@ else
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
     echo ""
+    windowBottom
 
+    title -d 1 "Creating a ChRIS STORE API user"
+    echo ""
+    echo "Setting user cubeadmin:cubeadmin1234 ..."
+    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose exec chris_store /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
+    echo ""
+    docker-compose restart chris_store
+    echo ""
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then
