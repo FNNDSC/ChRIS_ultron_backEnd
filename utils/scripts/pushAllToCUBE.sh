@@ -108,15 +108,26 @@ pfurl --auth cube:cube1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugi
 
 registerOutputFilesCmd="
 
+<<<<<<< HEAD
 pfurl --auth chris:chris1234                               \\
       --verb GET                                           \\
       --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/instances/1/   \\
       --content-type application/vnd.collection+json       \\
+=======
+pfurl --auth chris:chris1234                               \
+      --verb GET                                           \
+      --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/instances/1/   \
+      --content-type application/vnd.collection+json       \
+>>>>>>> Add example call for status check via API.
       --quiet --jsonpprintindent 4
 "
 
 
+<<<<<<< HEAD
 printf "Run the pl-dircopy plugin to pull this data from swift storage into CUBE:\n"
+=======
+printf "Run the pl-dircopy plugin to pull this data from swift storage:\n"
+>>>>>>> Add example call for status check via API.
 printf "$runPluginCmd"
 printf "\n"
 printf "Trigger output file registration in CUBE with:\n"
