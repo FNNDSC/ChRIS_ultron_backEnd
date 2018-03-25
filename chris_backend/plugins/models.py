@@ -190,7 +190,11 @@ class PluginInstance(models.Model):
             feedfile.fname.name = object['name']
             feedfile.save()
             fileCount += 1
-        return fileCount
+        return {
+            'status':   True,
+            'l_object': object_list,
+            'total':    fileCount
+        }
 
 
 class PluginInstanceFilter(FilterSet):
