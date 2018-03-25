@@ -978,7 +978,7 @@ class Charm():
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_responseStatus != str_DBstatus:
-            pudb.set_trace()
+            # pudb.set_trace()
             self.dp.qprint('Registering output files...', comms = 'status')
             d_register                  = self.c_pluginInst.register_output_files()
             for obj in d_register['l_object']:
