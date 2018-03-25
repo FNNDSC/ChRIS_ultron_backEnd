@@ -96,8 +96,21 @@ pfurl --auth cube:cube1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugi
 
 "
 
+registerOutputFilesCmd="
+
+pfurl --auth chris:chris1234                               \
+      --verb GET                                           \
+      --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/instances/1/   \
+      --content-type application/vnd.collection+json       \
+      --quiet --jsonpprintindent 4
+"
+
+
 printf "Run the pl-dircopy plugin to pull this data from swift storage:\n"
 printf "$runPluginCmd"
+printf "\n"
+printf "Trigger output file registration in CUBE with:\n"
+printf "$registerOutputFilesCmd"
 printf "\n"
 printf "Query swift with:\n"
 printf "$swiftQuery"
