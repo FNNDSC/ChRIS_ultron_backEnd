@@ -362,7 +362,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            quiet       = True
+            quiet       = settings.CHRIS_DEBUG['quiet']
         )
 
         # Some dev notes...
