@@ -80,11 +80,11 @@ G_SYNOPSIS="
 
 
         -S <SWIFTIP>
-        The IP address of the CUBE instance to which files are pushed.
+        The IP address of the swift instance to which files are pushed.
         If not specified will default to >> $SWIFTIP <<.
 
         -p <SWIFTPORT>
-        The port address of the CUBE instance to which files are pushed.
+        The port address of the swift instance to which files are pushed.
         If not specified will default to >> $SWIFTPORT <<.
         
  DESCRIPTION
