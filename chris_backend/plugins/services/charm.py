@@ -1009,6 +1009,7 @@ class Charm():
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
+<<<<<<< HEAD
             # pudb.set_trace()
             d_swiftState    = {}
             if 'swift' in d_response['jobOperation']['info']['pullPath']:
@@ -1028,6 +1029,11 @@ class Charm():
             Object list:\n""" % ( d_register['pollLoop'],
                     d_register['outputPath'],
                     d_register['total'])
+=======
+            self.dp.qprint('Registering output files...', comms = 'status')
+            #pudb.set_trace()
+            d_register                  = self.c_pluginInst.register_output_files()
+>>>>>>> Fix duplicate DB registration.
             for obj in d_register['l_object']:
                 str_registrationMsg += obj['name'] + '\n'
             self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
