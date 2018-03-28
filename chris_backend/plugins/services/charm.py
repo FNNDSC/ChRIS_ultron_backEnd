@@ -1009,6 +1009,7 @@ class Charm():
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
+<<<<<<< HEAD
             # pudb.set_trace()
             d_swiftState    = {}
             if 'swift' in d_response['jobOperation']['info']['pullPath']:
@@ -1017,6 +1018,10 @@ class Charm():
             d_register      = self.c_pluginInst.register_output_files(
                                                 swiftState = d_swiftState
             )
+=======
+            #pudb.set_trace()
+            d_register                  = self.c_pluginInst.register_output_files()
+>>>>>>> Record registration details to FS in tee-write.
             str_registrationMsg = """
             Registering output files...
 
