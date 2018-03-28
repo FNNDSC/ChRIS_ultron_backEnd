@@ -10,6 +10,7 @@ from rest_framework.filters import FilterSet
 from feeds.models import Feed, FeedFile
 from .fields import CPUField, MemoryField
 
+import time
 
 # API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
@@ -180,8 +181,16 @@ class PluginInstance(models.Model):
         )
         output_path = self.get_output_path()
         # get the full list of objects with prefix output_path in Swift storage
-        object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=output_path,
+
+        object_list = []
+        pollLoop    = 0
+        maxPolls    = 20
+
+        while len(object_list) <= 4 and pollLoop < maxPolls:
+            object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=output_path,
                                          full_listing=True)[1]
+            time.sleep(0.2)
+            pollLoop += 1
         root_instance = self.get_root_instance()
         feed = root_instance.feed
         fileCount = 0
@@ -191,9 +200,11 @@ class PluginInstance(models.Model):
             feedfile.save()
             fileCount += 1
         return {
-            'status':   True,
-            'l_object': object_list,
-            'total':    fileCount
+            'status':       True,
+            'l_object':     object_list,
+            'total':        fileCount,
+            'outputPath':   output_path,
+            'pollLoop':     pollLoop
         }
 
 
