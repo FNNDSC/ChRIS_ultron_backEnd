@@ -1010,6 +1010,7 @@ class Charm():
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
 <<<<<<< HEAD
+<<<<<<< HEAD
             # pudb.set_trace()
             d_swiftState    = {}
             if 'swift' in d_response['jobOperation']['info']['pullPath']:
@@ -1034,6 +1035,21 @@ class Charm():
             #pudb.set_trace()
             d_register                  = self.c_pluginInst.register_output_files()
 >>>>>>> Fix duplicate DB registration.
+=======
+            #pudb.set_trace()
+            d_register                  = self.c_pluginInst.register_output_files()
+            str_registrationMsg = """
+            Registering output files...
+
+            swift poll loops    = %d
+            swift prefix path   = %s
+
+            In total, registered %d objects. 
+
+            Object list:\n""" % ( d_register['pollLoop'],
+                    d_register['outputPath'],
+                    d_register['total'])
+>>>>>>> Record registration details to FS in tee-write.
             for obj in d_register['l_object']:
                 str_registrationMsg += obj['name'] + '\n'
             self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
