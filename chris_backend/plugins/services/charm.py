@@ -978,12 +978,24 @@ class Charm():
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
-            self.dp.qprint('Registering output files...', comms = 'status')
             #pudb.set_trace()
             d_register                  = self.c_pluginInst.register_output_files()
+            str_registrationMsg = """
+            Registering output files...
+
+            swift poll loops    = %d
+            swift prefix path   = %s
+
+            In total, registered %d objects. 
+
+            Object list:\n""" % ( d_register['pollLoop'],
+                    d_register['outputPath'],
+                    d_register['total'])
             for obj in d_register['l_object']:
-                self.dp.qprint('Registered object %s...' % obj['name'])
-            self.dp.qprint('In total, registered %d objects.' % d_register['total'])
+                str_registrationMsg += obj['name'] + '\n'
+            self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
+                            teeFile = '/data/tmp/registrationMsg-%s.txt' %  str(self.d_pluginInst['id']),
+                            teeMode = 'w+')
             str_responseStatus          = 'finishedSuccessfully'
             self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = timezone.now()
