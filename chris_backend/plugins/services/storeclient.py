@@ -9,63 +9,56 @@ from django.conf import settings
 
 class StoreClient(object):
 
-    def __init__(self, store_url, username, password):
+    def __init__(self, store_url, username, password, timeout=30):
         self.store_url = store_url
         self.username = username
         self.password = password
+        self.timeout = timeout
 
-    def get_plugin_representation(self, plugin_name):
+    def get_plugin(self, plugin_name):
         """
-        Get a plugin given its ChRIS store name.
+        Get a plugin's information (descriptors and parameters) given its ChRIS store
+        name.
         """
         plugin = {}
         search_params = {'name': plugin_name}
-        r = requests.get('http://localhost:8010/api/v1/' + 'search/',
-                         params=search_params,
-                         auth=(self.username, self.username),
-                         timeout=30)
-        collection = Collection.from_json(r.text)
-        if collection.items:
-            item = collection.items[0]
+        items = self._getRequest(self.store_url + 'search/', search_params)
+        if items:
+            # collect the plugin's descriptors
+            item = items[0]
             for descriptor in item.data:
                 plugin[descriptor.name] = descriptor.value
-            params_url = [link for link in item.links if link.rel=='parameters'][0].href
-
-            r = requests.get(params_url,
-                             auth=(self.username, self.username),
-                             timeout=30)
-            collection = Collection.from_json(r.text)
+            # collect the plugin's parameters descriptors
+            params_url = [link for link in item.links if link.rel == 'parameters'][0].href
+            items = self._getRequest(params_url)
             params = []
-            for item in collection.items:
+            for item in items:
                 param = {}
                 for descriptor in item.data:
                     param[descriptor.name] = descriptor.value
                 params.append(param)
             plugin['parameters'] = params
+        return plugin
 
-        for item in collection.items:
-            descriptor = item.data[0].name
-            value = item.data[0].value
-
-        requests.exceptions.Timeout
-        requests.exceptions.RequestException
-
-        client = docker.from_env()
-        # first try to pull the latest image
+    def _getRequest(self, url, params=None):
         try:
-            img = client.images.pull(dock_image_name)
-        except docker.errors.APIError:
-            # use local image ('remove' option automatically removes container when finished)
-            byte_str = client.containers.run(dock_image_name, remove=True)
-        else:
-            byte_str = client.containers.run(img, remove=True)
-        app_repr = json.loads(byte_str.decode())
-        plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
-        if app_repr['type'] not in plugin_types:
-            raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
-                             % (plugin_types, dock_image_name))
-        return app_repr
+            r = requests.get(url,
+                             params=params,
+                             auth=(self.username, self.username),
+                             timeout=self.timeout)
+        except (requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
+            raise StoreRequestException(str(e))
+        collection = Collection.from_json(r.text)
+        if collection.error :
+            raise StoreRequestException(collection.error.message)
+        return collection.items
 
 
+class StoreException(Exception): pass
 
+
+class StoreRequestException(StoreException): pass
+
+
+class StoreErrorException(StoreException): pass
 
