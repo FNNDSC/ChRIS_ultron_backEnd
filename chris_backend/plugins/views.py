@@ -15,7 +15,6 @@ from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
-
 class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.
@@ -116,13 +115,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
         if 'previous_id' in request_data:
             previous_id = request_data['previous_id']
         previous = serializer.validate_previous(previous_id, plugin)
-        gpu_limit = 0
-        if request_data.get('gpu_limit'):
-            gpu_limit = serializer.validate_gpu_limit(request_data['gpu_limit'], plugin)
-        # create plugin instance with corresponding owner, plugin and previous instances
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous)
-        # collect parameters from the request and validate and save them to the DB 
+        # collect parameters from the request and validate and save them to the DB
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -131,19 +126,16 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 data = {'value': requested_value}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
-                if parameter.name == 'gpu_limit':
-                    requested_value = serializer.validate_gpu_limit(request_data['gpu_limit'], plugin)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(  plugin_inst, 
+        pl_manager.run_plugin_app(  plugin_inst,
                                     parameters_dict,
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = 'host',
-                                    gpu_limit = gpu_limit
+                                    IOPhost             = 'host'
                                     )
 
     def list(self, request, *args, **kwargs):
