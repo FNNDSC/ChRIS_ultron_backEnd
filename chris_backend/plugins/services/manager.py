@@ -10,7 +10,6 @@ import json
 import docker
 import time
 from argparse import ArgumentParser
-import pudb
 
 if "DJANGO_SETTINGS_MODULE" not in os.environ:
     # django needs to be loaded (eg. when this script is run from the command line)
@@ -20,8 +19,9 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
     django.setup()
 
 from django.utils import timezone
-from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
-from plugins.models import CPUInt, MemoryInt
+from plugins.models import Plugin, PluginParameter
+from plugins.models import TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
+from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
 
 
