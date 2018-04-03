@@ -1,14 +1,14 @@
 
+import swiftclient
+
 from django.db import models
-from django.core.exceptions import ValidationError
+from django.conf import settings
 import django_filters
 
 from rest_framework.filters import FilterSet
 
-from django.conf import settings
-import swiftclient
-
 from feeds.models import Feed, FeedFile
+from .fields import CPUField, MemoryField
 
 
 # API types
@@ -22,100 +22,8 @@ TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
-STATUS_TYPES = ['started', 'running-on-remote', 'finished-on-remote']
+STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
 
-class MemoryInt(int):
-    def __new__(cls, memory_str, *args, **kwargs):
-        """
-        Convert memory_str in format of "xMi" or "xGi" to integer in MiB.
-        Example: memory_str_to_int("128Mi") -> 128
-                 memory_str_to_int("1Gi")   -> 1024
-        Throws ValueError if input string is not formatted correctly.
-        """
-        if type(memory_str) is int:
-            return  super(MemoryInt, cls).__new__(cls, memory_str)
-        try:
-            suffix = memory_str[-2:]
-            if suffix == 'Gi':
-                memory_int = int(memory_str[:-2]) * 1024
-                assert memory_int > 0
-                self = memory_int
-            elif suffix == 'Mi':
-                memory_int = int(memory_str[:-2])
-                assert memory_int > 0
-                self = memory_int
-            else:
-                raise ValueError
-        except (IndexError, ValueError, AssertionError):
-            raise ValueError("Memory format incorrect. Format is xMi or xGi where x is an integer.")
-        return  super(MemoryInt, cls).__new__(cls, memory_int)
-
-    def __str__(self):
-        return super().__str__() + 'Mi'
-
-class CPUInt(int):
-    def __new__(cls, cpu_str, *args, **kwargs):
-        """
-        Convert cpu_str in format of "xm" to integer in millicores.
-        Example: cpu_str_to_int("2000m") -> 2000
-        Throws ValueError if input string is not formatted correctly.
-        """
-        if type(cpu_str) is int:
-            return  super(CPUInt, cls).__new__(cls, cpu_str)
-        try:
-            cpu_int = int(cpu_str[:-1])
-            assert cpu_str[-1] is 'm'
-            assert cpu_int > 0
-        except (IndexError, ValueError, AssertionError):
-            raise ValueError("CPU format incorrect. Format is xm where x is an integer in millicores.")
-        return  super(CPUInt, cls).__new__(cls, cpu_int)
-
-    def __str__(self):
-        return super().__str__() + 'm'
-
-class MemoryField(models.Field):
-    """Stores memory quantity as integer."""
-    error_message = "Memory format incorrect. Format is xMi or xGi where x is an integer."
-
-    def get_internal_type(self):
-        return "IntegerField"
-
-    def get_prep_value(self, value):
-        """Python object --> Query Value."""
-        if value is None:
-            return None
-        return int(value)
-
-    def to_python(self, value):
-        """Query value --> Python object."""
-        if value is None:
-            return value
-        try:
-            return MemoryInt(value)
-        except ValueError:
-            raise ValidationError(self.error_message)
-
-class CPUField(models.Field):
-    """Stores CPU quantity as integer in millicores."""
-    error_message = "CPU format incorrect. Format is xm where x is an integer in millicores."
-
-    def get_internal_type(self):
-        return "IntegerField"
-
-    def get_prep_value(self, value):
-        """Python object --> Query Value."""
-        if value is None:
-            return None
-        return int(value)
-
-    def to_python(self, value):
-        """Query value --> Python object."""
-        if value is None:
-            return value
-        try:
-            return CPUInt(value)
-        except ValueError:
-            raise ValidationError(self.error_message)
 
 class Plugin(models.Model):
     # default minimum resource limits inserted at registration time
