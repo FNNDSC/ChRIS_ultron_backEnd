@@ -12,6 +12,7 @@ from .fields import CPUField, MemoryField
 
 import time
 
+
 # API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values"),
