@@ -9,12 +9,14 @@ from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
 from .fields import MemoryInt, CPUInt
 from .models import ComputeResource
 
+
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
     compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     class Meta:
         model = ComputeResource
         fields = ('url', 'compute_resource_identifier')
+
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
@@ -27,6 +29,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
                   'parameters', 'instances', 'min_number_of_workers',
                   'max_number_of_workers','min_cpu_limit','max_cpu_limit',
                   'min_memory_limit','max_memory_limit', 'min_gpu_limit', 'max_gpu_limit')
+        
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
