@@ -25,8 +25,7 @@ PFCON = {
 
 # chris store settings
 CHRIS_STORE = {
-    'host': 'chris_store',
-    'port': '8010',
+    'store_url': 'http://chris_store:8010/api/v1/',
     'username': 'cubeadmin',
     'password': 'cubeadmin1234'
 }

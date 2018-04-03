@@ -6,7 +6,7 @@ from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
-from .models import MemoryInt, CPUInt
+from .fields import MemoryInt, CPUInt
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
