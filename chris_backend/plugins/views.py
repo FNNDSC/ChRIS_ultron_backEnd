@@ -136,7 +136,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = str_IOPhost,
+                                    IOPhost             = str_IOPhost
                                     )
 
     def list(self, request, *args, **kwargs):

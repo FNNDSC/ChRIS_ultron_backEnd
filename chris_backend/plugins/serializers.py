@@ -6,9 +6,8 @@ from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
-from .models import ComputeResource
 from .fields import MemoryInt, CPUInt
-
+from .models import ComputeResource
 
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
     compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
@@ -16,9 +15,6 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ComputeResource
         fields = ('url', 'compute_resource_identifier')
-
-
-
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
@@ -76,8 +72,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'previous', 'owner', 'feed', 'plugin', 'compute_resource', 'string_param', 'int_param',
                   'float_param', 'bool_param', 'path_param', 'compute_resource_id', 'cpu_limit', 
                   'memory_limit', 'number_of_workers','gpu_limit')
-
-
+        
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """

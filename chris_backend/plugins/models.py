@@ -24,8 +24,6 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
 
-
-
 class ComputeResource(models.Model):
     compute_resource_identifier = models.CharField(max_length=100)
 

@@ -19,12 +19,11 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
     django.setup()
 
 from django.utils import timezone
-from plugins.models import Plugin, PluginParameter, TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
-from plugins.models import ComputeResource
+from plugins.models import Plugin, PluginParameter
 from plugins.models import TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
-
+from plugins.models import ComputeResource
 
 class PluginManager(object):
     def __init__(self):
