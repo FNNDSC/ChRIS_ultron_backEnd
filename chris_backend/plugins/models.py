@@ -1,13 +1,14 @@
 
+import swiftclient
+
 from django.db import models
+from django.conf import settings
 import django_filters
 
 from rest_framework.filters import FilterSet
 
-from django.conf import settings
-import swiftclient
-
 from feeds.models import Feed, FeedFile
+from .fields import CPUField, MemoryField
 
 
 # API types
@@ -21,9 +22,23 @@ TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
-STATUS_TYPES = ['started', 'running-on-remote', 'finished-on-remote']
+STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
+
+
+
+class ComputeResource(models.Model):
+    compute_resource_identifier = models.CharField(max_length=100)
+
+    def __str__(self):
+        return str(self.id)
 
 class Plugin(models.Model):
+    # default minimum resource limits inserted at registration time
+    defaults = {
+                'cpu_limit'        : 1000, # in millicores
+                'memory_limit'     : 200   # in Mi
+               }
+    maxint = 2147483647
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
@@ -36,6 +51,16 @@ class Plugin(models.Model):
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50, blank=True)
     version = models.CharField(max_length=10, blank=True)
+    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
+                        related_name='plugins')
+    min_gpu_limit = models.IntegerField(null=True)
+    max_gpu_limit = models.IntegerField(null=True)
+    min_number_of_workers = models.IntegerField(null=True, default=1)
+    max_number_of_workers = models.IntegerField(null=True, default=maxint)
+    min_cpu_limit = CPUField(null=True, default=defaults['cpu_limit'])          # In millicores
+    max_cpu_limit = CPUField(null=True, default=maxint)                         # In millicores
+    min_memory_limit = MemoryField(null=True, default=defaults['memory_limit']) # In Mi
+    max_memory_limit = MemoryField(null=True, default=maxint)                   # In Mi
 
     class Meta:
         ordering = ('type',)
@@ -49,7 +74,6 @@ class Plugin(models.Model):
         """
         params = self.parameters.all()
         return [param.name for param in params]
-    
 
 class PluginFilter(FilterSet):
     min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
@@ -85,7 +109,13 @@ class PluginInstance(models.Model):
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     owner = models.ForeignKey('auth.User')
-    
+    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
+                                    related_name='plugin_instance')
+    cpu_limit = CPUField(null=True)
+    memory_limit = MemoryField(null=True)
+    number_of_workers = models.IntegerField(null=True)
+    gpu_limit = models.IntegerField(null=True)
+
     class Meta:
         ordering = ('start_date',)
 
@@ -248,6 +278,3 @@ class PathParameter(models.Model):
 
     def __str__(self):
         return self.value
-
-
-

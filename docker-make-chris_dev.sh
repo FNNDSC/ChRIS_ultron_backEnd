@@ -144,6 +144,7 @@ fi
 
 declare -a A_CONTAINER=(
     "chris_dev_backend"
+    "chris_store"
     "pfcon${TAG}"
     "pfurl${TAG}"
     "pfioh${TAG}"
@@ -263,10 +264,29 @@ else
     mkdir -p FS/data 
     chmod 777 FS/data
     chmod 777 FS
+    b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
         tree FS
+        report=$(tree FS | tail -n 1)
+        if [[ "$report" != "3 directories, 0 files" ]] ; then 
+            b_FSOK=0
+        fi
+    else
+        report=$(find FS 2>/dev/null)
+        lines=$(echo "$report" | wc -l)
+        if (( lines != 4 )) ; then
+            b_FSOK=0
+        fi
     fi
+    if (( ! b_FSOK )) ; then 
+        printf "\n${Red}There should only be 3 directories and no files in the FS tree!\n"
+        printf "${Yellow}Please manually clean/delete the entire FS tree and re-run.\n"
+        printf "${Yellow}\nThis script will now exit with code '1'.\n\n"
+        exit 1
+    fi
+
+
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
@@ -283,14 +303,18 @@ else
     fi
     windowBottom
 
-    title -d 1 "Waiting until mysql server is ready to accept connections..."
+    title -d 1 "Waiting until mysql servers are ready to accept connections..."
+    # CUBE dev DB
     docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
+    # Chris store DB
+    docker-compose exec chris_store_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     title -d 1 "Applying migrations..."
     docker-compose exec chris_dev python manage.py migrate
+    docker-compose exec chris_store python manage.py migrate # temporary until we switch to truly production Chris store
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
@@ -323,8 +347,8 @@ else
     declare -i i=1
     declare -i STEP=10
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Registering $plugin..."
-        python3 plugins/services/manager.py --add ${plugin} 2> /dev/null;
+        echo "${STEP}.$i: Registering $plugin to "host"..."
+        python3 plugins/services/manager.py --add ${plugin} "host" 2> /dev/null;
         ((i++))
     done'
     windowBottom
@@ -341,7 +365,17 @@ else
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
     echo ""
+    windowBottom
 
+    title -d 1 "Creating a ChRIS STORE API user"
+    echo ""
+    echo "Setting user cubeadmin:cubeadmin1234 ..."
+    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose exec chris_store /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
+    echo ""
+    docker-compose restart chris_store
+    echo ""
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then

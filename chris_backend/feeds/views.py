@@ -141,9 +141,11 @@ class FeedList(generics.ListAPIView):
         query_list = [reverse('feed-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
+        user = self.request.user
         links = {'plugins': reverse('plugin-list', request=request),
                  'tags': reverse('full-tag-list', request=request),
-                 'uploadedfiles': reverse('uploadedfile-list', request=request)}
+                 'uploadedfiles': reverse('uploadedfile-list', request=request),
+                 'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
         return services.append_collection_links(response, links)
 
 
@@ -287,21 +289,13 @@ class FeedFileList(generics.ListAPIView):
         return self.filter_queryset(feed.files.all())
 
 
-class FeedFileDetail(generics.RetrieveUpdateDestroyAPIView):
+class FeedFileDetail(generics.RetrieveAPIView):
     """
     A feed's file view.
     """
     queryset = FeedFile.objects.all()
     serializer_class = FeedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overriden to append a collection+json template.
-        """
-        response = super(FeedFileDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"fname": ""}
-        return services.append_collection_template(response, template_data)
 
 
 class FileResource(generics.GenericAPIView):

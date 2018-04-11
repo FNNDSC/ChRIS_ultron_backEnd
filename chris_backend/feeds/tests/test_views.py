@@ -11,7 +11,7 @@ from rest_framework import status
 
 import swiftclient
 
-from plugins.models import Plugin, PluginInstance
+from plugins.models import Plugin, PluginInstance, ComputeResource
 from feeds.models import Note, Tag, Feed, Comment, FeedFile
 from feeds import views
 
@@ -34,7 +34,9 @@ class ViewTests(TestCase):
                                   'img_type': {'type': 'string', 'optional': True}}
 
         self.feedname = "Feed1"
-        
+        self.compute_resource = ComputeResource.objects.get(
+                                                        compute_resource_identifier="host")
+
         # create basic models
         
         # create the chris user and two other users
@@ -46,11 +48,14 @@ class ViewTests(TestCase):
                                         password=self.password)
         
         # create two plugins of different types
-        Plugin.objects.get_or_create(name="mri_convert", type="ds")
-        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
+        Plugin.objects.get_or_create(name="mri_convert", type="ds", 
+                                        compute_resource=self.compute_resource)
+        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs",
+                                            compute_resource=self.compute_resource)
         
         # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
         
@@ -120,7 +125,8 @@ class FeedListViewTests(ViewTests):
         # create an additional feed using a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
         pl_inst.feed.name = "Feed2"
         pl_inst.feed.save()
     
@@ -168,7 +174,8 @@ class FeedListQuerySearchViewTests(ViewTests):
         # create an additional feed using a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
         pl_inst.feed.name = "Feed2"
         pl_inst.feed.save()
 
@@ -475,7 +482,8 @@ class FullTagListViewTests(ViewTests):
         plugin = Plugin.objects.get(name="pacspull", type="fs")
         
         # create a new feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
         pl_inst.feed.name = "new"
         pl_inst.feed.save()
 
@@ -718,21 +726,6 @@ class FeedFileDetailViewTests(FeedFileViewTests):
     def test_feedfile_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_feedfile_delete_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(FeedFile.objects.count(), 0)
-
-    def test_feedfile_delete_failure_unauthenticated(self):
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_feedfile_delete_failure_access_denied(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class FileResourceViewTests(FeedFileViewTests):

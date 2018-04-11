@@ -9,7 +9,7 @@ Local settings
 """
 
 from .common import *  # noqa
-import  os
+import os
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
@@ -21,6 +21,13 @@ SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 PFCON = {
     'host': 'pfcon_service',
     'port': '5005'
+}
+
+# chris store settings
+CHRIS_STORE = {
+    'store_url': 'http://chris_store:8010/api/v1/',
+    'username': 'cubeadmin',
+    'password': 'cubeadmin1234'
 }
 
 # swift service settings
@@ -38,7 +45,7 @@ DEBUG = True
 CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
 
 if 'CHRIS_DEBUG_QUIET' in os.environ:
-    CHRIS_DEBUG['quiet']  = bool(int(os.environ['CHRIS_DEBUG_QUIET']))
+    CHRIS_DEBUG['quiet'] = bool(int(os.environ['CHRIS_DEBUG_QUIET']))
 
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases

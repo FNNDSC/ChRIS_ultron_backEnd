@@ -6,7 +6,6 @@ charm - ChRIS / pfcon interface.
 
 import  os
 import  pprint
-import  datetime
 import  json
 import  pudb
 import  pfurl
@@ -15,6 +14,7 @@ import  pfmisc
 import  webob
 
 from urllib.parse import urlparse, parse_qs
+from django.utils import timezone
 from django.conf import settings
 
 
@@ -80,7 +80,7 @@ class Charm():
     #             if str_comms == 'error':    write(pfurl.Colors.RED,       end="")
     #             if str_comms == "tx":       write(pfurl.Colors.YELLOW + "---->")
     #             if str_comms == "rx":       write(pfurl.Colors.GREEN  + "<----")
-    #             str_print = '%s' % datetime.datetime.now() + " "
+    #             str_print = '%s' % timezone.now() + " "
     #             write(str_print,       end="")
     #         str_print += ' | ' + self.__name__ + "." + str_caller + '() | ' + msg
     #         write(str_print)
@@ -152,17 +152,17 @@ class Charm():
         self.RC                     = 40
 
         for key, val in kwargs.items():
-            if key == 'app_args':       self.l_appArgs      = val
-            if key == 'd_args':         self.d_args         = val
-            if key == 'plugin_inst':    self.c_pluginInst   = val
-            if key == 'plugin_repr':    self.d_pluginRepr   = val
-            if key == 'app':            self.app            = val
-            if key == 'inputdir':       self.str_inputdir   = val
-            if key == 'outputdir':      self.str_outputdir  = val
-            if key == 'useDebug':       self.b_useDebug     = val
-            if key == 'debugFile':      self.str_debugFile  = val
-            if key == 'quiet':          self.b_quiet        = val
-            if key == 'IOPhost':        self.str_IOPhost    = val
+            if key == 'app_args':       self.l_appArgs         = val
+            if key == 'd_args':         self.d_args            = val
+            if key == 'plugin_inst':    self.c_pluginInst      = val
+            if key == 'plugin_repr':    self.d_pluginRepr      = val
+            if key == 'app':            self.app               = val
+            if key == 'inputdir':       self.str_inputdir      = val
+            if key == 'outputdir':      self.str_outputdir     = val
+            if key == 'useDebug':       self.b_useDebug        = val
+            if key == 'debugFile':      self.str_debugFile     = val
+            if key == 'quiet':          self.b_quiet           = val
+            if key == 'IOPhost':        self.str_IOPhost       = val
 
         if self.b_useDebug:
             self.debug                  = pfurl.Message(logTo = self.str_debugFile)
@@ -490,7 +490,6 @@ class Charm():
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)
-
         if str_service == 'pfcon':
             # Handle the case for 'fs'-type plugins that don't specify an 
             # inputdir.
@@ -552,24 +551,28 @@ class Charm():
                     "service":              str_IOPhost
                 },
 
-                "meta-compute":  
+                "meta-compute":
                 {
-                    'cmd':      "$execshell " + self.str_cmd,
-                    'threaded': True,
-                    'auid':     self.c_pluginInst.owner.username,
-                    'jid':      str(self.d_pluginInst['id']),
-                    "container":   
+                    'cmd':               "$execshell " + self.str_cmd,
+                    'threaded':          True,
+                    'auid':              self.c_pluginInst.owner.username,
+                    'jid':               str(self.d_pluginInst['id']),
+                    'number_of_workers': str(self.d_pluginInst['number_of_workers']),
+                    'cpu_limit':         str(self.d_pluginInst['cpu_limit']),
+                    'memory_limit':      str(self.d_pluginInst['memory_limit']),
+                    'gpu_limit':         self.d_pluginInst['gpu_limit'],
+                    "container":
                     {
                         "target": 
                         {
                             "image":            self.c_pluginInst.plugin.dock_image,
                             "cmdParse":         True
                         },
-                        "manager": 
+                        "manager":
                         {
                             "image":            "fnndsc/swarm",
                             "app":              "swarm.py",
-                            "env":  
+                            "env":
                             {
                                 "meta-store":   "key",
                                 "serviceType":  "docker",
@@ -648,7 +651,7 @@ class Charm():
             registeredFiles             = self.c_pluginInst.register_output_files()
             str_responseStatus          = 'finishedSuccessfully'
             self.c_pluginInst.status    = str_responseStatus
-            self.c_pluginInst.end_date  = datetime.datetime.now()
+            self.c_pluginInst.end_date  = timezone.now()
             self.dp.qprint('Registered %d files...' % registeredFiles)
             self.c_pluginInst.save()
             self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
