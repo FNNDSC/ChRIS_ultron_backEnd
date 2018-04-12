@@ -7,6 +7,14 @@ from collectionjson.services import collection_serializer_is_valid
 from .models import Plugin, PluginParameter, PluginInstance, StringParameter
 from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
 from .fields import MemoryInt, CPUInt
+from .models import ComputeResource
+
+class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
+    compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
+                                                 read_only=True)
+    class Meta:
+        model = ComputeResource
+        fields = ('url', 'compute_resource_identifier')
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
@@ -34,6 +42,10 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
     previous_id = serializers.ReadOnlyField(source='previous.id')
+
+    compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
+                                                 read_only=True)
+
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
@@ -57,10 +69,10 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
-                  'previous', 'owner', 'feed', 'plugin', 'string_param', 'int_param',
-                  'float_param', 'bool_param', 'path_param', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit')
-
+                  'previous', 'owner', 'feed', 'plugin', 'compute_resource', 'string_param', 'int_param',
+                  'float_param', 'bool_param', 'path_param', 'compute_resource_id', 'cpu_limit', 
+                  'memory_limit', 'number_of_workers','gpu_limit')
+        
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """

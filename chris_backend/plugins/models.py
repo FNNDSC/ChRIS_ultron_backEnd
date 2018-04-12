@@ -24,6 +24,11 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
 
+class ComputeResource(models.Model):
+    compute_resource_identifier = models.CharField(max_length=100)
+
+    def __str__(self):
+        return str(self.id)
 
 class Plugin(models.Model):
     # default minimum resource limits inserted at registration time
@@ -44,6 +49,8 @@ class Plugin(models.Model):
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50, blank=True)
     version = models.CharField(max_length=10, blank=True)
+    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
+                        related_name='plugins')
     min_gpu_limit = models.IntegerField(null=True)
     max_gpu_limit = models.IntegerField(null=True)
     min_number_of_workers = models.IntegerField(null=True, default=1)
@@ -100,6 +107,8 @@ class PluginInstance(models.Model):
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     owner = models.ForeignKey('auth.User')
+    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
+                                    related_name='plugin_instance')
     cpu_limit = CPUField(null=True)
     memory_limit = MemoryField(null=True)
     number_of_workers = models.IntegerField(null=True)

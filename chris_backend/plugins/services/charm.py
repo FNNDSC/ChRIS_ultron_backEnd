@@ -490,7 +490,6 @@ class Charm():
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)
-
         if str_service == 'pfcon':
             # Handle the case for 'fs'-type plugins that don't specify an 
             # inputdir.
