@@ -198,6 +198,7 @@ class PluginManagerTests(TestCase):
             # After submitting run request, wait before checking status
             # time.sleep(5)
 
+            # pudb.set_trace()
             self.pl_manager.check_plugin_app_exec_status(pl_inst)
             self.assertEqual(pl_inst.status, 'started')
 
