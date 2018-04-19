@@ -1043,18 +1043,6 @@ class Charm():
                     d_register['total']
             )
             #pudb.set_trace()
-            d_register                  = self.c_pluginInst.register_output_files()
-            str_registrationMsg = """
-            Registering output files...
-
-            swift poll loops    = %d
-            swift prefix path   = %s
-
-            In total, registered %d objects. 
-
-            Object list:\n""" % ( d_register['pollLoop'],
-                    d_register['outputPath'],
-                    d_register['total'])
             for obj in d_register['l_object']:
                 str_registrationMsg += obj['name'] + '\n'
             self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
