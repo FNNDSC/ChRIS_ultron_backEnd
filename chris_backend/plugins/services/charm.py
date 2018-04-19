@@ -884,6 +884,7 @@ class Charm():
 
                 "meta-compute":
                 {
+<<<<<<< HEAD
                     'cmd':               "$execshell " + self.str_cmd,
                     'threaded':          True,
                     'auid':              self.c_pluginInst.owner.username,
@@ -893,6 +894,14 @@ class Charm():
                     'memory_limit':      str(self.d_pluginInst['memory_limit']),
                     'gpu_limit':         self.d_pluginInst['gpu_limit'],
                     "container":
+=======
+                    'cmd':      "$execshell " + self.str_cmd,
+                    'threaded': True,
+                    'auid':     self.c_pluginInst.owner.username,
+                    'jid':      str_serviceName,
+                    'gpu_limit':  self.gpu_limit,
+                    "container":   
+>>>>>>> Improve logging of exec and status checking commands, add swift return processing.
                     {
                         "target": 
                         {
