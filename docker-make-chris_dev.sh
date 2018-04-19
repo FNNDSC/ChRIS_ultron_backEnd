@@ -347,8 +347,8 @@ else
     declare -i i=1
     declare -i STEP=10
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Registering $plugin..."
-        python3 plugins/services/manager.py --add ${plugin} 2> /dev/null;
+        echo "${STEP}.$i: Registering $plugin to "host"..."
+        python3 plugins/services/manager.py --add ${plugin} "host" 2> /dev/null;
         ((i++))
     done'
     windowBottom
