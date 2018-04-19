@@ -908,21 +908,53 @@ class Charm():
                                 "meta-store":   "key",
                                 "serviceType":  "docker",
                                 "shareDir":     "%shareDir",
-                                "serviceName":  str(self.d_pluginInst['id'])
+                                "serviceName":  str_serviceName
                             }
                         }
                     },
                     "service":              str_IOPhost
                 }
             }
-            str_dmsg = self.pp.pformat(d_msg).strip()
+            d_status   = {
+                    "action": "status",
+                    "meta": {
+                            "remote": {
+                                "key":       str_serviceName
+                            }
+                    }
+                }            
+            str_dmsgExec = json.dumps(d_msg,    indent = 4, sort_keys = True)
+            str_dmsgStat = json.dumps(d_status, indent = 4, sort_keys = True)
+            
+            str_pfurlCmdHeader = """\npfurl \\
+                    --verb POST --raw --http ${HOST_IP}:5005/api/v1/cmd \\
+                    --httpResponseBodyParse                             \\
+                    --jsonwrapper 'payload' --msg '"""
+            str_pfurlCmdExec    = str_pfurlCmdHeader + """
+            %s
+            '
+            """ % str_dmsgExec
+            str_pfurlCmdStatus = str_pfurlCmdHeader + """
+            %s
+            '
+            """ % str_dmsgStat 
             # pudb.set_trace()
             if os.path.exists('/data'):
                 if not os.path.exists('/data/tmp'):
                     os.makedirs('/data/tmp')
-                self.dp.qprint(str_dmsg, teeFile = '/data/tmp/dmsg-exec.json', teeMode = 'w+')
+                self.dp.qprint( str_pfurlCmdExec, 
+                                teeFile = '/data/tmp/dmsg-exec-%s.json' % str_serviceName, 
+                                teeMode = 'w+')
+                self.dp.qprint( str_pfurlCmdStatus, 
+                                teeFile = '/data/tmp/dmsg-stat-%s.json' % str_serviceName, 
+                                teeMode = 'w+')
             else:
-                self.dp.qprint(str_dmsg, teeFile = '/tmp/dmsg-exec.json', teeMode = 'w+')
+                self.dp.qprint( str_pfurlCmdExec, 
+                                teeFile = '/tmp/dmsg-exec-%s.json' % str_serviceName, 
+                                teeMode = 'w+')
+                self.dp.qprint( str_pfurlCmdStatus, 
+                                teeFile = '/tmp/dmsg-stat-%s.json' % str_serviceName, 
+                                teeMode = 'w+')
 
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
 
@@ -953,7 +985,6 @@ class Charm():
             }
         }
 
-        # pudb.set_trace()
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
         self.dp.qprint('d_response = %s' % d_response)
 
@@ -978,8 +1009,14 @@ class Charm():
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
         if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
-            #pudb.set_trace()
-            d_register                  = self.c_pluginInst.register_output_files()
+            # pudb.set_trace()
+            d_swiftState    = {}
+            if 'swift' in d_response['jobOperation']['info']['pullPath']:
+                d_swiftState = d_response['jobOperation']['info']['pullPath']['swift']
+
+            d_register      = self.c_pluginInst.register_output_files(
+                                                swiftState = d_swiftState
+            )
             str_registrationMsg = """
             Registering output files...
 
