@@ -10,9 +10,17 @@ from .serializers import UserSerializer
 from .permissions import IsUserOrChrisOrReadOnly
 
 
-class UserCreate(generics.CreateAPIView):
+class UserCreate(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json write template.
+        """
+        response = services.get_list_response(self, [])
+        template_data = {"username": "", "password": "", "email": ""}
+        return services.append_collection_template(response, template_data)
 
 
 class UserDetail(generics.RetrieveUpdateAPIView):
@@ -47,3 +55,4 @@ class UserDetail(generics.RetrieveUpdateAPIView):
         password = serializer.validated_data.get("password")
         user.set_password(password)
         user.save()
+
