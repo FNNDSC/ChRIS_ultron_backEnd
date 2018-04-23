@@ -30,8 +30,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
                   'compute_resource_identifier', 'parameters', 'instances',
                   'min_number_of_workers', 'max_number_of_workers', 'min_cpu_limit',
                   'max_cpu_limit', 'min_memory_limit', 'max_memory_limit',
-                  'min_gpu_limit',
-                  'max_gpu_limit')
+                  'min_gpu_limit', 'max_gpu_limit')
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
