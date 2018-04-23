@@ -23,6 +23,7 @@ from plugins.models import Plugin, PluginParameter
 from plugins.models import TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
+from django.conf import settings
 from plugins.models import ComputeResource
 from django.conf import settings
 
