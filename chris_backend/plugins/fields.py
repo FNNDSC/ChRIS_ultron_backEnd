@@ -11,8 +11,8 @@ class MemoryInt(int):
                  memory_str_to_int("1Gi")   -> 1024
         Throws ValueError if input string is not formatted correctly.
         """
-        if type(memory_str) is int:
-            return  super(MemoryInt, cls).__new__(cls, memory_str)
+        if isinstance(memory_str, int):
+            return super(MemoryInt, cls).__new__(cls, memory_str)
         try:
             suffix = memory_str[-2:]
             if suffix == 'Gi':
@@ -38,7 +38,7 @@ class CPUInt(int):
         Example: cpu_str_to_int("2000m") -> 2000
         Throws ValueError if input string is not formatted correctly.
         """
-        if type(cpu_str) is int:
+        if isinstance(cpu_str, int):
             return  super(CPUInt, cls).__new__(cls, cpu_str)
         try:
             cpu_int = int(cpu_str[:-1])
@@ -68,7 +68,7 @@ class MemoryField(models.Field):
     def to_python(self, value):
         """Query value --> Python object."""
         if value is None:
-            return value
+            return None
         try:
             return MemoryInt(value)
         except ValueError:
@@ -91,7 +91,7 @@ class CPUField(models.Field):
     def to_python(self, value):
         """Query value --> Python object."""
         if value is None:
-            return value
+            return None
         try:
             return CPUInt(value)
         except ValueError:
