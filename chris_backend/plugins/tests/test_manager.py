@@ -7,7 +7,7 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-from plugins.models import Plugin, PluginParameter, PluginInstance
+from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
 from plugins.services import manager
 
 import pudb
@@ -23,11 +23,14 @@ class PluginManagerTests(TestCase):
         self.username = 'data/foo'
         self.password = 'foo-pass'
         self.pl_manager = manager.PluginManager()
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create a plugin
         (plugin_fs, tf) = Plugin.objects.get_or_create( name        = self.plugin_fs_name,
                                                         dock_image  = self.plugin_fs_docker_image_name,
-                                                        type        = 'fs')
+                                                        type        = 'fs',
+                                                        compute_resource=self.compute_resource)
         # add plugin's parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -60,7 +63,7 @@ class PluginManagerTests(TestCase):
         """
         Test whether the manager can add a new plugin app to the system.
         """
-        self.pl_manager.run(['--add', self.plugin_ds_docker_image_name])
+        self.pl_manager.run(['--add', self.plugin_ds_docker_image_name, "host"])
         self.assertEquals(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
 
@@ -94,7 +97,8 @@ class PluginManagerTests(TestCase):
                                    return_value=None) as charm_app_manage_mock:
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
                 parameter_dict = {'dir': './'}
 
                 self.pl_manager.run_plugin_app(pl_inst,
@@ -102,7 +106,6 @@ class PluginManagerTests(TestCase):
                                                service='pfcon',
                                                inputDirOverride='/share/incoming',
                                                outputDirOverride='/share/outgoing',
-                                               IOPhost='host'
                                                )
                 self.assertEqual(pl_inst.status, 'started')
                 assert charm_init_mock.called
@@ -128,7 +131,8 @@ class PluginManagerTests(TestCase):
 
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                compute_resource=plugin.compute_resource)
             parameter_dict = {'dir': './'}
 
             # pudb.set_trace()
@@ -136,9 +140,7 @@ class PluginManagerTests(TestCase):
                                            parameter_dict,
                                            service             = 'pfcon',
                                            inputDirOverride    = '/share/incoming',
-                                           outputDirOverride   = '/share/outgoing',
-                                           IOPhost             = 'host'
-            )
+                                           outputDirOverride   = '/share/outgoing')
             self.assertEqual(pl_inst.status, 'started')
             # time.sleep(10)
         finally:
@@ -157,7 +159,8 @@ class PluginManagerTests(TestCase):
 
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+                pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
 
                 self.pl_manager.check_plugin_app_exec_status(pl_inst)
                 self.assertEqual(pl_inst.status, 'started')
@@ -184,16 +187,15 @@ class PluginManagerTests(TestCase):
 
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
             parameter_dict = {'dir': './'}
 
             self.pl_manager.run_plugin_app(pl_inst,
                                            parameter_dict,
                                            service             = 'pfcon',
                                            inputDirOverride    = '/share/incoming',
-                                           outputDirOverride   = '/share/outgoing',
-                                           IOPhost             = 'host'
-            )
+                                           outputDirOverride   = '/share/outgoing')
 
             # After submitting run request, wait before checking status
             # time.sleep(5)

@@ -10,17 +10,19 @@ import swiftclient
 
 from feeds.models import Feed, FeedFile
 from plugins.models import Plugin, PluginParameter, PluginInstance, swiftclient
-
+from plugins.models import ComputeResource
 
 class PluginModelTests(TestCase):
     
     def setUp(self):
         self.plugin_fs_name = "simplefsapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
-
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+                                                        compute_resource_identifier="host")
         # create a plugin
         (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                    type='fs')
+                                                    type='fs',
+                                                    compute_resource=self.compute_resource)
         # add plugins' parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -43,12 +45,16 @@ class PluginInstanceModelTests(TestCase):
         self.plugin_ds_parameters = {'prefix': {'type': 'string', 'optional': False}}
         self.username = 'foo'
         self.password = 'foo-pass'
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create plugins
         (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                    type='fs')
+                                                    type='fs',
+                                                    compute_resource=self.compute_resource)
         (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                    type='ds')
+                                                    type='ds',
+                                                    compute_resource=self.compute_resource)
         # add plugins' parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -73,7 +79,8 @@ class PluginInstanceModelTests(TestCase):
         # create an 'fs' plugin instance that in turn should create a new feed
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
         
         self.assertEquals(Feed.objects.count(), 1)
         self.assertEquals(pl_inst.feed.name,pl_inst.plugin.name)
@@ -86,7 +93,8 @@ class PluginInstanceModelTests(TestCase):
         # create a 'ds' plugin instance that shouldn't create a new feed
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
         self.assertEquals(Feed.objects.count(), 0)
 
     def test_get_root_instance(self):
@@ -97,11 +105,12 @@ class PluginInstanceModelTests(TestCase):
         # create a 'fs' plugin instance 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
         # create a 'ds' plugin instance whose root is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=pl_inst_root)
+                            previous=pl_inst_root,compute_resource=plugin.compute_resource)
         root_instance = pl_inst.get_root_instance()
         self.assertEquals(root_instance, pl_inst_root)
 
@@ -113,7 +122,8 @@ class PluginInstanceModelTests(TestCase):
         # create an 'fs' plugin instance 
         user = User.objects.get(username=self.username)
         plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst_fs = PluginInstance.objects.create(plugin=plugin_fs, owner=user)
+        pl_inst_fs = PluginInstance.objects.create(plugin=plugin_fs, owner=user,
+                                                    compute_resource=plugin_fs.compute_resource)
         # 'fs' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
         fs_output_path = '{0}/feed_{1}/{2}_{3}/data'.format( self.username,
@@ -127,7 +137,7 @@ class PluginInstanceModelTests(TestCase):
         user = User.objects.get(username=self.username)
         plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
         pl_inst_ds = PluginInstance.objects.create(plugin=plugin_ds,
-                                                   owner=user, previous=pl_inst_fs)
+                    owner=user, previous=pl_inst_fs, compute_resource=plugin_ds.compute_resource)
         # 'ds' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
         #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
@@ -144,7 +154,8 @@ class PluginInstanceModelTests(TestCase):
         # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
+                                    compute_resource=plugin.compute_resource)
         pl_inst.feed.name = 'Feed1'
         pl_inst.feed.save()
         output_path = pl_inst.get_output_path()
@@ -174,7 +185,8 @@ class PluginInstanceModelTests(TestCase):
         # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                            compute_resource=plugin.compute_resource)
         pl_inst.feed.name = 'Feed1'
         pl_inst.feed.save()
 

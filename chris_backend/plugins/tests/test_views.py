@@ -12,6 +12,7 @@ from django.conf import settings
 from rest_framework import status
 
 from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
+from plugins.models import ComputeResource
 from plugins.services.manager import PluginManager
 from plugins import views
 
@@ -26,7 +27,9 @@ class ViewTests(TestCase):
         self.username = 'data/foo'
         self.password = 'bar'
         self.content_type='application/vnd.collection+json'
-        
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
+
         # create basic models
         
         # create the chris user and another user
@@ -36,8 +39,10 @@ class ViewTests(TestCase):
                                  password=self.password)
         
         # create two plugins
-        Plugin.objects.get_or_create(name="pacspull", type="fs")
-        Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        Plugin.objects.get_or_create(name="pacspull", type="fs", 
+                                    compute_resource=self.compute_resource)
+        Plugin.objects.get_or_create(name="mri_convert", type="ds",
+                                    compute_resource=self.compute_resource)
 
 
 class PluginListViewTests(ViewTests):
@@ -189,7 +194,7 @@ class PluginInstanceListViewTests(ViewTests):
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = 'host')
+                                    IOPhost='host')
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
@@ -202,13 +207,14 @@ class PluginInstanceListViewTests(ViewTests):
 
             # add a plugin to the system though the plugin manager
             pl_manager = PluginManager()
-            pl_manager.add_plugin('fnndsc/pl-simplefsapp')
+            pl_manager.add_plugin('fnndsc/pl-simplefsapp', "host")
             plugin = Plugin.objects.get(name="simplefsapp")
             self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
 
             # create a simplefsapp plugin instance
             user = User.objects.get(username=self.username)
-            PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+            PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                        compute_resource=plugin.compute_resource)
 
             # make API request
             self.client.login(username=self.username, password=self.password)
@@ -229,7 +235,8 @@ class PluginInstanceListViewTests(ViewTests):
         # create a pacspull plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                            compute_resource=plugin.compute_resource)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "pacspull")
@@ -249,7 +256,8 @@ class PluginInstanceDetailViewTests(ViewTests):
         # create a pacspull plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        (self.pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+        (self.pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
         self.read_url = reverse("plugininstance-detail", kwargs={"pk": self.pl_inst.id})
 
     def test_plugin_instance_detail_success(self):
@@ -275,12 +283,13 @@ class PluginInstanceDetailViewTests(ViewTests):
 
             # add a plugin to the system through the plugin manager
             pl_manager = PluginManager()
-            pl_manager.add_plugin('fnndsc/pl-simplefsapp')
+            pl_manager.add_plugin('fnndsc/pl-simplefsapp', "host")
 
             # create a simplefsapp plugin instance
             plugin = Plugin.objects.get(name='simplefsapp')
             user = User.objects.get(username=self.username)
-            (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user)
+            (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                        compute_resource=plugin.compute_resource)
             self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
 
             # run the plugin instance
@@ -288,8 +297,7 @@ class PluginInstanceDetailViewTests(ViewTests):
                                         {'dir': './'},
                                         service             = 'pfcon',
                                         inputDirOverride    = '/share/incoming',
-                                        outputDirOverride   = '/share/outgoing',
-                                        IOPhost             = 'host')
+                                        outputDirOverride   = '/share/outgoing')
 
             # make API request
             self.client.login(username=self.username, password=self.password)
@@ -336,16 +344,16 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         super(PluginInstanceListQuerySearchViewTests, self).setUp()
 
         user = User.objects.get(username=self.username)
-
+        
         # create two plugin instances
         plugin = Plugin.objects.get(name="pacspull")
         (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
-                                                          owner=user)
+                                owner=user,compute_resource=plugin.compute_resource)
         # set first instance's status
         inst.status = STATUS_TYPES[0]
         plugin = Plugin.objects.get(name="mri_convert")
         (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
-                                                          owner=user)
+                                    owner=user, compute_resource=plugin.compute_resource)
         # set second instance's status
         inst.status = STATUS_TYPES[2]
 

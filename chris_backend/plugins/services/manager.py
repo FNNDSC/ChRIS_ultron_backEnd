@@ -23,17 +23,20 @@ from plugins.models import Plugin, PluginParameter
 from plugins.models import TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
+from plugins.models import ComputeResource
 
 
 class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
         group = parser.add_mutually_exclusive_group()
-        group.add_argument("-a", "--add", help="add a new plugin", metavar='DockImage')
+        group.add_argument("-a", "--add", nargs=2, help="add a new plugin at a compute resource", 
+                    metavar=('DockImage', 'ComputeResource'))
         group.add_argument("-r", "--remove", help="remove an existing plugin",
                            metavar='PluginName')
         group.add_argument("-m", "--modify", help="register NOW as modification date",
                            metavar='DockImage')
+
         self.parser = parser
 
         self.str_service        = ''
@@ -90,7 +93,7 @@ class PluginManager(object):
         plugin_param.help = param['help']
         plugin_param.save()
         
-    def add_plugin(self, dock_image_name):
+    def add_plugin(self, dock_image_name, compute_resource_identifier):
         """
         Register/add a new plugin to the system.
         """
@@ -117,17 +120,19 @@ class PluginManager(object):
         plugin.category      = app_repr['category']
         plugin.description   = app_repr['description']
         plugin.documentation = app_repr['documentation']
-        plugin.license       = app_repr['license']
-        plugin.version       = app_repr['version']
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.maxint))
+        plugin.license = app_repr['license']
+        plugin.version = app_repr['version']
+        (plugin.compute_resource, tf) = ComputeResource.objects.get_or_create(compute_resource_identifier=
+                                                            compute_resource_identifier)
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.defaults['max_limit']))
         plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.maxint))
+                                                           Plugin.defaults['min_cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.defaults['max_limit']))
         plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+                                                           Plugin.defaults['min_memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
         plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
         plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
         plugin.save()
 
@@ -177,15 +182,15 @@ class PluginManager(object):
         plugin.documentation = app_repr['documentation']
         plugin.license       = app_repr['license']
         plugin.version       = app_repr['version']
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.maxint)
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.defaults['max_limit'])
         plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.maxint)
+                                                           Plugin.defaults['min_cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.defaults['max_limit'])
         plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+                                                           Plugin.defaults['min_memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
         plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
         plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
 
         # add there are new parameters then add them
@@ -225,8 +230,8 @@ class PluginManager(object):
         max_cpu_limit = app_repr.get('max_cpu_limit')
         if max_cpu_limit:
             max_cpu_limit = CPUInt(max_cpu_limit)
-            if max_cpu_limit < Plugin.defaults['cpu_limit']:
-                max_cpu_limit = MemoryInt(Plugin.defaults['cpu_limit'])
+            if max_cpu_limit < Plugin.defaults['min_cpu_limit']:
+                max_cpu_limit = MemoryInt(Plugin.defaults['min_cpu_limit'])
         if min_cpu_limit:
             min_cpu_limit = CPUInt(min_cpu_limit)
         if max_cpu_limit and min_cpu_limit and max_cpu_limit < min_cpu_limit:
@@ -284,7 +289,7 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.add:
-            self.add_plugin(options.add)
+            self.add_plugin(options.add[0], options.add[1])
         elif options.remove:
             self.remove_plugin(options.remove)
         elif options.modify:
@@ -300,6 +305,8 @@ class PluginManager(object):
         # to the plugin input and output dir spaces.
         str_inputDirOverride        = ''
         str_outputDirOverride       = ''
+        self.str_IOPhost = plugin_inst.plugin.compute_resource.compute_resource_identifier
+ 
 
         for k, v in kwargs.items():
             if k == 'useDebug':             self.b_useDebug         = v
@@ -309,6 +316,7 @@ class PluginManager(object):
             if k == 'inputDirOverride':     str_inputDirOverride    = v
             if k == 'outputDirOverride':    str_outputDirOverride   = v
             if k == 'IOPhost':              self.str_IOPhost        = v
+
 
         plugin_repr = self.get_plugin_app_representation(plugin_inst.plugin.dock_image)
         # get input dir

@@ -7,13 +7,14 @@ from collectionjson import services
 from .models import Plugin, PluginFilter, PluginParameter 
 from .models import PluginInstance, PluginInstanceFilter
 from .models import StringParameter, FloatParameter, IntParameter
-from .models import BoolParameter, PathParameter
+from .models import BoolParameter, PathParameter, ComputeResource
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer
+from .serializers import PluginInstanceSerializer, ComputeResourceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
+
 
 class PluginList(generics.ListAPIView):
     """
@@ -116,8 +117,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
             previous_id = request_data['previous_id']
         previous = serializer.validate_previous(previous_id, plugin)
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous)
-        # collect parameters from the request and validate and save them to the DB
+                                      previous=previous, compute_resource=plugin.compute_resource)
+        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
+        # collect parameters from the request and validate and save them to the DB 
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -135,7 +137,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = 'host'
+                                    IOPhost             = str_IOPhost
                                     )
 
     def list(self, request, *args, **kwargs):

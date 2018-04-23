@@ -2,7 +2,7 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from plugins.models import Plugin, PluginParameter, PluginInstance
+from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
 from feeds.models import Note, Feed
 
 
@@ -16,10 +16,13 @@ class FeedModelTests(TestCase):
                                   'img_type': {'type': 'string', 'optional': True}}
         self.username = 'foo'
         self.password = 'bar'
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create a "fs" plugin
         (plugin, tf) = Plugin.objects.get_or_create(name=self.plugin_name,
-                                                    type=self.plugin_type)
+                                                    type=self.plugin_type,
+                                                    compute_resource=self.compute_resource)
         # add plugin parameter
         PluginParameter.objects.get_or_create(
             plugin=plugin,
@@ -38,6 +41,7 @@ class FeedModelTests(TestCase):
         # create a plugin instance that in turn creates a new feed
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
+                                            compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feed_name
         self.assertEquals(Note.objects.count(), 1)
