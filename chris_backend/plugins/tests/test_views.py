@@ -27,8 +27,8 @@ class ViewTests(TestCase):
         self.username = 'data/foo'
         self.password = 'bar'
         self.content_type='application/vnd.collection+json'
-        self.compute_resource = ComputeResource.objects.get(
-                                                        compute_resource_identifier="host")
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create basic models
         

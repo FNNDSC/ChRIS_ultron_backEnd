@@ -23,8 +23,8 @@ class PluginManagerTests(TestCase):
         self.username = 'data/foo'
         self.password = 'foo-pass'
         self.pl_manager = manager.PluginManager()
-        self.compute_resource = ComputeResource.objects.get(
-                                                        compute_resource_identifier="host")
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create a plugin
         (plugin_fs, tf) = Plugin.objects.get_or_create( name        = self.plugin_fs_name,

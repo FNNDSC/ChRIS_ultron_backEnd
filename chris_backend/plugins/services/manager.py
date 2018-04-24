@@ -122,7 +122,7 @@ class PluginManager(object):
         plugin.documentation = app_repr['documentation']
         plugin.license = app_repr['license']
         plugin.version = app_repr['version']
-        plugin.compute_resource = ComputeResource.objects.get(compute_resource_identifier=
+        (plugin.compute_resource, tf) = ComputeResource.objects.get_or_create(compute_resource_identifier=
                                                             compute_resource_identifier)
         plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.defaults['max_limit']))
         plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,

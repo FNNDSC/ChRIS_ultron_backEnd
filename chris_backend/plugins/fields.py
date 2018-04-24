@@ -39,7 +39,7 @@ class CPUInt(int):
         Throws ValueError if input string is not formatted correctly.
         """
         if isinstance(cpu_str, int):
-            return  super(CPUInt, cls).__new__(cls, cpu_str)
+            return super(CPUInt, cls).__new__(cls, cpu_str)
         try:
             cpu_int = int(cpu_str[:-1])
             assert cpu_str[-1] is 'm'

@@ -16,8 +16,8 @@ class FeedModelTests(TestCase):
                                   'img_type': {'type': 'string', 'optional': True}}
         self.username = 'foo'
         self.password = 'bar'
-        self.compute_resource = ComputeResource.objects.get(
-                                                        compute_resource_identifier="host")
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create a "fs" plugin
         (plugin, tf) = Plugin.objects.get_or_create(name=self.plugin_name,
