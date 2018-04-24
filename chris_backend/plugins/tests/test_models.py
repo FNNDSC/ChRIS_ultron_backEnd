@@ -17,7 +17,7 @@ class PluginModelTests(TestCase):
     def setUp(self):
         self.plugin_fs_name = "simplefsapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
-        self.compute_resource = ComputeResource.objects.get(
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
                                                         compute_resource_identifier="host")
         # create a plugin
         (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
@@ -45,8 +45,8 @@ class PluginInstanceModelTests(TestCase):
         self.plugin_ds_parameters = {'prefix': {'type': 'string', 'optional': False}}
         self.username = 'foo'
         self.password = 'foo-pass'
-        self.compute_resource = ComputeResource.objects.get(
-                                                        compute_resource_identifier="host")
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
 
         # create plugins
         (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,

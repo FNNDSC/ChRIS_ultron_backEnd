@@ -9,24 +9,30 @@ from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
 from .fields import MemoryInt, CPUInt
 from .models import ComputeResource
 
+
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
-    compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
-                                                 read_only=True)
+
     class Meta:
         model = ComputeResource
         fields = ('url', 'compute_resource_identifier')
 
+
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
     instances = serializers.HyperlinkedIdentityField(view_name='plugininstance-list')
-    
+    compute_resource_identifier = serializers.ReadOnlyField(
+        source='compute_resource.compute_resource_identifier')
+
     class Meta:
         model = Plugin
         fields = ('url', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
                   'description', 'documentation', 'license', 'version',
-                  'parameters', 'instances', 'min_number_of_workers',
-                  'max_number_of_workers','min_cpu_limit','max_cpu_limit',
-                  'min_memory_limit','max_memory_limit', 'min_gpu_limit', 'max_gpu_limit')
+                  'compute_resource_identifier', 'parameters', 'instances',
+                  'min_number_of_workers', 'max_number_of_workers', 'min_cpu_limit',
+                  'max_cpu_limit', 'min_memory_limit', 'max_memory_limit',
+                  'min_gpu_limit',
+                  'max_gpu_limit')
+
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
@@ -42,10 +48,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
     previous_id = serializers.ReadOnlyField(source='previous.id')
-
-    compute_resource = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
-                                                 read_only=True)
-
+    compute_resource_identifier = serializers.ReadOnlyField(
+        source='compute_resource.compute_resource_identifier')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
@@ -68,10 +72,11 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date', 'status',
-                  'previous', 'owner', 'feed', 'plugin', 'compute_resource', 'string_param', 'int_param',
-                  'float_param', 'bool_param', 'path_param', 'compute_resource_id', 'cpu_limit', 
-                  'memory_limit', 'number_of_workers','gpu_limit')
+        fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date',
+                  'status', 'previous', 'owner', 'feed', 'plugin',
+                  'compute_resource_identifier', 'string_param', 'int_param',
+                  'float_param', 'bool_param', 'path_param', 'compute_resource_id',
+                  'cpu_limit', 'memory_limit', 'number_of_workers','gpu_limit')
         
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -150,6 +155,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     def validate_value_within_interval(self, val, min_val, max_val, val_str):
         if val < min_val or val > max_val:
             raise serializers.ValidationError({'detail':"%s out of range." % val_str})
+
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')

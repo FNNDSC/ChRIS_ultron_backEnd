@@ -15,6 +15,7 @@ from .serializers import PluginInstanceSerializer, ComputeResourceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
+
 class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.

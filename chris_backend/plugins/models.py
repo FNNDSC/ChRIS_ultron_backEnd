@@ -24,19 +24,21 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
 
+
 class ComputeResource(models.Model):
     compute_resource_identifier = models.CharField(max_length=100)
 
     def __str__(self):
-        return str(self.id)
+        return self.compute_resource_identifier
+
 
 class Plugin(models.Model):
-    # default minimum resource limits inserted at registration time
+    # default resource limits inserted at registration time
     defaults = {
-                'cpu_limit'        : 1000, # in millicores
-                'memory_limit'     : 200   # in Mi
+                'min_cpu_limit': 1000,   # in millicores
+                'min_memory_limit': 200, # in Mi
+                'max_limit': 2147483647  # maxint
                }
-    maxint = 2147483647
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
@@ -54,11 +56,11 @@ class Plugin(models.Model):
     min_gpu_limit = models.IntegerField(null=True)
     max_gpu_limit = models.IntegerField(null=True)
     min_number_of_workers = models.IntegerField(null=True, default=1)
-    max_number_of_workers = models.IntegerField(null=True, default=maxint)
-    min_cpu_limit = CPUField(null=True, default=defaults['cpu_limit'])          # In millicores
-    max_cpu_limit = CPUField(null=True, default=maxint)                         # In millicores
-    min_memory_limit = MemoryField(null=True, default=defaults['memory_limit']) # In Mi
-    max_memory_limit = MemoryField(null=True, default=maxint)                   # In Mi
+    max_number_of_workers = models.IntegerField(null=True, default=defaults['max_limit'])
+    min_cpu_limit = CPUField(null=True, default=defaults['min_cpu_limit']) # In millicores
+    max_cpu_limit = CPUField(null=True, default=defaults['max_limit']) # In millicores
+    min_memory_limit = MemoryField(null=True, default=defaults['min_memory_limit']) # In Mi
+    max_memory_limit = MemoryField(null=True, default=defaults['max_limit']) # In Mi
 
     class Meta:
         ordering = ('type',)
@@ -72,6 +74,7 @@ class Plugin(models.Model):
         """
         params = self.parameters.all()
         return [param.name for param in params]
+
 
 class PluginFilter(FilterSet):
     min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
@@ -108,7 +111,7 @@ class PluginInstance(models.Model):
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     owner = models.ForeignKey('auth.User')
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
-                                    related_name='plugin_instance')
+                                    related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
     memory_limit = MemoryField(null=True)
     number_of_workers = models.IntegerField(null=True)

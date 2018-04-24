@@ -25,6 +25,7 @@ from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
 from plugins.models import ComputeResource
 
+
 class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
@@ -121,17 +122,17 @@ class PluginManager(object):
         plugin.documentation = app_repr['documentation']
         plugin.license = app_repr['license']
         plugin.version = app_repr['version']
-        plugin.compute_resource = ComputeResource.objects.get(compute_resource_identifier=
+        (plugin.compute_resource, tf) = ComputeResource.objects.get_or_create(compute_resource_identifier=
                                                             compute_resource_identifier)
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.maxint))
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.defaults['max_limit']))
         plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.maxint))
+                                                           Plugin.defaults['min_cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.defaults['max_limit']))
         plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+                                                           Plugin.defaults['min_memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
         plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
         plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
         plugin.save()
 
@@ -181,15 +182,15 @@ class PluginManager(object):
         plugin.documentation = app_repr['documentation']
         plugin.license       = app_repr['license']
         plugin.version       = app_repr['version']
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.maxint)
+        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.defaults['max_limit'])
         plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.maxint)
+                                                           Plugin.defaults['min_cpu_limit'])
+        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.defaults['max_limit'])
         plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.maxint)
+                                                           Plugin.defaults['min_memory_limit'])
+        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
         plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.maxint)
+        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
         plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
 
         # add there are new parameters then add them
@@ -229,8 +230,8 @@ class PluginManager(object):
         max_cpu_limit = app_repr.get('max_cpu_limit')
         if max_cpu_limit:
             max_cpu_limit = CPUInt(max_cpu_limit)
-            if max_cpu_limit < Plugin.defaults['cpu_limit']:
-                max_cpu_limit = MemoryInt(Plugin.defaults['cpu_limit'])
+            if max_cpu_limit < Plugin.defaults['min_cpu_limit']:
+                max_cpu_limit = MemoryInt(Plugin.defaults['min_cpu_limit'])
         if min_cpu_limit:
             min_cpu_limit = CPUInt(min_cpu_limit)
         if max_cpu_limit and min_cpu_limit and max_cpu_limit < min_cpu_limit:
