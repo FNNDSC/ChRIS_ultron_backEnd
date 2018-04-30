@@ -33,6 +33,111 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
                   'min_gpu_limit',
                   'max_gpu_limit')
 
+    def validate(self, data):
+        """
+        Overriden to validate compute-related descriptors in the plugin app representation.
+        """
+        # validate compute-related descriptors
+        data['min_number_of_workers'] = self.validate_app_workers_descriptor(
+            data['min_number_of_workers'])
+
+        data['max_number_of_workers'] = self.validate_app_workers_descriptor(
+            data['max_number_of_workers'])
+
+        data['min_gpu_limit'] = self.validate_app_gpu_descriptor(
+            data['min_gpu_limit'])
+
+        data['max_gpu_limit'] = self.validate_app_gpu_descriptor(
+            data['max_gpu_limit'])
+
+        data['min_cpu_limit'] = self.validate_app_cpu_descriptor(
+            data['min_cpu_limit'])
+
+        data['max_cpu_limit'] = self.validate_app_cpu_descriptor(
+            data['max_cpu_limit'])
+
+        data['min_memory_limit'] = self.validate_app_memory_descriptor(
+            data['min_memory_limit'])
+
+        data['max_memory_limit'] = self.validate_app_memory_descriptor(
+            data['max_memory_limit'])
+
+        # validate descriptor limits
+        err_msg = "Minimum number of workers should be less than maximum number of workers"
+        self.validate_app_descriptor_limits(data, 'min_number_of_workers',
+                                            'max_number_of_workers', err_msg)
+        err_msg = "Minimum cpu limit should be less than maximum cpu limit"
+        self.validate_app_descriptor_limits(data, 'min_cpu_limit', 'max_cpu_limit',
+                                            err_msg)
+        err_msg = "Minimum memory limit should be less than maximum memory limit"
+        self.validate_app_descriptor_limits(data, 'min_memory_limit',
+                                            'max_memory_limit', err_msg)
+        err_msg = "Minimum gpu limit should be less than maximum gpu limit"
+        self.validate_app_descriptor_limits(data, 'min_gpu_limit', 'max_gpu_limit',
+                                            err_msg)
+        return data
+
+    @staticmethod
+    def validate_app_workers_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum workers descriptors.
+        """
+        error_msg = "Minimum and maximum number of workers must be positive integers"
+        int_d = PluginSerializer.validate_app_int_descriptor(descriptor, error_msg)
+        if int_d < 1:
+            raise serializers.ValidationError(error_msg)
+        return int_d
+
+    @staticmethod
+    def validate_app_cpu_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum cpu descriptors.
+        """
+        try:
+            return CPUInt(descriptor)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+
+    @staticmethod
+    def validate_app_memory_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum memory descriptors.
+        """
+        try:
+            return MemoryInt(descriptor)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+
+    @staticmethod
+    def validate_app_gpu_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum gpu descriptors.
+        """
+        error_msg = "Minimum and maximum gpu must be non-negative integers"
+        return PluginSerializer.validate_app_int_descriptor(descriptor, error_msg)
+
+    @staticmethod
+    def validate_app_int_descriptor(descriptor, error_msg=''):
+        """
+        Custom method to validate a positive integer descriptor.
+        """
+        try:
+            int_d = int(descriptor)
+            assert int_d >= 0
+        except (ValueError, AssertionError):
+            raise serializers.ValidationError(error_msg)
+        return int_d
+
+    @staticmethod
+    def validate_app_descriptor_limits(app_repr, min_descriptor_name, max_descriptor_name,
+                                       error_msg=''):
+        """
+        Custom method to validate that a descriptor's minimum is smaller than its maximum.
+        """
+        if (min_descriptor_name in app_repr) and (max_descriptor_name in app_repr) \
+                and (app_repr[max_descriptor_name] < app_repr[min_descriptor_name]):
+            raise serializers.ValidationError(error_msg)
+
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
