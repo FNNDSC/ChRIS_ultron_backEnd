@@ -139,7 +139,7 @@ class PluginInstance(models.Model):
         Custom method to create and save a new feed to the DB.
         """
         feed = Feed()
-        feed.plugin_inst = self;
+        feed.plugin_inst = self
         feed.save()
         feed.name = self.plugin.name
         feed.owner = [self.owner]
