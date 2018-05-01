@@ -109,17 +109,15 @@ class PluginInstanceList(generics.ListCreateAPIView):
         instace's parameters in the resquest are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
+        # get previous plugin instance and create the new plugin instance
+        previous = serializer.validated_data['previous']
         plugin = self.get_object()
-        request_data = serializer.context['request'].data
-        # get previous plugin instance
-        previous_id = ""
-        if 'previous_id' in request_data:
-            previous_id = request_data['previous_id']
-        previous = serializer.validate_previous(previous_id, plugin)
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous, compute_resource=plugin.compute_resource)
-        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
-        # collect parameters from the request and validate and save them to the DB 
+                                      previous=previous,
+                                      compute_resource=plugin.compute_resource)
+
+        # collect parameters from the request and validate and save them to the DB
+        request_data = serializer.context['request'].data
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -130,15 +128,16 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
+
         # run the plugin's app
+        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(  plugin_inst,
-                                    parameters_dict,
-                                    service             = 'pfcon',
-                                    inputDirOverride    = '/share/incoming',
-                                    outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = str_IOPhost
-                                    )
+        pl_manager.run_plugin_app(plugin_inst,
+                                  parameters_dict,
+                                  service             = 'pfcon',
+                                  inputDirOverride    = '/share/incoming',
+                                  outputDirOverride   = '/share/outgoing',
+                                  IOPhost             = str_IOPhost)
 
     def list(self, request, *args, **kwargs):
         """
