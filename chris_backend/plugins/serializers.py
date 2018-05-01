@@ -181,7 +181,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'compute_resource_identifier', 'string_param', 'int_param',
                   'float_param', 'bool_param', 'path_param', 'compute_resource_id',
                   'cpu_limit', 'memory_limit', 'number_of_workers','gpu_limit')
-        
+
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
@@ -189,27 +189,41 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
 
-    def save(self, *args, **kwargs):
+    def validate(self, data):
         """
-        Overriden to provide defaults before saving instance.
+        Overriden to validate previous plugin instance and provide defaults after the
+        individual validators are already run.
         """
-        plugin = self.context['view'].get_object()
-        if 'gpu_limit' not in self.validated_data:
-            self.validated_data['gpu_limit'] = plugin.min_gpu_limit
-        if 'number_of_workers' not in self.validated_data:
-            self.validated_data['number_of_workers'] = plugin.min_number_of_workers
-        if 'cpu_limit' not in self.validated_data:
-            self.validated_data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
-        if 'memory_limit' not in self.validated_data:
-            self.validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
-        return super(PluginInstanceSerializer, self).save(*args, **kwargs)
+        # validate previous plugin instance
+        request_data = self.context['request'].data
+        previous_id = ""
+        if 'previous_id' in request_data:
+            previous_id = request_data['previous_id']
+        data['previous'] = self.validate_previous(previous_id)
 
-    def validate_previous(self, previous_id, plugin):
+        # provide defaults
+        plugin = self.context['view'].get_object()
+        if 'gpu_limit' not in data:
+            data['gpu_limit'] = plugin.min_gpu_limit
+        if 'number_of_workers' not in data:
+            data['number_of_workers'] = plugin.min_number_of_workers
+        if 'cpu_limit' not in data:
+            data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
+        if 'memory_limit' not in data:
+            data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
+
+        return data
+
+    def validate_previous(self, previous_id):
         """
         Custom method to check that an id is provided for previous instance when
         corresponding plugin is of type 'ds'. Then check that the provided id exists in
         the DB.
         """
+        # using self.context['view'] in validators prevents calling is_valid when creating
+        # a new serializer instance outside the Django view framework. But here is fine
+        # as plugin instances are always created through the API
+        plugin = self.context['view'].get_object()
         previous = None
         if plugin.type=='ds':
             if not previous_id:
@@ -256,7 +270,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                                             'memory_limit')
         return memory_limit
 
-    def validate_value_within_interval(self, val, min_val, max_val, val_str):
+    @staticmethod
+    def validate_value_within_interval(val, min_val, max_val, val_str):
         if val < min_val or val > max_val:
             raise serializers.ValidationError({'detail':"%s out of range." % val_str})
 
