@@ -183,37 +183,30 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'float_param', 'bool_param', 'path_param', 'compute_resource_id',
                   'cpu_limit', 'memory_limit', 'number_of_workers','gpu_limit')
 
+    def create(self, validated_data):
+        """
+        Overriden to provide compute-related defaults before creating a new plugin
+        instance.
+        """
+        plugin = self.context['view'].get_object()
+
+        if 'gpu_limit' not in validated_data:
+            validated_data['gpu_limit'] = plugin.min_gpu_limit
+        if 'number_of_workers' not in validated_data:
+            validated_data['number_of_workers'] = plugin.min_number_of_workers
+        if 'cpu_limit' not in validated_data:
+            validated_data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
+        if 'memory_limit' not in validated_data:
+            validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
+
+        return super(PluginInstanceSerializer, self).create(validated_data)
+
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
         Overriden to generate a properly formatted message for validation errors
         """
         return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
-
-    def validate(self, data):
-        """
-        Overriden to validate previous plugin instance and provide defaults after the
-        individual validators are already run.
-        """
-        # validate previous plugin instance
-        request_data = self.context['request'].data
-        previous_id = ""
-        if 'previous_id' in request_data:
-            previous_id = request_data['previous_id']
-        data['previous'] = self.validate_previous(previous_id)
-
-        # provide defaults
-        plugin = self.context['view'].get_object()
-        if 'gpu_limit' not in data:
-            data['gpu_limit'] = plugin.min_gpu_limit
-        if 'number_of_workers' not in data:
-            data['number_of_workers'] = plugin.min_number_of_workers
-        if 'cpu_limit' not in data:
-            data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
-        if 'memory_limit' not in data:
-            data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
-
-        return data
 
     def validate_previous(self, previous_id):
         """
