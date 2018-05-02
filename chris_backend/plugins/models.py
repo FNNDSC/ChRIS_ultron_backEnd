@@ -56,8 +56,8 @@ class Plugin(models.Model):
     version = models.CharField(max_length=10)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
                         related_name='plugins')
-    min_gpu_limit = models.IntegerField(null=True)
-    max_gpu_limit = models.IntegerField(null=True)
+    min_gpu_limit = models.IntegerField(null=True, default=0)
+    max_gpu_limit = models.IntegerField(null=True, default=defaults['max_limit'])
     min_number_of_workers = models.IntegerField(null=True, default=1)
     max_number_of_workers = models.IntegerField(null=True, default=defaults['max_limit'])
     min_cpu_limit = CPUField(null=True, default=defaults['min_cpu_limit']) # In millicores
