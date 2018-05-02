@@ -7,9 +7,9 @@ plugin app.
 import os
 import sys
 import json
-import docker
 import time
 from argparse import ArgumentParser
+from chrisstoreclient.client import StoreClient
 
 if "DJANGO_SETTINGS_MODULE" not in os.environ:
     # django needs to be loaded (eg. when this script is run from the command line)
@@ -25,140 +25,86 @@ from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
 from plugins.models import ComputeResource
 from django.conf import settings
-
+from plugins.serializers import PluginSerializer, PluginParameterSerializer
 
 
 class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument("-a", "--add", nargs=2, help="add a new plugin at a compute resource", 
-                    metavar=('DockImage', 'ComputeResource'))
-        group.add_argument("-r", "--remove", help="remove an existing plugin",
-                           metavar='PluginName')
-        group.add_argument("-m", "--modify", help="register NOW as modification date",
-                           metavar='DockImage')
+        subparsers = parser.add_subparsers(dest='subparser_name', title='subcommands',
+                                           description='valid subcommands',
+                                           help='sub-command help')
+
+        # create the parser for the "add" command
+        parser_add = subparsers.add_parser('add', help='Add a new plugin')
+        parser_add.add_argument('name', help="Plugin's name")
+        parser_add.add_argument('computeresource',
+                                help="Compute resource where the plugin's instances runs")
+        parser_add.add_argument('storeurl',
+                                help="Url of ChRIS store where the plugin is registered")
+        parser_add.add_argument('storeusername', help="Username for the ChRIS store")
+        parser_add.add_argument('storepassword', help="Password for the ChRIS store")
+        parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
+
+        # create the parser for the "modify" command
+        parser_modify = subparsers.add_parser('modify', help='Modify existing plugin')
+        parser_modify.add_argument('name', help="Plugin's name")
+        parser_modify.add_argument('--computeresource',
+                                help="Compute resource where the plugin's instances runs")
+        parser_modify.add_argument('storeurl',
+                                help="Url of ChRIS store where the plugin is registered")
+        parser_modify.add_argument('--storeusername', help="Username for the ChRIS store")
+        parser_modify.add_argument('--storepassword', help="Password for the ChRIS store")
+        parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
+
+        # create the parser for the "remove" command
+        parser_remove = subparsers.add_parser('remove', help='Remove an existing plugin')
+        parser_remove.add_argument('name', help="Plugin's name")
 
         self.parser = parser
-
         self.str_service        = ''
         self.str_IOPhost        = ''
+
         # Debug specifications
         self.b_quiet            = False
         self.b_useDebug         = True
         self.str_debugFile      = '%s/tmp/debug-charm.log' % os.environ['HOME']
 
-    def get_plugin_app_representation(self, dock_image_name):
-        """
-        Get a plugin app representation given its docker image name.
-        """
-        client = docker.from_env()
-        # first try to pull the latest image
-        try:
-            img = client.images.pull(dock_image_name)
-        except docker.errors.APIError:
-            # use local image ('remove' option automatically removes container when finished)
-            byte_str = client.containers.run(dock_image_name, remove=True)
-        else:
-            byte_str = client.containers.run(img, remove=True)
-        app_repr = json.loads(byte_str.decode())
-        plugin_types = [plg_type[0] for plg_type in PLUGIN_TYPE_CHOICES]
-        if app_repr['type'] not in plugin_types:
-            raise ValueError("A plugin's TYPE can only be any of %s. Please fix it in %s"
-                             % (plugin_types, dock_image_name))
-        return app_repr
-
-    def get_plugin_name(self, app_repr):
-        """
-        Get a plugin app's name from the plugin app's representation.
-        """
-        # the plugin app exec name stored in 'selfexec' must be: 'plugin name' + '.py'
-        if 'selfexec' not in app_repr:
-            raise KeyError("Missing 'selfexec' from plugin app's representation")
-        return app_repr['selfexec'].rsplit( ".", 1 )[ 0 ]
-
-    def _save_plugin_param(self, plugin, param):
-        """
-        Internal method to save a plugin parameter into the DB.
-        """
-        # add plugin parameter to the db
-        plugin_param = PluginParameter()
-        plugin_param.plugin = plugin
-        plugin_param.name = param['name']
-        plg_type = param['type']
-        plugin_param.type = [key for key in TYPES if TYPES[key]==plg_type][0]
-        plugin_param.optional = param['optional']
-        if param['default'] is None:
-            plugin_param.default = ""
-        else:
-            plugin_param.default = str(param['default'])
-        plugin_param.help = param['help']
-        plugin_param.save()
-        
-    def add_plugin(self, dock_image_name, compute_resource_identifier):
+    def add_plugin(self, args):
         """
         Register/add a new plugin to the system.
         """
-        # get representation from the corresponding app
-        app_repr = self.get_plugin_app_representation(dock_image_name)
-        name = self.get_plugin_name(app_repr)
-        max_cpu_limit, min_cpu_limit                 = self.get_cpu_limit(app_repr)
-        max_memory_limit, min_memory_limit           = self.get_memory_limit(app_repr)
-        max_number_of_workers, min_number_of_workers = self.get_number_of_workers(app_repr)
-        max_gpu_limit, min_gpu_limit                 = self.get_gpu_limit(app_repr)
+        timeout = 30
+        if args.storetimeout:
+            timeout = args.storetimeout
+        plg_repr = self.get_plugin_representation_from_store(args.storeurl,
+                                                             args.storeusername,
+                                                             args.storepassword, timeout)
+        plg_serializer = PluginSerializer(data=plg_repr)
+        plg_serializer.is_valid(raise_exception=True)
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier=args.computeresource)
+        plugin = plg_serializer.save(compute_resource=compute_resource)
+        # collect parameters and validate and save them to the DB
+        parameters_data = plg_repr['parameters']
+        for parameter in parameters_data:
+            parameter_serializer = PluginParameterSerializer(parameter)
+            parameter_serializer.is_valid(raise_exception=True)
+            parameter_serializer.save(plugin=plugin)
 
-        # check wether the plugin already exist
-        existing_plugin_names = [plugin.name for plugin in Plugin.objects.all()]
-        if name in existing_plugin_names:
-            raise ValueError("Plugin '%s' already exists in the system" % name)
-
-        # add plugin to the db
-        plugin = Plugin()
-        plugin.name = name
-        plugin.dock_image = dock_image_name
-        plugin.type          = app_repr['type']
-        plugin.authors       = app_repr['authors']
-        plugin.title         = app_repr['title']
-        plugin.category      = app_repr['category']
-        plugin.description   = app_repr['description']
-        plugin.documentation = app_repr['documentation']
-        plugin.license = app_repr['license']
-        plugin.version = app_repr['version']
-        (plugin.compute_resource, tf) = ComputeResource.objects.get_or_create(compute_resource_identifier=
-                                                            compute_resource_identifier)
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, CPUInt(Plugin.defaults['max_limit']))
-        plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['min_cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, MemoryInt(Plugin.defaults['max_limit']))
-        plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['min_memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
-        plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
-        plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
+    def modify_plugin(self, args):
+        """
+        Modify an existing/registered plugin and add the current date as a new plugin
+        modification date.
+        """
+        data = self.get_plugin_descriptors(args)
+        plugin = self.get_plugin(args.name)
+        if args.newname:
+            data['name'] = args.newname
+        plg_serializer = PluginSerializer(plugin, data=data)
+        plg_serializer.is_valid(raise_exception=True)
+        plugin.modification_date = timezone.now()
         plugin.save()
-
-        # add plugin's parameters to the db
-        params = app_repr['parameters']
-        for param in params:
-            self._save_plugin_param(plugin, param)
-
-    def get_plugin(self, name):
-        """
-        Get an existing/registered plugin.
-        """
-        try:
-            plugin = Plugin.objects.get(name=name)
-        except Plugin.DoesNotExist:
-            raise NameError("Couldn't find '%s' plugin in the system" % name)
-        return plugin
-                  
-    def remove_plugin(self, name):
-        """
-        Remove an existing/registered plugin from the system.
-        """
-        plugin = self.get_plugin(name)
-        plugin.delete()
 
     def register_plugin_app_modification(self, dock_image_name):
         """
@@ -205,98 +151,24 @@ class PluginManager(object):
         plugin.modification_date = timezone.now()
         plugin.save()
 
-    def get_gpu_limit(self, app_repr):
+    def remove_plugin(self, args):
         """
-        Validation for gpu limits.
+        Remove an existing/registered plugin from the system.
         """
-        min_gpu_limit = app_repr.get('min_gpu_limit')
-        max_gpu_limit = app_repr.get('max_gpu_limit')
-        try:
-            if max_gpu_limit:
-                max_gpu_limit = int(max_gpu_limit)
-                assert max_gpu_limit > 0
-            if min_gpu_limit:
-                min_gpu_limit = int(min_gpu_limit)
-                assert min_gpu_limit > 0
-        except (ValueError, AssertionError):
-            raise ValueError("gpu limit must be positive integer")
-        if min_gpu_limit and max_gpu_limit and min_gpu_limit > max_gpu_limit:
-            raise ValueError("min value for gpu should be less than max value")
-        return max_gpu_limit, min_gpu_limit
-
-    def get_cpu_limit(self, app_repr):
-        """
-        Validation for cpu limits.
-        """
-        min_cpu_limit = app_repr.get('min_cpu_limit')
-        max_cpu_limit = app_repr.get('max_cpu_limit')
-        if max_cpu_limit:
-            max_cpu_limit = CPUInt(max_cpu_limit)
-            if max_cpu_limit < Plugin.defaults['min_cpu_limit']:
-                max_cpu_limit = MemoryInt(Plugin.defaults['min_cpu_limit'])
-        if min_cpu_limit:
-            min_cpu_limit = CPUInt(min_cpu_limit)
-        if max_cpu_limit and min_cpu_limit and max_cpu_limit < min_cpu_limit:
-                raise ValueError("min cpu Limit should be less than max cpu limit.")
-        return max_cpu_limit, min_cpu_limit
-
-    def get_memory_limit(self, app_repr):
-        """
-        Validation for memory limits.
-        """
-        min_memory_limit = app_repr.get('min_memory_limit')
-        max_memory_limit = app_repr.get('max_memory_limit')
-        if max_memory_limit:
-            max_memory_limit = MemoryInt(max_memory_limit)
-            if max_memory_limit < Plugin.defaults['memory_limit']:
-                max_memory_limit = MemoryInt(Plugin.defaults['memory_limit'])
-        if min_memory_limit:
-            min_memory_limit = MemoryInt(min_memory_limit)
-        if max_memory_limit and min_memory_limit and max_memory_limit < min_memory_limit:
-                raise ValueError("min memory Limit should be less than max memory limit.")
-        return max_memory_limit, min_memory_limit
-
-    def get_number_of_workers(self, app_repr):
-        """
-        Validation for number of worker limits.
-        """
-        max_number_of_workers = app_repr.get('max_number_of_workers')
-        min_number_of_workers = app_repr.get('min_number_of_workers')
-        try:
-            if max_number_of_workers:
-                max_number_of_workers = int(max_number_of_workers)
-                assert max_number_of_workers > 0
-            if min_number_of_workers:
-                min_number_of_workers = int(min_number_of_workers)
-                assert min_number_of_workers > 0
-        except (ValueError, AssertionError):
-            raise ValueError("number of workers must be positive integer")
-        if max_number_of_workers and min_number_of_workers:
-            if max_number_of_workers < min_number_of_workers:
-                raise ValueError("min number of workers should be less than max number of workers.")
-        return max_number_of_workers, min_number_of_workers
-
-    def insert_default(self, value, default):
-        """
-        Return default if bool(value) is false. Else return the value.
-        """
-        if value:
-            return value
-        else:
-            return default
+        plugin = self.get_plugin(args.name)
+        plugin.delete()
 
     def run(self, args=None):
         """
         Parse the arguments passed to the manager and perform the appropriate action.
         """
         options = self.parser.parse_args(args)
-        if options.add:
-            self.add_plugin(options.add[0], options.add[1])
-        elif options.remove:
-            self.remove_plugin(options.remove)
-        elif options.modify:
-            self.register_plugin_app_modification(options.modify)
-        self.args = options
+        if options.subparser_name == 'add':
+            self.add_plugin(options)
+        elif options.subparser_name == 'modify':
+            self.modify_plugin(options)
+        elif options.subparser_name == 'remove':
+            self.remove_plugin(options)
 
     def run_plugin_app(self, plugin_inst, parameter_dict, **kwargs):
         """
@@ -427,6 +299,26 @@ class PluginManager(object):
         )
         str_responseStatus = chris_service.app_statusCheckAndRegister()
         return str_responseStatus
+
+    @staticmethod
+    def get_plugin_representation_from_store(name, store_url, username, password,
+                                             timeout=30):
+        """
+        Get a plugin app representation from the ChRIS store.
+        """
+        store_client = StoreClient(store_url, username, password, timeout)
+        return store_client.get_plugin(name)
+
+    @staticmethod
+    def get_plugin(name):
+        """
+        Get an existing plugin.
+        """
+        try:
+            plugin = Plugin.objects.get(name=name)
+        except Plugin.DoesNotExist:
+            raise NameError("Couldn't find '%s' plugin in the system" % name)
+        return plugin
 
 
 # ENTRYPOINT
