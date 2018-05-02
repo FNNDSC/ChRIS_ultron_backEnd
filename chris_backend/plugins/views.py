@@ -11,7 +11,7 @@ from .models import BoolParameter, PathParameter, ComputeResource
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer, ComputeResourceSerializer
+from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
@@ -106,18 +106,21 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         Overriden to associate an owner, a plugin and a previous plugin instance with 
         the newly created plugin instance before first saving to the DB. All the plugin 
-        instace's parameters in the resquest are also properly saved to the DB. Finally
+        instace's parameters in the request are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
         # get previous plugin instance and create the new plugin instance
-        previous = serializer.validated_data['previous']
+        request_data = serializer.context['request'].data
+        previous_id = ""
+        if 'previous_id' in request_data:
+            previous_id = request_data['previous_id']
+        previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous,
                                       compute_resource=plugin.compute_resource)
 
         # collect parameters from the request and validate and save them to the DB
-        request_data = serializer.context['request'].data
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
