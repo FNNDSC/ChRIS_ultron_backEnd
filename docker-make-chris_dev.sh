@@ -329,7 +329,43 @@ else
         windowBottom
     fi
 
-    title -d 1 "Registering plugins..."
+    title -d 1 "Creating a ChRIS STORE API user"
+    echo ""
+    echo "Setting user cubeadmin:cubeadmin1234 ..."
+    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose exec chris_store /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
+    echo ""
+    docker-compose restart chris_store
+    echo ""
+    windowBottom
+
+    title -d 1 "Registering plugins to the ChRIS STORE ..."
+    # Declare an array variable for the list of plugin names
+    # Add a new plugin name to the list if you want it to be automatically registered
+    declare -a plugins=("simplefsapp"
+                         "simpledsapp"
+                         "pacsquery"
+                         "pacsretrieve"
+                         "med2img"
+                         "s3retrieve"
+                         "s3push"
+                         "dircopy"
+                         "geretrieve"
+                         "pl-gepush"
+    )
+    declare -i i=1
+    declare -i STEP=10
+    for plugin in "${plugins[@]}"; do
+        echo "${STEP}.$i: Uploading $plugin representation ..."
+        PLUGIN_DOCK="fnndsc/pl-${plugin}"
+        PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
+        docker-compose exec chris_store python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
+        ((i++))
+    done
+    windowBottom
+
+    title -d 1 "Registering plugins to CUBE..."
     # Declare an array variable for the list of plugin dock images
     # Add a new plugin image name to the list if you want it to be automatically registered
     docker-compose exec chris_dev /bin/bash -c \
@@ -364,17 +400,6 @@ else
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
-    echo ""
-    windowBottom
-
-    title -d 1 "Creating a ChRIS STORE API user"
-    echo ""
-    echo "Setting user cubeadmin:cubeadmin1234 ..."
-    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
-    docker-compose exec chris_store /bin/bash -c \
-    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
-    echo ""
-    docker-compose restart chris_store
     echo ""
     windowBottom
 
