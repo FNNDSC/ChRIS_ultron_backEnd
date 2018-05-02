@@ -159,7 +159,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'previous_id': ""}
+        template_data = {'previous_id': "", 'cpu_limit':"", 'memory_limit':"",
+                         'number_of_workers':"", 'gpu_limit':""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)
