@@ -23,10 +23,8 @@ from plugins.models import Plugin, PluginParameter
 from plugins.models import TYPES, PLUGIN_TYPE_CHOICES, STATUS_TYPES
 from plugins.fields import CPUInt, MemoryInt
 from plugins.services import charm
-from django.conf import settings
 from plugins.models import ComputeResource
 from django.conf import settings
-
 
 class PluginManager(object):
     def __init__(self):
@@ -364,8 +362,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            quiet       = settings.CHRIS_DEBUG['quiet'],
-            gpuLimit    = int_gpuLimit
+            quiet       = settings.CHRIS_DEBUG['quiet']
         )
 
         # Some dev notes...
