@@ -50,7 +50,7 @@ class PluginManager(object):
         parser_modify.add_argument('name', help="Plugin's name")
         parser_modify.add_argument('--computeresource',
                                 help="Compute resource where the plugin's instances runs")
-        parser_modify.add_argument('storeurl',
+        parser_modify.add_argument('--storeurl',
                                 help="Url of ChRIS store where the plugin is registered")
         parser_modify.add_argument('--storeusername', help="Username for the ChRIS store")
         parser_modify.add_argument('--storepassword', help="Password for the ChRIS store")
@@ -79,13 +79,14 @@ class PluginManager(object):
         plg_repr = self.get_plugin_representation_from_store(args.storeurl,
                                                              args.storeusername,
                                                              args.storepassword, timeout)
+        parameters_data = plg_repr['parameters']
+        del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
         plg_serializer.is_valid(raise_exception=True)
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier=args.computeresource)
         plugin = plg_serializer.save(compute_resource=compute_resource)
         # collect parameters and validate and save them to the DB
-        parameters_data = plg_repr['parameters']
         for parameter in parameters_data:
             parameter_serializer = PluginParameterSerializer(parameter)
             parameter_serializer.is_valid(raise_exception=True)
@@ -96,59 +97,47 @@ class PluginManager(object):
         Modify an existing/registered plugin and add the current date as a new plugin
         modification date.
         """
-        data = self.get_plugin_descriptors(args)
         plugin = self.get_plugin(args.name)
-        if args.newname:
-            data['name'] = args.newname
-        plg_serializer = PluginSerializer(plugin, data=data)
-        plg_serializer.is_valid(raise_exception=True)
-        plugin.modification_date = timezone.now()
-        plugin.save()
+        compute_resource = None
+        plg_repr = None
+        if args.computeresource:
+            (compute_resource, tf) = ComputeResource.objects.get_or_create(
+                compute_resource_identifier=args.computeresource)
+        if args.storeurl and args.storeusername and args.storepassword:
+            timeout = 30
+            if args.storetimeout:
+                timeout = args.storetimeout
+            plg_repr = self.get_plugin_representation_from_store(args.storeurl,
+                                                                 args.storeusername,
+                                                                 args.storepassword,
+                                                                 timeout)
+        if plg_repr:
+            parameters_data = plg_repr['parameters']
+            del plg_repr['parameters']
+            plg_serializer = PluginSerializer(plugin, data=plg_repr)
+            plg_serializer.is_valid(raise_exception=True)
+            if compute_resource:
+                plugin = plg_serializer.save(compute_resource=compute_resource)
+            else:
+                plugin = plg_serializer.save()
+            # collect existing and new parameters and validate and save them to the DB
+            db_parameters = plugin.parameters.all()
+            for parameter in parameters_data:
+                db_param = [p for p in db_parameters if p.name == parameter['name']]
+                if db_param:
+                    parameter_serializer = PluginParameterSerializer(db_param[0],
+                                                                     data=parameter)
+                else:
+                    parameter_serializer = PluginParameterSerializer(data=parameter)
+                parameter_serializer.is_valid(raise_exception=True)
+                parameter_serializer.save(plugin=plugin)
+        elif compute_resource:
+            plg_serializer = PluginSerializer(plugin)
+            plugin = plg_serializer.save(compute_resource=compute_resource)
 
-    def register_plugin_app_modification(self, dock_image_name):
-        """
-        Register/add new parameters to a plugin from the corresponding plugin's app.
-        Also update plugin's fields and add the current date as a new plugin modification
-        date.
-        """
-        # get representation from the corresponding app
-        app_repr = self.get_plugin_app_representation(dock_image_name)
-        name = self.get_plugin_name(app_repr)
-        max_cpu_limit, min_cpu_limit                 = self.get_cpu_limit(app_repr)
-        max_memory_limit, min_memory_limit           = self.get_memory_limit(app_repr)
-        max_number_of_workers, min_number_of_workers = self.get_number_of_workers(app_repr)
-        max_gpu_limit, min_gpu_limit                 = self.get_gpu_limit(app_repr)
-
-        # update plugin fields (type cannot be changed as 'ds' plugins cannot have created
-        # a feed in the DB)
-        plugin = self.get_plugin(name)
-        plugin.authors       = app_repr['authors']
-        plugin.title         = app_repr['title']
-        plugin.category      = app_repr['category']
-        plugin.description   = app_repr['description']
-        plugin.documentation = app_repr['documentation']
-        plugin.license       = app_repr['license']
-        plugin.version       = app_repr['version']
-        plugin.max_cpu_limit         = self.insert_default(max_cpu_limit, Plugin.defaults['max_limit'])
-        plugin.min_cpu_limit         = self.insert_default(min_cpu_limit,
-                                                           Plugin.defaults['min_cpu_limit'])
-        plugin.max_memory_limit      = self.insert_default(max_memory_limit, Plugin.defaults['max_limit'])
-        plugin.min_memory_limit      = self.insert_default(min_memory_limit,
-                                                           Plugin.defaults['min_memory_limit'])
-        plugin.max_number_of_workers = self.insert_default(max_number_of_workers, Plugin.defaults['max_limit'])
-        plugin.min_number_of_workers = self.insert_default(min_number_of_workers, 1)
-        plugin.max_gpu_limit         = self.insert_default(max_gpu_limit, Plugin.defaults['max_limit'])
-        plugin.min_gpu_limit         = self.insert_default(min_gpu_limit, 0)
-
-        # add there are new parameters then add them
-        new_params = app_repr['parameters']
-        existing_param_names = [parameter.name for parameter in plugin.parameters.all()]
-        for param in new_params:
-            if param['name'] not in existing_param_names:
-                self._save_plugin_param(plugin, param)
-
-        plugin.modification_date = timezone.now()
-        plugin.save()
+        if plg_repr or compute_resource:
+            plugin.modification_date = timezone.now()
+            plugin.save()
 
     def remove_plugin(self, args):
         """
@@ -156,6 +145,22 @@ class PluginManager(object):
         """
         plugin = self.get_plugin(args.name)
         plugin.delete()
+
+    def get_existing_plugin_representation(self, name):
+        """
+        Get a plugin app representation dictionary from an existing plugin in the system.
+        """
+        plugin = self.get_plugin(name)
+        plg_serializer = PluginSerializer(plugin)
+        plg_serializer.is_valid(raise_exception=True)
+        plg_repr = plg_serializer.validated_data
+        plg_repr['parameters'] = []
+        db_parameters = plugin.parameters.all()
+        for db_param in db_parameters:
+            param_serializer = PluginParameterSerializer(db_param)
+            param_serializer.is_valid(raise_exception=True)
+            plg_repr['parameters'].append(param_serializer.validated_data)
+        return plg_repr
 
     def run(self, args=None):
         """
@@ -191,7 +196,7 @@ class PluginManager(object):
             if k == 'IOPhost':              self.str_IOPhost        = v
 
 
-        plugin_repr = self.get_plugin_app_representation(plugin_inst.plugin.dock_image)
+        plugin_repr = self.get_existing_plugin_representation(plugin_inst.plugin.name)
         # get input dir
         inputdir            = ""
         inputdirManagerFS   = ""
