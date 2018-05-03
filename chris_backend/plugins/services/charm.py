@@ -13,11 +13,12 @@ import  inspect
 import  pfmisc
 import  webob
 
-from urllib.parse import urlparse, parse_qs
-from django.utils import timezone
-from django.conf import settings
+from    urllib.parse    import urlparse, parse_qs
+from    django.utils    import timezone
+from    django.conf     import settings
 
-import swiftclient
+import  swiftclient
+import  time
 
 class Charm():
 
@@ -989,7 +990,7 @@ class Charm():
         self.dp.qprint('d_response = %s' % d_response)
 
         str_responseStatus  = ""
-        for str_action in ['pushPath', 'compute', 'pullPath']:
+        for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
             if str_action == 'compute':
                 for str_part in ['submit', 'return']:
                     str_actionStatus = str(d_response['jobOperationSummary'][str_action][str_part]['status'])
@@ -1000,19 +1001,28 @@ class Charm():
                 str_actionStatus = ''.join(str_actionStatus.split())
                 str_responseStatus += str_action + ':' + str_actionStatus + ';'
 
-        # try:
-        #     str_responseStatus  = d_    response['jobOperationSummary']['compute']['return']['l_status'][0]
-        # except:
-        #     str_responseStatus  = 'Error in response. No record of job found.'
-        # pudb.set_trace()
         str_DBstatus    = self.c_pluginInst.status
         self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
         self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
-        if 'pullPath:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
+        if 'swiftPut:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
             # pudb.set_trace()
+            b_swiftFound    = False
             d_swiftState    = {}
-            if 'swift' in d_response['jobOperation']['info']['pullPath']:
-                d_swiftState = d_response['jobOperation']['info']['pullPath']['swift']
+            if 'swiftPut' in d_response['jobOperation']['info']:
+                d_swiftState    = d_response['jobOperation']['info']['swiftPut']
+                b_swiftFound    = True
+            maxPolls        = 10
+            currentPoll     = 1
+            while not b_swiftFound and currentPoll <= maxPolls: 
+                if 'swiftPut' in d_response['jobOperation']['info']:
+                    d_swiftState    = d_response['jobOperation']['info']['swiftPut']
+                    b_swiftFound    = True
+                    self.dp.qprint('Found swift return data on poll %d' % currentPoll)
+                    break
+                self.dp.qprint('swift return data not found on poll %d; will sleep a bit...' % currentPoll)
+                time.sleep(0.2)
+                d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
+                currentPoll += 1
 
             d_register      = self.c_pluginInst.register_output_files(
                                                 swiftState = d_swiftState
@@ -1020,14 +1030,18 @@ class Charm():
             str_registrationMsg = """
             Registering output files...
 
-            swift poll loops    = %d
-            swift prefix path   = %s
+            pfcon swift poll loops      = %d
+            charm swift poll loops      = %d
+            swift prefix path           = %s
 
             In total, registered %d objects. 
 
-            Object list:\n""" % ( d_register['pollLoop'],
+            Object list:\n""" % ( 
+                    d_register['pollLoop'],
+                    currentPoll,
                     d_register['outputPath'],
-                    d_register['total'])
+                    d_register['total']
+            )
             for obj in d_register['l_object']:
                 str_registrationMsg += obj['name'] + '\n'
             self.dp.qprint('%s' % str_registrationMsg, status = 'comms',

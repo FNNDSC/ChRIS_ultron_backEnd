@@ -26,7 +26,6 @@ from plugins.services import charm
 from plugins.models import ComputeResource
 from django.conf import settings
 
-
 class PluginManager(object):
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
@@ -363,8 +362,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            quiet       = settings.CHRIS_DEBUG['quiet'],
-            gpuLimit    = int_gpuLimit
+            quiet       = settings.CHRIS_DEBUG['quiet']
         )
 
         # Some dev notes...
