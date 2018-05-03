@@ -144,7 +144,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)    
     class Meta:
         model = PluginParameter
-        fields = ('url', 'name', 'type', 'optional', 'default', 'flag', 'help', 'plugin')
+        fields = ('url', 'name', 'type', 'optional', 'default', 'flag', 'action',
+                  'help', 'plugin')
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
