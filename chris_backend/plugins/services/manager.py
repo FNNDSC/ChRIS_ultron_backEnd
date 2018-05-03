@@ -362,8 +362,7 @@ class PluginManager(object):
             inputdir    = inputdirManagerFS,
             outputdir   = outputdirManagerFS,
             IOPhost     = self.str_IOPhost,
-            quiet       = settings.CHRIS_DEBUG['quiet'],
-            gpuLimit    = int_gpuLimit
+            quiet       = settings.CHRIS_DEBUG['quiet']
         )
 
         # Some dev notes...
