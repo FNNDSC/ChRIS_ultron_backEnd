@@ -357,7 +357,7 @@ else
     declare -i i=1
     declare -i STEP=10
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Uploading $plugin representation ..."
+        echo "${STEP}.$i: Uploading $plugin representation to the ChRIS store ..."
         PLUGIN_DOCK="fnndsc/pl-${plugin}"
         PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
         docker-compose exec chris_store python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
