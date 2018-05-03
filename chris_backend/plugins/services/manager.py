@@ -55,7 +55,7 @@ class PluginManager(object):
                                 help="Url of ChRIS store where the plugin is registered")
         parser_modify.add_argument('--storeusername', help="Username for the ChRIS store")
         parser_modify.add_argument('--storepassword', help="Password for the ChRIS store")
-        parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
+        parser_modify.add_argument('--storetimeout', help="ChRIS store request timeout")
 
         # create the parser for the "remove" command
         parser_remove = subparsers.add_parser('remove', help='Remove an existing plugin')
@@ -77,7 +77,7 @@ class PluginManager(object):
         timeout = 30
         if args.storetimeout:
             timeout = args.storetimeout
-        plg_repr = self.get_plugin_representation_from_store(args.storeurl,
+        plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
                                                              args.storeusername,
                                                              args.storepassword, timeout)
         parameters_data = plg_repr['parameters']
@@ -89,7 +89,7 @@ class PluginManager(object):
         plugin = plg_serializer.save(compute_resource=compute_resource)
         # collect parameters and validate and save them to the DB
         for parameter in parameters_data:
-            parameter_serializer = PluginParameterSerializer(parameter)
+            parameter_serializer = PluginParameterSerializer(data=parameter)
             parameter_serializer.is_valid(raise_exception=True)
             parameter_serializer.save(plugin=plugin)
 
@@ -108,7 +108,7 @@ class PluginManager(object):
             timeout = 30
             if args.storetimeout:
                 timeout = args.storetimeout
-            plg_repr = self.get_plugin_representation_from_store(args.storeurl,
+            plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
                                                                  args.storeusername,
                                                                  args.storepassword,
                                                                  timeout)
@@ -213,7 +213,7 @@ class PluginManager(object):
             outputdir = str_outputDirOverride
         app_args = []
         # append input dir to app's argument list (only for ds plugins)
-        if plugin_repr['type'] == 'ds' and inputdir:
+        if plugin_inst.plugin.type == 'ds' and inputdir:
             app_args.append(inputdir)
         # append output dir to app's argument list
         app_args.append(outputdir)
@@ -222,13 +222,14 @@ class PluginManager(object):
         # append flag to save output meta data (output description)
         app_args.append("--saveoutputmeta")
         # append the parameters to app's argument list
+        db_parameters = plugin_inst.plugin.parameters.all()
         if parameter_dict:
             for param_name in parameter_dict:
                 param_value = parameter_dict[param_name]
-                for plugin_param in plugin_repr['parameters']:
-                    if plugin_param['name'] == param_name:
-                        app_args.append(plugin_param['flag'])
-                        if plugin_param['action'] == 'store':
+                for db_param in db_parameters:
+                    if db_param.name == param_name:
+                        app_args.append(db_param.flag)
+                        if db_param.action == 'store':
                             app_args.append(param_value)
                         break
 

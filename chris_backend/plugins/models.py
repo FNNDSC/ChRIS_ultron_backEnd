@@ -51,7 +51,7 @@ class Plugin(models.Model):
     selfexec = models.CharField(max_length=50)
     authors = models.CharField(max_length=200)
     title = models.CharField(max_length=400)
-    category = models.CharField(max_length=100)
+    category = models.CharField(max_length=100, blank=True)
     description = models.CharField(max_length=800)
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50)
@@ -94,6 +94,7 @@ class PluginFilter(FilterSet):
 class PluginParameter(models.Model):
     name = models.CharField(max_length=50)
     flag = models.CharField(max_length=52)
+    action = models.CharField(max_length=20, default='store')
     optional = models.BooleanField(default=True)
     default = models.CharField(max_length=200, blank=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
