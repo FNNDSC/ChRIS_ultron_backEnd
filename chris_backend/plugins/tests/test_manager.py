@@ -10,47 +10,50 @@ from django.conf import settings
 from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
 from plugins.services import manager
 
-import pudb
 
 class PluginManagerTests(TestCase):
     
     def setUp(self):
-        self.plugin_fs_docker_image_name = "fnndsc/pl-simplefsapp"
+        self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
+                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
+                            "description": "A simple chris fs app demo", "version": "0.1",
+                            "title": "Simple chris fs app", "license": "Opensource (MIT)",
+
+                            "parameters": [{"optional": True, "action": "store",
+                                            "help": "look up directory", "type": "path",
+                                            "name": "dir", "flag": "--dir",
+                                            "default": "./"}],
+
+                            "selfpath": "/usr/src/simplefsapp",
+                            "selfexec": "simplefsapp.py", "execshell": "python3"}
+
         self.plugin_fs_name = "simplefsapp"
-        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
+        #self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         self.plugin_ds_name = "simpledsapp"
-        self.plugin_ds_docker_image_name = "fnndsc/pl-simpledsapp"
+        self.plugin_ds_dock_image = "fnndsc/pl-simpledsapp"
         self.username = 'data/foo'
         self.password = 'foo-pass'
         self.pl_manager = manager.PluginManager()
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
 
         # create a plugin
-        (plugin_fs, tf) = Plugin.objects.get_or_create( name        = self.plugin_fs_name,
-                                                        dock_image  = self.plugin_fs_docker_image_name,
-                                                        type        = 'fs',
-                                                        compute_resource=self.compute_resource)
+        data = self.plugin_repr.copy()
+        parameters = self.plugin_repr['parameters']
+        del data['parameters']
+        data['compute_resource'] = self.compute_resource
+        (plugin_fs, tf) = Plugin.objects.get_or_create(**data)
+
         # add plugin's parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
-            name='dir',
-            type=self.plugin_fs_parameters['dir']['type'],
-            optional=self.plugin_fs_parameters['dir']['optional'])
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
 
         # create user
-        User.objects.create_user(username=self.username,
-                                        password=self.password)
-        
-    def test_mananger_can_get_plugin_app_representation(self):
-        """
-        Test whether the manager can return a plugin's app representation given the
-        plugin's name.
-        """
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        app_repr = self.pl_manager.get_plugin_app_representation(self.plugin_fs_docker_image_name)
-        self.assertEquals(plugin.type, app_repr['type'])
-        self.assertIn('parameters', app_repr)
+        User.objects.create_user(username=self.username, password=self.password)
 
     def test_mananger_can_get_plugin(self):
         """
@@ -58,34 +61,53 @@ class PluginManagerTests(TestCase):
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertEquals(plugin, self.pl_manager.get_plugin(self.plugin_fs_name))
-        
+
     def test_mananger_can_add_plugin(self):
         """
-        Test whether the manager can add a new plugin app to the system.
+        Test whether the manager can add a new plugin to the system.
         """
-        self.pl_manager.run(['--add', self.plugin_ds_docker_image_name, "host"])
+        self.plugin_repr['name'] = 'testapp'
+        with mock.patch.object(manager.PluginManager, 'get_plugin_representation_from_store',
+                               return_value=self.plugin_repr) as get_plugin_representation_from_store_mock:
+            self.pl_manager.run(['add', 'testapp', 'host',
+                                 'http://localhost:8010/api/v1/', 'cubeadmin',
+                                 'cubeadmin1234'])
         self.assertEquals(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
+        get_plugin_representation_from_store_mock.assert_called_with(
+            'testapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
+
+    def test_mananger_can_modify_plugin(self):
+        """
+        Test whether the manager can modify an existing plugin.
+        """
+        self.plugin_repr['selfexec'] = 'testapp.py'
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        initial_modification_date = plugin.modification_date
+        time.sleep(1)
+
+        with mock.patch.object(manager.PluginManager, 'get_plugin_representation_from_store',
+                               return_value=self.plugin_repr) as get_plugin_representation_from_store_mock:
+            self.pl_manager.run(['modify', self.plugin_fs_name,
+                                 '--computeresource', 'host1', '--storeurl',
+                                 'http://localhost:8010/api/v1/', '--storeusername',
+                                 'cubeadmin', '--storepassword', 'cubeadmin1234'])
+
+        get_plugin_representation_from_store_mock.assert_called_with(
+            'simplefsapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
+
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        self.assertTrue(plugin.modification_date > initial_modification_date)
+        self.assertEquals(plugin.selfexec,'testapp.py')
+        self.assertEquals(plugin.compute_resource.compute_resource_identifier, 'host1')
 
     def test_mananger_can_remove_plugin(self):
         """
-        Test whether the manager can remove an existing plugin app from the system.
+        Test whether the manager can remove an existing plugin from the system.
         """
-        self.pl_manager.run(['--remove', self.plugin_fs_name])
+        self.pl_manager.run(['remove', self.plugin_fs_name])
         self.assertEquals(Plugin.objects.count(), 0)
         self.assertEquals(PluginParameter.objects.count(), 0)
-
-    def test_mananger_can_register_plugin_app_modification_date(self):
-        """
-        Test whether the manager can register a new modification date for an
-        existing plugin app.
-        """
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        initial_modification_date = plugin.modification_date
-        time.sleep(2)
-        self.pl_manager.run(['--modify', self.plugin_fs_docker_image_name])
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        self.assertTrue(plugin.modification_date > initial_modification_date)
 
     def test_mananger_can_run_registered_plugin_app(self):
         """

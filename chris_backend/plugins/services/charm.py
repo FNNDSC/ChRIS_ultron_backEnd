@@ -147,7 +147,6 @@ class Charm():
         self.d_args                 = {}
         self.l_appArgs              = {}
         self.c_pluginInst           = {'contents':  'void'}
-        self.d_pluginRepr           = {}
         self.app                    = None
 
         self.LC                     = 40
@@ -157,7 +156,6 @@ class Charm():
             if key == 'app_args':       self.l_appArgs         = val
             if key == 'd_args':         self.d_args            = val
             if key == 'plugin_inst':    self.c_pluginInst      = val
-            if key == 'plugin_repr':    self.d_pluginRepr      = val
             if key == 'app':            self.app               = val
             if key == 'inputdir':       self.str_inputdir      = val
             if key == 'outputdir':      self.str_outputdir     = val
@@ -207,7 +205,6 @@ class Charm():
         self.dp.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.dp.qprint('app_args       = %s'   % self.l_appArgs)
         self.dp.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
-        self.dp.qprint('d_pluginRepr   = %s'   % self.pp.pformat(self.d_pluginRepr).strip())
         self.dp.qprint('app            = %s'   % self.app)
         self.dp.qprint('inputdir       = %s'   % self.str_inputdir)
         self.dp.qprint('outputdir      = %s'   % self.str_outputdir)
@@ -252,10 +249,10 @@ class Charm():
         self.dp.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
 
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-        str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+        str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
 
-        if len(self.d_pluginRepr['execshell']):
-            str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
+        if len(self.c_pluginInst.plugin.execshell):
+            str_exec            = '%s %s' % (self.c_pluginInst.plugin.execshell, str_exec)
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)
@@ -742,7 +739,7 @@ class Charm():
         filesystem can be "massaged" to conform to the existing fileIO 
         transmission pattern.
 
-        This method edits the cmdLine for fsplugin input to /share/incoming 
+        This method edits the cmdLine for fsplugin input to /share/incoming
         and sets any --dir to data location in local object storage.
         """
 
@@ -753,9 +750,9 @@ class Charm():
         # 'path'. Ideally speaking there should be only one, however for now
         # we won't assume that -- we'll lay the groundwork for more than 'path'
         # type parameter, but will process things as if there was only one...
-        for d_param in self.d_pluginRepr['parameters']:
-            if d_param['type'] == 'path':
-                l_pathArgs.append(d_param['name'])
+        for d_param in self.c_pluginInst.plugin.parameters.all():
+            if d_param.type == 'path':
+                l_pathArgs.append(d_param.name)
 
         # The 'path' type parameter refers to some location (ideally in the 
         # swift storage). We need to replace this location referring to some
@@ -773,7 +770,7 @@ class Charm():
                         self.l_appArgs[i] = '/share/incoming'
                     i+=1
                 str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-                str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+                str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
                 self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
                 self.dp.qprint('cmd = %s' % self.str_cmd)
 
@@ -813,10 +810,10 @@ class Charm():
 
         self.dp.qprint('l_appArgs = %s' % self.l_appArgs)
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-        str_exec                = os.path.join(self.d_pluginRepr['selfpath'], self.d_pluginRepr['selfexec'])
+        str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
 
-        # if len(self.d_pluginRepr['execshell']):
-        #     str_exec            = '%s %s' % (self.d_pluginRepr['execshell'], str_exec)
+        # if len(self.c_pluginInst.plugin.execshell):
+        #     str_exec            = '%s %s' % (self.c_pluginInst.plugin.execshell, str_exec)
 
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)

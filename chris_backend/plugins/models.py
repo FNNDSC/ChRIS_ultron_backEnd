@@ -58,14 +58,20 @@ class Plugin(models.Model):
     version = models.CharField(max_length=10)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
                         related_name='plugins')
-    min_gpu_limit = models.IntegerField(null=True, default=0)
-    max_gpu_limit = models.IntegerField(null=True, default=defaults['max_limit'])
-    min_number_of_workers = models.IntegerField(null=True, default=1)
-    max_number_of_workers = models.IntegerField(null=True, default=defaults['max_limit'])
-    min_cpu_limit = CPUField(null=True, default=defaults['min_cpu_limit']) # In millicores
-    max_cpu_limit = CPUField(null=True, default=defaults['max_limit']) # In millicores
-    min_memory_limit = MemoryField(null=True, default=defaults['min_memory_limit']) # In Mi
-    max_memory_limit = MemoryField(null=True, default=defaults['max_limit']) # In Mi
+    min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
+    max_gpu_limit = models.IntegerField(null=True, blank=True,
+                                        default=defaults['max_limit'])
+    min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
+    max_number_of_workers = models.IntegerField(null=True, blank=True,
+                                                default=defaults['max_limit'])
+    min_cpu_limit = CPUField(null=True, blank=True,
+                             default=defaults['min_cpu_limit']) # In millicores
+    max_cpu_limit = CPUField(null=True, blank=True,
+                             default=defaults['max_limit']) # In millicores
+    min_memory_limit = MemoryField(null=True, blank=True,
+                                   default=defaults['min_memory_limit']) # In Mi
+    max_memory_limit = MemoryField(null=True, blank=True,
+                                   default=defaults['max_limit']) # In Mi
 
     class Meta:
         ordering = ('type',)
