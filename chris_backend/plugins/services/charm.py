@@ -597,7 +597,7 @@ class Charm():
         d_ret                   = {
             'status':               b_status,
             'b_squashFileFound':    False,
-            'inputDir':             '',
+            'inputdir':             '',
             'd_objPut':             {},
             'd_objExists':          {}
         }
