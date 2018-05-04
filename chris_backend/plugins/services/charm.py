@@ -598,7 +598,7 @@ class Charm():
             'status':               b_status,
             'b_squashFileFound':    False,
             'inputDir':             '',
-            'd_swiftput':           {}
+            'd_objPut':             {},
             'd_objExists':          {}
         }
 
