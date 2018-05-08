@@ -26,41 +26,49 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Plugin
         fields = ('url', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
-                  'description', 'documentation', 'license', 'version',
-                  'compute_resource_identifier', 'parameters', 'instances',
-                  'min_number_of_workers', 'max_number_of_workers', 'min_cpu_limit',
-                  'max_cpu_limit', 'min_memory_limit', 'max_memory_limit',
-                  'min_gpu_limit',
-                  'max_gpu_limit')
+                  'description', 'documentation', 'license', 'version', 'execshell',
+                  'selfpath', 'selfexec', 'compute_resource_identifier', 'parameters',
+                  'instances', 'min_number_of_workers', 'max_number_of_workers',
+                  'min_cpu_limit', 'max_cpu_limit', 'min_memory_limit',
+                  'max_memory_limit', 'min_gpu_limit', 'max_gpu_limit')
 
     def validate(self, data):
         """
-        Overriden to validate compute-related descriptors in the plugin app representation.
+        Overriden to validate compute-related descriptors in the plugin app
+        representation.
         """
         # validate compute-related descriptors
-        data['min_number_of_workers'] = self.validate_app_workers_descriptor(
-            data['min_number_of_workers'])
+        if 'min_number_of_workers' in data:
+            data['min_number_of_workers'] = self.validate_app_workers_descriptor(
+                data['min_number_of_workers'])
 
-        data['max_number_of_workers'] = self.validate_app_workers_descriptor(
-            data['max_number_of_workers'])
+        if 'max_number_of_workers' in data:
+            data['max_number_of_workers'] = self.validate_app_workers_descriptor(
+                data['max_number_of_workers'])
 
-        data['min_gpu_limit'] = self.validate_app_gpu_descriptor(
-            data['min_gpu_limit'])
+        if 'min_gpu_limit' in data:
+            data['min_gpu_limit'] = self.validate_app_gpu_descriptor(
+                data['min_gpu_limit'])
 
-        data['max_gpu_limit'] = self.validate_app_gpu_descriptor(
-            data['max_gpu_limit'])
+        if 'max_gpu_limit' in data:
+            data['max_gpu_limit'] = self.validate_app_gpu_descriptor(
+                data['max_gpu_limit'])
 
-        data['min_cpu_limit'] = self.validate_app_cpu_descriptor(
-            data['min_cpu_limit'])
+        if 'min_cpu_limit' in data:
+            data['min_cpu_limit'] = self.validate_app_cpu_descriptor(
+                data['min_cpu_limit'])
 
-        data['max_cpu_limit'] = self.validate_app_cpu_descriptor(
+        if 'max_cpu_limit' in data:
+            data['max_cpu_limit'] = self.validate_app_cpu_descriptor(
             data['max_cpu_limit'])
 
-        data['min_memory_limit'] = self.validate_app_memory_descriptor(
-            data['min_memory_limit'])
+        if 'min_memory_limit' in data:
+            data['min_memory_limit'] = self.validate_app_memory_descriptor(
+                data['min_memory_limit'])
 
-        data['max_memory_limit'] = self.validate_app_memory_descriptor(
-            data['max_memory_limit'])
+        if 'max_memory_limit' in data:
+            data['max_memory_limit'] = self.validate_app_memory_descriptor(
+                data['max_memory_limit'])
 
         # validate descriptor limits
         err_msg = "Minimum number of workers should be less than maximum number of workers"
