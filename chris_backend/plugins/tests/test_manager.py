@@ -28,7 +28,6 @@ class PluginManagerTests(TestCase):
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
 
         self.plugin_fs_name = "simplefsapp"
-        #self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_dock_image = "fnndsc/pl-simpledsapp"
         self.username = 'data/foo'
@@ -67,14 +66,14 @@ class PluginManagerTests(TestCase):
         Test whether the manager can add a new plugin to the system.
         """
         self.plugin_repr['name'] = 'testapp'
-        with mock.patch.object(manager.PluginManager, 'get_plugin_representation_from_store',
-                               return_value=self.plugin_repr) as get_plugin_representation_from_store_mock:
-            self.pl_manager.run(['add', 'testapp', 'host',
-                                 'http://localhost:8010/api/v1/', 'cubeadmin',
-                                 'cubeadmin1234'])
+        # mock manager's get_plugin_representation_from_store static method
+        self.pl_manager.get_plugin_representation_from_store = mock.Mock(
+            return_value=self.plugin_repr)
+        self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/',
+                             'cubeadmin', 'cubeadmin1234'])
         self.assertEquals(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
-        get_plugin_representation_from_store_mock.assert_called_with(
+        self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'testapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
 
     def test_mananger_can_modify_plugin(self):
@@ -85,15 +84,14 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         initial_modification_date = plugin.modification_date
         time.sleep(1)
-
-        with mock.patch.object(manager.PluginManager, 'get_plugin_representation_from_store',
-                               return_value=self.plugin_repr) as get_plugin_representation_from_store_mock:
-            self.pl_manager.run(['modify', self.plugin_fs_name,
-                                 '--computeresource', 'host1', '--storeurl',
-                                 'http://localhost:8010/api/v1/', '--storeusername',
-                                 'cubeadmin', '--storepassword', 'cubeadmin1234'])
-
-        get_plugin_representation_from_store_mock.assert_called_with(
+        # mock manager's get_plugin_representation_from_store static method
+        self.pl_manager.get_plugin_representation_from_store = mock.Mock(
+            return_value=self.plugin_repr)
+        self.pl_manager.run(['modify', self.plugin_fs_name, '--computeresource', 'host1',
+                             '--storeurl', 'http://localhost:8010/api/v1/',
+                             '--storeusername', 'cubeadmin', '--storepassword',
+                             'cubeadmin1234'])
+        self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'simplefsapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
 
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
