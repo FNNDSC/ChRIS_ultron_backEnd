@@ -2,15 +2,16 @@
 import os, shutil
 from unittest import mock
 
+import swiftclient
+
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-import swiftclient
-
 from feeds.models import Feed, FeedFile
-from plugins.models import Plugin, PluginParameter, PluginInstance, swiftclient
+from plugins.models import Plugin, PluginParameter, PluginInstance
 from plugins.models import ComputeResource
+
 
 class PluginModelTests(TestCase):
     
@@ -226,6 +227,3 @@ class PluginInstanceModelTests(TestCase):
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')
-
-
-        
