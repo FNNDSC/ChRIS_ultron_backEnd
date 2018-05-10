@@ -23,13 +23,6 @@ PFCON = {
     'port': '5005'
 }
 
-# chris store settings
-CHRIS_STORE = {
-    'store_url': 'http://chris_store:8010/api/v1/',
-    'username': 'cubeadmin',
-    'password': 'cubeadmin1234'
-}
-
 # swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
