@@ -117,10 +117,7 @@ class PluginManager(object):
             del plg_repr['parameters']
             plg_serializer = PluginSerializer(plugin, data=plg_repr)
             plg_serializer.is_valid(raise_exception=True)
-            if compute_resource:
-                plugin = plg_serializer.save(compute_resource=compute_resource)
-            else:
-                plugin = plg_serializer.save()
+            plugin = plg_serializer.save(compute_resource=compute_resource)
             # collect existing and new parameters and validate and save them to the DB
             db_parameters = plugin.parameters.all()
             for parameter in parameters_data:
