@@ -189,8 +189,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date',
                   'status', 'previous', 'owner', 'feed', 'plugin',
                   'compute_resource_identifier', 'string_param', 'int_param',
-                  'float_param', 'bool_param', 'path_param', 'compute_resource_id',
-                  'cpu_limit', 'memory_limit', 'number_of_workers','gpu_limit')
+                  'float_param', 'bool_param', 'path_param', 'cpu_limit', 'memory_limit',
+                  'number_of_workers','gpu_limit')
 
     def create(self, validated_data):
         """
