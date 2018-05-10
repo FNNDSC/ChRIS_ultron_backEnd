@@ -12,6 +12,7 @@ from .fields import CPUField, MemoryField
 
 import time
 
+
 # API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values"),
@@ -45,23 +46,32 @@ class Plugin(models.Model):
     name = models.CharField(max_length=100, unique=True)
     dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
-    authors = models.CharField(max_length=200, blank=True)
-    title = models.CharField(max_length=400, blank=True)
+    execshell = models.CharField(max_length=50)
+    selfpath = models.CharField(max_length=512)
+    selfexec = models.CharField(max_length=50)
+    authors = models.CharField(max_length=200)
+    title = models.CharField(max_length=400)
     category = models.CharField(max_length=100, blank=True)
-    description = models.CharField(max_length=800, blank=True)
+    description = models.CharField(max_length=800)
     documentation = models.CharField(max_length=800, blank=True)
-    license = models.CharField(max_length=50, blank=True)
-    version = models.CharField(max_length=10, blank=True)
+    license = models.CharField(max_length=50)
+    version = models.CharField(max_length=10)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
                         related_name='plugins')
-    min_gpu_limit = models.IntegerField(null=True)
-    max_gpu_limit = models.IntegerField(null=True)
-    min_number_of_workers = models.IntegerField(null=True, default=1)
-    max_number_of_workers = models.IntegerField(null=True, default=defaults['max_limit'])
-    min_cpu_limit = CPUField(null=True, default=defaults['min_cpu_limit']) # In millicores
-    max_cpu_limit = CPUField(null=True, default=defaults['max_limit']) # In millicores
-    min_memory_limit = MemoryField(null=True, default=defaults['min_memory_limit']) # In Mi
-    max_memory_limit = MemoryField(null=True, default=defaults['max_limit']) # In Mi
+    min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
+    max_gpu_limit = models.IntegerField(null=True, blank=True,
+                                        default=defaults['max_limit'])
+    min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
+    max_number_of_workers = models.IntegerField(null=True, blank=True,
+                                                default=defaults['max_limit'])
+    min_cpu_limit = CPUField(null=True, blank=True,
+                             default=defaults['min_cpu_limit']) # In millicores
+    max_cpu_limit = CPUField(null=True, blank=True,
+                             default=defaults['max_limit']) # In millicores
+    min_memory_limit = MemoryField(null=True, blank=True,
+                                   default=defaults['min_memory_limit']) # In Mi
+    max_memory_limit = MemoryField(null=True, blank=True,
+                                   default=defaults['max_limit']) # In Mi
 
     class Meta:
         ordering = ('type',)
@@ -88,7 +98,9 @@ class PluginFilter(FilterSet):
 
 
 class PluginParameter(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=50)
+    flag = models.CharField(max_length=52)
+    action = models.CharField(max_length=20, default='store')
     optional = models.BooleanField(default=True)
     default = models.CharField(max_length=200, blank=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
@@ -137,7 +149,7 @@ class PluginInstance(models.Model):
         Custom method to create and save a new feed to the DB.
         """
         feed = Feed()
-        feed.plugin_inst = self;
+        feed.plugin_inst = self
         feed.save()
         feed.name = self.plugin.name
         feed.owner = [self.owner]

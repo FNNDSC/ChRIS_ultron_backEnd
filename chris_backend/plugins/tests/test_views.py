@@ -16,8 +16,8 @@ from plugins.models import ComputeResource
 from plugins.services.manager import PluginManager
 from plugins import views
 
-import pudb
 import time
+
 
 class ViewTests(TestCase):
     
@@ -193,8 +193,7 @@ class PluginInstanceListViewTests(ViewTests):
                                     parameters_dict,
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
-                                    outputDirOverride   = '/share/outgoing',
-                                    IOPhost='host')
+                                    outputDirOverride   = '/share/outgoing')
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
@@ -205,10 +204,38 @@ class PluginInstanceListViewTests(ViewTests):
             if not os.path.exists(self.test_dir):
                 os.makedirs(self.test_dir)
 
-            # add a plugin to the system though the plugin manager
-            pl_manager = PluginManager()
-            pl_manager.add_plugin('fnndsc/pl-simplefsapp', "host")
-            plugin = Plugin.objects.get(name="simplefsapp")
+            # add a plugin to the system
+            plugin_repr =      {"name": "simplefsapp",
+                                "dock_image": "fnndsc/pl-simplefsapp",
+                                "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
+                                "description": "A simple chris fs app demo",
+                                "version": "0.1",
+                                "title": "Simple chris fs app",
+                                "license": "Opensource (MIT)",
+
+                                "parameters": [{"optional": True, "action": "store",
+                                                "help": "look up directory",
+                                                "type": "path",
+                                                "name": "dir", "flag": "--dir",
+                                                "default": "./"}],
+
+                                "selfpath": "/usr/src/simplefsapp",
+                                "selfexec": "simplefsapp.py", "execshell": "python3"}
+            (compute_resource, tf) = ComputeResource.objects.get_or_create(
+                compute_resource_identifier="host")
+            parameters = plugin_repr['parameters']
+            data = plugin_repr
+            del data['parameters']
+            data['compute_resource'] = compute_resource
+            (plugin, tf) = Plugin.objects.get_or_create(**data)
+
+            # add plugin's parameters
+            PluginParameter.objects.get_or_create(
+                plugin=plugin,
+                name=parameters[0]['name'],
+                type=parameters[0]['type'],
+                flag=parameters[0]['flag'])
+
             self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
 
             # create a simplefsapp plugin instance
@@ -281,18 +308,46 @@ class PluginInstanceDetailViewTests(ViewTests):
             if not os.path.exists(self.test_dir):
                 os.makedirs(self.test_dir)
 
-            # add a plugin to the system through the plugin manager
-            pl_manager = PluginManager()
-            pl_manager.add_plugin('fnndsc/pl-simplefsapp', "host")
+            # add a plugin to the system
+            plugin_repr = {"name": "simplefsapp",
+                           "dock_image": "fnndsc/pl-simplefsapp",
+                           "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
+                           "description": "A simple chris fs app demo",
+                           "version": "0.1",
+                           "title": "Simple chris fs app",
+                           "license": "Opensource (MIT)",
+
+                           "parameters": [{"optional": True, "action": "store",
+                                           "help": "look up directory",
+                                           "type": "path",
+                                           "name": "dir", "flag": "--dir",
+                                           "default": "./"}],
+
+                           "selfpath": "/usr/src/simplefsapp",
+                           "selfexec": "simplefsapp.py", "execshell": "python3"}
+            (compute_resource, tf) = ComputeResource.objects.get_or_create(
+                compute_resource_identifier="host")
+            parameters = plugin_repr['parameters']
+            data = plugin_repr
+            del data['parameters']
+            data['compute_resource'] = compute_resource
+            (plugin, tf) = Plugin.objects.get_or_create(**data)
+
+            # add plugin's parameters
+            PluginParameter.objects.get_or_create(
+                plugin=plugin,
+                name=parameters[0]['name'],
+                type=parameters[0]['type'],
+                flag=parameters[0]['flag'])
 
             # create a simplefsapp plugin instance
-            plugin = Plugin.objects.get(name='simplefsapp')
             user = User.objects.get(username=self.username)
             (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
                                         compute_resource=plugin.compute_resource)
             self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
 
             # run the plugin instance
+            pl_manager = PluginManager()
             pl_manager.run_plugin_app(  pl_inst,
                                         {'dir': './'},
                                         service             = 'pfcon',
@@ -303,9 +358,6 @@ class PluginInstanceDetailViewTests(ViewTests):
             self.client.login(username=self.username, password=self.password)
             response = self.client.get(self.read_url)
             self.assertContains(response, "simplefsapp")
-
-            # After submitting run request, wait before checking status
-            # time.sleep(5)
 
             # In the following we keep checking the status until the job ends with
             # 'finishedSuccessfully'. The code runs in a lazy loop poll with a

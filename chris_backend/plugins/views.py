@@ -11,7 +11,7 @@ from .models import BoolParameter, PathParameter, ComputeResource
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer, ComputeResourceSerializer
+from .serializers import PluginInstanceSerializer
 from .permissions import IsChrisOrReadOnly
 from .services.manager import PluginManager
 
@@ -106,20 +106,21 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         Overriden to associate an owner, a plugin and a previous plugin instance with 
         the newly created plugin instance before first saving to the DB. All the plugin 
-        instace's parameters in the resquest are also properly saved to the DB. Finally
+        instace's parameters in the request are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
-        plugin = self.get_object()
+        # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
-        # get previous plugin instance
         previous_id = ""
         if 'previous_id' in request_data:
             previous_id = request_data['previous_id']
-        previous = serializer.validate_previous(previous_id, plugin)
+        previous = serializer.validate_previous(previous_id)
+        plugin = self.get_object()
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous, compute_resource=plugin.compute_resource)
-        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
-        # collect parameters from the request and validate and save them to the DB 
+                                      previous=previous,
+                                      compute_resource=plugin.compute_resource)
+
+        # collect parameters from the request and validate and save them to the DB
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -130,15 +131,14 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
+
         # run the plugin's app
         pl_manager = PluginManager()
-        pl_manager.run_plugin_app(  plugin_inst,
-                                    parameters_dict,
-                                    service             = 'pfcon',
-                                    inputDirOverride    = '/share/incoming',
-                                    outputDirOverride   = '/share/outgoing',
-                                    IOPhost             = str_IOPhost
-                                    )
+        pl_manager.run_plugin_app(plugin_inst,
+                                  parameters_dict,
+                                  service             = 'pfcon',
+                                  inputDirOverride    = '/share/incoming',
+                                  outputDirOverride   = '/share/outgoing')
 
     def list(self, request, *args, **kwargs):
         """
@@ -157,7 +157,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'previous_id': ""}
+        template_data = {'previous_id': "", 'cpu_limit':"", 'memory_limit':"",
+                         'number_of_workers':"", 'gpu_limit':""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)

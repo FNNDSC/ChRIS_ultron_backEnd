@@ -329,28 +329,48 @@ else
         windowBottom
     fi
 
-    title -d 1 "Registering plugins..."
-    # Declare an array variable for the list of plugin dock images
-    # Add a new plugin image name to the list if you want it to be automatically registered
-    docker-compose exec chris_dev /bin/bash -c \
-    'declare -a plugins=("fnndsc/pl-simplefsapp"
-                        "fnndsc/pl-simpledsapp"
-                        "fnndsc/pl-pacsquery"
-                        "fnndsc/pl-pacsretrieve"
-                        "fnndsc/pl-med2img"
-                        "fnndsc/pl-s3retrieve"
-                        "fnndsc/pl-s3push"
-                        "fnndsc/pl-dircopy"
-                        "local/pl-geretrieve"
-                        "local/pl-gepush"
-                        )
+    title -d 1 "Creating a ChRIS STORE API user"
+    echo ""
+    echo "Setting user cubeadmin:cubeadmin1234 ..."
+    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose exec chris_store /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
+    echo ""
+    docker-compose restart chris_store
+    echo ""
+    windowBottom
+
+    # Declare an array variable for the list of plugin names to be automatically registered
+    # Add a new plugin name to the list if you want it to be automatically registered
+    declare -a plugins=("simplefsapp"
+                         "simpledsapp"
+                         "pacsquery"
+                         "pacsretrieve"
+                         "s3retrieve"
+                         "s3push"
+                         "dircopy"
+    )
+
+    title -d 1 "Automatically uploading some plugins to the ChRIS STORE ..."
     declare -i i=1
-    declare -i STEP=10
+    declare -i STEP=7
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Registering $plugin to "host"..."
-        python3 plugins/services/manager.py --add ${plugin} "host" 2> /dev/null;
+        echo "${STEP}.$i: Uploading $plugin representation to the ChRIS store ..."
+        PLUGIN_DOCK="fnndsc/pl-${plugin}"
+        PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
+        docker-compose exec chris_store python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
         ((i++))
-    done'
+    done
+    windowBottom
+
+    title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
+    declare -i i=1
+    declare -i STEP=7
+    for plugin in "${plugins[@]}"; do
+        echo "${STEP}.$i: Registering $plugin to CUBE ..."
+        docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" host http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
+        ((i++))
+    done
     windowBottom
 
     title -d 1 "Creating two ChRIS API users"
@@ -364,17 +384,6 @@ else
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
-    echo ""
-    windowBottom
-
-    title -d 1 "Creating a ChRIS STORE API user"
-    echo ""
-    echo "Setting user cubeadmin:cubeadmin1234 ..."
-    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
-    docker-compose exec chris_store /bin/bash -c \
-    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
-    echo ""
-    docker-compose restart chris_store
     echo ""
     windowBottom
 
