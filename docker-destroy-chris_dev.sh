@@ -19,13 +19,27 @@ windowBottom
 
 title -d 1 "Destroying persistent volumes..."
     basedir=`pwd | xargs basename | awk '{print tolower($0)}'`
-    a_PVOLS=(
-        "${basedir//_}_chris_dev_db_data"
-        "${basedir//_}_chris_store_dev_db_data"
-        "${basedir//_}_swift_storage"
+    a_VOLS=(
+        "chris_dev_db_data"
+        "chris_store_dev_db_data"
+        "swift_storage"
     )
+    a_PVOLS=()
+    for vol in ${a_VOLS[@]}; do
+        SCANTXT=$(printf "Scanning for '%s'... " "$vol")
+        printf "%50s" "$SCANTXT"
+        DOCKERVOLNAME=$(docker volume ls | grep -v DRIVER | awk {'print $2'} | grep $vol)
+        if (( ${#DOCKERVOLNAME} )); then
+            printf "${Green}[ %s ]${NC}\n" "$DOCKERVOLNAME"
+        else
+            printf "${Red}[ Not found. ]${NC}\n"
+        fi
+        a_PVOLS+=($DOCKERVOLNAME)
+    done
+    printf "\n"
     for VOL in ${a_PVOLS[@]} ; do 
-        read -p  "Do you want to remove persistent volume $VOL? " -n 1 -r
+        printf "${Cyan}Do you want to remove persistent volume ${Green}[ $VOL ]${Cyan}?${NC}"
+        read -p  " [y/n] " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]] ; then
             docker volume rm $VOL
