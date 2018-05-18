@@ -895,7 +895,10 @@ class Charm():
                         "target": 
                         {
                             "image":            self.c_pluginInst.plugin.dock_image,
-                            "cmdParse":         True
+                            "cmdParse":         True,
+                            "selfexec":         self.c_pluginInst.plugin.selfexec,
+                            "selfpath":         self.c_pluginInst.plugin.selfpath,
+                            "execshell":        self.c_pluginInst.plugin.execshell
                         },
                         "manager":
                         {
