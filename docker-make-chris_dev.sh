@@ -351,24 +351,26 @@ else
                          "dircopy"
     )
 
-    title -d 1 "Automatically uploading some plugins to the ChRIS STORE ..."
+    title -d 1 "Automatically uploading some plugins to the ChRIS store ..."
     declare -i i=1
-    declare -i STEP=7
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Uploading $plugin representation to the ChRIS store ..."
+        printf "${STEP}.$i: "
+        printf "${Cyan}%-25s${NC} ---> ${LightBlue}[ ChRIS store ]${NC}... " "[ pl-$plugin ]"
         PLUGIN_DOCK="fnndsc/pl-${plugin}"
         PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
         docker-compose exec chris_store python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
+        printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
     windowBottom
 
     title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
     declare -i i=1
-    declare -i STEP=7
     for plugin in "${plugins[@]}"; do
-        echo "${STEP}.$i: Registering $plugin to CUBE ..."
+        printf "${STEP}.$i:"
+        printf "${LightBlue}[ ChRIS store ]${NC} ---> ${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}..." "[ pl-$plugin ]"
         docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" host http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
+        printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
     windowBottom
