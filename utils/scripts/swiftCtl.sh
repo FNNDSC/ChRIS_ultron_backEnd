@@ -131,8 +131,8 @@ in
         here=$(pwd)
         cd $PUSHDIR
         for FILE in *${EXT} ; do
-                printf "Pushing file: $PUSHDIR/%s to ${SWIFTPATHPREFIX}/$FILE\n" $FILE
-                CMD="swift -U chris:chris1234 -A http://${SWIFTIP}:${SWIFTPORT}/auth/v1.0  -K testing upload users ${PUSHDIR}/$FILE --object-name ${SWIFTPATHPREFIX}/$FILE"
+                printf "Pushing file: %s to ${SWIFTPATHPREFIX}/$FILE\n" $FILE
+                CMD="swift -U chris:chris1234 -A http://${SWIFTIP}:${SWIFTPORT}/auth/v1.0  -K testing upload users $FILE --object-name ${SWIFTPATHPREFIX}/$FILE"
                 CMD_eval "$CMD"
         done
         cd $here
@@ -168,38 +168,5 @@ in
         done
         ;;
 esac
-
-# if (( Gb_verbose )) ; then
-#         echo "$CMD"
-# fi
-# eval "$CMD"
-
-# printf "Files pushed to swift service.\n"
-# swiftQuery="
-
-# swift -A http://${CUBEIP}:8080/auth/v1.0 -U chris:chris1234 -K testing list users
-
-# "
-
-# runPluginCmd="
-
-# pfurl --auth cube:cube1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/8/instances/ \\
-# --content-type application/vnd.collection+json \\
-# --jsonwrapper 'template' --msg '
-# {\"data\":
-#     [{\"name\":\"dir\",
-#       \"value\":\"/${UPLOADPATHPREFIX}\"}
-#     ]
-# }' \\
-# --quiet --jsonpprintindent 4
-
-# "
-
-# printf "Run the pl-dircopy plugin to pull this data from swift storage:\n"
-# printf "$runPluginCmd"
-# printf "\n"
-# printf "Query swift with:\n"
-# printf "$swiftQuery"
-
 
 
