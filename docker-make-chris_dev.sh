@@ -368,7 +368,7 @@ else
     declare -i i=1
     for plugin in "${plugins[@]}"; do
         printf "${STEP}.$i:"
-        printf "${LightBlue}[ ChRIS store ]${NC} ---> ${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}..." "[ pl-$plugin ]"
+        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}..." "[ pl-$plugin ]"
         docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" host http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
