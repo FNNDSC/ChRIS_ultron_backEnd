@@ -882,7 +882,7 @@ class Charm():
 
                 "meta-compute":
                 {
-                    'cmd':               "$execshell " + self.str_cmd,
+                    'cmd':               "%s %s" % (self.c_pluginInst.plugin.execshell, self.str_cmd),
                     'threaded':          True,
                     'auid':              self.c_pluginInst.owner.username,
                     'jid':               str(self.d_pluginInst['id']),
@@ -895,7 +895,7 @@ class Charm():
                         "target": 
                         {
                             "image":            self.c_pluginInst.plugin.dock_image,
-                            "cmdParse":         True,
+                            "cmdParse":         False,
                             "selfexec":         self.c_pluginInst.plugin.selfexec,
                             "selfpath":         self.c_pluginInst.plugin.selfpath,
                             "execshell":        self.c_pluginInst.plugin.execshell
@@ -987,8 +987,7 @@ class Charm():
         }
 
         d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
-        self.dp.qprint('d_response = %s' % d_response)
-
+        self.dp.qprint('d_response = %s' % json.dumps(d_response, indent = 4, sort_keys = True))
         str_responseStatus  = ""
         for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
             if str_action == 'compute':
