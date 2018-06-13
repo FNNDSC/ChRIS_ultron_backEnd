@@ -11,6 +11,7 @@
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
 #                               [-S <storeBaseOverride>]        \
+#                               [-e <computeEnv>]               \
 #                               [local|fnndsc[:dev]]
 #
 # DESC
@@ -43,6 +44,13 @@
 #       Restart <service> in interactive mode. This is mainly for debugging
 #       and is typically used to restart the 'pfcon', 'pfioh', and 'pman' 
 #       services.
+#
+#   -e <computeEnv>
+#
+#       Register all plugins to the passed <computeEnv>. Note, this is simply
+#       an index string that is actually defined in `pfcon`. In other words,
+#       the <computeEnv> here is just a label, and the actual env is fully 
+#       specified by `pfcon`.
 #
 #   -a <swarm-advertise-adr>
 #
@@ -103,6 +111,7 @@ declare -i b_norestartinteractive_chris_dev=0
 declare -i b_debug=0
 declare -i b_swarmAdvertiseAdr=0
 declare -i b_storeBaseOverride=0
+COMPUTEENV="host"
 SWARMADVERTISEADDR=""
 RESTART=""
 HERE=$(pwd)
@@ -115,8 +124,9 @@ if [[ -f .env ]] ; then
     source .env 
 fi
 
-while getopts "r:psidUIa:S:" opt; do
-    case $opt in 
+while getopts "r:psidUIa:S:e:" opt; do
+    case $opt in
+        e) COMPUTEENV=$OPTARG                   ;; 
         r) b_restart=1
            RESTART=$OPTARG                      ;;
         p) b_pause=1                            ;;
@@ -368,8 +378,8 @@ else
     declare -i i=1
     for plugin in "${plugins[@]}"; do
         printf "${STEP}.$i:"
-        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}..." "[ pl-$plugin ]"
-        docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" host http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
+        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$COMPUTEENV${NC}..." "[ pl-$plugin ]"
+        docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" $COMPUTEENV http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
