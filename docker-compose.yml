@@ -24,7 +24,7 @@ services:
       - "8000:8000"
     depends_on:
       - chris_dev_db
-      - chris_store
+      - chrisstore
       - swift_service
       - pfcon_service
     labels:
@@ -44,7 +44,7 @@ services:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Backend development database"
 
-  chris_store:
+  chrisstore:
     image:  ${CREPO}/chris_store
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

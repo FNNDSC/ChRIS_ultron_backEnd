@@ -324,7 +324,7 @@ else
 
     title -d 1 "Applying migrations..."
     docker-compose exec chris_dev python manage.py migrate
-    docker-compose exec chris_store python manage.py migrate # temporary until we switch to truly production Chris store
+    docker-compose exec chrisstore python manage.py migrate # temporary until we switch to truly production Chris store
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
@@ -342,11 +342,11 @@ else
     title -d 1 "Creating a ChRIS STORE API user"
     echo ""
     echo "Setting user cubeadmin:cubeadmin1234 ..."
-    docker-compose exec chris_store /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
-    docker-compose exec chris_store /bin/bash -c \
+    docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
     echo ""
-    docker-compose restart chris_store
+    docker-compose restart chrisstore
     echo ""
     windowBottom
 
@@ -368,7 +368,7 @@ else
         printf "${Cyan}%-25s${NC} ---> ${LightBlue}[ ChRIS store ]${NC}... " "[ cubeadmin/$plugin ]"
         PLUGIN_DOCK="fnndsc/pl-${plugin}"
         PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
-        docker-compose exec chris_store python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
+        docker-compose exec chrisstore python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
@@ -379,7 +379,7 @@ else
     for plugin in "${plugins[@]}"; do
         printf "${STEP}.$i:"
         printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$COMPUTEENV${NC}..." "[ cubeadmin/$plugin ]"
-        docker-compose exec chris_dev python plugins/services/manager.py add "cubeadmin/${plugin}" $COMPUTEENV http://chris_store:8010/api/v1/ cubeadmin cubeadmin1234
+        docker-compose exec chris_dev python plugins/services/manager.py add "cubeadmin/${plugin}" $COMPUTEENV http://chrisstore:8010/api/v1/ cubeadmin cubeadmin1234
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
