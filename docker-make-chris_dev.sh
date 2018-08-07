@@ -339,9 +339,14 @@ else
         windowBottom
     fi
 
-    title -d 1 "Creating a ChRIS STORE API user"
+    title -d 1 "Creating two ChRIS STORE API users"
     echo ""
-    echo "Setting user cubeadmin:cubeadmin1234 ..."
+    echo "Setting superuser chris:chris1234 ..."
+    docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;'
+    docker-compose exec chrisstore /bin/bash -c \
+    'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
+    echo ""
+    echo "Setting normal user cubeadmin:cubeadmin1234 ..."
     docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
     docker-compose exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
