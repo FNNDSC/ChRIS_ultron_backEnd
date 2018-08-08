@@ -1,12 +1,8 @@
 
-import json
-
 from django.conf.urls import url, include
-from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
 from django.test import TestCase
 
-from rest_framework import status
 from rest_framework.routers import DefaultRouter
 
 from collection_json import Collection

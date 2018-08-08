@@ -177,7 +177,7 @@ class PluginInstanceListQuerySearch(generics.ListAPIView):
     """
     serializer_class = PluginInstanceSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
-    filter_class = PluginInstanceFilter
+    filterset_class = PluginInstanceFilter
 
     def get_queryset(self):
         """

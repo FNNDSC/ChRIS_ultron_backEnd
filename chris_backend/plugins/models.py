@@ -3,9 +3,9 @@ import swiftclient
 
 from django.db import models
 from django.conf import settings
-import django_filters
 
-from rest_framework.filters import FilterSet
+import django_filters
+from django_filters.rest_framework import FilterSet
 
 from feeds.models import Feed, FeedFile
 from .fields import CPUField, MemoryField
@@ -122,7 +122,7 @@ class PluginInstance(models.Model):
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
-    owner = models.ForeignKey('auth.User')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
                                     related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
@@ -238,10 +238,10 @@ class PluginInstance(models.Model):
 
 
 class PluginInstanceFilter(FilterSet):
-    min_start_date = django_filters.DateFilter(name="start_date", lookup_expr='gte')
-    max_start_date = django_filters.DateFilter(name="start_date", lookup_expr='lte')
-    min_end_date = django_filters.DateFilter(name="end_date", lookup_expr='gte')
-    max_end_date = django_filters.DateFilter(name="end_date", lookup_expr='lte')
+    min_start_date = django_filters.DateFilter(field_name="start_date", lookup_expr='gte')
+    max_start_date = django_filters.DateFilter(field_name="start_date", lookup_expr='lte')
+    min_end_date = django_filters.DateFilter(field_name="end_date", lookup_expr='gte')
+    max_end_date = django_filters.DateFilter(field_name="end_date", lookup_expr='lte')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
 
     def filter_by_root_id(self, queryset, name, value):

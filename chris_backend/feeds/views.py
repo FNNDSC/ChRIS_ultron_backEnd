@@ -155,7 +155,7 @@ class FeedListQuerySearch(generics.ListAPIView):
     """
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated,)
-    filter_class = FeedFilter
+    filterset_class = FeedFilter
 
     def get_queryset(self):
         """

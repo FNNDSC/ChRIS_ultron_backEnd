@@ -1,7 +1,7 @@
 
 from urllib.parse import urlparse
 
-from django.core.urlresolvers import resolve
+from django.urls import resolve
 
 from rest_framework.response import Response
 from rest_framework import serializers
@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 def get_list_response(list_view_instance, queryset):
     """
-    Convenience method to get an HTTP response with a list of objects
+    Convenience function to get an HTTP response with a list of objects
     from a list view instance and a queryset
     """
     page = list_view_instance.paginate_queryset(queryset)
@@ -23,7 +23,7 @@ def get_list_response(list_view_instance, queryset):
 
 def append_collection_links(response, link_dict):
     """
-    Convenience method to append document-level links to a response object.
+    Convenience function to append document-level links to a response object.
     """
     data = response.data
     if not 'collection_links' in data:
@@ -36,7 +36,7 @@ def append_collection_links(response, link_dict):
 
 def append_collection_template(response, template_data):
     """
-    Convenience method to append to a response a collection+json template.
+    Convenience function to append to a response a collection+json template.
     """
     data = []
     for (k, v) in template_data.items():
@@ -47,13 +47,13 @@ def append_collection_template(response, template_data):
 
 def append_collection_querylist(response, query_url_list):
     """
-    Convenience method to append to a response a collection+json queries template.
+    Convenience function to append to a response a collection+json queries template.
     """
     queries = []
     for query_url in query_url_list:
         relative_url = urlparse(query_url).path
         match = resolve(relative_url)
-        filters = match.func.cls.filter_class.base_filters
+        filters = match.func.cls.filterset_class.base_filters
         data = []
         for k in filters.keys():
             data.append({"name": k, "value": ""})
