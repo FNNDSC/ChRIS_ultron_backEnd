@@ -3,7 +3,7 @@ import os, json, shutil
 from unittest import mock
 
 from django.test import TestCase, tag
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
 
@@ -411,10 +411,10 @@ class TagListViewTests(ViewTests):
         # create two tags
         user = User.objects.get(username=self.username)
         (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
-        tag.feed = [feed]
+        tag.feed.set([feed])
         tag.save()
         (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
-        tag.feed = [feed]
+        tag.feed.set([feed])
         tag.save()
         
     def test_tag_create_success(self):
@@ -457,7 +457,7 @@ class TagListViewTests(ViewTests):
         owner = User.objects.get(username=self.username)
         new_owner = User.objects.get(username=self.other_username)
         # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner = [owner, new_owner]
+        feed.owner.set([owner, new_owner])
         feed.save()
         response = self.client.get(self.create_read_url)
         self.assertNotContains(response, "Tag2")
@@ -476,7 +476,7 @@ class FullTagListViewTests(ViewTests):
         # create one tag for self.feedname
         user = User.objects.get(username=self.username)
         (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
-        tag.feed = [feed]
+        tag.feed.set([feed])
         tag.save()
         
         plugin = Plugin.objects.get(name="pacspull", type="fs")
@@ -490,7 +490,7 @@ class FullTagListViewTests(ViewTests):
         # create another tag for the new feed
         feed = Feed.objects.get(name="new")
         (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
-        tag.feed = [feed]
+        tag.feed.set([feed])
         tag.save()
 
     def test_full_tag_list_success(self):
@@ -509,7 +509,7 @@ class FullTagListViewTests(ViewTests):
         owner = User.objects.get(username=self.username)
         new_owner = User.objects.get(username=self.other_username)
         # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner = [owner, new_owner]
+        feed.owner.set([owner, new_owner])
         feed.save()
         response = self.client.get(self.list_url)
         self.assertNotContains(response, "Tag2")
@@ -529,7 +529,7 @@ class TagDetailViewTests(ViewTests):
         # create a tag
         user = User.objects.get(username=self.username)
         (tag, tf) = Tag.objects.get_or_create(name="Tag1", color="blue", owner=user)
-        tag.feed = [feed]
+        tag.feed.set([feed])
         tag.save()
 
         self.read_update_delete_url = reverse("tag-detail", kwargs={"pk": tag.id})       
@@ -558,7 +558,7 @@ class TagDetailViewTests(ViewTests):
         owner = User.objects.get(username=self.username)
         new_owner = User.objects.get(username=self.other_username)
         # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner = [owner, new_owner]
+        feed.owner.set([owner, new_owner])
         feed.save()
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

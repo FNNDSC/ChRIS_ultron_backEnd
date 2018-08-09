@@ -7,7 +7,7 @@ from collectionjson import services
 from .models import Plugin, PluginFilter, PluginParameter 
 from .models import PluginInstance, PluginInstanceFilter
 from .models import StringParameter, FloatParameter, IntParameter
-from .models import BoolParameter, PathParameter, ComputeResource
+from .models import BoolParameter, PathParameter
 
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
@@ -45,7 +45,7 @@ class PluginListQuerySearch(generics.ListAPIView):
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
-    filter_class = PluginFilter
+    filterset_class = PluginFilter
         
 
 class PluginDetail(generics.RetrieveAPIView):

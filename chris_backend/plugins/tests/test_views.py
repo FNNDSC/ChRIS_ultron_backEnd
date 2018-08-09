@@ -5,7 +5,7 @@ import shutil
 from unittest import mock
 
 from django.test import TestCase, tag
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
 
