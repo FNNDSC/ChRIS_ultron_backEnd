@@ -871,7 +871,6 @@ class Charm():
                         "mechanism":    "compress",
                         "compress": 
                         {
-                            "encoding": "none",
                             "archive":  "zip",
                             "unpack":   True,
                             "cleanup":  True
