@@ -10,6 +10,11 @@ Local settings
 
 from .common import *  # noqa
 import os
+import logging
+
+
+# avoid cluttered console output (for instance logging all the http requests)
+logging.disable(logging.DEBUG)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
