@@ -62,8 +62,8 @@ git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 cd ChRIS_ultron_backEnd
 workon chris_env
 pip install httpie
+pip install python-swiftclient
 pip install django-storage-swift
-pip install docker
 ```
 
 You can also install some python libraries (not all of them) specified in the ``requirements/base.txt`` and 

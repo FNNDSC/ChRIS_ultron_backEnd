@@ -10,6 +10,11 @@ Local settings
 
 from .common import *  # noqa
 import os
+import logging
+
+
+# avoid cluttered console output (for instance logging all the http requests)
+logging.disable(logging.DEBUG)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
@@ -63,7 +68,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # django-debug-toolbar
 # ------------------------------------------------------------------------------
-MIDDLEWARE_CLASSES += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 INSTALLED_APPS += ['debug_toolbar']
 
 INTERNAL_IPS = ['127.0.0.1',]

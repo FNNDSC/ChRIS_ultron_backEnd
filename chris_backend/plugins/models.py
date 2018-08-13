@@ -1,16 +1,18 @@
 
-import swiftclient
+import time
 
 from django.db import models
 from django.conf import settings
-import django_filters
 
-from rest_framework.filters import FilterSet
+import django_filters
+from django_filters.rest_framework import FilterSet
+
+import swiftclient
 
 from feeds.models import Feed, FeedFile
 from .fields import CPUField, MemoryField
 
-import time
+
 
 
 # API types
@@ -88,13 +90,15 @@ class Plugin(models.Model):
 
 
 class PluginFilter(FilterSet):
-    min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='lte')
-    
+    min_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='lte')
+
     class Meta:
         model = Plugin
         fields = ['name', 'dock_image', 'type', 'category', 'authors',
-                  'min_creation_date', 'max_creation_date', ]
+                  'min_creation_date', 'max_creation_date']
 
 
 class PluginParameter(models.Model):
@@ -122,7 +126,7 @@ class PluginInstance(models.Model):
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
-    owner = models.ForeignKey('auth.User')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
                                     related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
@@ -152,7 +156,7 @@ class PluginInstance(models.Model):
         feed.plugin_inst = self
         feed.save()
         feed.name = self.plugin.name
-        feed.owner = [self.owner]
+        feed.owner.set([self.owner])
         feed.save()
 
     def get_root_instance(self):
@@ -238,11 +242,16 @@ class PluginInstance(models.Model):
 
 
 class PluginInstanceFilter(FilterSet):
-    min_start_date = django_filters.DateFilter(name="start_date", lookup_expr='gte')
-    max_start_date = django_filters.DateFilter(name="start_date", lookup_expr='lte')
-    min_end_date = django_filters.DateFilter(name="end_date", lookup_expr='gte')
-    max_end_date = django_filters.DateFilter(name="end_date", lookup_expr='lte')
+    min_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='gte')
+    max_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='lte')
+    min_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='gte')
+    max_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='lte')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
+
+    class Meta:
+        model = PluginInstance
+        fields = ['min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
+                  'root_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """
@@ -251,7 +260,7 @@ class PluginInstanceFilter(FilterSet):
         """
         filtered_queryset = []
         root_queryset = queryset.filter(pk=value)
-        # check whether the root id value is in the DB 
+        # check whether the root id value is in the DB
         if not root_queryset.exists():
             return root_queryset
         queue = [root_queryset[0]]
@@ -259,14 +268,9 @@ class PluginInstanceFilter(FilterSet):
             visited = queue.pop()
             queue.extend(list(visited.next.all()))
             filtered_queryset.append(visited)
-        return filtered_queryset     
+        return filtered_queryset
 
-    class Meta:
-        model = PluginInstance
-        fields = ['root_id', 'status', 'previous_id', 'min_start_date', 'max_start_date',
-                  'min_end_date', 'max_end_date']
-        
-        
+
 class StringParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,

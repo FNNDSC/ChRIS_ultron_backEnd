@@ -49,6 +49,12 @@ def api_500(request):
 
 class ResponseMiddleware(object):
 
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
     def process_response(self, request, response):
         if response.status_code == status.HTTP_404_NOT_FOUND:
             return api_404(request)
@@ -59,12 +65,3 @@ class ResponseMiddleware(object):
     def process_exception(self, request, exception):
         print(exception)
         return api_500(request)
-
-
-
-
-
-
-
-
-

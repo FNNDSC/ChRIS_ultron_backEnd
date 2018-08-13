@@ -22,7 +22,7 @@ class MoronModelViewSet(ModelViewSet):
     queryset = Moron.objects.all()
     serializer_class = MoronHyperlinkedModelSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_class = MoronFilter
+    filterset_class = MoronFilter
     
 
 class MoronReadOnlyModelViewSet(ReadOnlyModelViewSet):

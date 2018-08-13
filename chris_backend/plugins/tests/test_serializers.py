@@ -303,7 +303,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         plg_inst_serializer.create(data)
         self.assertEqual(data['gpu_limit'], plugin.min_gpu_limit)
@@ -334,7 +334,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         # create serializer for a 'ds' plugin instance
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         previous = plg_inst_serializer.validate_previous(pl_inst_fs.id)
 
@@ -351,7 +351,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_gpu_limit(plugin.min_gpu_limit-1)
@@ -368,7 +368,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_number_of_workers(plugin.min_number_of_workers-1)
@@ -384,7 +384,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_cpu_limit(plugin.min_cpu_limit-1)
@@ -401,7 +401,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(data=data)
         plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context = {'view': mock.Mock()}
+        plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_memory_limit(plugin.min_memory_limit-1)

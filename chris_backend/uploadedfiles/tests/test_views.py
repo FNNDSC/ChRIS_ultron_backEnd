@@ -1,4 +1,5 @@
 
+import logging
 import os, shutil
 from unittest import mock, skip
 
@@ -7,7 +8,7 @@ import swiftclient
 from django.test import TestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from rest_framework import status
 
@@ -50,6 +51,9 @@ class UploadedFileListViewTests(UploadedFileViewTests):
     """
 
     def setUp(self):
+        # do not log http requests during tests
+        logging.disable(logging.CRITICAL)
+
         super(UploadedFileListViewTests, self).setUp()
         self.create_read_url = reverse("uploadedfile-list")
 
@@ -60,6 +64,8 @@ class UploadedFileListViewTests(UploadedFileViewTests):
             os.makedirs(self.test_dir)
 
     def tearDown(self):
+        # restore logging level
+        logging.disable(logging.DEBUG)
         # remove test directory
         shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)

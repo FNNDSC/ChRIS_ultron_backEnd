@@ -2,7 +2,7 @@
 from django.db import models
 
 import django_filters
-from rest_framework.filters import FilterSet
+from django_filters.rest_framework import FilterSet
 
 
 class Feed(models.Model):
@@ -37,10 +37,12 @@ class Feed(models.Model):
 
 
 class FeedFilter(FilterSet):
-    min_id = django_filters.NumberFilter(name="id", lookup_expr='gte')
-    max_id = django_filters.NumberFilter(name="id", lookup_expr='lte')
-    min_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(name="creation_date", lookup_expr='lte')
+    min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')
+    max_id = django_filters.NumberFilter(field_name="id", lookup_expr='lte')
+    min_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='lte')
 
     class Meta:
         model = Feed
@@ -65,7 +67,7 @@ class Tag(models.Model):
     name = models.CharField(max_length=100, blank=True, default='')
     color = models.CharField(max_length=20)
     feed = models.ManyToManyField(Feed, related_name='tags')
-    owner = models.ForeignKey('auth.User')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
@@ -76,7 +78,7 @@ class Comment(models.Model):
     title = models.CharField(max_length=100, blank=True, default='')
     content = models.TextField(blank=True, default='')
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name='comments')
-    owner = models.ForeignKey('auth.User')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
         ordering = ('creation_date',)
