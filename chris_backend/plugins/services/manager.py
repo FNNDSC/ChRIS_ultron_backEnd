@@ -37,18 +37,18 @@ class PluginManager(object):
         parser_add = subparsers.add_parser('add', help='Add a new plugin')
         parser_add.add_argument('name', help="Plugin's name")
         parser_add.add_argument('computeresource',
-                                help="Compute resource where the plugin's instances runs")
+                                help="Compute resource where the plugin's instances run")
         parser_add.add_argument('storeurl',
                                 help="Url of ChRIS store where the plugin is registered")
-        parser_add.add_argument('storeusername', help="Username for the ChRIS store")
-        parser_add.add_argument('storepassword', help="Password for the ChRIS store")
+        parser_add.add_argument('--storeusername', help="Username for the ChRIS store")
+        parser_add.add_argument('--storepassword', help="Password for the ChRIS store")
         parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
 
         # create the parser for the "modify" command
         parser_modify = subparsers.add_parser('modify', help='Modify existing plugin')
         parser_modify.add_argument('name', help="Plugin's name")
         parser_modify.add_argument('--computeresource',
-                                help="Compute resource where the plugin's instances runs")
+                                help="Compute resource where the plugin's instances run")
         parser_modify.add_argument('--storeurl',
                                 help="Url of ChRIS store where the plugin is registered")
         parser_modify.add_argument('--storeusername', help="Username for the ChRIS store")
@@ -101,7 +101,7 @@ class PluginManager(object):
         if args.computeresource:
             (compute_resource, tf) = ComputeResource.objects.get_or_create(
                 compute_resource_identifier=args.computeresource)
-        if args.storeurl and args.storeusername and args.storepassword:
+        if args.storeurl:
             timeout = 30
             if args.storetimeout:
                 timeout = args.storetimeout
@@ -281,8 +281,8 @@ class PluginManager(object):
         return str_responseStatus
 
     @staticmethod
-    def get_plugin_representation_from_store(name, store_url, username, password,
-                                             timeout=30):
+    def get_plugin_representation_from_store(name, store_url, username=None,
+                                             password=None, timeout=30):
         """
         Get a plugin app representation from the ChRIS store.
         """
