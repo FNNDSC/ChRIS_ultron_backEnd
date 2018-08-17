@@ -10,6 +10,6 @@ pfmisc==1.2.2
 pytz==2016.7
 python-swiftclient==3.6.0
 django-storage-swift==1.2.19
-python-chrisstoreclient==0.0.5
+python-chrisstoreclient==0.0.6
 
 
