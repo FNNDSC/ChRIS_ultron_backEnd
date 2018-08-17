@@ -69,12 +69,11 @@ class PluginManagerTests(TestCase):
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
-        self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/',
-                             'cubeadmin', 'cubeadmin1234'])
+        self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/'])
         self.assertEquals(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
-            'testapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
+            'testapp', 'http://localhost:8010/api/v1/', None, None, 30)
 
     def test_mananger_can_modify_plugin(self):
         """
@@ -88,11 +87,9 @@ class PluginManagerTests(TestCase):
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
         self.pl_manager.run(['modify', self.plugin_fs_name, '--computeresource', 'host1',
-                             '--storeurl', 'http://localhost:8010/api/v1/',
-                             '--storeusername', 'cubeadmin', '--storepassword',
-                             'cubeadmin1234'])
+                             '--storeurl', 'http://localhost:8010/api/v1/'])
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
-            'simplefsapp', 'http://localhost:8010/api/v1/', 'cubeadmin', 'cubeadmin1234', 30)
+            'simplefsapp', 'http://localhost:8010/api/v1/', None, None, 30)
 
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
