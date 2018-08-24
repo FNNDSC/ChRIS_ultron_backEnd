@@ -118,7 +118,7 @@ HERE=$(pwd)
 echo "Starting script in dir $HERE"
 
 CREPO=fnndsc
-TAG=:dev
+TAG=:latest
 
 if [[ -f .env ]] ; then
     source .env 
