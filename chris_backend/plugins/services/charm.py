@@ -126,8 +126,7 @@ class Charm():
         self.str_protocol           = "http"
 
         self.dp                     = pfmisc.debug(    
-                                            verbosity   = 0,
-                                            level       = -1,
+                                            verbosity   = 1,
                                             within      = self.__name__ 
                                             )
 
@@ -182,23 +181,23 @@ class Charm():
         # pudb.set_trace()
 
         if not self.b_quiet:
-            print(pfurl.Colors.LIGHT_GREEN)
-            print("""
+            self.dp.qprint(pfurl.Colors.LIGHT_GREEN)
+            self.dp.qprint("""
             \t\t\t+---------------------+
             \t\t\t|  Welcome to charm!  |
             \t\t\t+---------------------+
             """)
-            print(pfurl.Colors.CYAN + """
+            self.dp.qprint(pfurl.Colors.CYAN + """
             'charm' is the interface class/code between ChRIS and a remote 
             REST-type server, typically 'pfcon'.
 
             """)
             if self.b_useDebug:
-                print("""
+                self.dp.qprint("""
             Debugging output is directed to the file '%s'.
                 """ % (self.str_debugFile))
             else:
-                print("""
+                self.dp.qprint("""
             Debugging output will appear in *this* console.
                 """)
 
