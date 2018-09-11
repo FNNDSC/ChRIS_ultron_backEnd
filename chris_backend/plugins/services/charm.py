@@ -13,9 +13,11 @@ import  inspect
 import  pfmisc
 import  webob
 
-from    urllib.parse    import urlparse, parse_qs
-from    django.utils    import timezone
-from    django.conf     import settings
+from    urllib.parse    import  urlparse, parse_qs
+from    django.utils    import  timezone
+from    django.conf     import  settings
+
+from    pfmisc._colors  import  Colors
 
 import  swiftclient
 import  time
@@ -145,25 +147,46 @@ class Charm():
         # pudb.set_trace()
 
         if not self.b_quiet:
-            self.dp.qprint(pfurl.Colors.LIGHT_GREEN)
-            self.dp.qprint("""
-            \t\t\t+---------------------+
-            \t\t\t|  Welcome to charm!  |
-            \t\t\t+---------------------+
-            """)
-            self.dp.qprint(pfurl.Colors.CYAN + """
+            str_desc = Colors.CYAN + """
+                                +---------------------+
+                                |  Welcome to charm!  |
+                                +---------------------+
+            """ + Colors.LIGHT_GREEN + """
+
             'charm' is the interface class/code between ChRIS and a remote 
             REST-type server, typically 'pfcon'.
 
-            """)
+            This module is the only contact boundary between ChRIS and 
+            external/remote services.
+
+            Debugging output is currently sent to """ + Colors.YELLOW
             if self.b_useDebug:
-                self.dp.qprint("""
-            Debugging output is directed to the file '%s'.
-                """ % (self.str_debugFile))
+                str_desc += "'" + self.str_debugFile +"'"
             else:
-                self.dp.qprint("""
-            Debugging output will appear in *this* console.
-                """)
+                str_desc += "*this* console"
+            str_desc += Colors.NO_COLOUR
+
+            self.dp.qprint(str_desc)
+
+            # self.dp.qprint(pfurl.Colors.LIGHT_GREEN)
+            # self.dp.qprint("""
+            # \t\t\t+---------------------+
+            # \t\t\t|  Welcome to charm!  |
+            # \t\t\t+---------------------+
+            # """)
+            # self.dp.qprint(pfurl.Colors.CYAN + """
+            # 'charm' is the interface class/code between ChRIS and a remote 
+            # REST-type server, typically 'pfcon'.
+
+            # """)
+            # if self.b_useDebug:
+            #     self.dp.qprint("""
+            # Debugging output is directed to the file '%s'.
+            #     """ % (self.str_debugFile))
+            # else:
+            #     self.dp.qprint("""
+            # Debugging output will appear in *this* console.
+            #     """)
 
         self.dp.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.dp.qprint('app_args       = %s'   % self.l_appArgs)
