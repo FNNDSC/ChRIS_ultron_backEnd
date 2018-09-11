@@ -356,7 +356,9 @@ else
     windowBottom
 
     # Declare an array variable for the list of plugin names to be automatically registered
-    # Add a new plugin name to the list if you want it to be automatically registered
+    # Add a new plugin name to the list for it to be automatically registered
+    # If the main module name within a plugin is different than the plugin name,
+    # separate the plugin and module strings with a '/' characater (see below):
     declare -a plugins=("simplefsapp"
                          "simpledsapp"
                          "pacsquery"
@@ -364,16 +366,23 @@ else
                          "s3retrieve"
                          "s3push"
                          "dircopy"
+                         "pfdicom_tagextract/dcm_tagExtract"
+                         "pfdicom_tagsub/dcm_tagSub"
     )
 
     title -d 1 "Automatically uploading some plugins to the ChRIS store ..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
+        dockerhubRepo=$(echo $plugin | awk -F\/ '{print $1}')
+        moduleName=$(echo $plugin | awk -F\/ '{print $2}')
+        if (( ! ${#moduleName} )) ; then
+            moduleName=$dockerhubRepo
+        fi
         printf "${STEP}.$i: "
-        printf "${Cyan}%-25s${NC} ---> ${LightBlue}[ ChRIS store ]${NC}... " "[ $plugin ]"
-        PLUGIN_DOCK="fnndsc/pl-${plugin}"
-        PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${plugin}.py" --json 2> /dev/null;)
-        docker-compose exec chrisstore python plugins/services/manager.py add "${plugin}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
+        printf "${Cyan}%-25s${NC} ---> ${LightBlue}[ ChRIS store ]${NC}... " "[ $dockerhubRepo ]"
+        PLUGIN_DOCK="fnndsc/pl-${dockerhubRepo}"
+        PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${moduleName}.py" --json 2> /dev/null;)
+        docker-compose exec chrisstore python plugins/services/manager.py add "${dockerhubRepo}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
@@ -382,9 +391,10 @@ else
     title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
+        dockerhubRepo=$(echo $plugin | awk -F\/ '{print $1}')
         printf "${STEP}.$i:"
-        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$COMPUTEENV${NC}..." "[ $plugin ]"
-        docker-compose exec chris_dev python plugins/services/manager.py add "${plugin}" $COMPUTEENV http://chrisstore:8010/api/v1/
+        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-25s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$COMPUTEENV${NC}..." "[ $dockerhubRepo ]"
+        docker-compose exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $COMPUTEENV http://chrisstore:8010/api/v1/
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
