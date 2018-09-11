@@ -22,7 +22,8 @@ title -d 1 "Destroying persistent volumes..."
     a_VOLS=(
         "chris_dev_db_data"
         "chris_store_dev_db_data"
-        "swift_storage"
+        "nd_swift_storage"
+        "pfcon_swift_storage"
     )
     a_PVOLS=()
     for vol in ${a_VOLS[@]}; do
