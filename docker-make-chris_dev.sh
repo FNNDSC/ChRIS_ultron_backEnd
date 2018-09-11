@@ -364,6 +364,8 @@ else
                          "s3retrieve"
                          "s3push"
                          "dircopy"
+                         "pfdicom_tagextract"
+                         "pfdicom_tagsub"
     )
 
     title -d 1 "Automatically uploading some plugins to the ChRIS store ..."
