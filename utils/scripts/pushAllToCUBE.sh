@@ -81,7 +81,7 @@ here=$(pwd)
 cd $PUSHDIR
 for FILE in *${EXT} ; do
     printf "%s\n" $FILE
-    http -a cube:cube1234 -f POST http://${CUBEIP}:${CUBEPORT}/api/v1/uploadedfiles/ upload_path=/${UPLOADPATHPREFIX}/$FILE fname@$FILE
+    http -a chris:chris1234 -f POST http://${CUBEIP}:${CUBEPORT}/api/v1/uploadedfiles/ upload_path=/${UPLOADPATHPREFIX}/$FILE fname@$FILE
 done
 cd $here
 
@@ -94,7 +94,7 @@ swift -A http://${CUBEIP}:8080/auth/v1.0 -U chris:chris1234 -K testing list user
 
 runPluginCmd="
 
-pfurl --auth cube:cube1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/8/instances/ \\
+pfurl --auth chris:chris1234 --verb POST --http ${CUBEIP}:${CUBEPORT}/api/v1/plugins/7/instances/ \\
 --content-type application/vnd.collection+json \\
 --jsonwrapper 'template' --msg '
 {\"data\":

@@ -42,6 +42,7 @@ RUN apt-get update \
   && apt-get install -y libmysqlclient-dev                            \
   && apt-get install -y libssl-dev libcurl4-openssl-dev               \
   && apt-get install -y apache2 apache2-dev bsdmainutils vim net-tools inetutils-ping \
+  && pip install --upgrade pip                                        \
   && pip3 install -r ${REQPATH}/local.txt                             \
   && chmod 777 /usr/src                                               \
   # && chmod 777 /usr/src/docker-entrypoint.py                          \

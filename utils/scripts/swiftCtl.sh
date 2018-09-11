@@ -131,7 +131,9 @@ in
         here=$(pwd)
         cd $PUSHDIR
         for FILE in *${EXT} ; do
-                printf "Pushing file: %s to ${SWIFTPATHPREFIX}/$FILE\n" $FILE
+                if (( Gb_verbose )); then
+                        printf "Pushing file: %s to ${SWIFTPATHPREFIX}/$FILE\n" $FILE
+                fi
                 CMD="swift -U chris:chris1234 -A http://${SWIFTIP}:${SWIFTPORT}/auth/v1.0  -K testing upload users $FILE --object-name ${SWIFTPATHPREFIX}/$FILE"
                 CMD_eval "$CMD"
         done
@@ -162,7 +164,9 @@ in
         fi
 
         for FILE in $LIST ; do
-              printf "Pulling file: %s\n" $FILE
+              if (( Gb_verbose )) ; then
+                      printf "Pulling file: %s\n" $FILE
+              fi
               CMD="swift -U chris:chris1234 -A http://${SWIFTIP}:${SWIFTPORT}/auth/v1.0  -K testing download users $OUTPUTDIR --prefix $FILE"
               CMD_eval "$CMD"
         done
