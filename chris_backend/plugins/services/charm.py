@@ -18,6 +18,7 @@ from    django.utils    import  timezone
 from    django.conf     import  settings
 
 from    pfmisc._colors  import  Colors
+from    pfmisc.message  import  Message
 
 import  swiftclient
 import  time
@@ -55,13 +56,13 @@ class Charm():
             return self.dp.verbosity
 
     def col2_print(self, str_left, str_right, level = 1):
-        self.dp.qprint(pfurl.Colors.WHITE +
+        self.dp.qprint(Colors.WHITE +
               ('%*s' % (self.LC, str_left)), 
               end       = '',
               level     = level,
               syslog    = False)
-        self.dp.qprint(pfurl.Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + pfurl.Colors.NO_COLOUR,
+        self.dp.qprint(Colors.LIGHT_BLUE +
+              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR,
               level     = level,
               syslog    = False
               )
@@ -69,7 +70,7 @@ class Charm():
     def __init__(self, **kwargs):
         # threading.Thread.__init__(self)
 
-        self._log                   = pfurl.Message()
+        self._log                   = Message()
         self._log._b_syslog         = True
         self.__name__               = "Charm"
         self.b_useDebug             = settings.CHRIS_DEBUG['useDebug']
@@ -130,7 +131,7 @@ class Charm():
             if key == 'IOPhost':        self.str_IOPhost       = val
 
         if self.b_useDebug:
-            self.debug                  = pfurl.Message(logTo = self.str_debugFile)
+            self.debug                  = Message(logTo = self.str_debugFile)
             self.debug._b_syslog        = True
             self.debug._b_flushNewLine  = True
 
@@ -203,58 +204,58 @@ class Charm():
         self.app.launch(self.l_appArgs)
         self.c_pluginInst.register_output_files()
 
-    def app_crunnerWrap(self):
-        """
-        Run the "app" in a crunner instance.
+    # def app_crunnerWrap(self):
+    #     """
+    #     Run the "app" in a crunner instance.
 
-        :param self:
-        :return:
-        """
+    #     :param self:
+    #     :return:
+    #     """
 
-        str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
-        self.dp.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
+    #     str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
+    #     self.dp.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
 
-        str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-        str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
+    #     str_allCmdLineArgs      = ' '.join(self.l_appArgs)
+    #     str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
 
-        if len(self.c_pluginInst.plugin.execshell):
-            str_exec            = '%s %s' % (self.c_pluginInst.plugin.execshell, str_exec)
+    #     if len(self.c_pluginInst.plugin.execshell):
+    #         str_exec            = '%s %s' % (self.c_pluginInst.plugin.execshell, str_exec)
 
-        self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
-        self.dp.qprint('cmd = %s' % self.str_cmd)
+    #     self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
+    #     self.dp.qprint('cmd = %s' % self.str_cmd)
 
-        self.app_crunner(self.str_cmd, loopctl = True)
-        self.c_pluginInst.register_output_files()
+    #     self.app_crunner(self.str_cmd, loopctl = True)
+    #     self.c_pluginInst.register_output_files()
 
-    def app_crunner(self, str_cmd, **kwargs):
-        """
-        Run the "app" in a crunner instance.
+    # def app_crunner(self, str_cmd, **kwargs):
+    #     """
+    #     Run the "app" in a crunner instance.
 
-        :param self:
-        :return:
-        """
+    #     :param self:
+    #     :return:
+    #     """
 
-        # The loopctl controls whether or not to block on the
-        # crunner shell job
-        b_loopctl               = False
+    #     # The loopctl controls whether or not to block on the
+    #     # crunner shell job
+    #     b_loopctl               = False
 
-        for k,v in kwargs.items():
-            if k == 'loopctl':  b_loopctl = v
+    #     for k,v in kwargs.items():
+    #         if k == 'loopctl':  b_loopctl = v
 
-        verbosity               = 1
-        shell                   = pfurl.crunner(
-                                            verbosity   = verbosity,
-                                            debug       = True,
-                                            debugTo     = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
+    #     verbosity               = 1
+    #     shell                   = pfurl.crunner(
+    #                                         verbosity   = verbosity,
+    #                                         debug       = True,
+    #                                         debugTo     = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
 
-        shell.b_splitCompound   = True
-        shell.b_showStdOut      = True
-        shell.b_showStdErr      = True
-        shell.b_echoCmd         = False
+    #     shell.b_splitCompound   = True
+    #     shell.b_showStdOut      = True
+    #     shell.b_showStdErr      = True
+    #     shell.b_echoCmd         = False
 
-        shell(str_cmd)
-        if b_loopctl:
-            shell.jobs_loopctl()
+    #     shell(str_cmd)
+    #     if b_loopctl:
+    #         shell.jobs_loopctl()
 
     def app_service_shutdown(self, **kwargs):
         """
