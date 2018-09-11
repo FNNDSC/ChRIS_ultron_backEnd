@@ -168,26 +168,6 @@ class Charm():
 
             self.dp.qprint(str_desc)
 
-            # self.dp.qprint(pfurl.Colors.LIGHT_GREEN)
-            # self.dp.qprint("""
-            # \t\t\t+---------------------+
-            # \t\t\t|  Welcome to charm!  |
-            # \t\t\t+---------------------+
-            # """)
-            # self.dp.qprint(pfurl.Colors.CYAN + """
-            # 'charm' is the interface class/code between ChRIS and a remote 
-            # REST-type server, typically 'pfcon'.
-
-            # """)
-            # if self.b_useDebug:
-            #     self.dp.qprint("""
-            # Debugging output is directed to the file '%s'.
-            #     """ % (self.str_debugFile))
-            # else:
-            #     self.dp.qprint("""
-            # Debugging output will appear in *this* console.
-            #     """)
-
         self.dp.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
         self.dp.qprint('app_args       = %s'   % self.l_appArgs)
         self.dp.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
