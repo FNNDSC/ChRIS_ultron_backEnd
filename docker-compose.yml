@@ -85,7 +85,7 @@ services:
     image:  ${CREPO}/pfcon${TAG}
     volumes:
       - ./FS/data:/data
-    command: ["--forever", "--httpResponse"]
+    command: ["--forever", "--httpResponse", "--verbosity", "1"]
     ports:
       - "5005:5005"
     depends_on:
@@ -101,7 +101,7 @@ services:
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
     image:  ${CREPO}/pfioh${TAG}
-    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase"]
+    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
     ports:
@@ -124,7 +124,7 @@ services:
     environment:
       - STOREBASE
     image:  ${CREPO}/pman${TAG}
-    command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12"]
+    command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./FS/remote:/hostFS/storeBase
