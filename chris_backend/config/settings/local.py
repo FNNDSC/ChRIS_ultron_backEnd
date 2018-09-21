@@ -95,3 +95,5 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 # corsheaders
 # ------------------------------------------------------------------------------
 CORS_ORIGIN_ALLOW_ALL = True
+CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
+
