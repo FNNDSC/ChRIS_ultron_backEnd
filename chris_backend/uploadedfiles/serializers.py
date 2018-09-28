@@ -19,7 +19,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UploadedFile
-        fields = ('url', 'upload_path', 'fname', 'file_resource', 'owner')
+        fields = ('url', 'id', 'upload_path', 'fname', 'file_resource', 'owner')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
