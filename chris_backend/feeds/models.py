@@ -46,7 +46,8 @@ class FeedFilter(FilterSet):
 
     class Meta:
         model = Feed
-        fields = ['name', 'min_id', 'max_id', 'min_creation_date', 'max_creation_date']
+        fields = ['id', 'name', 'min_id', 'max_id', 'min_creation_date',
+                  'max_creation_date']
 
 
 class Note(models.Model):

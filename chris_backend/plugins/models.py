@@ -97,7 +97,7 @@ class PluginFilter(FilterSet):
 
     class Meta:
         model = Plugin
-        fields = ['name', 'dock_image', 'type', 'category', 'authors',
+        fields = ['id', 'name', 'dock_image', 'type', 'category', 'authors',
                   'min_creation_date', 'max_creation_date']
 
 
@@ -250,7 +250,7 @@ class PluginInstanceFilter(FilterSet):
 
     class Meta:
         model = PluginInstance
-        fields = ['min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
+        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
                   'root_id']
 
     def filter_by_root_id(self, queryset, name, value):

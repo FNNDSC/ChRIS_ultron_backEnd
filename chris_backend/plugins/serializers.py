@@ -25,7 +25,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Plugin
-        fields = ('url', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
+        fields = ('url', 'id', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
                   'description', 'documentation', 'license', 'version', 'execshell',
                   'selfpath', 'selfexec', 'compute_resource_identifier', 'parameters',
                   'instances', 'min_number_of_workers', 'max_number_of_workers',
@@ -152,7 +152,7 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)    
     class Meta:
         model = PluginParameter
-        fields = ('url', 'name', 'type', 'optional', 'default', 'flag', 'action',
+        fields = ('url', 'id', 'name', 'type', 'optional', 'default', 'flag', 'action',
                   'help', 'plugin')
 
 
@@ -287,7 +287,7 @@ class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)   
     class Meta:
         model = StringParameter
-        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'id', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -299,7 +299,7 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = IntParameter
-        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'id', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -311,7 +311,7 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = FloatParameter
-        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'id', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -323,7 +323,7 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     
     class Meta:
         model = BoolParameter
-        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'id', 'param_name', 'value', 'plugin_inst', 'plugin_param')
 
 
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -334,7 +334,7 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)
     class Meta:
         model = PathParameter
-        fields = ('url', 'param_name', 'value', 'plugin_inst', 'plugin_param')
+        fields = ('url', 'id', 'param_name', 'value', 'plugin_inst', 'plugin_param')
         
 
 PARAMETER_SERIALIZERS = {'string': StringParameterSerializer,

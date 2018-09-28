@@ -16,7 +16,7 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Note
-        fields = ('url', 'title', 'content', 'feed')
+        fields = ('url', 'id', 'title', 'content', 'feed')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -33,7 +33,7 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Tag
-        fields = ('url', 'name', 'owner', 'color', 'feed')
+        fields = ('url', 'id', 'name', 'owner', 'color', 'feed')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -84,7 +84,7 @@ class CommentSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('url', 'title', 'owner', 'content', 'feed')
+        fields = ('url', 'id', 'title', 'owner', 'content', 'feed')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -106,8 +106,8 @@ class FeedFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = FeedFile
-        fields = ('url', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource', 'feed',
-                  'plugin_inst')
+        fields = ('url', 'id', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource',
+                  'feed', 'plugin_inst')
 
     def _get_file_link(self, obj):
         """
