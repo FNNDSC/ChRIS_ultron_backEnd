@@ -135,7 +135,7 @@ class PluginInstance(models.Model):
     gpu_limit = models.IntegerField(null=True)
 
     class Meta:
-        ordering = ('start_date',)
+        ordering = ('-start_date',)
 
     def __str__(self):
         return str(self.id)
@@ -167,6 +167,19 @@ class PluginInstance(models.Model):
         while not current.plugin.type == 'fs':
             current = current.previous
         return current
+
+    def get_descendant_instances(self):
+        """
+        Custom method to return all the plugin instances that are a descendant of this
+        plugin instance.
+        """
+        descendant_instances = []
+        queue = [self]
+        while len(queue) > 0:
+            visited = queue.pop()
+            queue.extend(list(visited.next.all()))
+            descendant_instances.append(visited)
+        return descendant_instances
             
     def get_output_path(self):
         """
