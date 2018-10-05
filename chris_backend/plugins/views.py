@@ -4,6 +4,9 @@ from rest_framework.reverse import reverse
 
 from collectionjson import services
 
+from feeds.serializers import FeedFileSerializer
+from feeds.permissions import IsOwnerOrChris
+
 from .models import Plugin, PluginFilter, PluginParameter 
 from .models import PluginInstance, PluginInstanceFilter
 from .models import StringParameter, FloatParameter, IntParameter
@@ -208,6 +211,83 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
         pl_manager.check_plugin_app_exec_status(instance)
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         return  response
+
+
+class PluginInstanceDescendantList(generics.ListAPIView):
+    """
+    A view for the collection of plugin instances that are a descendant of this plugin
+    instance.
+    """
+    serializer_class = PluginInstanceSerializer
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list of the plugin instance descendants.
+        """
+        queryset = self.get_descendants_queryset()
+        return services.get_list_response(self, queryset)
+
+    def get_descendants_queryset(self):
+        """
+        Custom method to get the actual descendants queryset.
+        """
+        instance = self.get_object()
+        return self.filter_queryset(instance.get_descendant_instances())
+
+
+class PluginInstanceFileList(generics.ListAPIView):
+    """
+    A view for the collection of feeds' files.
+    """
+    serializer_class = FeedFileSerializer
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list of the files created by the queried plugin instance.
+        """
+        queryset = self.get_files_queryset()
+        return services.get_list_response(self, queryset)
+
+    def get_files_queryset(self):
+        """
+        Custom method to get the actual files queryset.
+        """
+        instance = self.get_object()
+        return self.filter_queryset(instance.files.all())
+
+
+class PluginInstanceParameterList(generics.ListAPIView):
+    """
+    A view for the collection of feeds' files.
+    """
+    serializer_class = PARAMETER_SERIALIZERS['string']
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list with all the parameter values used by the queried
+        plugin instance.
+        """
+        queryset = self.get_parameters_queryset()
+        return services.get_list_response(self, queryset)
+
+    def get_parameters_queryset(self):
+        """
+        Custom method to get a queryset with all the parameters.
+        """
+        instance = self.get_object()
+        queryset = []
+        queryset.extend(list(instance.path_param.all()))
+        queryset.extend(list(instance.string_param.all()))
+        queryset.extend(list(instance.int_param.all()))
+        queryset.extend(list(instance.float_param.all()))
+        queryset.extend(list(instance.bool_param.all()))
+        return self.filter_queryset(queryset)
 
 
 class StringParameterDetail(generics.RetrieveAPIView):
