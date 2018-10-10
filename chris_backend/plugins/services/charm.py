@@ -776,6 +776,7 @@ class Charm():
         self.dp.qprint('cmdLineArg = %s' % str_cmdLineArgs)
 
         self.dp.qprint('l_appArgs = %s' % self.l_appArgs)
+        self.l_appArgs = [str(s) for s in self.l_appArgs] # convert all arguments to string
         str_allCmdLineArgs      = ' '.join(self.l_appArgs)
         str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
 

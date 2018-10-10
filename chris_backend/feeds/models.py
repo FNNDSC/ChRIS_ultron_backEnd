@@ -57,9 +57,6 @@ class Note(models.Model):
     content = models.TextField(blank=True, default='')
     feed = models.OneToOneField(Feed, on_delete=models.CASCADE, related_name='note')
 
-    class Meta:
-        ordering = ('creation_date',)
-
     def __str__(self):
         return self.title
 
@@ -82,7 +79,7 @@ class Comment(models.Model):
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
-        ordering = ('creation_date',)
+        ordering = ('-creation_date',)
 
     def __str__(self):
         return self.title
@@ -92,7 +89,11 @@ class FeedFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=2048)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name='files')
-    plugin_inst = models.ForeignKey('plugins.PluginInstance', on_delete=models.CASCADE, related_name='file')
+    plugin_inst = models.ForeignKey('plugins.PluginInstance', on_delete=models.CASCADE,
+                                    related_name='files')
+
+    class Meta:
+        ordering = ('fname',)
 
     def __str__(self):
         return self.fname.name

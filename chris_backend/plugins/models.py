@@ -135,7 +135,7 @@ class PluginInstance(models.Model):
     gpu_limit = models.IntegerField(null=True)
 
     class Meta:
-        ordering = ('start_date',)
+        ordering = ('-start_date',)
 
     def __str__(self):
         return str(self.id)
@@ -167,6 +167,19 @@ class PluginInstance(models.Model):
         while not current.plugin.type == 'fs':
             current = current.previous
         return current
+
+    def get_descendant_instances(self):
+        """
+        Custom method to return all the plugin instances that are a descendant of this
+        plugin instance.
+        """
+        descendant_instances = []
+        queue = [self]
+        while len(queue) > 0:
+            visited = queue.pop()
+            queue.extend(list(visited.next.all()))
+            descendant_instances.append(visited)
+        return descendant_instances
             
     def get_output_path(self):
         """
@@ -285,9 +298,9 @@ class StringParameter(models.Model):
 class IntParameter(models.Model):
     value = models.IntegerField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
-                                    related_name='int_param')
+                                    related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='int_inst')
+                                     related_name='integer_inst')
 
     def __str__(self):
         return str(self.value)
@@ -307,9 +320,9 @@ class FloatParameter(models.Model):
 class BoolParameter(models.Model):
     value = models.BooleanField(default=False, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
-                                    related_name='bool_param')
+                                    related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='bool_inst')
+                                     related_name='boolean_inst')
 
     def __str__(self):
         return str(self.value)

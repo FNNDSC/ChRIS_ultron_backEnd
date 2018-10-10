@@ -84,16 +84,28 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
         plugin_views.PluginInstanceDetail.as_view(), name='plugininstance-detail'),
 
+    url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/descendants/$',
+        plugin_views.PluginInstanceDescendantList.as_view(),
+        name='plugininstance-descendant-list'),
+
+    url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/files/$',
+        plugin_views.PluginInstanceFileList.as_view(),
+        name='plugininstance-file-list'),
+
+    url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
+        plugin_views.PluginInstanceParameterList.as_view(),
+        name='plugininstance-parameter-list'),
+
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
         plugin_views.StringParameterDetail.as_view(), name='stringparameter-detail'),
 
-    url(r'^v1/plugins/int-parameter/(?P<pk>[0-9]+)/$',
+    url(r'^v1/plugins/integer-parameter/(?P<pk>[0-9]+)/$',
         plugin_views.IntParameterDetail.as_view(), name='intparameter-detail'),
 
     url(r'^v1/plugins/float-parameter/(?P<pk>[0-9]+)/$',
         plugin_views.FloatParameterDetail.as_view(), name='floatparameter-detail'),
 
-    url(r'^v1/plugins/bool-parameter/(?P<pk>[0-9]+)/$',
+    url(r'^v1/plugins/boolean-parameter/(?P<pk>[0-9]+)/$',
         plugin_views.BoolParameterDetail.as_view(), name='boolparameter-detail'),
 
     url(r'^v1/plugins/path-parameter/(?P<pk>[0-9]+)/$',
