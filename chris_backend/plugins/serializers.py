@@ -174,29 +174,13 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
                                                read_only=True)
-    string_param = serializers.HyperlinkedRelatedField(many=True,
-                                                       view_name='stringparameter-detail',
-                                                       read_only=True)
-    int_param = serializers.HyperlinkedRelatedField(many=True,
-                                                    view_name='intparameter-detail',
-                                                    read_only=True)
-    float_param = serializers.HyperlinkedRelatedField(many=True,
-                                                    view_name='floatparameter-detail',
-                                                    read_only=True)
-    bool_param = serializers.HyperlinkedRelatedField(many=True,
-                                                    view_name='boolparameter-detail',
-                                                    read_only=True)
-    path_param = serializers.HyperlinkedRelatedField(many=True,
-                                                       view_name='pathparameter-detail',
-                                                       read_only=True)
 
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date',
                   'status', 'previous', 'owner', 'feed', 'plugin', 'descendants', 'files',
-                  'parameters', 'compute_resource_identifier', 'string_param', 'int_param',
-                  'float_param', 'bool_param', 'path_param', 'cpu_limit', 'memory_limit',
-                  'number_of_workers','gpu_limit')
+                  'parameters', 'compute_resource_identifier', 'cpu_limit',
+                  'memory_limit', 'number_of_workers','gpu_limit')
 
     def create(self, validated_data):
         """

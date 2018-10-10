@@ -274,7 +274,13 @@ class PluginInstanceParameterList(generics.ListAPIView):
         plugin instance.
         """
         queryset = self.get_parameters_queryset()
-        return services.get_list_response(self, queryset)
+        response = services.get_list_response(self, queryset)
+        results = response.data['results']
+        # the items' url must be corrected because this view always uses the same string
+        # serializer for any type
+        for item in results:
+            item['url'] = item['url'].replace('string', item['type'])
+        return response
 
     def get_parameters_queryset(self):
         """
@@ -284,9 +290,9 @@ class PluginInstanceParameterList(generics.ListAPIView):
         queryset = []
         queryset.extend(list(instance.path_param.all()))
         queryset.extend(list(instance.string_param.all()))
-        queryset.extend(list(instance.int_param.all()))
+        queryset.extend(list(instance.integer_param.all()))
         queryset.extend(list(instance.float_param.all()))
-        queryset.extend(list(instance.bool_param.all()))
+        queryset.extend(list(instance.boolean_param.all()))
         return self.filter_queryset(queryset)
 
 

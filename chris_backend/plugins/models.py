@@ -298,9 +298,9 @@ class StringParameter(models.Model):
 class IntParameter(models.Model):
     value = models.IntegerField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
-                                    related_name='int_param')
+                                    related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='int_inst')
+                                     related_name='integer_inst')
 
     def __str__(self):
         return str(self.value)
@@ -320,9 +320,9 @@ class FloatParameter(models.Model):
 class BoolParameter(models.Model):
     value = models.BooleanField(default=False, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
-                                    related_name='bool_param')
+                                    related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='bool_inst')
+                                     related_name='boolean_inst')
 
     def __str__(self):
         return str(self.value)
