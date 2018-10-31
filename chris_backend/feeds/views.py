@@ -6,9 +6,9 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import Note, Tag, Feed, FeedFilter, Comment, FeedFile
-from .serializers import FeedSerializer, FeedFileSerializer
-from .serializers import NoteSerializer, TagSerializer, CommentSerializer
+from .models import Note, Tag, FeedTagRelationship, Feed, FeedFilter, Comment, FeedFile
+from .serializers import FeedSerializer, FeedFileSerializer, NoteSerializer
+from .serializers import TagSerializer, FeedTagSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris 
 
@@ -30,20 +30,24 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
         return services.append_collection_template(response, template_data)
 
 
-class TagList(generics.ListCreateAPIView):
+class FeedTagList(generics.ListCreateAPIView):
     """
-    A view for a feed-specific collection of tags.
+    A view for a feed-specific collection of user-specific tags.
     """
     queryset = Feed.objects.all()
-    serializer_class = TagSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    serializer_class = FeedTagSerializer
+    permission_classes = (permissions.IsAuthenticated,)
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner and feed list with the tag
-        before first saving to the DB.
+        Overriden to associate a tag and feed before first saving to the DB.
         """
-        serializer.save(owner=self.request.user, feed=[self.get_object()])
+        request_data = serializer.context['request'].data
+        tag_id = ""
+        if 'tag_id' in request_data:
+            tag_id = request_data['tag_id']
+        tag = serializer.validate_tag(tag_id)
+        serializer.save(tag=tag, feed=self.get_object())
 
     def list(self, request, *args, **kwargs):
         """
@@ -57,7 +61,7 @@ class TagList(generics.ListCreateAPIView):
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
-        template_data = {"name": "", "color": ""}
+        template_data = {"tag_id": ""}
         return services.append_collection_template(response, template_data)
 
     def get_tags_queryset(self, user):
@@ -65,13 +69,29 @@ class TagList(generics.ListCreateAPIView):
         Custom method to get the actual tags' queryset for the feed and user
         """
         feed = self.get_object()
-        tags = [tag for tag in feed.tags.all() if tag.owner==user]
-        return self.filter_queryset(tags)
+        return FeedTagRelationship.objects.filter(feed=feed, tag__owner=user)
 
 
-class FullTagList(generics.ListAPIView):
+class FeedTagDetail(generics.RetrieveUpdateDestroyAPIView):
     """
-    A view for the full collection of tags.
+    A feed-specific tag view.
+    """
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(TagDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"name": "", "color": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class TagList(generics.ListCreateAPIView):
+    """
+    A view for the collection of user-specific tags.
     """
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -85,16 +105,23 @@ class FullTagList(generics.ListAPIView):
         # if the user is chris then return all the tags in the system
         if (user.username == 'chris'):
             return Tag.objects.all()
-
         return Tag.objects.filter(owner=user)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate an owner with the tag before first saving to the DB.
+        """
+        serializer.save(owner=self.request.user)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations.
+        Overriden to append document-level link relations and a collection+json template.
         """
         response = super(FullTagList, self).list(request, *args, **kwargs)
         links = {'feeds': reverse('feed-list', request=request)}
-        return services.append_collection_links(response, links)
+        response = services.append_collection_links(response, links)
+        template_data = {"name": "", "color": ""}
+        return services.append_collection_template(response, template_data)
 
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -143,7 +170,7 @@ class FeedList(generics.ListAPIView):
         # append document-level link relations
         user = self.request.user
         links = {'plugins': reverse('plugin-list', request=request),
-                 'tags': reverse('full-tag-list', request=request),
+                 'tags': reverse('tag-list', request=request),
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
         return services.append_collection_links(response, links)
