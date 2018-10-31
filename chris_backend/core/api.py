@@ -35,10 +35,13 @@ urlpatterns = format_suffix_patterns([
         feed_views.NoteDetail.as_view(), name='note-detail'),
 
     url(r'^v1/(?P<pk>[0-9]+)/tags/$',
-        feed_views.TagList.as_view(), name='tag-list'),
+        feed_views.FeedTagList.as_view(), name='feedtag-list'),
+
+    url(r'^v1/feedtags/(?P<pk>[0-9]+)/$',
+        feed_views.FeedTagDetail.as_view(), name='feedtag-detail'),
 
     url(r'^v1/tags/$',
-        feed_views.FullTagList.as_view(), name='full-tag-list'),
+        feed_views.TagList.as_view(), name='tag-list'),
 
     url(r'^v1/tags/(?P<pk>[0-9]+)/$',
         feed_views.TagDetail.as_view(), name='tag-detail'),
