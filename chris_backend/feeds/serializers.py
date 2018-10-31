@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
 from collectionjson.services import collection_serializer_is_valid
-from .models import Note, Tag, Feed, Comment, FeedFile
+from .models import Note, Feed, Tag, FeedTagRelationship, Comment, FeedFile
 
 
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
@@ -28,12 +28,11 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
-                                               read_only=True)
+    feeds = serializers.HyperlinkedIdentityField(view_name='feed-list')
 
     class Meta:
         model = Tag
-        fields = ('url', 'id', 'name', 'owner', 'color', 'feed')
+        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -41,6 +40,33 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to generate a properly formatted message for validation errors
         """
         return super(TagSerializer, self).is_valid(raise_exception=raise_exception)
+
+
+class FeedTagSerializer(serializers.HyperlinkedModelSerializer):
+    owner = serializers.ReadOnlyField(source='tag.owner.username')
+    name = serializers.ReadOnlyField(source='tag.name')
+    color = serializers.ReadOnlyField(source='tag.color')
+    feeds = serializers.HyperlinkedIdentityField(view_name='feed-list')
+
+    class Meta:
+        model = FeedTagRelationship
+        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds')
+
+    def validate_tag(self, tag_id):
+        """
+        Custom method to check that a tag id is provided and that it exists in the DB.
+        """
+        if not tag_id:
+            raise serializers.ValidationError(
+                {'detail': "A tag id is required"})
+        try:
+            pk = int(tag_id)
+            tag = Tag.objects.get(pk=pk)
+        except (ValueError, ObjectDoesNotExist):
+            raise serializers.ValidationError(
+                {'detail':
+                 "Couldn't find any tag with id %s" % tag_id})
+        return tag
 
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
