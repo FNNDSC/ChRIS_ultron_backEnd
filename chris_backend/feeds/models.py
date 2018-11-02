@@ -64,14 +64,15 @@ class Note(models.Model):
 class Tag(models.Model):
     name = models.CharField(max_length=100, blank=True, default='')
     color = models.CharField(max_length=20)
-    feeds = models.ManyToManyField(Feed, through='FeedTagRelationship')
+    feeds = models.ManyToManyField(Feed, related_name='tags',
+                                   through='Tagging')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
 
 
-class FeedTagRelationship(models.Model):
+class Tagging(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
 
