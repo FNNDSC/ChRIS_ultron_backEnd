@@ -55,5 +55,20 @@ class IsRelatedFeedOwnerOrChris(permissions.BasePermission):
         return False
 
 
+class IsRelatedTagOwnerOrChris(permissions.BasePermission):
+    """
+    Custom permission to only allow owners of a related tag or superuser
+    'chris' to access an object (eg. a tagging).
+    """
+
+    def has_object_permission(self, request, view, obj):
+        # Read and write permissions are only allowed to
+        # the owner and superuser 'chris'.
+        if (request.user.username == 'chris') or (request.user == obj.tag.owner):
+            return True
+        return False
+
+
+
 
 

@@ -3,12 +3,13 @@ import os
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.utils import IntegrityError
 
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
 from collectionjson.services import collection_serializer_is_valid
-from .models import Note, Feed, Tag, FeedTagRelationship, Comment, FeedFile
+from .models import Note, Feed, Tag, Tagging, Comment, FeedFile
 
 
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
@@ -28,11 +29,12 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='owner.username')
-    feeds = serializers.HyperlinkedIdentityField(view_name='feed-list')
+    feeds = serializers.HyperlinkedIdentityField(view_name='tag-feed-list')
+    taggings = serializers.HyperlinkedIdentityField(view_name='tag-tagging-list')
 
     class Meta:
         model = Tag
-        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds')
+        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds', 'taggings')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -42,19 +44,41 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
         return super(TagSerializer, self).is_valid(raise_exception=raise_exception)
 
 
-class FeedTagSerializer(serializers.HyperlinkedModelSerializer):
+class TaggingSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.ReadOnlyField(source='tag.owner.username')
-    name = serializers.ReadOnlyField(source='tag.name')
-    color = serializers.ReadOnlyField(source='tag.color')
-    feeds = serializers.HyperlinkedIdentityField(view_name='feed-list')
+    tag_id = serializers.ReadOnlyField(source='tag.id')
+    feed_id = serializers.ReadOnlyField(source='feed.id')
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    tag = serializers.HyperlinkedRelatedField(view_name='tag-detail', read_only=True)
 
     class Meta:
-        model = FeedTagRelationship
-        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds')
+        model = Tagging
+        fields = ('url', 'id', 'owner', 'tag_id', 'feed_id', 'tag', 'feed')
 
-    def validate_tag(self, tag_id):
+    def create(self, validated_data):
         """
-        Custom method to check that a tag id is provided and that it exists in the DB.
+        Overriden to handle the error when trying to create an already existing tagging.
+        """
+        try:
+            return super(TaggingSerializer, self).create(validated_data)
+        except IntegrityError:
+            feed = validated_data['feed']
+            tag = validated_data['tag']
+            raise serializers.ValidationError(
+                {'detail':
+                 "Tagging for feed_id %s and tag_id %s already exists!" % (feed.id, tag.id)})
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(TaggingSerializer, self).is_valid(raise_exception=raise_exception)
+
+    def validate_tag(self, tag_id, user):
+        """
+        Custom method to check that a tag id is provided, exists in the DB and
+        owned by the user.
         """
         if not tag_id:
             raise serializers.ValidationError(
@@ -66,12 +90,38 @@ class FeedTagSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 {'detail':
                  "Couldn't find any tag with id %s" % tag_id})
+        if tag.owner != user:
+            raise serializers.ValidationError(
+                {'detail':
+                 "User is not the owner of tag with tag_id %s" % tag_id})
         return tag
+
+    def validate_feed(self, feed_id, user):
+        """
+        Custom method to check that a feed id is provided, exists in the DB and
+        owned by the user.
+        """
+        if not feed_id:
+            raise serializers.ValidationError(
+                {'detail': "A feed id is required"})
+        try:
+            pk = int(feed_id)
+            feed = Feed.objects.get(pk=pk)
+        except (ValueError, ObjectDoesNotExist):
+            raise serializers.ValidationError(
+                {'detail':
+                 "Couldn't find any feed with id %s" % feed_id})
+        if user not in feed.owner.all():
+            raise serializers.ValidationError(
+                {'detail':
+                 "User is not an owner of feed with feed_id %s" % feed_id})
+        return feed
 
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
-    tags = serializers.HyperlinkedIdentityField(view_name='tag-list')
+    tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
+    taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
@@ -82,7 +132,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner',
-                  'note', 'tags', 'comments', 'files', 'plugin_inst')
+                  'note', 'tags', 'taggings', 'comments', 'files', 'plugin_inst')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
