@@ -117,7 +117,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         previous_id = ""
         if 'previous_id' in request_data:
             previous_id = request_data['previous_id']
-        previous = serializer.validate_previous(previous_id)
+        previous = serializer.validate_previous(previous_id, self.request.user)
         plugin = self.get_object()
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous,
