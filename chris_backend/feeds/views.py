@@ -156,7 +156,7 @@ class FeedTaggingList(generics.ListCreateAPIView):
         tag_id = ""
         if 'tag_id' in request_data:
             tag_id = request_data['tag_id']
-        tag = serializer.validate_tag(tag_id, self.request.user)
+        tag = serializer.validate_tag(tag_id)
         serializer.save(tag=tag, feed=self.get_object())
 
     def list(self, request, *args, **kwargs):
@@ -199,7 +199,7 @@ class TagTaggingList(generics.ListCreateAPIView):
         feed_id = ""
         if 'feed_id' in request_data:
             feed_id = request_data['feed_id']
-        feed = serializer.validate_feed(feed_id, self.request.user)
+        feed = serializer.validate_feed(feed_id)
         serializer.save(tag=self.get_object(), feed=feed)
 
     def list(self, request, *args, **kwargs):
