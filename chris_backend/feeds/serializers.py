@@ -75,7 +75,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
         """
         return super(TaggingSerializer, self).is_valid(raise_exception=raise_exception)
 
-    def validate_tag(self, tag_id, user):
+    def validate_tag(self, tag_id):
         """
         Custom method to check that a tag id is provided, exists in the DB and
         owned by the user.
@@ -90,13 +90,14 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 {'detail':
                  "Couldn't find any tag with id %s" % tag_id})
+        user = self.context['request'].user
         if tag.owner != user:
             raise serializers.ValidationError(
                 {'detail':
                  "User is not the owner of tag with tag_id %s" % tag_id})
         return tag
 
-    def validate_feed(self, feed_id, user):
+    def validate_feed(self, feed_id):
         """
         Custom method to check that a feed id is provided, exists in the DB and
         owned by the user.
@@ -111,6 +112,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 {'detail':
                  "Couldn't find any feed with id %s" % feed_id})
+        user = self.context['request'].user
         if user not in feed.owner.all():
             raise serializers.ValidationError(
                 {'detail':
@@ -143,7 +145,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_new_owner(self, username):
         """
-        Custom method to check whether a new feef owner is a system-registered user.
+        Custom method to check whether a new feed owner is a system-registered user.
         """
         try:
             # check if user is a system-registered user
