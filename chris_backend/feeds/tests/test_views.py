@@ -514,41 +514,38 @@ class FeedTagListViewTests(ViewTests):
         feed = Feed.objects.get(name=self.feedname)
         self.list_url = reverse("feed-tag-list", kwargs={"pk": feed.id})
 
-        # create one tag for self.feedname
+        # create Tag2 tag
         user = User.objects.get(username=self.username)
         (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
 
-        # tag self.feedname
-        tagging = Tagging(tag=tag, feed=feed)
-        tagging.save()
+        # tag self.feedname with Tag2
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
 
-        plugin = Plugin.objects.get(name="pacspull", type="fs")
-        
         # create a new feed by creating a "fs" plugin instance
+        plugin = Plugin.objects.get(name="pacspull", type="fs")
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                     compute_resource=plugin.compute_resource)
         pl_inst.feed.name = "new"
         pl_inst.feed.save()
 
-        # create another tag for the new feed
-        feed = Feed.objects.get(name="new")
+        # create Tag3 tag
         (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
 
-        # tag the new feed
-        tagging = Tagging(tag=tag, feed=feed)
-        tagging.save()
+        # tag the new feed with Tag3
+        feed = Feed.objects.get(name="new")
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
 
     def test_feed_tag_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         self.assertContains(response, "Tag2")
-        self.assertNotContains(response, "Tag3")
+        self.assertNotContains(response, "Tag3") # tag list is feed-specific
 
     def test_feed_tag_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_tag_list_failure_not_owner(self):
+    def test_feed_tag_list_failure_not_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -562,8 +559,243 @@ class FeedTagListViewTests(ViewTests):
         feed.owner.set([owner, new_owner])
         feed.save()
         response = self.client.get(self.list_url)
-        self.assertNotContains(response, "Tag2")
-        self.assertNotContains(response, "Tag3")
+        self.assertNotContains(response, "Tag2") # a feed owner can not see another feed owner's tags
+
+
+class TagFeedListViewTests(ViewTests):
+    """
+    Test the tag-feed-list view
+    """
+
+    def setUp(self):
+        super(TagFeedListViewTests, self).setUp()
+
+        # create Tag2 tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
+
+        self.list_url = reverse("tag-feed-list", kwargs={"pk": tag.id})
+
+        # tag self.feedname with Tag2
+        feed = Feed.objects.get(name=self.feedname)
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+        # create a new feed by creating a "fs" plugin instance
+        plugin = Plugin.objects.get(name="pacspull", type="fs")
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+        pl_inst.feed.name = "new"
+        pl_inst.feed.save()
+
+        # create Tag3 tag
+        (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
+
+        # tag the new feed with Tag3
+        feed = Feed.objects.get(name="new")
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+    def test_tag_feed_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, self.feedname)
+        self.assertNotContains(response, "new")  # feed list is tag-specific
+
+    def test_tag_feed_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_tag_feed_list_failure_not_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class FeedTaggingListViewTests(ViewTests):
+    """
+    Test the feed-tagging-list view
+    """
+
+    def setUp(self):
+        super(FeedTaggingListViewTests, self).setUp()
+
+        feed = Feed.objects.get(name=self.feedname)
+        self.create_read_url = reverse("feed-tagging-list", kwargs={"pk": feed.id})
+
+        # create Tag1 tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag1", color="green", owner=user)
+
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "tag_id", "value": tag.id}]}})
+
+        # create Tag2 tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
+
+        # tag self.feedname with Tag2
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+    def test_feed_tagging_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        tag = Tag.objects.get(name="Tag1")
+        self.assertEqual(response.data["tag_id"], tag.id)
+        feed = Feed.objects.get(name=self.feedname)
+        self.assertEqual(response.data["feed_id"], feed.id)
+
+    def test_feed_tagging_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_tagging_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        tag = Tag.objects.get(name="Tag2")
+        self.assertContains(response, tag.id)
+
+    def test_feed_tagging_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_tagging_list_failure_not_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_tagging_list_from_other_feed_owners_not_listed(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        feed = Feed.objects.get(name=self.feedname)
+        owner = User.objects.get(username=self.username)
+        new_owner = User.objects.get(username=self.other_username)
+        # make new_owner an owner of the feed together with the feed's current owner
+        feed.owner.set([owner, new_owner])
+        feed.save()
+        response = self.client.get(self.create_read_url)
+        tag = Tag.objects.get(name="Tag2")
+        self.assertNotContains(response, tag.id) # a feed owner can not see another feed owner's taggings
+
+
+class TagTaggingListViewTests(ViewTests):
+    """
+    Test the tag-tagging-list view
+    """
+
+    def setUp(self):
+        super(TagTaggingListViewTests, self).setUp()
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        # create Tag2 tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag2", color="blue", owner=user)
+
+        self.create_read_url = reverse("tag-tagging-list", kwargs={"pk": tag.id})
+
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "feed_id", "value": feed.id}]}})
+
+        # create a new feed by creating a "fs" plugin instance
+        plugin = Plugin.objects.get(name="pacspull", type="fs")
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+        pl_inst.feed.name = "new"
+        pl_inst.feed.save()
+
+        # tag new feed with Tag2
+        feed = Feed.objects.get(name="new")
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+        # create Tag3 tag
+        (tag, tf) = Tag.objects.get_or_create(name="Tag3", color="red", owner=user)
+
+        # tag self.feedname with Tag3
+        Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+    def test_tag_tagging_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        tag = Tag.objects.get(name="Tag2")
+        self.assertEqual(response.data["tag_id"], tag.id)
+        feed = Feed.objects.get(name=self.feedname)
+        self.assertEqual(response.data["feed_id"], feed.id)
+
+    def test_tag_tagging_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_tag_tagging_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        feed = Feed.objects.get(name="new")
+        self.assertContains(response, feed.id)
+        feed = Feed.objects.get(name=self.feedname)
+        self.assertNotContains(response, feed.id)
+
+    def test_tag_tagging_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_tag_tagging_list_failure_not_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class TaggingDetailViewTests(ViewTests):
+    """
+    Test the tagging-detail view
+    """
+
+    def setUp(self):
+        super(TaggingDetailViewTests, self).setUp()
+
+        # create a tag
+        user = User.objects.get(username=self.username)
+        (tag, tf) = Tag.objects.get_or_create(name="Tag1", color="blue", owner=user)
+
+        # tag self.feedname with Tag1
+        feed = Feed.objects.get(name=self.feedname)
+        (tagging, tf) = Tagging.objects.get_or_create(tag=tag, feed=feed)
+
+        self.read_delete_url = reverse("tagging-detail", kwargs={"pk": tagging.id})
+
+    def test_tagging_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        tag = Tag.objects.get(name="Tag1")
+        self.assertEqual(response.data["tag_id"], tag.id)
+        feed = Feed.objects.get(name=self.feedname)
+        self.assertContains(response, feed.id)
+
+    def test_tagging_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_tagging_detail_failure_not_related_tag_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tagging_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEquals(Tagging.objects.count(), 0)
+
+    def test_tagging_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_tagging_delete_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
 
 class FeedFileViewTests(ViewTests):
