@@ -207,7 +207,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
 
-    def validate_previous(self, previous_id, user):
+    def validate_previous(self, previous_id):
         """
         Custom method to check that an id is provided for previous instance when
         corresponding plugin is of type 'ds'. Then check that the provided id exists in
@@ -231,8 +231,9 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                     {'detail': err_str % previous_id})
             # check that the user can run plugins within this feed
             root_inst = previous.get_root_instance()
+            user = self.context['request'].user
             if user not in root_inst.feed.owner.all():
-                err_str = "User is not an owner of feed for plugin instance with id %s"
+                err_str = "User is not an owner of feed for previous instance with id %s"
                 raise serializers.ValidationError(
                     {'detail': err_str % previous_id})
         return previous
