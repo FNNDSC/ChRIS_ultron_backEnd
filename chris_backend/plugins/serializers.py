@@ -211,7 +211,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         Custom method to check that an id is provided for previous instance when
         corresponding plugin is of type 'ds'. Then check that the provided id exists in
-        the DB.
+        the DB and that the user can run plugins within this feed.
         """
         # using self.context['view'] in validators prevents calling is_valid when creating
         # a new serializer instance outside the Django view framework. But here is fine
@@ -226,9 +226,16 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 pk = int(previous_id)
                 previous = PluginInstance.objects.get(pk=pk)
             except (ValueError, ObjectDoesNotExist):
+                err_str = "Couldn't find any 'previous' plugin instance with id %s"
                 raise serializers.ValidationError(
-                    {'detail':
-                     "Couldn't find any 'previous' plugin instance with id %s" % previous_id})
+                    {'detail': err_str % previous_id})
+            # check that the user can run plugins within this feed
+            root_inst = previous.get_root_instance()
+            user = self.context['request'].user
+            if user not in root_inst.feed.owner.all():
+                err_str = "User is not an owner of feed for previous instance with id %s"
+                raise serializers.ValidationError(
+                    {'detail': err_str % previous_id})
         return previous
 
     def validate_gpu_limit(self, gpu_limit):

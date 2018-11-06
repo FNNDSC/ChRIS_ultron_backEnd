@@ -336,6 +336,8 @@ class PluginInstanceSerializerTests(SerializerTests):
         plg_inst_serializer.is_valid(raise_exception=True)
         plg_inst_serializer.context['view'] = mock.Mock()
         plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
+        plg_inst_serializer.context['request'] = mock.Mock()
+        plg_inst_serializer.context['request'].user = self.user
         previous = plg_inst_serializer.validate_previous(pl_inst_fs.id)
 
         self.assertEqual(previous, pl_inst_fs)

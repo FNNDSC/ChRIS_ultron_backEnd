@@ -100,7 +100,9 @@ Open another terminal and run
 ```bash
 docker ps
 ```
-Find out from the previous output the name of the container running the Django server in interactive mode (usually *chrisultronbackend_chris_dev_run_1*) and run the Unit tests and Integration tests within that container. For instance to run only the Unit tests:
+Find out from the previous output the name of the container running the Django server in interactive mode (usually *chrisultronbackend_chris_dev_run_1*) and run the Unit tests and Integration tests within that container. 
+
+To run only the Unit tests:
 
 ```bash
 docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test --exclude-tag integration

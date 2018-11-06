@@ -34,15 +34,6 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/note(?P<pk>[0-9]+)/$',
         feed_views.NoteDetail.as_view(), name='note-detail'),
 
-    url(r'^v1/(?P<pk>[0-9]+)/tags/$',
-        feed_views.TagList.as_view(), name='tag-list'),
-
-    url(r'^v1/tags/$',
-        feed_views.FullTagList.as_view(), name='full-tag-list'),
-
-    url(r'^v1/tags/(?P<pk>[0-9]+)/$',
-        feed_views.TagDetail.as_view(), name='tag-detail'),
-
     url(r'^v1/(?P<pk>[0-9]+)/comments/$',
         feed_views.CommentList.as_view(), name='comment-list'),
 
@@ -57,6 +48,28 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
         feed_views.FileResource.as_view(), name='feedfile-resource'),
+
+    url(r'^v1/(?P<pk>[0-9]+)/tags/$',
+        feed_views.FeedTagList.as_view(), name='feed-tag-list'),
+
+    url(r'^v1/(?P<pk>[0-9]+)/taggings/$',
+        feed_views.FeedTaggingList.as_view(), name='feed-tagging-list'),
+
+
+    url(r'^v1/tags/$',
+        feed_views.TagList.as_view(), name='tag-list'),
+
+    url(r'^v1/tags/(?P<pk>[0-9]+)/$',
+        feed_views.TagDetail.as_view(), name='tag-detail'),
+
+    url(r'^v1/tags/(?P<pk>[0-9]+)/feeds/$',
+        feed_views.TagFeedList.as_view(), name='tag-feed-list'),
+
+    url(r'^v1/tags/(?P<pk>[0-9]+)/taggings/$',
+        feed_views.TagTaggingList.as_view(), name='tag-tagging-list'),
+
+    url(r'^v1/taggings/(?P<pk>[0-9]+)/$',
+        feed_views.TaggingDetail.as_view(), name='tagging-detail'),
 
 
     url(r'^v1/plugins/$',
