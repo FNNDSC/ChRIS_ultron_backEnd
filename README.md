@@ -165,7 +165,9 @@ Stop and remove CUBE services and storage space by running the destroy bash scri
 ```
 
 
-### REST API Documentation
+### Documentation
+
+#### REST API reference
 
 Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
 
@@ -180,3 +182,15 @@ Build the html documentation
 cd docs/
 make html
 ```
+
+#### ChRIS REST API design.
+
+Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-REST-API-design).
+
+#### ChRIS backend database design.
+
+Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-database-design).
+
+#### Wiki.
+
+Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki).
