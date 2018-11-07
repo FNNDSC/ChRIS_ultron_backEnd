@@ -189,7 +189,7 @@ Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-REST-
 
 #### ChRIS backend database design.
 
-Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-database-design).
+Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-database-design).
 
 #### Wiki.
 
