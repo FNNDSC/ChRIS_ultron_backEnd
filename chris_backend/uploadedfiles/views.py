@@ -69,6 +69,21 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         template_data = {"upload_path": ""}
         return services.append_collection_template(response, template_data)
 
+    def perform_update(self, serializer):
+        """
+        Overriden to update feed's owners if requested by a PUT request.
+        """
+        user = self.request.user
+        user_file = self.get_object()
+        request_data = serializer.context['request'].data
+        if 'fname' in request_data:
+            del request_data['fname']
+        if 'upload_path' in request_data:
+            path = request_data['upload_path']
+            if path != user_file.upload_path:
+                path = serializer.validate_file_upload_path(user, path)
+                serializer.save(upload_path=path)
+
 
 class UploadedFileResource(generics.GenericAPIView):
     """
