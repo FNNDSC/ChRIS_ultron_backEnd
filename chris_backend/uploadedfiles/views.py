@@ -1,11 +1,15 @@
 
+from django.conf import settings
+
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import UploadedFile
+import swiftclient
+
+from .models import UploadedFile, uploaded_file_path
 from .serializers import UploadedFileSerializer
 from .permissions import IsOwnerOrChris
 
@@ -39,7 +43,7 @@ class UploadedFileList(generics.ListCreateAPIView):
         if 'upload_path' in request_data:
             path = request_data['upload_path']
         user = self.request.user
-        path = serializer.validate_file_upload_path(user, path)
+        path = serializer.validate_file_upload_path(path)
         serializer.save(owner=user, upload_path=path)
 
     def list(self, request, *args, **kwargs):
@@ -69,20 +73,47 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         template_data = {"upload_path": ""}
         return services.append_collection_template(response, template_data)
 
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to include the current fname in the request.
+        """
+        user_file = self.get_object()
+        request.data['fname'] = user_file.fname.file # fname is required in the serializer
+        return super(UploadedFileDetail, self).update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         """
-        Overriden to update feed's owners if requested by a PUT request.
+        Overriden to validate and update the upload path in swift.
         """
-        user = self.request.user
-        user_file = self.get_object()
         request_data = serializer.context['request'].data
-        if 'fname' in request_data:
-            del request_data['fname']
-        if 'upload_path' in request_data:
-            path = request_data['upload_path']
-            if path != user_file.upload_path:
-                path = serializer.validate_file_upload_path(user, path)
-                serializer.save(upload_path=path)
+        path = request_data['upload_path']
+        user_file = self.get_object()
+        if path != user_file.upload_path:
+            user = self.request.user
+            path = serializer.validate_file_upload_path(path)
+            serializer.save(owner=user, upload_path=path)
+            # initiate a Swift service connection to delete the old object from swift
+            conn = swiftclient.Connection(
+                user=settings.SWIFT_USERNAME,
+                key=settings.SWIFT_KEY,
+                authurl=settings.SWIFT_AUTH_URL,
+            )
+            old_swift_path = uploaded_file_path(user_file, '')
+            conn.delete_object(settings.SWIFT_CONTAINER_NAME, old_swift_path)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to delete the file from swift storage.
+        """
+        swift_path = uploaded_file_path(instance, '')
+        instance.delete()
+        # initiate a Swift service connection to delete the object from swift
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, swift_path)
 
 
 class UploadedFileResource(generics.GenericAPIView):

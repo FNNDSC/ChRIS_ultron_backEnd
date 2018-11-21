@@ -1,6 +1,8 @@
 
 import logging
 import os, shutil
+import json
+import io
 from unittest import mock, skip
 
 import swiftclient
@@ -12,7 +14,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
-from uploadedfiles.models import UploadedFile
+from uploadedfiles.models import UploadedFile, uploaded_file_path
 from uploadedfiles import views
 
 
@@ -119,6 +121,9 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
         super(UploadedFileDetailViewTests, self).setUp()
         self.read_update_delete_url = reverse("uploadedfile-detail",
                                               kwargs={"pk": self.uploadedfile.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "upload_path",
+                                   "value": "/myfolder/myfile1.txt"}]}})
 
     def test_uploadedfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -134,11 +139,24 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_uploadedfile_update_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_uploadedfile_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_uploadedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(UploadedFile.objects.count(), 0)
+        swift_path = uploaded_file_path(self.uploadedfile, '')
+        mocked_method = 'uploadedfiles.views.swiftclient.Connection.delete_object'
+        with mock.patch(mocked_method) as delete_object_mock:
+            response = self.client.delete(self.read_update_delete_url)
+            delete_object_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME, swift_path)
+            self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+            self.assertEquals(UploadedFile.objects.count(), 0)
 
     def test_uploadedfile_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -182,13 +200,6 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
     @tag('integration')
     def test_integration_uploadedfileresource_download_success(self):
-        # create a test file
-        test_file_path = self.test_dir
-        self.test_file = test_file_path + '/file1.txt'
-        file = open(self.test_file, "w")
-        file.write("test file")
-        file.close()
-
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,
@@ -199,7 +210,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
         conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # upload file to Swift storage
-        with open(self.test_file, 'r') as file1:
+        with io.StringIO("test file") as file1:
             conn.put_object(settings.SWIFT_CONTAINER_NAME, 'test/uploads/file1.txt',
                             contents=file1.read(),
                             content_type='text/plain')
