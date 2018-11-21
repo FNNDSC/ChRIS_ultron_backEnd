@@ -17,7 +17,7 @@ class UploadedFileModelTests(TestCase):
         file_path = uploaded_file_path(uploadedfile_instance, filename)
         expected_file_path = '{0}/{1}/{2}'.format(uploadedfile_instance.owner.username,
                                                   'uploads',
-                                                  uploadedfile_instance.upload_path)
+                                                  uploadedfile_instance.upload_path.strip('/'))
         self.assertEquals(file_path, expected_file_path)
 
     def test_str(self):
