@@ -14,7 +14,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail',
                                                read_only=True)
     file_resource = ItemLinkField('_get_file_link')
-    fname = serializers.FileField(write_only=True, required=False)
+    fname = serializers.FileField(write_only=True)
     upload_path = serializers.CharField()
 
     class Meta:
@@ -42,7 +42,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         # return url = current url + file name
         return url + os.path.basename(obj.fname.name)
 
-    def validate_file_upload_path(self, user, path):
+    def validate_file_upload_path(self, path):
         """
         Custom method to check that the provided path is unique for this user in the DB.
         """
@@ -53,6 +53,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         path = os.path.join('/', path)
         try:
             # check if path for this file already exists in the db
+            user = self.context['request'].user
             UploadedFile.objects.get(owner=user.id, upload_path=path)
         except ObjectDoesNotExist:
             return path
