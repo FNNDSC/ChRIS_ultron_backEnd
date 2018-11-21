@@ -14,7 +14,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail',
                                                read_only=True)
     file_resource = ItemLinkField('_get_file_link')
-    fname = serializers.FileField(write_only=True, required=False)
+    fname = serializers.FileField(write_only=True)
     upload_path = serializers.CharField()
 
     class Meta:
