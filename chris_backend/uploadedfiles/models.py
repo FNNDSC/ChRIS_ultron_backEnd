@@ -7,7 +7,7 @@ def uploaded_file_path(instance, filename):
     # SWIFT_CONTAINER_NAME/<username>/<uploads>/<instance.upload_path>
     owner = instance.owner
     username = owner.username
-    return '{0}/{1}/{2}'.format(username, 'uploads', instance.upload_path)
+    return '{0}/{1}/{2}'.format(username, 'uploads', instance.upload_path.strip('/'))
 
 
 class UploadedFile(models.Model):
