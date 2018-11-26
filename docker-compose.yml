@@ -15,7 +15,6 @@ services:
   chris_dev:
     image:  ${CREPO}/chris_dev_backend
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./chris_backend:/usr/src/chris_backend
       - ./FS/data:/data
     environment:
@@ -46,8 +45,6 @@ services:
 
   chrisstore:
     image:  ${CREPO}/chris_store
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8010:8010"
     depends_on:

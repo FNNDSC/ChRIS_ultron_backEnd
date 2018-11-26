@@ -239,7 +239,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
 
 class PluginInstanceFileList(generics.ListAPIView):
     """
-    A view for the collection of feeds' files.
+    A view for the collection of files written by a plugin instance.
     """
     serializer_class = FeedFileSerializer
     queryset = PluginInstance.objects.all()
@@ -250,7 +250,12 @@ class PluginInstanceFileList(generics.ListAPIView):
         Overriden to return a list of the files created by the queried plugin instance.
         """
         queryset = self.get_files_queryset()
-        return services.get_list_response(self, queryset)
+        response = services.get_list_response(self, queryset)
+        instance = self.get_object()
+        feed = instance.get_root_instance().feed
+        links = {'feed': reverse('feed-detail', request=request,
+                             kwargs={"pk": feed.id})}
+        return services.append_collection_links(response, links)
 
     def get_files_queryset(self):
         """
@@ -262,7 +267,7 @@ class PluginInstanceFileList(generics.ListAPIView):
 
 class PluginInstanceParameterList(generics.ListAPIView):
     """
-    A view for the collection of feeds' files.
+    A view for the collection of parameters that the plugin instance was run with.
     """
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = PluginInstance.objects.all()
@@ -277,14 +282,14 @@ class PluginInstanceParameterList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         results = response.data['results']
         # the items' url must be corrected because this view always uses the same string
-        # serializer for any type
+        # serializer for any parameter type
         for item in results:
             item['url'] = item['url'].replace('string', item['type'])
         return response
 
     def get_parameters_queryset(self):
         """
-        Custom method to get a queryset with all the parameters.
+        Custom method to get a queryset with all the parameters regardless their type.
         """
         instance = self.get_object()
         queryset = []

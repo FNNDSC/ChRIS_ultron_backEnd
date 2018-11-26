@@ -11,8 +11,9 @@ from django.conf import settings
 
 from rest_framework import status
 
+from feeds.models import FeedFile
 from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
-from plugins.models import ComputeResource
+from plugins.models import ComputeResource, PathParameter, FloatParameter
 from plugins.services.manager import PluginManager
 from plugins import views
 
@@ -26,15 +27,18 @@ class ViewTests(TestCase):
         self.chris_password = 'chris12'
         self.username = 'data/foo'
         self.password = 'bar'
+        self.other_username = 'boo'
+        self.other_password = 'far'
+
         self.content_type='application/vnd.collection+json'
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
 
-        # create basic models
-        
-        # create the chris user and another user
+        # create the chris superuser and two additional users
         User.objects.create_user(username=self.chris_username,
                                  password=self.chris_password)
+        User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
         User.objects.create_user(username=self.username,
                                  password=self.password)
         
@@ -420,5 +424,140 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         self.assertNotContains(response, STATUS_TYPES[1])
 
     def test_plugin_instance_query_search_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceDescendantListViewTests(ViewTests):
+    """
+    Test the plugininstance-descendant-list view
+    """
+
+    def setUp(self):
+        super(PluginInstanceDescendantListViewTests, self).setUp()
+
+        user = User.objects.get(username=self.username)
+
+        # create an 'fs' plugin instance
+        plugin = Plugin.objects.get(name="pacspull")
+        (fs_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+
+        # create a tree of 'ds' plugin instances
+        plugin = Plugin.objects.get(name="mri_convert")
+        PluginInstance.objects.get_or_create(plugin=plugin, owner=user, previous=fs_inst,
+                                             compute_resource=plugin.compute_resource)
+
+        (plugin, tf) = Plugin.objects.get_or_create(name="mri_info", type="ds",
+                                    compute_resource=self.compute_resource)
+        (ds_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                previous=fs_inst, compute_resource=plugin.compute_resource)
+
+        (plugin, tf) = Plugin.objects.get_or_create(name="mri_surf", type="ds",
+                                    compute_resource=self.compute_resource)
+        PluginInstance.objects.get_or_create(plugin=plugin, owner=user, previous=ds_inst,
+                                             compute_resource=plugin.compute_resource)
+
+        self.list_url = reverse("plugininstance-descendant-list", kwargs={"pk": fs_inst.id})
+
+    def test_plugin_instance_descendant_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        # response should contain all the instances in the tree
+        self.assertContains(response, "pacspull")
+        self.assertContains(response, "mri_convert")
+        self.assertContains(response, "mri_info")
+        self.assertContains(response, "mri_surf")
+
+    def test_plugin_instance_descendant_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceFileListViewTests(ViewTests):
+    """
+    Test the plugininstance-file-list view
+    """
+
+    def setUp(self):
+        super(PluginInstanceFileListViewTests, self).setUp()
+
+        user = User.objects.get(username=self.username)
+
+        # create a plugin instance
+        plugin = Plugin.objects.get(name="pacspull")
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+
+        # create a feed file associated to the plugin instance
+        (feedfile, tf) = FeedFile.objects.get_or_create(plugin_inst=inst, feed=inst.feed)
+        feedfile.fname.name = 'test_file.txt'
+        feedfile.save()
+
+        self.list_url = reverse("plugininstance-file-list", kwargs={"pk": inst.id})
+
+    def test_plugin_instance_file_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "test_file.txt")
+
+    def test_plugin_instance_file_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_instance_file_list_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PluginInstanceParameterListViewTests(ViewTests):
+    """
+    Test the plugininstance-parameter-list view
+    """
+
+    def setUp(self):
+        super(PluginInstanceParameterListViewTests, self).setUp()
+
+        user = User.objects.get(username=self.username)
+
+        # create a plugin
+        plugin = Plugin.objects.get(name="pacspull")
+        parameters = [{"type": "path", "name": "param1", "flag": "--param1"},
+                      {"type": "float", "name": "param2", "flag": "--param2"}]
+
+        # add plugin's parameters
+        (param1, tf) = PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
+        (param2, tf) = PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[1]['name'],
+            type=parameters[1]['type'],
+            flag=parameters[1]['flag'])
+
+        # create a plugin instance
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+
+        # create two plugin parameter instances associated to the plugin instance
+        PathParameter.objects.get_or_create(plugin_inst=inst, plugin_param=param1,
+                                            value="./")
+        FloatParameter.objects.get_or_create(plugin_inst=inst, plugin_param=param2,
+                                             value=3.14)
+
+        self.list_url = reverse("plugininstance-parameter-list", kwargs={"pk": inst.id})
+
+    def test_plugin_instance_parameter_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "param1")
+        self.assertContains(response, "./")
+        self.assertContains(response, "param2")
+        self.assertContains(response, 3.14)
+
+    def test_plugin_instance_parameter_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -383,7 +383,7 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class FeedFileList(generics.ListAPIView):
     """
-    A view for the collection of feeds' files.
+    A view for the collection of a feed's files.
     """
     queryset = Feed.objects.all()
     serializer_class = FeedFileSerializer
