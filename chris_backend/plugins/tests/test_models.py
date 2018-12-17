@@ -1,4 +1,5 @@
 
+import logging
 import os, shutil
 from unittest import mock
 
@@ -16,6 +17,9 @@ from plugins.models import ComputeResource
 class PluginModelTests(TestCase):
     
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.plugin_fs_name = "simplefsapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -34,7 +38,11 @@ class PluginModelTests(TestCase):
     def test_get_plugin_parameter_names(self):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         param_names = plugin.get_plugin_parameter_names()
-        self.assertEquals(param_names, ['dir'])
+        self.assertEqual(param_names, ['dir'])
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
         
       
 class PluginInstanceModelTests(TestCase):
@@ -83,8 +91,8 @@ class PluginInstanceModelTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                             compute_resource=plugin.compute_resource)
         
-        self.assertEquals(Feed.objects.count(), 1)
-        self.assertEquals(pl_inst.feed.name,pl_inst.plugin.name)
+        self.assertEqual(Feed.objects.count(), 1)
+        self.assertEqual(pl_inst.feed.name,pl_inst.plugin.name)
 
     def test_save_do_not_create_new_feed_just_after_ds_plugininstance_is_created(self):
         """
@@ -96,7 +104,7 @@ class PluginInstanceModelTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                     compute_resource=plugin.compute_resource)
-        self.assertEquals(Feed.objects.count(), 0)
+        self.assertEqual(Feed.objects.count(), 0)
 
     def test_get_root_instance(self):
         """
@@ -113,7 +121,7 @@ class PluginInstanceModelTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                             previous=pl_inst_root,compute_resource=plugin.compute_resource)
         root_instance = pl_inst.get_root_instance()
-        self.assertEquals(root_instance, pl_inst_root)
+        self.assertEqual(root_instance, pl_inst_root)
 
     def test_get_output_path(self):
         """
@@ -131,7 +139,7 @@ class PluginInstanceModelTests(TestCase):
                                                              pl_inst_fs.feed.id,
                                                              pl_inst_fs.plugin.name,
                                                              pl_inst_fs.id) 
-        self.assertEquals(pl_inst_fs.get_output_path(), fs_output_path)
+        self.assertEqual(pl_inst_fs.get_output_path(), fs_output_path)
         
 
         # create a 'ds' plugin instance 
@@ -145,7 +153,7 @@ class PluginInstanceModelTests(TestCase):
         ds_output_path = os.path.join(os.path.dirname(fs_output_path),
                                       '{0}_{1}/data'.format(pl_inst_ds.plugin.name,
                                                             pl_inst_ds.id))
-        self.assertEquals(pl_inst_ds.get_output_path(), ds_output_path)
+        self.assertEqual(pl_inst_ds.get_output_path(), ds_output_path)
 
     def test_register_output_files(self):
         """
@@ -173,9 +181,9 @@ class PluginInstanceModelTests(TestCase):
                                                   authurl=settings.SWIFT_AUTH_URL,)
                 conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
                                                    prefix=output_path, full_listing=True)
-                self.assertEquals(FeedFile.objects.count(), 1)
+                self.assertEqual(FeedFile.objects.count(), 1)
                 feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
-                self.assertEquals(feedfile.fname.name, output_path + '/file1.txt')
+                self.assertEqual(feedfile.fname.name, output_path + '/file1.txt')
 
     @tag('integration')
     def test_integration_register_output_files(self):
@@ -221,9 +229,9 @@ class PluginInstanceModelTests(TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
         pl_inst.register_output_files()
-        self.assertEquals(FeedFile.objects.count(), 1)
+        self.assertEqual(FeedFile.objects.count(), 1)
         feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
-        self.assertEquals(feedfile.fname.name, output_path + '/file1.txt')
+        self.assertEqual(feedfile.fname.name, output_path + '/file1.txt')
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')

@@ -24,8 +24,10 @@ class UploadedFileViewTests(TestCase):
     """
 
     def setUp(self):
-        self.content_type = 'application/vnd.collection+json'
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
 
+        self.content_type = 'application/vnd.collection+json'
         self.chris_username = 'chris'
         self.chris_password = 'chrispass'
         self.username = 'test'
@@ -46,6 +48,10 @@ class UploadedFileViewTests(TestCase):
         self.uploadedfile.fname.name = 'test/uploads/file1.txt'
         self.uploadedfile.save()
 
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
+
 
 class UploadedFileListViewTests(UploadedFileViewTests):
     """
@@ -53,9 +59,6 @@ class UploadedFileListViewTests(UploadedFileViewTests):
     """
 
     def setUp(self):
-        # do not log http requests during tests
-        logging.disable(logging.CRITICAL)
-
         super(UploadedFileListViewTests, self).setUp()
         self.create_read_url = reverse("uploadedfile-list")
 
@@ -66,8 +69,7 @@ class UploadedFileListViewTests(UploadedFileViewTests):
             os.makedirs(self.test_dir)
 
     def tearDown(self):
-        # restore logging level
-        logging.disable(logging.DEBUG)
+        super(UploadedFileListViewTests, self).tearDown()
         # remove test directory
         shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
@@ -155,8 +157,8 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
         with mock.patch(mocked_method) as delete_object_mock:
             response = self.client.delete(self.read_update_delete_url)
             delete_object_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME, swift_path)
-            self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-            self.assertEquals(UploadedFile.objects.count(), 0)
+            self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+            self.assertEqual(UploadedFile.objects.count(), 0)
 
     def test_uploadedfile_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -185,6 +187,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
             os.makedirs(self.test_dir)
 
     def tearDown(self):
+        super(UploadedFileResourceViewTests, self).tearDown()
         # remove test directory
         shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
@@ -217,8 +220,8 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(str(response.content, 'utf-8'), "test file")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.content, 'utf-8'), "test file")
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, 'test/uploads/file1.txt')

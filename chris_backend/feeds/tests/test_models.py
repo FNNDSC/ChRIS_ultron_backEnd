@@ -1,4 +1,6 @@
 
+import logging
+
 from django.test import TestCase
 from django.contrib.auth.models import User
 
@@ -9,6 +11,9 @@ from feeds.models import Note, Feed
 class FeedModelTests(TestCase):
     
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.feed_name = "Feed1"
         self.plugin_name = "pacspull"
         self.plugin_type = "fs"
@@ -32,7 +37,11 @@ class FeedModelTests(TestCase):
 
         # create user
         user = User.objects.create_user(username=self.username,
-                                        password=self.password)      
+                                        password=self.password)
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
     def test_save_creates_new_note_just_after_feed_is_created(self):
         """
@@ -44,4 +53,4 @@ class FeedModelTests(TestCase):
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
                                             compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feed_name
-        self.assertEquals(Note.objects.count(), 1)
+        self.assertEqual(Note.objects.count(), 1)

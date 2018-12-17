@@ -1,3 +1,5 @@
+
+import logging
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -13,6 +15,9 @@ from feeds.serializers import TaggingSerializer, FeedSerializer
 class SerializerTests(TestCase):
 
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.username = 'foo'
         self.password = 'bar'
         self.feedname = "Feed1"
@@ -36,6 +41,10 @@ class SerializerTests(TestCase):
                                                 compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
 
 class TaggingSerializerTests(SerializerTests):
