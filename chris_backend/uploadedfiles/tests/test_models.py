@@ -1,4 +1,5 @@
 
+import logging
 from unittest import mock
 
 from django.test import TestCase
@@ -7,6 +8,14 @@ from uploadedfiles.models import UploadedFile, uploaded_file_path
 
 
 class UploadedFileModelTests(TestCase):
+
+    def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
     def test_uploaded_file_path(self):
         uploadedfile_instance = mock.Mock()
@@ -18,7 +27,7 @@ class UploadedFileModelTests(TestCase):
         expected_file_path = '{0}/{1}/{2}'.format(uploadedfile_instance.owner.username,
                                                   'uploads',
                                                   uploadedfile_instance.upload_path.strip('/'))
-        self.assertEquals(file_path, expected_file_path)
+        self.assertEqual(file_path, expected_file_path)
 
     def test_str(self):
         uploadedfile_mock = mock.MagicMock(spec=UploadedFile)

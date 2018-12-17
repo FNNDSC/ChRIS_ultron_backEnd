@@ -1,4 +1,6 @@
 
+import logging
+
 from django.conf.urls import url, include
 from django.test.utils import override_settings
 from django.test import TestCase
@@ -7,7 +9,6 @@ from collection_json import Collection
 from rest_framework import status
 from rest_framework.routers import DefaultRouter
 
-from collectionjson.renderers import CollectionJsonRenderer
 from .models import Dummy, Idiot, Moron, Simple
 from . import views
 
@@ -24,8 +25,14 @@ class SimpleGetTest(TestCase):
     endpoint = ''
 
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
         self.response = self.client.get(self.endpoint)
         self.collection = Collection.from_json(self.response.content.decode('utf8'))
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
 
 class TestCollectionJsonRenderer(SimpleGetTest):

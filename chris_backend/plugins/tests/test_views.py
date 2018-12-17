@@ -1,4 +1,5 @@
 
+import logging
 import os
 import json
 import shutil
@@ -23,6 +24,9 @@ import time
 class ViewTests(TestCase):
     
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
         self.username = 'data/foo'
@@ -47,6 +51,10 @@ class ViewTests(TestCase):
                                     compute_resource=self.compute_resource)
         Plugin.objects.get_or_create(name="mri_convert", type="ds",
                                     compute_resource=self.compute_resource)
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
 
 class PluginListViewTests(ViewTests):
@@ -173,9 +181,6 @@ class PluginInstanceListViewTests(ViewTests):
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(
             {"template": {"data": [{"name": "dir", "value": "./"}]}})
-
-    def tearDown(self):
-        pass
 
     def test_plugin_instance_create_success(self):
         with mock.patch.object(views.PluginManager, 'run_plugin_app',

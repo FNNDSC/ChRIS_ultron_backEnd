@@ -1,4 +1,5 @@
 
+import logging
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -15,6 +16,9 @@ from plugins.serializers import PluginInstanceSerializer
 class SerializerTests(TestCase):
 
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.username = 'foo'
         self.password = 'foopassword'
         self.plugin_name = "simplefsapp"
@@ -51,6 +55,10 @@ class SerializerTests(TestCase):
         # create user
         User.objects.create_user(username=self.username, password=self.password)
 
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
+
 
 class PluginSerializerTests(SerializerTests):
 
@@ -71,7 +79,7 @@ class PluginSerializerTests(SerializerTests):
         """
         with self.assertRaises(serializers.ValidationError):
             PluginSerializer.validate_app_cpu_descriptor('100me')
-            self.assertEquals(100, PluginSerializer.validate_app_cpu_descriptor('100m'))
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100m'))
 
     def test_validate_app_memory_descriptor(self):
         """
@@ -80,8 +88,8 @@ class PluginSerializerTests(SerializerTests):
         """
         with self.assertRaises(serializers.ValidationError):
             PluginSerializer.validate_app_cpu_descriptor('100me')
-            self.assertEquals(100, PluginSerializer.validate_app_cpu_descriptor('100mi'))
-            self.assertEquals(100, PluginSerializer.validate_app_cpu_descriptor('100gi'))
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100mi'))
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100gi'))
 
     def test_validate_app_gpu_descriptor(self):
         """

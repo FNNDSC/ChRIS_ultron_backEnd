@@ -1,5 +1,6 @@
 
 import json
+import logging
 
 from django.conf.urls import url, include
 from django.test.utils import override_settings
@@ -16,7 +17,13 @@ class SimplePOSTTest(TestCase):
     endpoint = ''
 
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
         self.content_type='application/vnd.collection+json'
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
 
 
 class TestCollectionJsonParser(SimplePOSTTest):
