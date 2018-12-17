@@ -50,11 +50,9 @@ RUN apt-get update \
   && chmod 777 /usr/users                                             \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# RUN chmod 777 /usr/users
-
 WORKDIR $APPROOT
 ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
-EXPOSE 8000 5005
+EXPOSE 8000
 
 # Start as user $UID
 # For now this is disabled so the service runs as root to 
