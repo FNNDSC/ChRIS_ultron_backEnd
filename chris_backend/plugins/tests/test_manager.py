@@ -1,4 +1,5 @@
 
+import logging
 import os, shutil
 import time
 from unittest import mock
@@ -14,6 +15,9 @@ from plugins.services import manager
 class PluginManagerTests(TestCase):
     
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
                             "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
                             "description": "A simple chris fs app demo", "version": "0.1",
@@ -54,12 +58,16 @@ class PluginManagerTests(TestCase):
         # create user
         User.objects.create_user(username=self.username, password=self.password)
 
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
+
     def test_mananger_can_get_plugin(self):
         """
         Test whether the manager can return a plugin object.
         """
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        self.assertEquals(plugin, self.pl_manager.get_plugin(self.plugin_fs_name))
+        self.assertEqual(plugin, self.pl_manager.get_plugin(self.plugin_fs_name))
 
     def test_mananger_can_add_plugin(self):
         """
@@ -70,7 +78,7 @@ class PluginManagerTests(TestCase):
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
         self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/'])
-        self.assertEquals(Plugin.objects.count(), 2)
+        self.assertEqual(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'testapp', 'http://localhost:8010/api/v1/', None, None, 30)
@@ -93,16 +101,16 @@ class PluginManagerTests(TestCase):
 
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
-        self.assertEquals(plugin.selfexec,'testapp.py')
-        self.assertEquals(plugin.compute_resource.compute_resource_identifier, 'host1')
+        self.assertEqual(plugin.selfexec,'testapp.py')
+        self.assertEqual(plugin.compute_resource.compute_resource_identifier, 'host1')
 
     def test_mananger_can_remove_plugin(self):
         """
         Test whether the manager can remove an existing plugin from the system.
         """
         self.pl_manager.run(['remove', self.plugin_fs_name])
-        self.assertEquals(Plugin.objects.count(), 0)
-        self.assertEquals(PluginParameter.objects.count(), 0)
+        self.assertEqual(Plugin.objects.count(), 0)
+        self.assertEqual(PluginParameter.objects.count(), 0)
 
     def test_mananger_can_run_registered_plugin_app(self):
         """

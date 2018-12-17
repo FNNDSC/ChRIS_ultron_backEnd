@@ -1,4 +1,5 @@
 
+import logging
 import os, json, shutil
 from unittest import mock
 
@@ -19,8 +20,10 @@ from feeds import views
 class ViewTests(TestCase):
     
     def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
         self.content_type='application/vnd.collection+json'
-        
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
         self.username = 'foo'
@@ -58,6 +61,10 @@ class ViewTests(TestCase):
                                             compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
         
 
 class NoteDetailViewTests(ViewTests):
@@ -259,8 +266,8 @@ class FeedDetailViewTests(ViewTests):
     def test_feed_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(Feed.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Feed.objects.count(), 0)
 
     def test_feed_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -381,8 +388,8 @@ class CommentDetailViewTests(ViewTests):
     def test_comment_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(Comment.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Comment.objects.count(), 0)
 
     def test_comment_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -491,8 +498,8 @@ class TagDetailViewTests(ViewTests):
     def test_tag_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(Tag.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Tag.objects.count(), 0)
 
     def test_tag_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -785,8 +792,8 @@ class TaggingDetailViewTests(ViewTests):
     def test_tagging_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_delete_url)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEquals(Tagging.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Tagging.objects.count(), 0)
 
     def test_tagging_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_delete_url)
@@ -812,6 +819,7 @@ class FeedFileViewTests(ViewTests):
             os.makedirs(self.test_dir)
 
     def tearDown(self):
+        super(FeedFileViewTests, self).tearDown()
         #remove test directory
         shutil.rmtree(self.test_dir)
         settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
@@ -982,8 +990,8 @@ class FileResourceViewTests(FeedFileViewTests):
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(str(response.content,'utf-8'), "test file")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.content,'utf-8'), "test file")
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt')
