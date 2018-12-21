@@ -1,6 +1,7 @@
 
 import logging
-import os, json, shutil
+import json
+import io
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -807,22 +808,22 @@ class TaggingDetailViewTests(ViewTests):
 
 class FeedFileViewTests(ViewTests):
     """
-    Generric feedfile view tests' setup and tearDown
+    Generic feedfile view tests' setup and tearDown
     """
 
     def setUp(self):
         super(FeedFileViewTests, self).setUp()
         # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+        # self.test_dir = settings.MEDIA_ROOT + '/test'
+        # settings.MEDIA_ROOT = self.test_dir
+        # if not os.path.exists(self.test_dir):
+        #     os.makedirs(self.test_dir)
 
     def tearDown(self):
         super(FeedFileViewTests, self).tearDown()
         #remove test directory
-        shutil.rmtree(self.test_dir)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+        # shutil.rmtree(self.test_dir)
+        # settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
         
 class FeedFileListViewTests(FeedFileViewTests):
@@ -837,28 +838,17 @@ class FeedFileListViewTests(FeedFileViewTests):
         self.list_url = reverse("feedfile-list", kwargs={"pk": feed.id})
 
         # create a test file 
-        test_file_path = self.test_dir
-        self.test_file = test_file_path + '/file1.txt'
-        file = open(self.test_file, "w")
-        file.write("test file1")
-        file.close()
-        file = open(test_file_path + '/file2.txt', "w")
-        file.write("test file2")
-        file.close()
+        # test_file_path = self.test_dir
+        # self.test_file = test_file_path + '/file1.txt'
+        # file = open(self.test_file, "w")
+        # file.write("test file1")
+        # file.close()
+        # file = open(test_file_path + '/file2.txt', "w")
+        # file.write("test file2")
+        # file.close()
 
         # create two files in the DB "already uploaded" to the server)
         pl_inst = PluginInstance.objects.all()[0]
-        #file = open(self.test_file, "r")
-        #django_file = File(file)
-        #feedfile = FeedFile(plugin_inst=pl_inst)
-        #feedfile.fname.save("file2.txt", django_file, save=True)
-        #feedfile.feed = [feed]
-        #feedfile.save()
-        #feedfile = FeedFile(plugin_inst=pl_inst)
-        #feedfile.fname.save("file3.txt", django_file, save=True)
-        #feedfile.feed = [feed]
-        #feedfile.save()
-        #file.close()
         feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
         feedfile.fname.name = 'file1.txt'
         feedfile.save()
@@ -869,8 +859,8 @@ class FeedFileListViewTests(FeedFileViewTests):
     def test_feedfile_create_failure_post_not_allowed(self):
         self.client.login(username=self.username, password=self.password)
         # try to create a new feed file with a POST request to the list
-        #  POST request using multipart/form-data to be able to upload file  
-        with open(self.test_file) as f:
+        # POST request using multipart/form-data to be able to upload file
+        with io.StringIO("test file") as f:
             post = {"fname": f}
             response = self.client.post(self.list_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -900,13 +890,6 @@ class FeedFileDetailViewTests(FeedFileViewTests):
         super(FeedFileDetailViewTests, self).setUp()
         feed = Feed.objects.get(name=self.feedname)
         self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
-
-        # create a test file 
-        test_file_path = self.test_dir
-        self.test_file = test_file_path + '/file1.txt'
-        file = open(self.test_file, "w")
-        file.write("test file")
-        file.close()
 
         # create a file in the DB "already uploaded" to the server
         pl_inst = PluginInstance.objects.all()[0]
@@ -966,12 +949,6 @@ class FileResourceViewTests(FeedFileViewTests):
 
     @tag('integration')
     def test_integration_fileresource_download_success(self):
-        # create a test file
-        test_file_path = self.test_dir
-        self.test_file = test_file_path + '/file1.txt'
-        file = open(self.test_file, "w")
-        file.write("test file")
-        file.close()
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
@@ -983,7 +960,7 @@ class FileResourceViewTests(FeedFileViewTests):
         conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # upload file to Swift storage
-        with open(self.test_file, 'r') as file1:
+        with io.StringIO("test file") as file1:
             conn.put_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt',
                             contents=file1.read(),
                             content_type='text/plain')

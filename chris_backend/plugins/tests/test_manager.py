@@ -1,12 +1,11 @@
 
 import logging
-import os, shutil
+import os
 import time
 from unittest import mock
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
-from django.conf import settings
 
 from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
 from plugins.services import manager
@@ -147,31 +146,29 @@ class PluginManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
-        try:
-            # create test directory where files are created
-            test_dir = settings.MEDIA_ROOT + '/test'
-            settings.MEDIA_ROOT = test_dir
-            if not os.path.exists(test_dir):
-                os.makedirs(test_dir)
+        # try:
+        #     # create test directory where files are created
+        #     test_dir = settings.MEDIA_ROOT + '/test'
+        #     settings.MEDIA_ROOT = test_dir
+        #     if not os.path.exists(test_dir):
+        #         os.makedirs(test_dir)
 
-            user = User.objects.get(username=self.username)
-            plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                compute_resource=plugin.compute_resource)
-            parameter_dict = {'dir': './'}
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                            compute_resource=plugin.compute_resource)
+        parameter_dict = {'dir': './'}
+        self.pl_manager.run_plugin_app(pl_inst,
+                                       parameter_dict,
+                                       service             = 'pfcon',
+                                       inputDirOverride    = '/share/incoming',
+                                       outputDirOverride   = '/share/outgoing')
+        self.assertEqual(pl_inst.status, 'started')
 
-            # pudb.set_trace()
-            self.pl_manager.run_plugin_app(pl_inst,
-                                           parameter_dict,
-                                           service             = 'pfcon',
-                                           inputDirOverride    = '/share/incoming',
-                                           outputDirOverride   = '/share/outgoing')
-            self.assertEqual(pl_inst.status, 'started')
-            # time.sleep(10)
-        finally:
-            # remove test directory
-            shutil.rmtree(test_dir, ignore_errors=True)
-            settings.MEDIA_ROOT = os.path.dirname(test_dir)
+        # finally:
+        #     # remove test directory
+        #     shutil.rmtree(test_dir, ignore_errors=True)
+        #     settings.MEDIA_ROOT = os.path.dirname(test_dir)
 
     def test_mananger_can_check_plugin_app_exec_status(self):
         """
@@ -203,56 +200,41 @@ class PluginManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
-        try:
-            # create test directory where files are created
-            test_dir = settings.MEDIA_ROOT + '/test'
-            settings.MEDIA_ROOT = test_dir
-            if not os.path.exists(test_dir):
-                os.makedirs(test_dir)
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                compute_resource=plugin.compute_resource)
+        parameter_dict = {'dir': './'}
 
-            user = User.objects.get(username=self.username)
-            plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
-            parameter_dict = {'dir': './'}
+        self.pl_manager.run_plugin_app(pl_inst,
+                                       parameter_dict,
+                                       service             = 'pfcon',
+                                       inputDirOverride    = '/share/incoming',
+                                       outputDirOverride   = '/share/outgoing')
 
-            self.pl_manager.run_plugin_app(pl_inst,
-                                           parameter_dict,
-                                           service             = 'pfcon',
-                                           inputDirOverride    = '/share/incoming',
-                                           outputDirOverride   = '/share/outgoing')
+        self.pl_manager.check_plugin_app_exec_status(pl_inst)
+        self.assertEqual(pl_inst.status, 'started')
 
-            # After submitting run request, wait before checking status
-            # time.sleep(5)
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 2 second intervals.
+        maxLoopTries    = 20
+        currentLoop     = 1
+        b_checkAgain    = True
+        while b_checkAgain:
+            str_responseStatus = self.pl_manager.check_plugin_app_exec_status(pl_inst)
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            else:
+                time.sleep(2)
+            currentLoop += 1
+            if currentLoop == maxLoopTries:
+                b_checkAgain = False
 
-            # pudb.set_trace()
-            self.pl_manager.check_plugin_app_exec_status(pl_inst)
-            self.assertEqual(pl_inst.status, 'started')
+        # if pl_inst.status != 'finishedSuccessfully':
+        #     pudb.set_trace()
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
-            # In the following we keep checking the status until the job ends with
-            # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-            # max number of attempts at 2 second intervals.
-            maxLoopTries    = 20
-            currentLoop     = 1
-            b_checkAgain    = True
-            while b_checkAgain:
-                str_responseStatus = self.pl_manager.check_plugin_app_exec_status(pl_inst)
-                if str_responseStatus == 'finishedSuccessfully':
-                    b_checkAgain = False
-                else:
-                    time.sleep(2)
-                currentLoop += 1
-                if currentLoop == maxLoopTries:
-                    b_checkAgain = False
-
-            # if pl_inst.status != 'finishedSuccessfully':
-            #     pudb.set_trace()
-            self.assertEqual(pl_inst.status, 'finishedSuccessfully')
-            # self.assertEqual(pl_inst.status, 'pushPath:True;compute:True;pullPath:True;')
-            str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')
-            str_ABSfileCreatedByPlugin  = '/' + str_fileCreatedByPlugin
-            self.assertTrue(os.path.isfile(str_ABSfileCreatedByPlugin))
-        finally:
-            # remove test directory
-            shutil.rmtree(test_dir, ignore_errors=True)
-            settings.MEDIA_ROOT = os.path.dirname(test_dir)
+        str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')
+        str_ABSfileCreatedByPlugin  = '/' + str_fileCreatedByPlugin
+        self.assertTrue(os.path.isfile(str_ABSfileCreatedByPlugin))

@@ -1,6 +1,7 @@
 
 import logging
-import os, shutil
+import os
+import io
 from unittest import mock
 
 import swiftclient
@@ -157,7 +158,7 @@ class PluginInstanceModelTests(TestCase):
 
     def test_register_output_files(self):
         """
-        Test whether custom register_output_files method properly register a plugin's
+        Test whether custom register_output_files method properly registers a plugin's
         output file with the REST API.
         """
         # create an 'fs' plugin instance
@@ -188,7 +189,7 @@ class PluginInstanceModelTests(TestCase):
     @tag('integration')
     def test_integration_register_output_files(self):
         """
-        Test whether custom register_output_files method properly register a plugin's
+        Test whether custom register_output_files method properly registers a plugin's
         output file with the REST API.
         """
         # create an 'fs' plugin instance
@@ -208,25 +209,12 @@ class PluginInstanceModelTests(TestCase):
         # create container in case it doesn't already exist
         conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
-
-        # create a test file
-        test_file = self.test_dir + '/file1.txt'
-        file = open(test_file, "w")
-        file.write("test file")
-        file.close()
-
         # upload file to Swift storage
         output_path = pl_inst.get_output_path()
-        with open(test_file, 'r') as file1:
+        with io.StringIO("test file") as file1:
             conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
                             contents=file1.read(),
                             content_type='text/plain')
-        # remove test directory
-        shutil.rmtree(self.test_dir, ignore_errors=True)
 
         pl_inst.register_output_files()
         self.assertEqual(FeedFile.objects.count(), 1)

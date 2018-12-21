@@ -1,14 +1,12 @@
 
 import logging
-import os
 import json
-import shutil
+import time
 from unittest import mock
 
 from django.test import TestCase, tag
 from django.urls import reverse
 from django.contrib.auth.models import User
-from django.conf import settings
 
 from rest_framework import status
 
@@ -17,8 +15,6 @@ from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
 from plugins.models import ComputeResource, PathParameter, FloatParameter
 from plugins.services.manager import PluginManager
 from plugins import views
-
-import time
 
 
 class ViewTests(TestCase):
@@ -206,61 +202,49 @@ class PluginInstanceListViewTests(ViewTests):
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
-        try:
-            # create test directory where files are created
-            self.test_dir = settings.MEDIA_ROOT + '/test'
-            settings.MEDIA_ROOT = self.test_dir
-            if not os.path.exists(self.test_dir):
-                os.makedirs(self.test_dir)
+        # add an FS plugin to the system
+        plugin_repr =      {"name": "simplefsapp",
+                            "dock_image": "fnndsc/pl-simplefsapp",
+                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
+                            "description": "A simple chris fs app demo",
+                            "version": "0.1",
+                            "title": "Simple chris fs app",
+                            "license": "Opensource (MIT)",
 
-            # add a plugin to the system
-            plugin_repr =      {"name": "simplefsapp",
-                                "dock_image": "fnndsc/pl-simplefsapp",
-                                "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                                "description": "A simple chris fs app demo",
-                                "version": "0.1",
-                                "title": "Simple chris fs app",
-                                "license": "Opensource (MIT)",
+                            "parameters": [{"optional": True, "action": "store",
+                                            "help": "look up directory",
+                                            "type": "path",
+                                            "name": "dir", "flag": "--dir",
+                                            "default": "./"}],
 
-                                "parameters": [{"optional": True, "action": "store",
-                                                "help": "look up directory",
-                                                "type": "path",
-                                                "name": "dir", "flag": "--dir",
-                                                "default": "./"}],
+                            "selfpath": "/usr/src/simplefsapp",
+                            "selfexec": "simplefsapp.py", "execshell": "python3"}
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
+        parameters = plugin_repr['parameters']
+        data = plugin_repr
+        del data['parameters']
+        data['compute_resource'] = compute_resource
+        (plugin, tf) = Plugin.objects.get_or_create(**data)
 
-                                "selfpath": "/usr/src/simplefsapp",
-                                "selfexec": "simplefsapp.py", "execshell": "python3"}
-            (compute_resource, tf) = ComputeResource.objects.get_or_create(
-                compute_resource_identifier="host")
-            parameters = plugin_repr['parameters']
-            data = plugin_repr
-            del data['parameters']
-            data['compute_resource'] = compute_resource
-            (plugin, tf) = Plugin.objects.get_or_create(**data)
+        # add plugin's parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
 
-            # add plugin's parameters
-            PluginParameter.objects.get_or_create(
-                plugin=plugin,
-                name=parameters[0]['name'],
-                type=parameters[0]['type'],
-                flag=parameters[0]['flag'])
+        # create a plugin's instance
+        user = User.objects.get(username=self.username)
+        PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
 
-            self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
-
-            # create a simplefsapp plugin instance
-            user = User.objects.get(username=self.username)
-            PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                        compute_resource=plugin.compute_resource)
-
-            # make API request
-            self.client.login(username=self.username, password=self.password)
-            response = self.client.post(self.create_read_url, data=self.post,
-                                        content_type=self.content_type)
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        finally:
-            # remove test directory
-            shutil.rmtree(self.test_dir, ignore_errors=True)
-            settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+        # make POST API request
+        self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -310,86 +294,74 @@ class PluginInstanceDetailViewTests(ViewTests):
 
     @tag('integration')
     def test_integration_plugin_instance_detail_success(self):
-        try:
-            # create test directory where files are created
-            self.test_dir = settings.MEDIA_ROOT + '/test'
-            settings.MEDIA_ROOT = self.test_dir
-            if not os.path.exists(self.test_dir):
-                os.makedirs(self.test_dir)
+        # add an FS plugin to the system
+        plugin_repr = {"name": "simplefsapp",
+                       "dock_image": "fnndsc/pl-simplefsapp",
+                       "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
+                       "description": "A simple chris fs app demo",
+                       "version": "0.1",
+                       "title": "Simple chris fs app",
+                       "license": "Opensource (MIT)",
 
-            # add a plugin to the system
-            plugin_repr = {"name": "simplefsapp",
-                           "dock_image": "fnndsc/pl-simplefsapp",
-                           "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                           "description": "A simple chris fs app demo",
-                           "version": "0.1",
-                           "title": "Simple chris fs app",
-                           "license": "Opensource (MIT)",
+                       "parameters": [{"optional": True, "action": "store",
+                                       "help": "look up directory",
+                                       "type": "path",
+                                       "name": "dir", "flag": "--dir",
+                                       "default": "./"}],
 
-                           "parameters": [{"optional": True, "action": "store",
-                                           "help": "look up directory",
-                                           "type": "path",
-                                           "name": "dir", "flag": "--dir",
-                                           "default": "./"}],
+                       "selfpath": "/usr/src/simplefsapp",
+                       "selfexec": "simplefsapp.py", "execshell": "python3"}
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
+        parameters = plugin_repr['parameters']
+        data = plugin_repr
+        del data['parameters']
+        data['compute_resource'] = compute_resource
+        (plugin, tf) = Plugin.objects.get_or_create(**data)
 
-                           "selfpath": "/usr/src/simplefsapp",
-                           "selfexec": "simplefsapp.py", "execshell": "python3"}
-            (compute_resource, tf) = ComputeResource.objects.get_or_create(
-                compute_resource_identifier="host")
-            parameters = plugin_repr['parameters']
-            data = plugin_repr
-            del data['parameters']
-            data['compute_resource'] = compute_resource
-            (plugin, tf) = Plugin.objects.get_or_create(**data)
+        # add plugin's parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
 
-            # add plugin's parameters
-            PluginParameter.objects.get_or_create(
-                plugin=plugin,
-                name=parameters[0]['name'],
-                type=parameters[0]['type'],
-                flag=parameters[0]['flag'])
+        # create a plugin's instance
+        user = User.objects.get(username=self.username)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                    compute_resource=plugin.compute_resource)
+        self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
 
-            # create a simplefsapp plugin instance
-            user = User.objects.get(username=self.username)
-            (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                        compute_resource=plugin.compute_resource)
-            self.read_url = reverse("plugininstance-detail", kwargs={"pk": pl_inst.id})
+        # run the plugin instance
+        pl_manager = PluginManager()
+        pl_manager.run_plugin_app(  pl_inst,
+                                    {'dir': './'},
+                                    service             = 'pfcon',
+                                    inputDirOverride    = '/share/incoming',
+                                    outputDirOverride   = '/share/outgoing')
 
-            # run the plugin instance
-            pl_manager = PluginManager()
-            pl_manager.run_plugin_app(  pl_inst,
-                                        {'dir': './'},
-                                        service             = 'pfcon',
-                                        inputDirOverride    = '/share/incoming',
-                                        outputDirOverride   = '/share/outgoing')
+        # make API GET request
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "simplefsapp")
 
-            # make API request
-            self.client.login(username=self.username, password=self.password)
-            response = self.client.get(self.read_url)
-            self.assertContains(response, "simplefsapp")
-
-            # In the following we keep checking the status until the job ends with
-            # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-            # max number of attempts at 2 second intervals.
-            maxLoopTries    = 20
-            currentLoop     = 1
-            b_checkAgain    = True
-            while b_checkAgain:
-                response            = self.client.get(self.read_url)
-                str_responseStatus  = response.data['status']
-                if str_responseStatus == 'finishedSuccessfully':
-                    b_checkAgain = False
-                else:
-                    time.sleep(2)
-                currentLoop += 1
-                if currentLoop == maxLoopTries:
-                    b_checkAgain = False
-
-            self.assertContains(response, "finishedSuccessfully")
-        finally:
-            # remove test directory
-            shutil.rmtree(self.test_dir, ignore_errors=True)
-            settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 2 second intervals.
+        maxLoopTries    = 20
+        currentLoop     = 1
+        b_checkAgain    = True
+        while b_checkAgain:
+            response            = self.client.get(self.read_url)
+            str_responseStatus  = response.data['status']
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            else:
+                time.sleep(2)
+            currentLoop += 1
+            if currentLoop == maxLoopTries:
+                b_checkAgain = False
+        self.assertContains(response, "finishedSuccessfully")
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
