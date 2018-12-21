@@ -1,6 +1,5 @@
 
 import logging
-import os, shutil
 import json
 import io
 from unittest import mock, skip
@@ -62,30 +61,15 @@ class UploadedFileListViewTests(UploadedFileViewTests):
         super(UploadedFileListViewTests, self).setUp()
         self.create_read_url = reverse("uploadedfile-list")
 
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
-
     def tearDown(self):
         super(UploadedFileListViewTests, self).tearDown()
-        # remove test directory
-        shutil.rmtree(self.test_dir)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     @tag('integration')
     def test_integration_uploadedfile_create_success(self):
-        # create a test file
-        test_file_path = self.test_dir
-        self.test_file = test_file_path + '/file2.txt'
-        file = open(self.test_file, "w")
-        file.write("test file")
-        file.close()
 
-        self.client.login(username=self.username, password=self.password)
         # POST request using multipart/form-data to be able to upload file
-        with open(self.test_file) as f:
+        self.client.login(username=self.username, password=self.password)
+        with io.StringIO("test file") as f:
             post = {"fname": f, "upload_path": "/file2.txt"}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -180,17 +164,8 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
         self.download_url = reverse("uploadedfile-resource",
                                     kwargs={"pk": self.uploadedfile.id}) + 'file1.txt'
 
-        # create test directory where files are created
-        self.test_dir = settings.MEDIA_ROOT + '/test'
-        settings.MEDIA_ROOT = self.test_dir
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
-
     def tearDown(self):
         super(UploadedFileResourceViewTests, self).tearDown()
-        # remove test directory
-        shutil.rmtree(self.test_dir)
-        settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
 
     def test_uploadedfileresource_get(self):
         uploadedfile = self.uploadedfile
@@ -203,6 +178,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
     @tag('integration')
     def test_integration_uploadedfileresource_download_success(self):
+
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,
