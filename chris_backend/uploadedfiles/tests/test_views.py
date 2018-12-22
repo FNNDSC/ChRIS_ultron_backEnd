@@ -2,7 +2,7 @@
 import logging
 import json
 import io
-from unittest import mock, skip
+from unittest import mock
 
 import swiftclient
 
