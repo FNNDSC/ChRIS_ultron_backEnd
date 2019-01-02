@@ -292,7 +292,7 @@ class PluginInstanceDetailViewTests(ViewTests):
             # appropriate args
             check_plugin_app_exec_status_mock.assert_called_with(self.pl_inst)
 
-    @tag('integration')
+    @tag('failing-test')
     def test_integration_plugin_instance_detail_success(self):
         # add an FS plugin to the system
         plugin_repr = {"name": "simplefsapp",

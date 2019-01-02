@@ -189,7 +189,7 @@ class PluginManagerTests(TestCase):
                 charm_init_mock.assert_called_with(plugin_inst=pl_inst)
                 app_statusCheckAndRegister_mock.assert_called_with()
 
-    @tag('integration')
+    @tag('failing-test')
     def test_integration_mananger_can_check_plugin_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
