@@ -195,15 +195,14 @@ class PluginManager(object):
         app_args.append("--saveoutputmeta")
         # append the parameters to app's argument list
         db_parameters = plugin_inst.plugin.parameters.all()
-        if parameter_dict:
-            for param_name in parameter_dict:
-                param_value = parameter_dict[param_name]
-                for db_param in db_parameters:
-                    if db_param.name == param_name:
-                        app_args.append(db_param.flag)
-                        if db_param.action == 'store':
-                            app_args.append(param_value)
-                        break
+        for param_name in parameter_dict:
+            param_value = parameter_dict[param_name]
+            for db_param in db_parameters:
+                if db_param.name == param_name:
+                    app_args.append(db_param.flag)
+                    if db_param.action == 'store':
+                        app_args.append(param_value)
+                    break
 
         # run the app via an external REST service...
         str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
