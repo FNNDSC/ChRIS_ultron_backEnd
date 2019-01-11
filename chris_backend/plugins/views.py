@@ -4,7 +4,6 @@ from rest_framework.reverse import reverse
 from rest_framework.response import Response
 
 from collectionjson import services
-
 from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
 from .models import DefaultPipingPathParameter, DefaultPipingStrParameter
