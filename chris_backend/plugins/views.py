@@ -115,8 +115,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
         previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
+        feed = previous.feed if previous else None
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
+                                      previous=previous, feed=feed,
                                       compute_resource=plugin.compute_resource)
         # collect parameters from the request and validate and save them to the DB
         parameters = plugin.parameters.all()
