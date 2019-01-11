@@ -151,5 +151,3 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = PluginParameter
         fields = ('url', 'id', 'name', 'type', 'optional', 'default', 'flag', 'action',
                   'help', 'plugin')
-
-

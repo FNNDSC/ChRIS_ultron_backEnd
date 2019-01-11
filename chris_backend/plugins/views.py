@@ -1,6 +1,7 @@
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.response import Response
 
 from collectionjson import services
 
@@ -84,5 +85,3 @@ class PluginParameterDetail(generics.RetrieveAPIView):
     serializer_class = PluginParameterSerializer
     queryset = PluginParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-
-
