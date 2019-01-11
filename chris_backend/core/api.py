@@ -43,11 +43,8 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/(?P<pk>[0-9]+)/files/$',
         feed_views.FeedFileList.as_view(), name='feedfile-list'),
 
-    url(r'^v1/files/(?P<pk>[0-9]+)/$',
-        feed_views.FeedFileDetail.as_view(), name='feedfile-detail'),
-
-    url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
-        feed_views.FileResource.as_view(), name='feedfile-resource'),
+    url(r'^v1/(?P<pk>[0-9]+)/plugininstances/$',
+        feed_views.FeedPluginInstanceList.as_view(), name='feed-plugininstance-list'),
 
     url(r'^v1/(?P<pk>[0-9]+)/tags/$',
         feed_views.FeedTagList.as_view(), name='feed-tag-list'),
@@ -104,6 +101,13 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/files/$',
         plugin_views.PluginInstanceFileList.as_view(),
         name='plugininstance-file-list'),
+
+    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
+        plugin_views.PluginInstanceFileDetail.as_view(),
+        name='plugininstance-file-detail'),
+
+    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
+        plugin_views.FileResource.as_view(), name='plugininstance-file-resource'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
         plugin_views.PluginInstanceParameterList.as_view(),
