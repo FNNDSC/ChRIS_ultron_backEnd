@@ -9,8 +9,6 @@ class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, blank=True, default='')
-    plugin_inst = models.OneToOneField('plugins.PluginInstance',
-                                       on_delete=models.CASCADE, related_name='feed')
     owner = models.ManyToManyField('auth.User', related_name='feed')
 
     class Meta:
@@ -95,17 +93,3 @@ class Comment(models.Model):
 
     def __str__(self):
         return self.title
-
-
-class FeedFile(models.Model):
-    creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=2048)
-    feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name='files')
-    plugin_inst = models.ForeignKey('plugins.PluginInstance', on_delete=models.CASCADE,
-                                    related_name='files')
-
-    class Meta:
-        ordering = ('fname',)
-
-    def __str__(self):
-        return self.fname.name

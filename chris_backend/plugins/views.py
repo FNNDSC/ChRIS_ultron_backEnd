@@ -1,21 +1,19 @@
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.response import Response
 
 from collectionjson import services
-
-from feeds.serializers import FeedFileSerializer
-from feeds.permissions import IsOwnerOrChris
+from core.renderers import BinaryFileRenderer
 
 from .models import Plugin, PluginFilter, PluginParameter 
-from .models import PluginInstance, PluginInstanceFilter
+from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
 from .models import StringParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
-
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer
-from .permissions import IsChrisOrReadOnly
+from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
+from .permissions import IsChrisOrReadOnly, IsRelatedFeedOwnerOrChris
 from .services.manager import PluginManager
 
 
@@ -114,15 +112,13 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
-        previous_id = ""
-        if 'previous_id' in request_data:
-            previous_id = request_data['previous_id']
+        previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
+        feed = previous.feed if previous else None
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
+                                      previous=previous, feed=feed,
                                       compute_resource=plugin.compute_resource)
-
         # collect parameters from the request and validate and save them to the DB
         parameters = plugin.parameters.all()
         parameters_dict = {}
@@ -134,7 +130,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
-
         # run the plugin's app
         pl_manager = PluginManager()
         pl_manager.run_plugin_app(plugin_inst,
@@ -241,9 +236,9 @@ class PluginInstanceFileList(generics.ListAPIView):
     """
     A view for the collection of files written by a plugin instance.
     """
-    serializer_class = FeedFileSerializer
+    serializer_class = PluginInstanceFileSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -252,7 +247,7 @@ class PluginInstanceFileList(generics.ListAPIView):
         queryset = self.get_files_queryset()
         response = services.get_list_response(self, queryset)
         instance = self.get_object()
-        feed = instance.get_root_instance().feed
+        feed = instance.feed
         links = {'feed': reverse('feed-detail', request=request,
                              kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
@@ -263,6 +258,31 @@ class PluginInstanceFileList(generics.ListAPIView):
         """
         instance = self.get_object()
         return self.filter_queryset(instance.files.all())
+
+
+class PluginInstanceFileDetail(generics.RetrieveAPIView):
+    """
+    A view for a file written by a plugin instance.
+    """
+    queryset = PluginInstanceFile.objects.all()
+    serializer_class = PluginInstanceFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+
+class FileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource.
+    """
+    queryset = PluginInstanceFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Overriden to be able to make a GET request to an actual file resource.
+        """
+        plg_inst_file = self.get_object()
+        return Response(plg_inst_file.fname)
 
 
 class PluginInstanceParameterList(generics.ListAPIView):

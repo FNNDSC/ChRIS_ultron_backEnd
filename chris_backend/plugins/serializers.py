@@ -1,13 +1,16 @@
 
+import os
+
 from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework import serializers
 from collectionjson.services import collection_serializer_is_valid
+from collectionjson.fields import ItemLinkField
 
-from .models import Plugin, PluginParameter, PluginInstance, StringParameter
-from .models import FloatParameter, IntParameter, BoolParameter, PathParameter
+from .models import Plugin, PluginParameter, PluginInstance, PluginInstanceFile
+from .models import FloatParameter, IntParameter, BoolParameter
+from .models import PathParameter, StringParameter, ComputeResource
 from .fields import MemoryInt, CPUInt
-from .models import ComputeResource
 
 
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
@@ -230,9 +233,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'detail': err_str % previous_id})
             # check that the user can run plugins within this feed
-            root_inst = previous.get_root_instance()
             user = self.context['request'].user
-            if user not in root_inst.feed.owner.all():
+            if user not in previous.feed.owner.all():
                 err_str = "User is not an owner of feed for previous instance with id %s"
                 raise serializers.ValidationError(
                     {'detail': err_str % previous_id})
@@ -274,6 +276,34 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     def validate_value_within_interval(val, min_val, max_val, val_str):
         if val < min_val or val > max_val:
             raise serializers.ValidationError({'detail':"%s out of range." % val_str})
+
+
+class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                      read_only=True)
+    file_resource = ItemLinkField('_get_file_link')
+    fname = serializers.FileField(use_url=False)
+    feed_id = serializers.ReadOnlyField(source='plugin_inst.feed.id')
+    plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
+
+    class Meta:
+        model = PluginInstanceFile
+        fields = ('url', 'id', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource',
+                  'plugin_inst')
+
+    def _get_file_link(self, obj):
+        """
+        Custom method to get the hyperlink to the actual file resource
+        """
+        fields = self.fields.items()
+        # get the current url
+        url_field = [v for (k, v) in fields if k == 'url'][0]
+        view = url_field.view_name
+        request = self.context['request']
+        format = self.context['format']
+        url = url_field.get_url(obj, view, request, format)
+        # return url = current url + file name
+        return url + os.path.basename(obj.fname.name)
 
 
 class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -370,4 +400,3 @@ PARAMETER_SERIALIZERS = {'string': StringParameterSerializer,
                          'float': FloatParameterSerializer,
                          'boolean': BoolParameterSerializer,
                          'path': PathParameterSerializer}
-
