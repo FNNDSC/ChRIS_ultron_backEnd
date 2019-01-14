@@ -5,6 +5,7 @@ import json
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from rest_framework import status
 
