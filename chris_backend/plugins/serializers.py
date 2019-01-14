@@ -160,7 +160,9 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
+    feed_id = serializers.ReadOnlyField(source='feed.id')
     owner = serializers.ReadOnlyField(source='owner.username')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
@@ -169,7 +171,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(
         view_name='plugininstance-parameter-list')
     files = serializers.HyperlinkedIdentityField(
-        view_name='plugininstance-file-list')
+        view_name='plugininstancefile-list')
     previous_id = serializers.ReadOnlyField(source='previous.id')
     compute_resource_identifier = serializers.ReadOnlyField(
         source='compute_resource.compute_resource_identifier')
@@ -180,10 +182,11 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'previous_id', 'plugin_name', 'start_date', 'end_date',
-                  'status', 'previous', 'owner', 'feed', 'plugin', 'descendants', 'files',
-                  'parameters', 'compute_resource_identifier', 'cpu_limit',
-                  'memory_limit', 'number_of_workers','gpu_limit')
+        fields = ('url', 'id', 'previous_id', 'plugin_id', 'plugin_name', 'feed_id',
+                  'start_date', 'end_date', 'status', 'previous', 'owner', 'feed',
+                  'plugin', 'descendants', 'files', 'parameters',
+                  'compute_resource_identifier', 'cpu_limit', 'memory_limit',
+                  'number_of_workers','gpu_limit')
 
     def create(self, validated_data):
         """
