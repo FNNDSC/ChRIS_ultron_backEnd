@@ -100,14 +100,14 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/files/$',
         plugin_views.PluginInstanceFileList.as_view(),
-        name='plugininstance-file-list'),
+        name='plugininstancefile-list'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
         plugin_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstance-file-detail'),
+        name='plugininstancefile-detail'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugin_views.FileResource.as_view(), name='plugininstance-file-resource'),
+        plugin_views.FileResource.as_view(), name='plugininstancefile-resource'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
         plugin_views.PluginInstanceParameterList.as_view(),
