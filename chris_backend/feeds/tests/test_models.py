@@ -45,7 +45,7 @@ class FeedModelTests(TestCase):
 
     def test_save_creates_new_note_just_after_feed_is_created(self):
         """
-        Test whether overriden save method creates a note just after a feed is created
+        Test whether overriden save method creates a note just after a feed is created.
         """
         # create a plugin instance that in turn creates a new feed
         user = User.objects.get(username=self.username)
