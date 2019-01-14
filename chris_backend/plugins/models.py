@@ -13,8 +13,6 @@ from feeds.models import Feed
 from .fields import CPUField, MemoryField
 
 
-
-
 # API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values"),
@@ -145,10 +143,14 @@ class PluginInstance(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to save a new feed to the DB the first time the instance is saved.
+        Overriden to save a new feed to the DB the first time 'fs' instances are saved.
+        For 'ds' instances the feed of the previous instance is assigned.
         """
-        if not hasattr(self, 'feed') and self.plugin.type == 'fs':
-            self._save_feed()
+        if not hasattr(self, 'feed'):
+            if self.plugin.type == 'fs':
+                self.feed = self._save_feed()
+            if self.plugin.type == 'ds':
+                self.feed = self.previous.feed
         super(PluginInstance, self).save(*args, **kwargs)
             
     def _save_feed(self):
@@ -157,9 +159,10 @@ class PluginInstance(models.Model):
         """
         feed = Feed()
         feed.name = self.plugin.name
+        feed.save()
         feed.owner.set([self.owner])
         feed.save()
-        self.feed = feed
+        return feed
 
     def get_root_instance(self):
         """
@@ -259,12 +262,19 @@ class PluginInstanceFilter(FilterSet):
     max_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='lte')
     min_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='gte')
     max_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='lte')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    owner_username = django_filters.CharFilter(field_name='owner.username',
+                                               lookup_expr='exact')
+    feed_id = django_filters.CharFilter(field_name='feed.id',
+                                               lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
+    plugin_name = django_filters.CharFilter(field_name='plugin.name',
+                                               lookup_expr='icontains')
 
     class Meta:
         model = PluginInstance
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
-                  'root_id']
+                  'root_id', 'title', 'status', 'owner_username', 'feed_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """
