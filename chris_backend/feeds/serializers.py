@@ -25,13 +25,13 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class TagSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     feeds = serializers.HyperlinkedIdentityField(view_name='tag-feed-list')
     taggings = serializers.HyperlinkedIdentityField(view_name='tag-tagging-list')
 
     class Meta:
         model = Tag
-        fields = ('url', 'id', 'name', 'owner', 'color', 'feeds', 'taggings')
+        fields = ('url', 'id', 'name', 'owner_username', 'color', 'feeds', 'taggings')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -42,7 +42,7 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class TaggingSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.ReadOnlyField(source='tag.owner.username')
+    owner_username = serializers.ReadOnlyField(source='tag.owner.username')
     tag_id = serializers.ReadOnlyField(source='tag.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
@@ -50,7 +50,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Tagging
-        fields = ('url', 'id', 'owner', 'tag_id', 'feed_id', 'tag', 'feed')
+        fields = ('url', 'id', 'owner_username', 'tag_id', 'feed_id', 'tag', 'feed')
 
     def create(self, validated_data):
         """
@@ -154,12 +154,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username')
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
 
     class Meta:
         model = Comment
-        fields = ('url', 'id', 'title', 'owner', 'content', 'feed')
+        fields = ('url', 'id', 'title', 'owner_username', 'content', 'feed')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):

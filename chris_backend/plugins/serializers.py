@@ -163,7 +163,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
     feed_id = serializers.ReadOnlyField(source='feed.id')
-    owner = serializers.ReadOnlyField(source='owner.username')
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
     descendants = serializers.HyperlinkedIdentityField(
@@ -183,8 +183,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'previous_id', 'plugin_id', 'plugin_name', 'feed_id',
-                  'start_date', 'end_date', 'status', 'previous', 'owner', 'feed',
-                  'plugin', 'descendants', 'files', 'parameters',
+                  'start_date', 'end_date', 'status', 'owner_username', 'previous',
+                  'feed', 'plugin', 'descendants', 'files', 'parameters',
                   'compute_resource_identifier', 'cpu_limit', 'memory_limit',
                   'number_of_workers','gpu_limit')
 
