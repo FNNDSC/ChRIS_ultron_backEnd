@@ -10,8 +10,8 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-from feeds.models import Feed, FeedFile
-from plugins.models import Plugin, PluginParameter, PluginInstance
+from feeds.models import Feed
+from plugins.models import Plugin, PluginParameter, PluginInstance, PluginInstanceFile
 from plugins.models import ComputeResource
 
 
@@ -100,12 +100,17 @@ class PluginInstanceModelTests(TestCase):
         Test whether overriden save method do not create a feed just after a 'ds' plugin 
         instance is created.
         """
-        # create a 'ds' plugin instance that shouldn't create a new feed
+        # create a 'fs' plugin instance
         user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+        # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
-        self.assertEqual(Feed.objects.count(), 0)
+        PluginInstance.objects.create(plugin=plugin, owner=user, previous=plg_inst,
+                                      compute_resource=plugin.compute_resource)
+        # the new 'ds' plugin instance shouldn't create a new feed
+        self.assertEqual(Feed.objects.count(), 1)
 
     def test_get_root_instance(self):
         """
@@ -115,14 +120,15 @@ class PluginInstanceModelTests(TestCase):
         # create a 'fs' plugin instance 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
+        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
                                                 compute_resource=plugin.compute_resource)
         # create a 'ds' plugin instance whose root is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                            previous=pl_inst_root,compute_resource=plugin.compute_resource)
-        root_instance = pl_inst.get_root_instance()
-        self.assertEqual(root_instance, pl_inst_root)
+        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=plg_inst_root,
+                                                compute_resource=plugin.compute_resource)
+        root_instance = plg_inst.get_root_instance()
+        self.assertEqual(root_instance, plg_inst_root)
 
     def test_get_output_path(self):
         """
@@ -166,8 +172,6 @@ class PluginInstanceModelTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
                                     compute_resource=plugin.compute_resource)
-        pl_inst.feed.name = 'Feed1'
-        pl_inst.feed.save()
         output_path = pl_inst.get_output_path()
         object_list = [{'name': output_path + '/file1.txt'}]
         container_data = ['', object_list]
@@ -182,9 +186,9 @@ class PluginInstanceModelTests(TestCase):
                                                   authurl=settings.SWIFT_AUTH_URL,)
                 conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
                                                    prefix=output_path, full_listing=True)
-                self.assertEqual(FeedFile.objects.count(), 1)
-                feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
-                self.assertEqual(feedfile.fname.name, output_path + '/file1.txt')
+                self.assertEqual(PluginInstanceFile.objects.count(), 1)
+                plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=pl_inst)
+                self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
 
     @tag('integration')
     def test_integration_register_output_files(self):
@@ -195,10 +199,8 @@ class PluginInstanceModelTests(TestCase):
         # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                             compute_resource=plugin.compute_resource)
-        pl_inst.feed.name = 'Feed1'
-        pl_inst.feed.save()
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
@@ -210,16 +212,16 @@ class PluginInstanceModelTests(TestCase):
         conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # upload file to Swift storage
-        output_path = pl_inst.get_output_path()
+        output_path = plg_inst.get_output_path()
         with io.StringIO("test file") as file1:
             conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
                             contents=file1.read(),
                             content_type='text/plain')
 
-        pl_inst.register_output_files()
-        self.assertEqual(FeedFile.objects.count(), 1)
-        feedfile = FeedFile.objects.get(plugin_inst=pl_inst, feed=pl_inst.feed)
-        self.assertEqual(feedfile.fname.name, output_path + '/file1.txt')
+        plg_inst.register_output_files()
+        self.assertEqual(PluginInstanceFile.objects.count(), 1)
+        plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=plg_inst)
+        self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')

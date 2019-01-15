@@ -1,21 +1,15 @@
 
 import logging
 import json
-import io
-from unittest import mock
 
-from django.test import TestCase, tag
+from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-from django.conf import settings
 
 from rest_framework import status
 
-import swiftclient
-
-from plugins.models import Plugin, PluginInstance, ComputeResource
-from feeds.models import Note, Tag, Tagging, Feed, Comment, FeedFile
-from feeds import views
+from plugins.models import Plugin, PluginInstance, PluginInstanceFile, ComputeResource
+from feeds.models import Note, Tag, Tagging, Feed, Comment
 
 
 class ViewTests(TestCase):
@@ -70,7 +64,7 @@ class ViewTests(TestCase):
 
 class NoteDetailViewTests(ViewTests):
     """
-    Test the note-detail view
+    Test the note-detail view.
     """
 
     def setUp(self):
@@ -122,7 +116,7 @@ class NoteDetailViewTests(ViewTests):
 
 class FeedListViewTests(ViewTests):
     """
-    Test the feed-list view
+    Test the feed-list view.
     """
 
     def setUp(self):
@@ -171,7 +165,7 @@ class FeedListViewTests(ViewTests):
 
 class FeedListQuerySearchViewTests(ViewTests):
     """
-    Test the feed-list-query-search view
+    Test the feed-list-query-search view.
     """
 
     def setUp(self):
@@ -210,7 +204,7 @@ class FeedListQuerySearchViewTests(ViewTests):
 
 class FeedDetailViewTests(ViewTests):
     """
-    Test the feed-detail view
+    Test the feed-detail view.
     """
 
     def setUp(self):
@@ -282,7 +276,7 @@ class FeedDetailViewTests(ViewTests):
 
 class CommentListViewTests(ViewTests):
     """
-    Test the comment-list view
+    Test the comment-list view.
     """
 
     def setUp(self):
@@ -336,7 +330,7 @@ class CommentListViewTests(ViewTests):
 
 class CommentDetailViewTests(ViewTests):
     """
-    Test the comment-detail view
+    Test the comment-detail view.
     """
 
     def setUp(self):
@@ -404,7 +398,7 @@ class CommentDetailViewTests(ViewTests):
 
 class TagListViewTests(ViewTests):
     """
-    Test the tag-list view
+    Test the tag-list view.
     """
 
     def setUp(self):
@@ -450,7 +444,7 @@ class TagListViewTests(ViewTests):
 
 class TagDetailViewTests(ViewTests):
     """
-    Test the tag-detail view
+    Test the tag-detail view.
     """
 
     def setUp(self):
@@ -514,7 +508,7 @@ class TagDetailViewTests(ViewTests):
 
 class FeedTagListViewTests(ViewTests):
     """
-    Test the feed-tag-list view
+    Test the feed-tag-list view.
     """
 
     def setUp(self):
@@ -572,7 +566,7 @@ class FeedTagListViewTests(ViewTests):
 
 class TagFeedListViewTests(ViewTests):
     """
-    Test the tag-feed-list view
+    Test the tag-feed-list view.
     """
 
     def setUp(self):
@@ -620,7 +614,7 @@ class TagFeedListViewTests(ViewTests):
 
 class FeedTaggingListViewTests(ViewTests):
     """
-    Test the feed-tagging-list view
+    Test the feed-tagging-list view.
     """
 
     def setUp(self):
@@ -688,7 +682,7 @@ class FeedTaggingListViewTests(ViewTests):
 
 class TagTaggingListViewTests(ViewTests):
     """
-    Test the tag-tagging-list view
+    Test the tag-tagging-list view.
     """
 
     def setUp(self):
@@ -757,7 +751,7 @@ class TagTaggingListViewTests(ViewTests):
 
 class TaggingDetailViewTests(ViewTests):
     """
-    Test the tagging-detail view
+    Test the tagging-detail view.
     """
 
     def setUp(self):
@@ -804,31 +798,11 @@ class TaggingDetailViewTests(ViewTests):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
 
-class FeedFileViewTests(ViewTests):
+
+class FeedFileListViewTests(ViewTests):
     """
-    Generic feedfile view tests' setup and tearDown
-    """
-
-    def setUp(self):
-        super(FeedFileViewTests, self).setUp()
-        # create test directory where files are created
-        # self.test_dir = settings.MEDIA_ROOT + '/test'
-        # settings.MEDIA_ROOT = self.test_dir
-        # if not os.path.exists(self.test_dir):
-        #     os.makedirs(self.test_dir)
-
-    def tearDown(self):
-        super(FeedFileViewTests, self).tearDown()
-        #remove test directory
-        # shutil.rmtree(self.test_dir)
-        # settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
-
-        
-class FeedFileListViewTests(FeedFileViewTests):
-    """
-    Test the feedfile-list view
+    Test the feedfile-list view.
     """
 
     def setUp(self):
@@ -837,7 +811,7 @@ class FeedFileListViewTests(FeedFileViewTests):
         self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
         self.list_url = reverse("feedfile-list", kwargs={"pk": feed.id})
 
-        # create a test file 
+        # create a test file
         # test_file_path = self.test_dir
         # self.test_file = test_file_path + '/file1.txt'
         # file = open(self.test_file, "w")
@@ -847,27 +821,28 @@ class FeedFileListViewTests(FeedFileViewTests):
         # file.write("test file2")
         # file.close()
 
-        # create two files in the DB "already uploaded" to the server)
-        pl_inst = PluginInstance.objects.all()[0]
-        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = 'file1.txt'
-        feedfile.save()
-        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = 'file2.txt'
-        feedfile.save()
+        # create two files in the DB "already uploaded" to the server from two different
+        # plugin instances that write to the same feed
+        plg_inst = PluginInstance.objects.all()[0]
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'file1.txt'
+        plg_inst_file.save()
 
-    def test_feedfile_create_failure_post_not_allowed(self):
-        self.client.login(username=self.username, password=self.password)
-        # try to create a new feed file with a POST request to the list
-        # POST request using multipart/form-data to be able to upload file
-        with io.StringIO("test file") as f:
-            post = {"fname": f}
-            response = self.client.post(self.list_url, data=post)
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        # create a second 'ds' plugin instance in the same feed tree
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name="mri_convert")
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                              previous_id= plg_inst.id,
+                                                compute_resource=plugin.compute_resource)
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'file2.txt'
+        plg_inst_file.save()
+
 
     def test_feedfile_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
+        # it shows all the files for all the plugin instances that write to the feed
         self.assertContains(response, "file1.txt")
         self.assertContains(response, "file2.txt")
 
@@ -878,106 +853,4 @@ class FeedFileListViewTests(FeedFileViewTests):
 
     def test_feedfile_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        
-
-class FeedFileDetailViewTests(FeedFileViewTests):
-    """
-    Test the feedfile-detail view
-    """
-
-    def setUp(self):
-        super(FeedFileDetailViewTests, self).setUp()
-        feed = Feed.objects.get(name=self.feedname)
-        self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
-
-        # create a file in the DB "already uploaded" to the server
-        pl_inst = PluginInstance.objects.all()[0]
-        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = 'file1.txt'
-        feedfile.save()
-
-        self.read_update_delete_url = reverse("feedfile-detail", kwargs={"pk": feedfile.id})
-          
-    def test_feedfile_detail_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_update_delete_url)
-        self.assertContains(response, "file1.txt")
-        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
-
-    def test_feedfile_detail_success_user_chris(self):
-        self.client.login(username=self.chris_username, password=self.chris_password)
-        response = self.client.get(self.read_update_delete_url)
-        self.assertContains(response, "file1.txt")
-        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
-
-    def test_feedfile_detail_failure_not_related_feed_owner(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_feedfile_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
-class FileResourceViewTests(FeedFileViewTests):
-    """
-    Test the feedfile-resource view
-    """
-
-    def setUp(self):
-        super(FileResourceViewTests, self).setUp()
-        feed = Feed.objects.get(name=self.feedname)
-        pl_inst = PluginInstance.objects.all()[0]
-        self.pl_inst = pl_inst
-        # create a file in the DB "already uploaded" to the server
-        feedfile = FeedFile(plugin_inst=pl_inst, feed=feed)
-        feedfile.fname.name = '/tests/file1.txt'
-        feedfile.save()
-        self.download_url = reverse("feedfile-resource",
-                                    kwargs={"pk": feedfile.id}) + 'file1.txt'
-
-    def test_fileresource_get(self):
-        feedfile = FeedFile.objects.get(fname="/tests/file1.txt")
-        fileresource_view_inst = mock.Mock()
-        fileresource_view_inst.get_object = mock.Mock(return_value=feedfile)
-        request_mock = mock.Mock()
-        with mock.patch('feeds.views.Response') as response_mock:
-            views.FileResource.get(fileresource_view_inst, request_mock)
-            response_mock.assert_called_with(feedfile.fname)
-
-    @tag('integration')
-    def test_integration_fileresource_download_success(self):
-
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME)
-
-        # upload file to Swift storage
-        with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt',
-                            contents=file1.read(),
-                            content_type='text/plain')
-
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.download_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.content,'utf-8'), "test file")
-
-        # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt')
-
-    def test_fileresource_download_failure_not_related_feed_owner(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.download_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_fileresource_download_failure_unauthenticated(self):
-        response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

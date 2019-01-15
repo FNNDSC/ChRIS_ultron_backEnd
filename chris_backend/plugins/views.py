@@ -1,21 +1,19 @@
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.response import Response
 
 from collectionjson import services
-
-from feeds.serializers import FeedFileSerializer
-from feeds.permissions import IsOwnerOrChris
+from core.renderers import BinaryFileRenderer
 
 from .models import Plugin, PluginFilter, PluginParameter 
-from .models import PluginInstance, PluginInstanceFilter
+from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
 from .models import StringParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
-
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import PluginSerializer,  PluginParameterSerializer
-from .serializers import PluginInstanceSerializer
-from .permissions import IsChrisOrReadOnly
+from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
+from .permissions import IsRelatedFeedOwnerOrChris
 from .services.manager import PluginManager
 
 
@@ -25,7 +23,7 @@ class PluginList(generics.ListAPIView):
     """
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -47,7 +45,7 @@ class PluginListQuerySearch(generics.ListAPIView):
     """
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginFilter
         
 
@@ -57,7 +55,7 @@ class PluginDetail(generics.RetrieveAPIView):
     """
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginParameterList(generics.ListAPIView):
@@ -66,7 +64,7 @@ class PluginParameterList(generics.ListAPIView):
     """
     serializer_class = PluginParameterSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -94,7 +92,7 @@ class PluginParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PluginParameterSerializer
     queryset = PluginParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -109,20 +107,17 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         Overriden to associate an owner, a plugin and a previous plugin instance with 
         the newly created plugin instance before first saving to the DB. All the plugin 
-        instace's parameters in the request are also properly saved to the DB. Finally
+        instance's parameters in the request are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
         # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
-        previous_id = ""
-        if 'previous_id' in request_data:
-            previous_id = request_data['previous_id']
+        previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous,
                                       compute_resource=plugin.compute_resource)
-
         # collect parameters from the request and validate and save them to the DB
         parameters = plugin.parameters.all()
         parameters_dict = {}
@@ -134,7 +129,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
-
         # run the plugin's app
         pl_manager = PluginManager()
         pl_manager.run_plugin_app(plugin_inst,
@@ -179,19 +173,9 @@ class PluginInstanceListQuerySearch(generics.ListAPIView):
     A view for the collection of plugin instances resulting from a query search.
     """
     serializer_class = PluginInstanceSerializer
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginInstanceFilter
-
-    def get_queryset(self):
-        """
-        Overriden to return a custom queryset that is only comprised by the plugin  
-        instances owned by the currently authenticated user.
-        """
-        user = self.request.user
-        # if the user is chris then return all the plugin instances in the system
-        if user.username == 'chris':
-            return PluginInstance.objects.all()
-        return PluginInstance.objects.filter(owner=user)
 
         
 class PluginInstanceDetail(generics.RetrieveAPIView):
@@ -200,7 +184,7 @@ class PluginInstanceDetail(generics.RetrieveAPIView):
     """
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -220,7 +204,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     """
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -241,9 +225,9 @@ class PluginInstanceFileList(generics.ListAPIView):
     """
     A view for the collection of files written by a plugin instance.
     """
-    serializer_class = FeedFileSerializer
+    serializer_class = PluginInstanceFileSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -252,7 +236,7 @@ class PluginInstanceFileList(generics.ListAPIView):
         queryset = self.get_files_queryset()
         response = services.get_list_response(self, queryset)
         instance = self.get_object()
-        feed = instance.get_root_instance().feed
+        feed = instance.feed
         links = {'feed': reverse('feed-detail', request=request,
                              kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
@@ -265,13 +249,38 @@ class PluginInstanceFileList(generics.ListAPIView):
         return self.filter_queryset(instance.files.all())
 
 
+class PluginInstanceFileDetail(generics.RetrieveAPIView):
+    """
+    A view for a file written by a plugin instance.
+    """
+    queryset = PluginInstanceFile.objects.all()
+    serializer_class = PluginInstanceFileSerializer
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+
+
+class FileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource.
+    """
+    queryset = PluginInstanceFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Overriden to be able to make a GET request to an actual file resource.
+        """
+        plg_inst_file = self.get_object()
+        return Response(plg_inst_file.fname)
+
+
 class PluginInstanceParameterList(generics.ListAPIView):
     """
     A view for the collection of parameters that the plugin instance was run with.
     """
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -307,7 +316,7 @@ class StringParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StringParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
     
 
 class IntParameterDetail(generics.RetrieveAPIView):
@@ -316,7 +325,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['integer']
     queryset = IntParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class FloatParameterDetail(generics.RetrieveAPIView):
@@ -325,7 +334,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = FloatParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
     
 
 class BoolParameterDetail(generics.RetrieveAPIView):
@@ -334,7 +343,7 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PathParameterDetail(generics.RetrieveAPIView):
@@ -343,4 +352,4 @@ class PathParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['path']
     queryset = PathParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,)

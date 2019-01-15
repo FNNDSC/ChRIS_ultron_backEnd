@@ -1,13 +1,13 @@
 
 from rest_framework import generics, permissions
-from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from collectionjson import services
-from core.renderers import BinaryFileRenderer
+from plugins.models import PluginInstance, PluginInstanceFile
+from plugins.serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 
-from .models import Note, Tag, Tagging, Feed, FeedFilter, Comment, FeedFile
-from .serializers import FeedSerializer, FeedFileSerializer, NoteSerializer
+from .models import Note, Tag, Tagging, Feed, FeedFilter, Comment
+from .serializers import FeedSerializer, NoteSerializer
 from .serializers import TagSerializer, TaggingSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
 from .permissions import IsRelatedFeedOwnerOrChris, IsRelatedTagOwnerOrChris
@@ -383,10 +383,10 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class FeedFileList(generics.ListAPIView):
     """
-    A view for the collection of a feed's files.
+    A view for the collection of all files in a feed.
     """
     queryset = Feed.objects.all()
-    serializer_class = FeedFileSerializer
+    serializer_class = PluginInstanceFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
     def list(self, request, *args, **kwargs):
@@ -403,32 +403,34 @@ class FeedFileList(generics.ListAPIView):
 
     def get_feedfiles_queryset(self):
         """
-        Custom method to get the actual feedfiles' queryset
+        Custom method to get the actual feed files queryset.
         """
         feed = self.get_object()
-        return self.filter_queryset(feed.files.all())
+        return PluginInstanceFile.objects.filter(plugin_inst__feed=feed)
 
 
-class FeedFileDetail(generics.RetrieveAPIView):
+class FeedPluginInstanceList(generics.ListAPIView):
     """
-    A feed's file view.
+    A view for the collection of comments.
     """
-    queryset = FeedFile.objects.all()
-    serializer_class = FeedFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+    queryset = Feed.objects.all()
+    serializer_class = PluginInstanceSerializer
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
 
-
-class FileResource(generics.GenericAPIView):
-    """
-    A view to enable downloading of a file resource .
-    """
-    queryset = FeedFile.objects.all()
-    renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
-
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         """
-        Overriden to be able to make a GET request to an actual file resource.
+        Overriden to return a list of the plugin instances for the queried feed.
         """
-        feed_file = self.get_object()
-        return Response(feed_file.fname)
+        queryset = self.get_plugin_instances_queryset()
+        response = services.get_list_response(self, queryset)
+        feed = self.get_object()
+        links = {'feed': reverse('feed-detail', request=request,
+                                   kwargs={"pk": feed.id})}
+        return services.append_collection_links(response, links)
+
+    def get_plugin_instances_queryset(self):
+        """
+        Custom method to get the actual plugin instances queryset.
+        """
+        feed = self.get_object()
+        return self.filter_queryset(feed.plugin_instances.all())

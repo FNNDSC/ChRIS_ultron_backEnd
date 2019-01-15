@@ -2,17 +2,20 @@
 import logging
 import json
 import time
+import io
 from unittest import mock
 
 from django.test import TestCase, tag
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from rest_framework import status
 
-from feeds.models import FeedFile
-from plugins.models import Plugin, PluginParameter, PluginInstance, STATUS_TYPES
-from plugins.models import ComputeResource, PathParameter, FloatParameter
+import swiftclient
+
+from plugins.models import Plugin, PluginParameter, PluginInstance, PluginInstanceFile
+from plugins.models import ComputeResource, PathParameter, FloatParameter, STATUS_TYPES
 from plugins.services.manager import PluginManager
 from plugins import views
 
@@ -55,7 +58,7 @@ class ViewTests(TestCase):
 
 class PluginListViewTests(ViewTests):
     """
-    Test the plugin-list view
+    Test the plugin-list view.
     """
 
     def setUp(self):
@@ -75,7 +78,7 @@ class PluginListViewTests(ViewTests):
 
 class PluginListQuerySearchViewTests(ViewTests):
     """
-    Test the plugin-list-query-search view
+    Test the plugin-list-query-search view.
     """
 
     def setUp(self):
@@ -95,7 +98,7 @@ class PluginListQuerySearchViewTests(ViewTests):
 
 class PluginDetailViewTests(ViewTests):
     """
-    Test the plugin-detail view
+    Test the plugin-detail view.
     """
 
     def setUp(self):
@@ -116,7 +119,7 @@ class PluginDetailViewTests(ViewTests):
 
 class PluginParameterListViewTests(ViewTests):
     """
-    Test the pluginparameter-list view
+    Test the pluginparameter-list view.
     """
 
     def setUp(self):
@@ -144,7 +147,7 @@ class PluginParameterListViewTests(ViewTests):
 
 class PluginParameterDetailViewTests(ViewTests):
     """
-    Test the pluginparameter-detail view
+    Test the pluginparameter-detail view.
     """
 
     def setUp(self):
@@ -168,7 +171,7 @@ class PluginParameterDetailViewTests(ViewTests):
 
 class PluginInstanceListViewTests(ViewTests):
     """
-    Test the plugininstance-list view
+    Test the plugininstance-list view.
     """
 
     def setUp(self):
@@ -268,7 +271,7 @@ class PluginInstanceListViewTests(ViewTests):
 
 class PluginInstanceDetailViewTests(ViewTests):
     """
-    Test the plugininstance-detail view
+    Test the plugininstance-detail view.
     """
 
     def setUp(self):
@@ -370,7 +373,7 @@ class PluginInstanceDetailViewTests(ViewTests):
 
 class PluginInstanceListQuerySearchViewTests(ViewTests):
     """
-    Test the plugininstance-list-query-search view
+    Test the plugininstance-list-query-search view.
     """
 
     def setUp(self):
@@ -385,8 +388,9 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         # set first instance's status
         inst.status = STATUS_TYPES[0]
         plugin = Plugin.objects.get(name="mri_convert")
-        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
-                                    owner=user, compute_resource=plugin.compute_resource)
+        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                          previous=inst,
+                                                compute_resource=plugin.compute_resource)
         # set second instance's status
         inst.status = STATUS_TYPES[2]
 
@@ -407,7 +411,7 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
 
 class PluginInstanceDescendantListViewTests(ViewTests):
     """
-    Test the plugininstance-descendant-list view
+    Test the plugininstance-descendant-list view.
     """
 
     def setUp(self):
@@ -451,46 +455,9 @@ class PluginInstanceDescendantListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class PluginInstanceFileListViewTests(ViewTests):
-    """
-    Test the plugininstance-file-list view
-    """
-
-    def setUp(self):
-        super(PluginInstanceFileListViewTests, self).setUp()
-
-        user = User.objects.get(username=self.username)
-
-        # create a plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
-        (inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
-
-        # create a feed file associated to the plugin instance
-        (feedfile, tf) = FeedFile.objects.get_or_create(plugin_inst=inst, feed=inst.feed)
-        feedfile.fname.name = 'test_file.txt'
-        feedfile.save()
-
-        self.list_url = reverse("plugininstance-file-list", kwargs={"pk": inst.id})
-
-    def test_plugin_instance_file_list_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.list_url)
-        self.assertContains(response, "test_file.txt")
-
-    def test_plugin_instance_file_list_failure_unauthenticated(self):
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_plugin_instance_file_list_failure_access_denied(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-
 class PluginInstanceParameterListViewTests(ViewTests):
     """
-    Test the plugininstance-parameter-list view
+    Test the plugininstance-parameter-list view.
     """
 
     def setUp(self):
@@ -537,4 +504,174 @@ class PluginInstanceParameterListViewTests(ViewTests):
 
     def test_plugin_instance_parameter_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceFileViewTests(ViewTests):
+    """
+    Generic plugin instance file view tests' setup and tearDown.
+    """
+
+    def setUp(self):
+        super(PluginInstanceFileViewTests, self).setUp()
+        # create a plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name="pacspull")
+        (self.plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin,
+                                                                   owner=user,
+                                                compute_resource=plugin.compute_resource)
+        # create test directory where files are created
+        # self.test_dir = settings.MEDIA_ROOT + '/test'
+        # settings.MEDIA_ROOT = self.test_dir
+        # if not os.path.exists(self.test_dir):
+        #     os.makedirs(self.test_dir)
+
+    def tearDown(self):
+        super(PluginInstanceFileViewTests, self).tearDown()
+        # remove test directory
+        # shutil.rmtree(self.test_dir)
+        # settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
+
+
+class PluginInstanceFileListViewTests(PluginInstanceFileViewTests):
+    """
+    Test the plugininstancefile-list view.
+    """
+
+    def setUp(self):
+        super(PluginInstanceFileListViewTests, self).setUp()
+
+        # create a plugin instance file associated to the plugin instance
+        plg_inst = self.plg_inst
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'test_file.txt'
+        plg_inst_file.save()
+
+        self.list_url = reverse("plugininstancefile-list", kwargs={"pk": plg_inst.id})
+
+    def test_plugin_instance_file_create_failure_post_not_allowed(self):
+        self.client.login(username=self.username, password=self.password)
+        # try to create a new plugin file with a POST request to the list
+        # POST request using multipart/form-data to be able to upload file
+        with io.StringIO("test file") as f:
+            post = {"fname": f}
+            response = self.client.post(self.list_url, data=post)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_plugin_instance_file_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "test_file.txt")
+
+    def test_plugin_instance_file_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_instance_file_list_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PluginInstanceFileDetailViewTests(PluginInstanceFileViewTests):
+    """
+    Test the plugininstancefile-detail view.
+    """
+
+    def setUp(self):
+        super(PluginInstanceFileDetailViewTests, self).setUp()
+        #self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
+        plg_inst = self.plg_inst
+        self.corresponding_plugin_instance_url = reverse("plugininstance-detail",
+                                                         kwargs={"pk": plg_inst.id})
+
+        # create a file in the DB "already uploaded" to the server
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'file1.txt'
+        plg_inst_file.save()
+
+        self.read_url = reverse("plugininstancefile-detail",
+                                kwargs={"pk": plg_inst_file.id})
+
+    def test_plugin_instance_file_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "file1.txt")
+        self.assertTrue(response.data["plugin_inst"].endswith(
+            self.corresponding_plugin_instance_url))
+
+    def test_plugin_instance_file_detail_success_user_chris(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "file1.txt")
+        self.assertTrue(response.data["plugin_inst"].endswith(
+            self.corresponding_plugin_instance_url))
+
+    def test_plugin_instance_file_detail_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_instance_file_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class FileResourceViewTests(PluginInstanceFileViewTests):
+    """
+    Test the plugininstancefile-resource view.
+    """
+
+    def setUp(self):
+        super(FileResourceViewTests, self).setUp()
+        plg_inst = self.plg_inst
+        # create a file in the DB "already uploaded" to the server
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(
+            plugin_inst=plg_inst)
+        plg_inst_file.fname.name = '/tests/file1.txt'
+        plg_inst_file.save()
+        self.download_url = reverse("plugininstancefile-resource",
+                                    kwargs={"pk": plg_inst_file.id}) + 'file1.txt'
+
+    def test_fileresource_get(self):
+        plg_inst_file = PluginInstanceFile.objects.get(fname="/tests/file1.txt")
+        fileresource_view_inst = mock.Mock()
+        fileresource_view_inst.get_object = mock.Mock(return_value=plg_inst_file)
+        request_mock = mock.Mock()
+        with mock.patch('plugins.views.Response') as response_mock:
+            views.FileResource.get(fileresource_view_inst, request_mock)
+            response_mock.assert_called_with(plg_inst_file.fname)
+
+    @tag('integration')
+    def test_integration_fileresource_download_success(self):
+        # initiate a Swift service connection
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        # create container in case it doesn't already exist
+        conn.put_container(settings.SWIFT_CONTAINER_NAME)
+
+        # upload file to Swift storage
+        with io.StringIO("test file") as file1:
+            conn.put_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt',
+                            contents=file1.read(),
+                            content_type='text/plain')
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.content, 'utf-8'), "test file")
+
+        # delete file from Swift storage
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt')
+
+    def test_fileresource_download_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_fileresource_download_failure_unauthenticated(self):
+        response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

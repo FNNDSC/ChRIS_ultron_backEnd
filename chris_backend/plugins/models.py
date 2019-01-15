@@ -9,10 +9,8 @@ from django_filters.rest_framework import FilterSet
 
 import swiftclient
 
-from feeds.models import Feed, FeedFile
+from feeds.models import Feed
 from .fields import CPUField, MemoryField
-
-
 
 
 # API types
@@ -120,12 +118,15 @@ class PluginParameter(models.Model):
     
 
 class PluginInstance(models.Model):
+    title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=30, default=STATUS_TYPES[0])
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
+                             related_name='plugin_instances')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
                                     related_name='plugin_instances')
@@ -142,22 +143,26 @@ class PluginInstance(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to save a new feed to the DB the first time the instance is saved.
+        Overriden to save a new feed to the DB the first time 'fs' instances are saved.
+        For 'ds' instances the feed of the previous instance is assigned.
         """
+        if not hasattr(self, 'feed'):
+            if self.plugin.type == 'fs':
+                self.feed = self._save_feed()
+            if self.plugin.type == 'ds':
+                self.feed = self.previous.feed
         super(PluginInstance, self).save(*args, **kwargs)
-        if not hasattr(self, 'feed') and self.plugin.type=='fs':
-            self._save_feed()
             
     def _save_feed(self):
         """
         Custom method to create and save a new feed to the DB.
         """
         feed = Feed()
-        feed.plugin_inst = self
-        feed.save()
         feed.name = self.plugin.name
+        feed.save()
         feed.owner.set([self.owner])
         feed.save()
+        return feed
 
     def get_root_instance(self):
         """
@@ -237,13 +242,11 @@ class PluginInstance(models.Model):
                         full_listing    = True)[1]
             time.sleep(0.2)
             pollLoop += 1
-        root_instance   = self.get_root_instance()
-        feed            = root_instance.feed
         fileCount       = 0
         for object in object_list:
-            feedfile = FeedFile(plugin_inst=self, feed=feed)
-            feedfile.fname.name = object['name']
-            feedfile.save()
+            plg_inst_file = PluginInstanceFile(plugin_inst=self)
+            plg_inst_file.fname.name = object['name']
+            plg_inst_file.save()
             fileCount += 1
         return {
             'status':       True,
@@ -259,12 +262,20 @@ class PluginInstanceFilter(FilterSet):
     max_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='lte')
     min_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='gte')
     max_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='lte')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                               lookup_expr='exact')
+    feed_id = django_filters.CharFilter(field_name='feed_id',
+                                               lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
+    plugin_name = django_filters.CharFilter(field_name='plugin__name',
+                                               lookup_expr='icontains')
 
     class Meta:
         model = PluginInstance
-        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
-                  'root_id']
+        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
+                  'max_end_date', 'root_id', 'title', 'status', 'owner_username',
+                  'feed_id', 'plugin_name']
 
     def filter_by_root_id(self, queryset, name, value):
         """
@@ -282,6 +293,19 @@ class PluginInstanceFilter(FilterSet):
             queue.extend(list(visited.next.all()))
             filtered_queryset.append(visited)
         return filtered_queryset
+
+
+class PluginInstanceFile(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    fname = models.FileField(max_length=2048)
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='files')
+
+    class Meta:
+        ordering = ('fname',)
+
+    def __str__(self):
+        return self.fname.name
 
 
 class StringParameter(models.Model):

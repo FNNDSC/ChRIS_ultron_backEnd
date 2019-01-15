@@ -6,6 +6,9 @@ from unittest import mock
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
+from django.conf import settings
+
+import swiftclient
 
 from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
 from plugins.services import manager
@@ -153,6 +156,15 @@ class PluginManagerTests(TestCase):
         #     if not os.path.exists(test_dir):
         #         os.makedirs(test_dir)
 
+        # initiate a Swift service connection and create container in case
+        # it doesn't already exist
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        conn.put_container(settings.SWIFT_CONTAINER_NAME)
+
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
@@ -200,6 +212,15 @@ class PluginManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
+        # initiate a Swift service connection and create container in case
+        # it doesn't already exist
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        conn.put_container(settings.SWIFT_CONTAINER_NAME)
+
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
