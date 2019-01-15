@@ -263,18 +263,19 @@ class PluginInstanceFilter(FilterSet):
     min_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='gte')
     max_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='lte')
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
-    owner_username = django_filters.CharFilter(field_name='owner.username',
+    owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
-    feed_id = django_filters.CharFilter(field_name='feed.id',
+    feed_id = django_filters.CharFilter(field_name='feed_id',
                                                lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
-    plugin_name = django_filters.CharFilter(field_name='plugin.name',
+    plugin_name = django_filters.CharFilter(field_name='plugin__name',
                                                lookup_expr='icontains')
 
     class Meta:
         model = PluginInstance
-        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date', 'max_end_date',
-                  'root_id', 'title', 'status', 'owner_username', 'feed_id']
+        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
+                  'max_end_date', 'root_id', 'title', 'status', 'owner_username',
+                  'feed_id', 'plugin_name']
 
     def filter_by_root_id(self, queryset, name, value):
         """
