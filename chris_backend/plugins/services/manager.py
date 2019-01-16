@@ -1,12 +1,9 @@
 """
-Plugin manager module that provides functionality to add, modify and delete plugins to the
-plugins django app. There is also functionality to run and check the execution status of a
-plugin app.
+Plugin manager module that provides functionality to add, modify and delete plugins.
 """
 
 import os
 import sys
-import time
 from argparse import ArgumentParser
 from chrisstoreclient.client import StoreClient
 
@@ -18,15 +15,14 @@ if "DJANGO_SETTINGS_MODULE" not in os.environ:
     django.setup()
 
 from django.utils import timezone
-from django.conf import settings
 
-from plugins.models import Plugin, PluginParameter
+from plugins.models import Plugin
 from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer, PluginParameterSerializer
-from plugins.services import charm
 
 
 class PluginManager(object):
+
     def __init__(self):
         parser = ArgumentParser(description='Manage plugins')
         subparsers = parser.add_subparsers(dest='subparser_name', title='subcommands',
@@ -152,132 +148,6 @@ class PluginManager(object):
             self.modify_plugin(options)
         elif options.subparser_name == 'remove':
             self.remove_plugin(options)
-
-    def run_plugin_app(self, plugin_inst, parameter_dict, **kwargs):
-        """
-        Run a plugin's app.
-        """
-        # These directory overrides allow for mapping from the original ChRIS dir space
-        # to the plugin input and output dir spaces.
-        str_inputDirOverride        = ''
-        str_outputDirOverride       = ''
-
-        for k, v in kwargs.items():
-            if k == 'useDebug':             self.b_useDebug         = v
-            if k == 'debugFile':            self.str_debugFile      = v
-            if k == 'quiet':                self.b_quiet            = v
-            if k == 'service':              self.str_service        = v
-            if k == 'inputDirOverride':     str_inputDirOverride    = v
-            if k == 'outputDirOverride':    str_outputDirOverride   = v
-
-        # get input dir
-        inputdir            = ""
-        inputdirManagerFS   = ""
-        if plugin_inst.previous:
-            inputdirManagerFS   = plugin_inst.previous.get_output_path()
-            inputdir            = inputdirManagerFS
-        if len(str_inputDirOverride):
-            inputdir = str_inputDirOverride
-        # get output dir
-        outputdirManagerFS      = plugin_inst.get_output_path()
-        outputdir               = outputdirManagerFS
-        if len(str_outputDirOverride):
-            outputdir = str_outputDirOverride
-        app_args = []
-        # append input dir to app's argument list (only for ds plugins)
-        if plugin_inst.plugin.type == 'ds' and inputdir:
-            app_args.append(inputdir)
-        # append output dir to app's argument list
-        app_args.append(outputdir)
-        # append flag to save input meta data (passed options)
-        app_args.append("--saveinputmeta")
-        # append flag to save output meta data (output description)
-        app_args.append("--saveoutputmeta")
-        # append the parameters to app's argument list
-        db_parameters = plugin_inst.plugin.parameters.all()
-        for param_name in parameter_dict:
-            param_value = parameter_dict[param_name]
-            for db_param in db_parameters:
-                if db_param.name == param_name:
-                    app_args.append(db_param.flag)
-                    if db_param.action == 'store':
-                        app_args.append(param_value)
-                    break
-
-        # run the app via an external REST service...
-        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
-        chris_service = charm.Charm(
-            app_args    = app_args,
-            d_args      = parameter_dict,
-            plugin_inst = plugin_inst,
-            inputdir    = inputdirManagerFS,
-            outputdir   = outputdirManagerFS,
-            IOPhost     = str_IOPhost,
-            quiet       = settings.CHRIS_DEBUG['quiet']
-        )
-
-        # Some dev notes...
-        #
-        # To run the app directly on the CLI via 'crunner', use
-        #         chris_service.app_manage(method = 'crunner')
-        # Note that this call blocks until the CLI process returns.
-        #
-        # To run the app 'internally', i.e. not as a CLI but by calling the app 
-        # run() method directly in python:
-        #         chris_service.app_manage(method = 'internal')
-        # Again, this blocks on the app run() method.
-        #
-        # The call to "method = 'pfcon'" does not block but dispatches
-        # to a completely asynchronous external server process and returns 
-        # immediately. The check on output is performed when views are updated,
-        # again by talking to the application server.
-        #
-
-        chris_service.app_manage(method     = self.str_service,
-                                 IOPhost    = str_IOPhost   )
-
-        # Finally, any output files generated by the app need to be registered in the DB.
-        # This is handled by the app_manage() method, and in asynchronous cases (i.e. via the pman server)
-        # registration occurs via a call to the overloaded retrieve() method in PluginInstanceDetail in
-        # plugins/views.py.
-        #
-
-    @staticmethod
-    def check_apps_exec_server(**kwargs):
-        """
-        check if a remote server instance is servicing requests
-        :return:
-        """
-        # pudb.set_trace()
-        chris_service = charm.Charm(**kwargs)
-        chris_service.app_service_checkIfAvailable(**kwargs)
-        # Wait a bit for transients
-        time.sleep(5)
-
-    @staticmethod
-    def shutdown_apps_exec_server(**kwargs):
-        """
-        Shutdown a remote server instance
-        :return:
-        """
-        # pudb.set_trace()
-        chris_service = charm.Charm(**kwargs)
-        chris_service.app_service_shutdown(**kwargs)
-        # Wait a bit for transients
-        time.sleep(5)
-
-    @staticmethod
-    def check_plugin_app_exec_status(plugin_inst):
-        """
-        Check a plugin's app execution status. It connects to the remote
-        service to determine job status.
-        """
-        # pudb.set_trace()
-        chris_service = charm.Charm(
-            plugin_inst = plugin_inst
-        )
-        str_responseStatus = chris_service.app_statusCheckAndRegister()
-        return str_responseStatus
 
     @staticmethod
     def get_plugin_representation_from_store(name, store_url, username=None,

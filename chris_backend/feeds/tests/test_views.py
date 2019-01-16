@@ -8,7 +8,8 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin, PluginInstance, PluginInstanceFile, ComputeResource
+from plugins.models import Plugin, ComputeResource
+from plugininstances.models import PluginInstance, PluginInstanceFile
 from feeds.models import Note, Tag, Tagging, Feed, Comment
 
 

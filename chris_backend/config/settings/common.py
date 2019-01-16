@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'feeds',
     'collectionjson',
     'plugins',
+    'plugininstances',
     'uploadedfiles',
     'users'
 ]

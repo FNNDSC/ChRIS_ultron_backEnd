@@ -3,8 +3,9 @@ from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
 from collectionjson import services
-from plugins.models import PluginInstance, PluginInstanceFile
-from plugins.serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
+from plugininstances.models import PluginInstance, PluginInstanceFile
+from plugininstances.serializers import PluginInstanceSerializer
+from plugininstances.serializers import PluginInstanceFileSerializer
 
 from .models import Note, Tag, Tagging, Feed, FeedFilter, Comment
 from .serializers import FeedSerializer, NoteSerializer
