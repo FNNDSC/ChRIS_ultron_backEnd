@@ -182,11 +182,13 @@ urlpatterns = format_suffix_patterns([
         name='plugininstancefile-detail'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugin_views.FileResource.as_view(), name='plugininstancefile-resource'),
+        plugininstance_views.FileResource.as_view(),
+        name='plugininstancefile-resource'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
         plugininstance_views.PluginInstanceParameterList.as_view(),
         name='plugininstance-parameter-list'),
+
 
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
         plugininstance_views.StrParameterDetail.as_view(),
