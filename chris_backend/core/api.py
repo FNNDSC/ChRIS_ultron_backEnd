@@ -5,7 +5,8 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 from feeds import views as feed_views
 from plugins import views as plugin_views
-from uploadedfiles import views as uploaded_file_views
+from plugininstances import views as plugininstance_views
+from uploadedfiles import views as uploadedfile_views
 from users import views as user_views
 
 # API v1 endpoints
@@ -84,30 +85,34 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/parameters/(?P<pk>[0-9]+)/$',
         plugin_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
 
+
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
-        plugin_views.PluginInstanceList.as_view(), name='plugininstance-list'),
+        plugininstance_views.PluginInstanceList.as_view(),
+        name='plugininstance-list'),
 
     url(r'^v1/plugins/instances/search/$',
-        plugin_views.PluginInstanceListQuerySearch.as_view(),
+        plugininstance_views.PluginInstanceListQuerySearch.as_view(),
         name='plugininstance-list-query-search'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceDetail.as_view(), name='plugininstance-detail'),
+        plugininstance_views.PluginInstanceDetail.as_view(),
+        name='plugininstance-detail'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/descendants/$',
-        plugin_views.PluginInstanceDescendantList.as_view(),
+        plugininstance_views.PluginInstanceDescendantList.as_view(),
         name='plugininstance-descendant-list'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/files/$',
-        plugin_views.PluginInstanceFileList.as_view(),
+        plugininstance_views.PluginInstanceFileList.as_view(),
         name='plugininstancefile-list'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceFileDetail.as_view(),
+        plugininstance_views.PluginInstanceFileDetail.as_view(),
         name='plugininstancefile-detail'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugin_views.FileResource.as_view(), name='plugininstancefile-resource'),
+        plugininstance_views.FileResource.as_view(),
+        name='plugininstancefile-resource'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
         plugin_views.PluginInstanceFileDetail.as_view(),
@@ -124,33 +129,39 @@ urlpatterns = format_suffix_patterns([
         plugin_views.FileResource.as_view(), name='plugininstancefile-resource'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
-        plugin_views.PluginInstanceParameterList.as_view(),
+        plugininstance_views.PluginInstanceParameterList.as_view(),
         name='plugininstance-parameter-list'),
 
+
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.StringParameterDetail.as_view(), name='stringparameter-detail'),
+        plugininstance_views.StringParameterDetail.as_view(),
+        name='stringparameter-detail'),
 
     url(r'^v1/plugins/integer-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.IntParameterDetail.as_view(), name='intparameter-detail'),
+        plugininstance_views.IntParameterDetail.as_view(),
+        name='intparameter-detail'),
 
     url(r'^v1/plugins/float-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.FloatParameterDetail.as_view(), name='floatparameter-detail'),
+        plugininstance_views.FloatParameterDetail.as_view(),
+        name='floatparameter-detail'),
 
     url(r'^v1/plugins/boolean-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.BoolParameterDetail.as_view(), name='boolparameter-detail'),
+        plugininstance_views.BoolParameterDetail.as_view(),
+        name='boolparameter-detail'),
 
     url(r'^v1/plugins/path-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.PathParameterDetail.as_view(), name='pathparameter-detail'),
+        plugininstance_views.PathParameterDetail.as_view(),
+        name='pathparameter-detail'),
 
 
     url(r'^v1/uploadedfiles/$',
-        uploaded_file_views.UploadedFileList.as_view(), name='uploadedfile-list'),
+        uploadedfile_views.UploadedFileList.as_view(), name='uploadedfile-list'),
 
     url(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/$',
-        uploaded_file_views.UploadedFileDetail.as_view(), name='uploadedfile-detail'),
+        uploadedfile_views.UploadedFileDetail.as_view(), name='uploadedfile-detail'),
 
     url(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/.*$',
-        uploaded_file_views.UploadedFileResource.as_view(), name='uploadedfile-resource'),
+        uploadedfile_views.UploadedFileResource.as_view(), name='uploadedfile-resource'),
 
 ])
 

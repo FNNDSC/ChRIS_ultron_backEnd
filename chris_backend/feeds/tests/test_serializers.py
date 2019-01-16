@@ -7,7 +7,8 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from plugins.models import Plugin, PluginInstance, ComputeResource
+from plugins.models import Plugin, ComputeResource
+from plugininstances.models import PluginInstance
 from feeds.models import Feed, Tag, Tagging
 from feeds.serializers import TaggingSerializer, FeedSerializer
 
