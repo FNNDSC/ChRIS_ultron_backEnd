@@ -4,7 +4,8 @@ import logging
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from plugins.models import Plugin, PluginParameter, PluginInstance, ComputeResource
+from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugininstances.models import PluginInstance
 from feeds.models import Note, Feed
 
 
@@ -36,7 +37,7 @@ class FeedModelTests(TestCase):
             optional=self.plugin_parameters['mrn']['optional'])
 
         # create user
-        user = User.objects.create_user(username=self.username,
+        User.objects.create_user(username=self.username,
                                         password=self.password)
 
     def tearDown(self):
