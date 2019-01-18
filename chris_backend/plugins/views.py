@@ -5,8 +5,9 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 
 from .models import Plugin, PluginFilter, PluginParameter
+from .models import Pipeline, PipelineFilter, PluginPiping
 from .serializers import PluginSerializer,  PluginParameterSerializer
-
+from .serializers import PipelineSerializer, PluginPipingSerializer
 
 class PluginList(generics.ListAPIView):
     """

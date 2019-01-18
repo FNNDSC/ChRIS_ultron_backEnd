@@ -1,8 +1,11 @@
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
+from .models import Pipeline, PluginPiping
 from .fields import MemoryInt, CPUInt
 
 
