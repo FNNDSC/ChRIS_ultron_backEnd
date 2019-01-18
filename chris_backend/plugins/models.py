@@ -107,3 +107,48 @@ class PluginParameter(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Pipeline(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    modification_date = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, unique=True)
+    authors = models.CharField(max_length=200, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    description = models.CharField(max_length=800, blank=True)
+    owner = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL)
+    plugins = models.ManyToManyField(Plugin, related_name='pipelines',
+                                     through='PluginPiping')
+
+    class Meta:
+        ordering = ('category',)
+
+    def __str__(self):
+        return self.name
+
+
+class PluginPiping(models.Model):
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        # interesting case in which the union of the foreign keys is not a primary key
+        unique_together = ('pipeline', 'position')
+
+    def __str__(self):
+        return str(self.id)
+
+
+class PipelineFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='lte')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                               lookup_expr='exact')
+
+    class Meta:
+        model = Pipeline
+        fields = ['id', 'name', 'category', 'owner_username', 'min_creation_date',
+                  'max_creation_date']

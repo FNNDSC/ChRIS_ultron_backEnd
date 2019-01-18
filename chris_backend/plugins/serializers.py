@@ -1,8 +1,11 @@
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+from collectionjson.services import collection_serializer_is_valid
 
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
+from .models import Pipeline, PluginPiping
 from .fields import MemoryInt, CPUInt
 
 
@@ -153,3 +156,52 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
                   'help', 'plugin')
 
 
+class PipelineSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_id_list = serializers.JSONField(write_only=True)
+    owner_username = serializers.ReadOnlyField(source='owner.username')
+    plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
+    plugin_positions = serializers.HyperlinkedIdentityField(
+        view_name='pipeline-pluginpiping-list')
+
+    class Meta:
+        model = Pipeline
+        fields = ('url', 'id', 'name', 'authors', 'category', 'description',
+                  'plugin_id_list', 'owner_username', 'plugins', 'plugin_positions')
+
+    def create(self, validated_data):
+        # more work needed here likely
+        validated_data.pop('plugin_id_list', None)
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
+
+    def validate_plugin_id_list(self, plugin_id_list):
+        """
+        Custom method to validate the list of plugin ids.
+        """
+        try:
+            for id_str in plugin_id_list.split(','):
+               id = int(id_str)
+               Plugin.objects.get(pk=id)
+        except (ValueError, ObjectDoesNotExist):
+            err_str = "Couldn't find any plugin with id %s"
+            raise serializers.ValidationError({'detail': err_str % id})
+        return plugin_id_list
+
+
+class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_id = serializers.ReadOnlyField(source='plugin.id')
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
+                                                 read_only=True)
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+
+    class Meta:
+        model = PluginPiping
+        fields = ('url', 'id', 'plugin_id', 'pipeline_id', 'position', 'plugin',
+                  'pipeline')
