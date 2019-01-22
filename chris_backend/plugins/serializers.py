@@ -403,6 +403,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         tree of plugins and the index of the root of the tree. Each node is a dictionary
         containing the plugin id and the list of child indices.
         """
+        plugins = []
         try:
             root_ix = [ix for ix,d in enumerate(tree_list)
                        if d['previous_index'] is None][0]
