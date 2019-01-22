@@ -1,4 +1,6 @@
 
+import json
+
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from collectionjson.services import collection_serializer_is_valid
@@ -169,13 +171,32 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                   'plugin_id_list', 'owner_username', 'plugins', 'plugin_positions')
 
     def create(self, validated_data):
-        # more work needed here likely
+        """
+        Overriden to create the pipeline and associate to it all the plugins in the
+        passed list in the same order as they appear in the list.
+        """
+        plugins = validated_data.pop('plugin_id_list')
+        pipeline = super(PipelineSerializer, self).create(validated_data)
+        i = 0
+        for plg in plugins:
+            plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=plg,
+                                                     position=i)
+            plg_piping.save()
+            i += 1
+        return pipeline
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to remove the plugin id list from the validated data as plugins
+        or their order in the pipeline are not allowed to be updated.
+        """
         validated_data.pop('plugin_id_list', None)
+        return super(PipelineSerializer, self).update(instance, validated_data)
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
 
@@ -183,14 +204,26 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         """
         Custom method to validate the list of plugin ids.
         """
+        plugins = []
         try:
-            for id_str in plugin_id_list.split(','):
-               id = int(id_str)
-               Plugin.objects.get(pk=id)
+            plugin_ids = list(json.loads(plugin_id_list))
+            if len(plugin_ids) == 0:
+                raise Exception("Invalid empty list %s" % plugin_id_list)
+            for id in plugin_ids:
+                plg = Plugin.objects.get(pk=id)
+                if plg.type == 'fs':
+                    raise Exception("%s is a plugin of type 'fs' and therefore can not "
+                                    "be used to create a pipeline" % plg)
+                plugins.append(plg)
+        except json.decoder.JSONDecodeError:
+            err_str = "Invalid JSON string %s"
+            raise serializers.ValidationError({err_str % plugin_id_list})
         except (ValueError, ObjectDoesNotExist):
             err_str = "Couldn't find any plugin with id %s"
-            raise serializers.ValidationError({'detail': err_str % id})
-        return plugin_id_list
+            raise serializers.ValidationError({err_str % id})
+        except Exception as e:
+            raise serializers.ValidationError(e)
+        return plugins
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
