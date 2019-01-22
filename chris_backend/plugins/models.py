@@ -85,10 +85,17 @@ class PluginFilter(FilterSet):
     max_creation_date = django_filters.DateFilter(field_name="creation_date",
                                                   lookup_expr='lte')
 
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
+
     class Meta:
         model = Plugin
-        fields = ['id', 'name', 'dock_image', 'type', 'category', 'authors',
-                  'min_creation_date', 'max_creation_date']
+        fields = ['id', 'name', 'title', 'dock_image', 'type', 'category', 'authors',
+                  'description', 'min_creation_date', 'max_creation_date']
 
 
 class PluginParameter(models.Model):
@@ -147,8 +154,13 @@ class PipelineFilter(FilterSet):
                                                   lookup_expr='lte')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
 
     class Meta:
         model = Pipeline
-        fields = ['id', 'name', 'category', 'owner_username', 'min_creation_date',
-                  'max_creation_date']
+        fields = ['id', 'owner_username', 'name', 'category', 'description',
+                  'authors', 'min_creation_date', 'max_creation_date']
