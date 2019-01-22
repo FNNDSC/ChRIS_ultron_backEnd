@@ -157,6 +157,30 @@ urlpatterns = format_suffix_patterns([
         name='pluginpiping-detail'),
 
 
+    url(r'^v1/pipelines/$',
+        plugin_views.PipelineList.as_view(),
+        name='pipeline-list'),
+
+    url(r'^v1/pipelines/search/$',
+        plugin_views.PipelineListQuerySearch.as_view(),
+        name='pipeline-list-query-search'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/$',
+        plugin_views.PipelineDetail.as_view(),
+        name='pipeline-detail'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/plugins/$',
+        plugin_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/pipings/$',
+        plugin_views.PipelinePluginPipingList.as_view(),
+        name='pipeline-pluginpiping-list'),
+
+    url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
+        plugin_views.PluginPipingDetail.as_view(),
+        name='pluginpiping-detail'),
+
+
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
         plugininstance_views.PluginInstanceList.as_view(),
         name='plugininstance-list'),
