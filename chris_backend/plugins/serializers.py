@@ -452,6 +452,22 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 ix_queue.append(ix)
                 piping_queue.append(plg_piping)
 
+    def validate_plugin_inst_id(self, plugin_inst_id):
+        """
+        Custom method to validate the plugin instance id.
+        """
+        try:
+            plg = Plugin.objects.get(pk=plugin_inst_id)
+            if plg.type == 'fs':
+                raise Exception("%s is a plugin of type 'fs' and therefore can not "
+                            "be used to create a pipeline" % plg)
+        except (ValueError, ObjectDoesNotExist):
+            err_str = "Couldn't find any plugin with id %s"
+            raise serializers.ValidationError({err_str % id})
+        except Exception as e:
+            raise serializers.ValidationError(e)
+        return [plg]
+
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
