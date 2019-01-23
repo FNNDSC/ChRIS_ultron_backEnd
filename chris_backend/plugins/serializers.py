@@ -159,7 +159,9 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
-    plugin_id_list = serializers.JSONField(write_only=True)
+    plugin_id_list = serializers.JSONField(write_only=True, required=False)
+    plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
+                                              required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
     plugin_positions = serializers.HyperlinkedIdentityField(
@@ -168,14 +170,21 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'authors', 'category', 'description',
-                  'plugin_id_list', 'owner_username', 'plugins', 'plugin_positions')
+                  'plugin_id_list', 'plugin_inst_id', 'owner_username', 'plugins',
+                  'plugin_positions')
 
     def create(self, validated_data):
         """
         Overriden to create the pipeline and associate to it all the plugins in the
         passed list in the same order as they appear in the list.
         """
-        plugins = validated_data.pop('plugin_id_list')
+        #import pdb; pdb.set_trace()
+        plugins_from_id_list = validated_data.pop('plugin_id_list', None)
+        plugins_from_inst_id = validated_data.pop('plugin_inst_id', None)
+        if plugins_from_id_list:
+            plugins = plugins_from_id_list
+        else:
+            plugins = plugins_from_inst_id
         pipeline = super(PipelineSerializer, self).create(validated_data)
         i = 0
         for plg in plugins:
@@ -187,10 +196,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        Overriden to remove the plugin id list from the validated data as plugins
-        or their order in the pipeline are not allowed to be updated.
+        Overriden to remove parameters that are not allowed to be used on update.
         """
         validated_data.pop('plugin_id_list', None)
+        validated_data.pop('plugin_inst_id', None)
         return super(PipelineSerializer, self).update(instance, validated_data)
 
     @collection_serializer_is_valid
@@ -199,6 +208,19 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to generate a properly formatted message for validation errors.
         """
         return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
+
+
+    def validate(self, data):
+        """
+        Overriden to validate compute-related descriptors in the plugin app
+        representation.
+        """
+        plugin_id_list = data.pop('plugin_id_list', None)
+        plugis_inst_id = data.pop('plugin_inst_id', None)
+        if not plugin_id_list and not plugis_inst_id:
+            err_str = "At least one of the fields 'plugin_id_list' or 'plugin_inst_id' %s"
+            raise serializers.ValidationError({err_str % "must be provided"})
+        return data
 
     def validate_plugin_id_list(self, plugin_id_list):
         """
@@ -224,6 +246,22 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         except Exception as e:
             raise serializers.ValidationError(e)
         return plugins
+
+    def validate_plugin_inst_id(self, plugin_inst_id):
+        """
+        Custom method to validate the plugin instance id.
+        """
+        try:
+            plg = Plugin.objects.get(pk=plugin_inst_id)
+            if plg.type == 'fs':
+                raise Exception("%s is a plugin of type 'fs' and therefore can not "
+                            "be used to create a pipeline" % plg)
+        except (ValueError, ObjectDoesNotExist):
+            err_str = "Couldn't find any plugin with id %s"
+            raise serializers.ValidationError({err_str % id})
+        except Exception as e:
+            raise serializers.ValidationError(e)
+        return [plg]
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):

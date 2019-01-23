@@ -115,7 +115,7 @@ class PipelineList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         template_data = {'name': "", 'authors': "", 'category': "", 'description': "",
-                         'plugin_id_list': ""}
+                         'plugin_id_list': "", 'plugin_inst_id': ""}
         return services.append_collection_template(response, template_data)
 
 
@@ -147,13 +147,11 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include required name value if not not in the request and to
-        override the required plugin_id_list.
+        Overriden to include required parameters if not in the request.
         """
         pipeline = self.get_object()
-        # name and plugin_id_list are required in the serializer
         if not 'name' in request.data:
-            request.data['name'] = pipeline.name
+            request.data['name'] = pipeline.name # name is required in the serializer
         request.data['plugin_id_list'] = str([plg.id for plg in pipeline.plugins.all()])
         return super(PipelineDetail, self).update(request, *args, **kwargs)
 
