@@ -8,7 +8,6 @@ from rest_framework.reverse import reverse
 from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
 from plugininstances.models import PluginInstance
-
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import Pipeline, PluginPiping
