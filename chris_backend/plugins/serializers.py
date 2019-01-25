@@ -3,7 +3,9 @@ import json
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+
 from collectionjson.services import collection_serializer_is_valid
+from plugininstances.models import PluginInstance
 
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
@@ -159,19 +161,19 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
-    plugin_id_list = serializers.JSONField(write_only=True, required=False)
+    plugin_id_tree = serializers.JSONField(write_only=True, required=False)
     plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
                                               required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
-    plugin_positions = serializers.HyperlinkedIdentityField(
+    plugin_tree = serializers.HyperlinkedIdentityField(
         view_name='pipeline-pluginpiping-list')
 
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'authors', 'category', 'description',
-                  'plugin_id_list', 'plugin_inst_id', 'owner_username', 'plugins',
-                  'plugin_positions')
+                  'plugin_id_tree', 'plugin_inst_id', 'owner_username', 'plugins',
+                  'plugin_tree')
 
     def create(self, validated_data):
         """
@@ -209,28 +211,27 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         """
         return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
 
-
     def validate(self, data):
         """
-        Overriden to validate compute-related descriptors in the plugin app
-        representation.
+        Overriden to validate that some fields are in data.
         """
-        plugin_id_list = data.pop('plugin_id_list', None)
+        plugin_id_tree = data.pop('plugin_id_tree', None)
         plugis_inst_id = data.pop('plugin_inst_id', None)
-        if not plugin_id_list and not plugis_inst_id:
-            err_str = "At least one of the fields 'plugin_id_list' or 'plugin_inst_id' %s"
-            raise serializers.ValidationError({err_str % "must be provided"})
+        if not plugin_id_tree and not plugis_inst_id:
+            raise serializers.ValidationError("At least one of the fields "
+                                              "'plugin_id_tree' or 'plugin_inst_id' must "
+                                              "be provided")
         return data
 
-    def validate_plugin_id_list(self, plugin_id_list):
+    def validate_plugin_id_list(self, plugin_id_tree):
         """
-        Custom method to validate the list of plugin ids.
+        Overriden to validate the tree of plugin ids.
         """
         plugins = []
         try:
-            plugin_ids = list(json.loads(plugin_id_list))
+            plugin_ids = list(json.loads(plugin_id_tree))
             if len(plugin_ids) == 0:
-                raise Exception("Invalid empty list %s" % plugin_id_list)
+                raise Exception("Invalid empty list %s" % plugin_id_tree)
             for id in plugin_ids:
                 plg = Plugin.objects.get(pk=id)
                 if plg.type == 'fs':
@@ -249,24 +250,49 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_plugin_inst_id(self, plugin_inst_id):
         """
-        Custom method to validate the plugin instance id.
+        Overriden to validate the plugin instance id.
         """
         try:
-            plg = Plugin.objects.get(pk=plugin_inst_id)
-            if plg.type == 'fs':
-                raise Exception("%s is a plugin of type 'fs' and therefore can not "
-                            "be used to create a pipeline" % plg)
-        except (ValueError, ObjectDoesNotExist):
-            err_str = "Couldn't find any plugin with id %s"
-            raise serializers.ValidationError({err_str % id})
-        except Exception as e:
-            raise serializers.ValidationError(e)
-        return [plg]
+            plg_inst = PluginInstance.objects.get(pk=plugin_inst_id)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError("Couldn't find any plugin instance with id "
+                                              "%s" % plugin_inst_id)
+        plg = plg_inst.plugin
+        if plg.type == 'fs':
+            raise serializers.ValidationError("%s is a plugin of type 'fs' and therefore "
+                                              "can not be used as the root of a new "
+                                              "pipeline" % plg.name)
+        return plg_inst
+
+    @staticmethod
+    def validate_tree(tree_list):
+        """
+        Custom method to validate a tree wich is a list of dictionaries. Each dictionary
+        containing the id of a node and the id of the previous node.
+        """
+        tree = {}
+        id_dict = {d['id']:d['previous_id'] for d in tree_list}
+        root_id = [k for k,v in id_dict.items() if v is None][0]
+        tree[root_id] = []
+        id_dict[root_id] = -1  # -1 means a node for this id was already created
+        for id in id_dict:
+            if id_dict[id] != -1:
+                previous_id = id_dict[id]
+                if id_dict[previous_id] == -1:
+                    tree[previous_id].append(id)
+                else:
+                    tree[previous_id]=[id]
+
+
+
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    previous_id = serializers.ReadOnlyField(source='previous.id')
+    previous = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
+                                                 read_only=True)
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
@@ -274,5 +300,6 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginPiping
-        fields = ('url', 'id', 'plugin_id', 'pipeline_id', 'position', 'plugin',
-                  'pipeline')
+        fields = ('url', 'id', 'plugin_id', 'pipeline_id', 'previous_id', 'previous',
+                  'plugin', 'pipeline')
+
