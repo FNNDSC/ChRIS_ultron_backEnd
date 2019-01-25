@@ -454,19 +454,41 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_plugin_inst_id(self, plugin_inst_id):
         """
-        Custom method to validate the plugin instance id.
+        Overriden to validate the plugin instance id.
         """
         try:
-            plg = Plugin.objects.get(pk=plugin_inst_id)
-            if plg.type == 'fs':
-                raise Exception("%s is a plugin of type 'fs' and therefore can not "
-                            "be used to create a pipeline" % plg)
-        except (ValueError, ObjectDoesNotExist):
-            err_str = "Couldn't find any plugin with id %s"
-            raise serializers.ValidationError({err_str % id})
-        except Exception as e:
-            raise serializers.ValidationError(e)
-        return [plg]
+            plg_inst = PluginInstance.objects.get(pk=plugin_inst_id)
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError("Couldn't find any plugin instance with id "
+                                              "%s" % plugin_inst_id)
+        plg = plg_inst.plugin
+        if plg.type == 'fs':
+            raise serializers.ValidationError("%s is a plugin of type 'fs' and therefore "
+                                              "can not be used as the root of a new "
+                                              "pipeline" % plg.name)
+        return plg_inst
+
+    @staticmethod
+    def validate_tree(tree_list):
+        """
+        Custom method to validate a tree wich is a list of dictionaries. Each dictionary
+        containing the id of a node and the id of the previous node.
+        """
+        tree = {}
+        id_dict = {d['id']:d['previous_id'] for d in tree_list}
+        root_id = [k for k,v in id_dict.items() if v is None][0]
+        tree[root_id] = []
+        id_dict[root_id] = -1  # -1 means a node for this id was already created
+        for id in id_dict:
+            if id_dict[id] != -1:
+                previous_id = id_dict[id]
+                if id_dict[previous_id] == -1:
+                    tree[previous_id].append(id)
+                else:
+                    tree[previous_id]=[id]
+
+
+
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
