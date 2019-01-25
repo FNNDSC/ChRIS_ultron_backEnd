@@ -137,11 +137,11 @@ class Pipeline(models.Model):
 class PluginPiping(models.Model):
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
-    position = models.PositiveIntegerField()
+    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
+                                 related_name='next')
 
     class Meta:
-        # interesting case in which the union of the foreign keys is not a primary key
-        unique_together = ('pipeline', 'position')
+        ordering = ('pipeline',)
 
     def __str__(self):
         return str(self.id)

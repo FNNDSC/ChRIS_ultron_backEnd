@@ -3,7 +3,9 @@ import json
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+
 from collectionjson.services import collection_serializer_is_valid
+from plugininstances.models import PluginInstance
 
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
