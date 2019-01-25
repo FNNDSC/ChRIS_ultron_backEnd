@@ -183,30 +183,32 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         # here a piping pecedes another piping if its corresponding pluging precedes
         # the other piping's plugin in the pipeline
         #import pdb; pdb.set_trace()
-        bf_plugin_id_tree = validated_data.pop('plugin_id_tree', None)
+        id_tree = validated_data.pop('plugin_id_tree', None)
         plugin_inst_id = validated_data.pop('plugin_inst_id', None)
         pipeline = super(PipelineSerializer, self).create(validated_data)
-        if bf_plugin_id_tree:
-            root = bf_plugin_id_tree.pop(0)
-            root_plg = Plugin.objects.get(pk=root['id'])
+        if id_tree:
+            root_id = id_tree['root_id']
+            child_ids = id_tree['child_ids']
+            root_plg = Plugin.objects.get(pk=root_id)
             root_plg_piping = PluginPiping.objects.create(pipeline=pipeline,
                                                           plugin=root_plg)
             root_plg_piping.save()
-            previous_plg_id = root['id']
-            previous_piping = root_plg_piping
-            pipings_queue = []
-            for d in bf_plugin_id_tree:
-                plg = Plugin.objects.get(pk=d['id'])
-                while d['previous_id'] != previous_plg_id:
-                    previous_piping = pipings_queue.pop(0)
-                    previous_plg_id = previous_piping.plugin.id
-                plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=plg,
-                                                         previous=previous_piping)
-                plg_piping.save()
-                pipings_queue.append(plg_piping)
+            # breath-first traversal
+            piping_queue = [root_plg_piping]
+            plugin_id_queue = [root_id]
+            while len(plugin_id_queue):
+                curr_id = plugin_id_queue.pop(0)
+                curr_piping = piping_queue.pop(0)
+                for plg_id in child_ids[curr_id]:
+                    plg = Plugin.objects.get(pk=plg_id)
+                    plg_piping = PluginPiping.objects.create(pipeline=pipeline,
+                                                             plugin=plg,
+                                                             previous=curr_piping)
+                    plg_piping.save()
+                    plugin_id_queue.append(plg_id)
+                    piping_queue.append(plg_piping)
         else:
-
-
+            pass
         return pipeline
 
     def update(self, instance, validated_data):
@@ -264,13 +266,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         if len(plugin_id_list) == 0:
             raise serializers.ValidationError("Invalid empty list %s" % plugin_id_tree)
 
-        try:
-            bf_plugin_id_tree = PipelineSerializer.sort_tree_list_in_breadth_first(
-                plugin_id_tree)
-        except (ValueError, Exception) as e:
-            raise serializers.ValidationError(e)
-
-        for d in bf_plugin_id_tree:
+        for d in plugin_id_list:
             plg_id = d['id']
             try:
                 plg = Plugin.objects.get(pk=plg_id)
@@ -281,31 +277,41 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError("%s is a plugin of type 'fs' and "
                                                   "therefore can not be used to create a "
                                                   "pipeline" % plg)
-        return bf_plugin_id_tree
+        try:
+            id_tree_dict = PipelineSerializer.get_child_ids(plugin_id_tree)
+            PipelineSerializer.validate_id_tree(id_tree_dict)
+        except (ValueError, Exception) as e:
+            raise serializers.ValidationError(e)
+
+        return id_tree_dict
 
     @staticmethod
-    def sort_tree_list_in_breadth_first(tree_list):
+    def validate_id_tree(id_tree):
         """
-        Custom method to sort the passed tree list in breadth_first order. Raises an
-        exception if the represented tree is not connected.
+        Custom method to validate whether the represented tree in id_tree is a single
+        connected component.
         """
-        (child_ids, root_id) = PipelineSerializer.get_child_ids(tree_list)
-        sorted_tree_list = []
-        queue = [{'id': root_id, 'previous_id': None}]
+        root_id = id_tree['root_id']
+        child_ids = id_tree['child_ids']
+        num_nodes = 0
+        for child_id in child_ids:
+            children_list = child_ids[child_id]
+            num_nodes += len(children_list)
+        # breath-first traversal
+        nodes = []
+        queue = [root_id]
         while len(queue):
-            cur_node = queue.pop(0)
-            sorted_tree_list.append(cur_node)
-            for child in child_ids[cur_node['id']]:
-                queue.append({'id': child, 'previous_id': cur_node['id']})
-        if len(sorted_tree_list) < len(tree_list):
-            raise ValueError("Tree is not connected! Bad tree list %s." % tree_list)
-        return sorted_tree_list
+            curr_id = queue.pop(0)
+            nodes.append(curr_id)
+            queue.extend(child_ids[curr_id])
+        if len(nodes) < num_nodes:
+            raise ValueError("Tree is not connected!")
 
     @staticmethod
-    def get_child_ids(tree_list):
+    def get_id_tree(tree_list):
         """
         Custom method to return a list of child ids for each id in tree_list and the
-        root id of the tree.
+        root id of the tree in a single dictionary.
         """
         try:
             previous_id_dict = {d['id']:d['previous_id'] for d in tree_list}
@@ -326,7 +332,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     child_ids[prev_id].append(id)
                 else:
                     child_ids[prev_id] = [id]
-        return (child_ids, root_id)
+        return {'root_id': root_id, 'child_ids': child_ids}
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
