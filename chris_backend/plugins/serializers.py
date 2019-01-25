@@ -468,27 +468,81 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                                               "pipeline" % plg.name)
         return plg_inst
 
+    def validate_plugin_id_tree(self, plugin_id_tree):
+        """
+        Overriden to validate the tree of plugin ids. It should be a list of dictionaries.
+        Each dictionary containing the id of a node and the id of the previous node.
+        """
+        try:
+            plugin_id_list = list(json.loads(plugin_id_tree))
+        except json.decoder.JSONDecodeError:
+            raise serializers.ValidationError("Invalid JSON string %s" % plugin_id_tree)
+        if len(plugin_id_list) == 0:
+            raise serializers.ValidationError("Invalid empty list %s" % plugin_id_tree)
+
+        try:
+            bf_plugin_id_tree = PipelineSerializer.sort_tree_list_in_breadth_first(
+                plugin_id_tree)
+        except (ValueError, Exception) as e:
+            raise serializers.ValidationError(e)
+
+        for d in bf_plugin_id_tree:
+            plg_id = d['id']
+            try:
+                plg = Plugin.objects.get(pk=plg_id)
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError("Couldn't find any plugin with id %s" %
+                                                  plg_id)
+            if plg.type == 'fs':
+                raise serializers.ValidationError("%s is a plugin of type 'fs' and "
+                                                  "therefore can not be used to create a "
+                                                  "pipeline" % plg)
+        return bf_plugin_id_tree
+
     @staticmethod
-    def validate_tree(tree_list):
+    def sort_tree_list_in_breadth_first(tree_list):
         """
-        Custom method to validate a tree wich is a list of dictionaries. Each dictionary
-        containing the id of a node and the id of the previous node.
+        Custom method to sort the passed tree list in breadth_first order. Raises an
+        exception if the represented tree is not connected.
         """
-        tree = {}
-        id_dict = {d['id']:d['previous_id'] for d in tree_list}
-        root_id = [k for k,v in id_dict.items() if v is None][0]
-        tree[root_id] = []
-        id_dict[root_id] = -1  # -1 means a node for this id was already created
-        for id in id_dict:
-            if id_dict[id] != -1:
-                previous_id = id_dict[id]
-                if id_dict[previous_id] == -1:
-                    tree[previous_id].append(id)
+        (child_ids, root_id) = PipelineSerializer.get_child_ids(tree_list)
+        sorted_tree_list = []
+        queue = [{'id': root_id, 'previous_id': None}]
+        while len(queue):
+            cur_node = queue.pop(0)
+            sorted_tree_list.append(cur_node)
+            for child in child_ids[cur_node['id']]:
+                queue.append({'id': child, 'previous_id': cur_node['id']})
+        if len(sorted_tree_list) < len(tree_list):
+            raise ValueError("Tree is not connected! Bad tree list %s." % tree_list)
+        return sorted_tree_list
+
+    @staticmethod
+    def get_child_ids(tree_list):
+        """
+        Custom method to return a list of child ids for each id in tree_list and the
+        root id of the tree.
+        """
+        try:
+            previous_id_dict = {d['id']:d['previous_id'] for d in tree_list}
+            root_id = [k for k,v in previous_id_dict.items() if not v][0]
+        except IndexError:
+            raise ValueError("Couldn't find any root id in %s" % tree_list)
+        except Exception:
+            raise ValueError("Bad tree list %s. It must be a list of dictionaries with"
+                             " 'id' and 'previous_id' as keys" % tree_list)
+        child_ids = {root_id: []} # dict with a list of child ids for each id entry
+        previous_id_dict[root_id] = -1  # -1 a child_ids entry for id was already created
+        for id in previous_id_dict:
+            if previous_id_dict[id] != -1:
+                child_ids[id] = []
+                prev_id = previous_id_dict[id]
+                previous_id_dict[id] = -1
+                if previous_id_dict[prev_id] == -1:
+                    child_ids[prev_id].append(id)
                 else:
-                    tree[previous_id]=[id]
-
-
-
+                    child_ids[prev_id] = [id]
+        return (child_ids, root_id)
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
