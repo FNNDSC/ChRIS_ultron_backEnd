@@ -152,7 +152,7 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         pipeline = self.get_object()
         if not 'name' in request.data:
             request.data['name'] = pipeline.name # name is required in the serializer
-        request.data['plugin_id_list'] = str([plg.id for plg in pipeline.plugins.all()])
+        request.data['plugin_id_tree'] = str([plg.id for plg in pipeline.plugins.all()])
         return super(PipelineDetail, self).update(request, *args, **kwargs)
 
 
