@@ -1,5 +1,6 @@
 
 import logging
+import json
 
 from django.test import TestCase
 from django.urls import reverse
@@ -7,7 +8,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin, PluginParameter
+from plugins.models import Plugin, PluginParameter, Pipeline
 from plugins.models import ComputeResource
 
 
@@ -149,3 +150,48 @@ class PluginParameterDetailViewTests(ViewTests):
     def test_plugin_parameter_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PipelineListViewTests(ViewTests):
+    """
+    Test the pipeline-list view.
+    """
+
+    def setUp(self):
+        super(PipelineListViewTests, self).setUp()
+        self.content_type = 'application/vnd.collection+json'
+        self.pipeline_name = 'Pipeline1'
+        user = User.objects.get(username=self.username)
+        Pipeline.objects.get_or_create(name=self.pipeline_name, owner=user)
+        self.create_read_url = reverse("pipeline-list")
+
+    def test_pipeline_create_success(self):
+        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
+                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
+                                                compute_resource=self.compute_resource)
+
+        plugin_id_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
+                         ', "previous_index": null}, {"plugin_id": ' + \
+                         str(plugin_ds2.id) + ', "previous_index": 0}]'
+        post = json.dumps(
+            {"template": {"data": [{"name": "name", "value": "Pipeline2"},
+                                   {"name": "plugin_id_tree", "value": plugin_id_tree}]}})
+
+        # make API request
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_pipeline_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, "Pipeline1")
+
+    def test_pipeline_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+
