@@ -481,72 +481,101 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError("Invalid empty list %s" % plugin_id_tree)
 
         for d in plugin_id_list:
-            plg_id = d['id']
             try:
+                prev_ix = d['previous_index']
+                plg_id = d['plugin_id']
                 plg = Plugin.objects.get(pk=plg_id)
             except ObjectDoesNotExist:
                 raise serializers.ValidationError("Couldn't find any plugin with id %s" %
                                                   plg_id)
+            except Exception:
+                raise serializers.ValidationError("%s must be a JSON object with "
+                                                  "'plugin_id' and 'previous_index' "
+                                                  "properties" % d)
             if plg.type == 'fs':
                 raise serializers.ValidationError("%s is a plugin of type 'fs' and "
                                                   "therefore can not be used to create a "
                                                   "pipeline" % plg)
         try:
-            id_tree_dict = PipelineSerializer.get_child_ids(plugin_id_tree)
-            PipelineSerializer.validate_id_tree(id_tree_dict)
+            tree_dict = PipelineSerializer.get_tree(plugin_id_list)
+            PipelineSerializer.validate_tree(tree_dict)
         except (ValueError, Exception) as e:
             raise serializers.ValidationError(e)
-
-        return id_tree_dict
+        return tree_dict
 
     @staticmethod
-    def validate_id_tree(id_tree):
+    def validate_tree(tree_dict):
         """
-        Custom method to validate whether the represented tree in id_tree is a single
-        connected component.
+        Custom method to validate whether the represented tree in tree_dict dictionary
+        is a single connected component.
         """
-        root_id = id_tree['root_id']
-        child_ids = id_tree['child_ids']
-        num_nodes = 0
-        for child_id in child_ids:
-            children_list = child_ids[child_id]
-            num_nodes += len(children_list)
+        root_ix = tree_dict['root_index']
+        tree = tree_dict['tree']
+        num_nodes = len(tree)
         # breath-first traversal
         nodes = []
-        queue = [root_id]
+        queue = [root_ix]
         while len(queue):
-            curr_id = queue.pop(0)
-            nodes.append(curr_id)
-            queue.extend(child_ids[curr_id])
+            curr_ix = queue.pop(0)
+            nodes.append(curr_ix)
+            queue.extend(tree[curr_ix]['child_indices'])
         if len(nodes) < num_nodes:
             raise ValueError("Tree is not connected!")
 
     @staticmethod
-    def get_id_tree(tree_list):
+    def get_tree(tree_list):
         """
-        Custom method to return a list of child ids for each id in tree_list and the
-        root id of the tree in a single dictionary.
+        Custom method to return a dictionary containing a list of nodes representing a
+        tree of plugins and the index of the root of the tree. Each node is a dictionary
+        containing the plugin id and the list of child indices.
         """
         try:
-            previous_id_dict = {d['id']:d['previous_id'] for d in tree_list}
-            root_id = [k for k,v in previous_id_dict.items() if not v][0]
+            root_ix = [ix for ix,d in enumerate(tree_list)
+                       if d['previous_index'] is None][0]
         except IndexError:
-            raise ValueError("Couldn't find any root id in %s" % tree_list)
-        except Exception:
-            raise ValueError("Bad tree list %s. It must be a list of dictionaries with"
-                             " 'id' and 'previous_id' as keys" % tree_list)
-        child_ids = {root_id: []} # dict with a list of child ids for each id entry
-        previous_id_dict[root_id] = -1  # -1 a child_ids entry for id was already created
-        for id in previous_id_dict:
-            if previous_id_dict[id] != -1:
-                child_ids[id] = []
-                prev_id = previous_id_dict[id]
-                previous_id_dict[id] = -1
-                if previous_id_dict[prev_id] == -1:
-                    child_ids[prev_id].append(id)
-                else:
-                    child_ids[prev_id] = [id]
-        return {'root_id': root_id, 'child_ids': child_ids}
+            raise ValueError("Couldn't find the root of the tree in %s" % tree_list)
+        tree = [None] * len(tree_list)
+        tree[root_ix] = {'plugin_id': tree_list[root_ix]['plugin_id'], 'child_indices':[]}
+        for ix, d in enumerate(tree_list):
+            if ix != root_ix:
+                if not tree[ix]:
+                    tree[ix] = {'plugin_id': d['plugin_id'], 'child_indices': []}
+                prev_ix = d['previous_index']
+                try:
+                    if tree[prev_ix]:
+                        tree[prev_ix]['child_indices'].append(ix)
+                    else:
+                        tree[prev_ix] = {'plugin_id': tree_list[prev_ix]['plugin_id'],
+                                         'child_indices': [ix]}
+                except (IndexError, TypeError):
+                    raise ValueError("Invalid 'previous_index' for node %s" % d)
+        return {'root_index': root_ix, 'tree': tree}
+
+    @staticmethod
+    def _add_plugin_tree_to_pipeline(pipeline, tree_dict):
+        """
+        Internal custom method to associate a tree of plugins to a pipeline in the DB.
+        """
+        # here a piping precedes another piping if its corresponding plugin precedes
+        # the other piping's plugin in the pipeline
+        root_ix = tree_dict['root_index']
+        tree = tree_dict['tree']
+        root_plg = Plugin.objects.get(pk=tree[root_ix]['plugin_id'])
+        root_plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=root_plg)
+        root_plg_piping.save()
+        # breath-first traversal
+        piping_queue = [root_plg_piping]
+        ix_queue = [root_ix]
+        while len(piping_queue):
+            curr_ix = ix_queue.pop(0)
+            curr_piping = piping_queue.pop(0)
+            for ix in tree[curr_ix]['child_indices']:
+                plg = Plugin.objects.get(pk=tree[ix]['plugin_id'])
+                plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=plg,
+                                                         previous=curr_piping)
+                plg_piping.save()
+                ix_queue.append(ix)
+                piping_queue.append(plg_piping)
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
