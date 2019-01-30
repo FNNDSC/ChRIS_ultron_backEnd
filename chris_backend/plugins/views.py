@@ -8,6 +8,7 @@ from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
+from .permissions import IsOwnerOrChrisOrReadOnly
 
 class PluginList(generics.ListAPIView):
     """
