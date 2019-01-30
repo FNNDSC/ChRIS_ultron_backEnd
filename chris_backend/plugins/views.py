@@ -8,6 +8,7 @@ from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
+from .permissions import IsOwnerOrChrisOrReadOnly
 
 class PluginList(generics.ListAPIView):
     """
@@ -135,7 +136,7 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -150,9 +151,8 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to include required parameters if not in the request.
         """
         pipeline = self.get_object()
-        if not 'name' in request.data:
-            request.data['name'] = pipeline.name # name is required in the serializer
-        request.data['plugin_id_tree'] = str([plg.id for plg in pipeline.plugins.all()])
+        if 'name' not in request.data:
+            request.data['name'] = pipeline.name  # name is required in the serializer
         return super(PipelineDetail, self).update(request, *args, **kwargs)
 
 
