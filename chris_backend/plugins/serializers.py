@@ -28,12 +28,13 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
-                  'description', 'documentation', 'license', 'version', 'execshell',
-                  'selfpath', 'selfexec', 'compute_resource_identifier', 'parameters',
-                  'instances', 'min_number_of_workers', 'max_number_of_workers',
-                  'min_cpu_limit', 'max_cpu_limit', 'min_memory_limit',
-                  'max_memory_limit', 'min_gpu_limit', 'max_gpu_limit')
+        fields = ('url', 'id', 'name', 'dock_image', 'type', 'authors', 'title',
+                  'category', 'description', 'documentation', 'license', 'version',
+                  'execshell', 'selfpath', 'selfexec', 'compute_resource_identifier',
+                  'parameters', 'instances', 'min_number_of_workers',
+                  'max_number_of_workers', 'min_cpu_limit', 'max_cpu_limit',
+                  'min_memory_limit', 'max_memory_limit', 'min_gpu_limit',
+                  'max_gpu_limit')
 
     def validate(self, data):
         """
@@ -74,7 +75,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
                 data['max_memory_limit'])
 
         # validate descriptor limits
-        err_msg = "Minimum number of workers should be less than maximum number of workers"
+        err_msg = "Minimum number of workers should be less than maximum number of " \
+                  "workers"
         self.validate_app_descriptor_limits(data, 'min_number_of_workers',
                                             'max_number_of_workers', err_msg)
         err_msg = "Minimum cpu limit should be less than maximum cpu limit"
