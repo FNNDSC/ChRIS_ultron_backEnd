@@ -54,7 +54,6 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/(?P<pk>[0-9]+)/taggings/$',
         feed_views.FeedTaggingList.as_view(), name='feed-tagging-list'),
 
-
     url(r'^v1/tags/$',
         feed_views.TagList.as_view(), name='tag-list'),
 
@@ -85,6 +84,30 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/plugins/parameters/(?P<pk>[0-9]+)/$',
         plugin_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
+
+
+    url(r'^v1/pipelines/$',
+        plugin_views.PipelineList.as_view(),
+        name='pipeline-list'),
+
+    url(r'^v1/pipelines/search/$',
+        plugin_views.PipelineListQuerySearch.as_view(),
+        name='pipeline-list-query-search'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/$',
+        plugin_views.PipelineDetail.as_view(),
+        name='pipeline-detail'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/plugins/$',
+        plugin_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/pipings/$',
+        plugin_views.PipelinePluginPipingList.as_view(),
+        name='pipeline-pluginpiping-list'),
+
+    url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
+        plugin_views.PluginPipingDetail.as_view(),
+        name='pluginpiping-detail'),
 
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
@@ -118,7 +141,6 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/parameters/$',
         plugininstance_views.PluginInstanceParameterList.as_view(),
         name='plugininstance-parameter-list'),
-
 
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
         plugininstance_views.StringParameterDetail.as_view(),

@@ -29,9 +29,9 @@ class ComputeResource(models.Model):
 class Plugin(models.Model):
     # default resource limits inserted at registration time
     defaults = {
-                'min_cpu_limit': 1000,   # in millicores
-                'min_memory_limit': 200, # in Mi
-                'max_limit': 2147483647  # maxint
+                'min_cpu_limit': 1000,    # in millicores
+                'min_memory_limit': 200,  # in Mi
+                'max_limit': 2147483647   # maxint
                }
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
@@ -57,13 +57,13 @@ class Plugin(models.Model):
     max_number_of_workers = models.IntegerField(null=True, blank=True,
                                                 default=defaults['max_limit'])
     min_cpu_limit = CPUField(null=True, blank=True,
-                             default=defaults['min_cpu_limit']) # In millicores
+                             default=defaults['min_cpu_limit'])  # In millicores
     max_cpu_limit = CPUField(null=True, blank=True,
-                             default=defaults['max_limit']) # In millicores
+                             default=defaults['max_limit'])  # In millicores
     min_memory_limit = MemoryField(null=True, blank=True,
-                                   default=defaults['min_memory_limit']) # In Mi
+                                   default=defaults['min_memory_limit'])  # In Mi
     max_memory_limit = MemoryField(null=True, blank=True,
-                                   default=defaults['max_limit']) # In Mi
+                                   default=defaults['max_limit'])  # In Mi
 
     class Meta:
         ordering = ('type',)
@@ -85,10 +85,17 @@ class PluginFilter(FilterSet):
     max_creation_date = django_filters.DateFilter(field_name="creation_date",
                                                   lookup_expr='lte')
 
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
+
     class Meta:
         model = Plugin
-        fields = ['id', 'name', 'dock_image', 'type', 'category', 'authors',
-                  'min_creation_date', 'max_creation_date']
+        fields = ['id', 'name', 'title', 'dock_image', 'type', 'category', 'authors',
+                  'description', 'min_creation_date', 'max_creation_date']
 
 
 class PluginParameter(models.Model):
@@ -107,3 +114,53 @@ class PluginParameter(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Pipeline(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    modification_date = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, unique=True)
+    authors = models.CharField(max_length=200, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    description = models.CharField(max_length=800, blank=True)
+    owner = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL)
+    plugins = models.ManyToManyField(Plugin, related_name='pipelines',
+                                     through='PluginPiping')
+
+    class Meta:
+        ordering = ('category',)
+
+    def __str__(self):
+        return self.name
+
+
+class PluginPiping(models.Model):
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
+                                 related_name='next')
+
+    class Meta:
+        ordering = ('pipeline',)
+
+    def __str__(self):
+        return str(self.id)
+
+
+class PipelineFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name="creation_date",
+                                                  lookup_expr='lte')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                               lookup_expr='exact')
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
+
+    class Meta:
+        model = Pipeline
+        fields = ['id', 'owner_username', 'name', 'category', 'description',
+                  'authors', 'min_creation_date', 'max_creation_date']
