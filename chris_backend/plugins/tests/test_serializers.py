@@ -331,17 +331,17 @@ class PipelineSerializerTests(SerializerTests):
         pipeline_serializer.update(pipeline, validated_data)
         self.assertEqual(pipeline.name, 'Pipeline2')
 
-    def test_validate_validates_required_fields(self):
+    def test_validate_validates_required_fields_on_create(self):
         """
         Test whether overriden validate method validates that at least one of the fields
-        'plugin_id_tree' or 'plugin_inst_id' must be provided.
+        'plugin_id_tree' or 'plugin_inst_id' must be provided when creating a new
+        pipeline.
         """
         owner = User.objects.get(username=self.username)
-        pipeline = Pipeline.objects.get(name=self.pipeline_name)
-        pipeline_serializer = PipelineSerializer(pipeline)
-        validated_data = {'name': 'Pipeline 1', 'owner': owner}
+        data = {'name': 'Pipeline2', 'owner': owner}
+        pipeline_serializer = PipelineSerializer(data=data)
         with self.assertRaises(serializers.ValidationError):
-            pipeline_serializer.validate(validated_data)
+            pipeline_serializer.validate(data)
 
     def test_validate_plugin_inst_id(self):
         """
