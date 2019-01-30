@@ -28,12 +28,13 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'name', 'dock_image', 'type', 'authors', 'title', 'category',
-                  'description', 'documentation', 'license', 'version', 'execshell',
-                  'selfpath', 'selfexec', 'compute_resource_identifier', 'parameters',
-                  'instances', 'min_number_of_workers', 'max_number_of_workers',
-                  'min_cpu_limit', 'max_cpu_limit', 'min_memory_limit',
-                  'max_memory_limit', 'min_gpu_limit', 'max_gpu_limit')
+        fields = ('url', 'id', 'name', 'dock_image', 'type', 'authors', 'title',
+                  'category', 'description', 'documentation', 'license', 'version',
+                  'execshell', 'selfpath', 'selfexec', 'compute_resource_identifier',
+                  'parameters', 'instances', 'min_number_of_workers',
+                  'max_number_of_workers', 'min_cpu_limit', 'max_cpu_limit',
+                  'min_memory_limit', 'max_memory_limit', 'min_gpu_limit',
+                  'max_gpu_limit')
 
     def validate(self, data):
         """
@@ -74,7 +75,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
                 data['max_memory_limit'])
 
         # validate descriptor limits
-        err_msg = "Minimum number of workers should be less than maximum number of workers"
+        err_msg = "Minimum number of workers should be less than maximum number of " \
+                  "workers"
         self.validate_app_descriptor_limits(data, 'min_number_of_workers',
                                             'max_number_of_workers', err_msg)
         err_msg = "Minimum cpu limit should be less than maximum cpu limit"
@@ -184,7 +186,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         root_plg_inst = validated_data.pop('plugin_inst_id', None)
         pipeline = super(PipelineSerializer, self).create(validated_data)
 
-        if not tree_dict: # generate tree_dict from passed plugin instance
+        if not tree_dict:  # generate tree_dict from passed plugin instance
             tree_dict = {'root_index': 0, 'tree': []}
             curr_ix = 0
             queue = [root_plg_inst]
@@ -219,12 +221,14 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         """
-        Overriden to validate that at least one of two fields are in data.
+        Overriden to validate that at least one of two fields are in data
+        when creating a new pipeline.
         """
-        if 'plugin_id_tree' not in data and 'plugin_inst_id' not in data:
-            raise serializers.ValidationError("At least one of the fields "
-                                              "'plugin_id_tree' or 'plugin_inst_id' must "
-                                              "be provided")
+        if not self.instance:  # this validation only happens on create and not on update
+            if 'plugin_id_tree' not in data and 'plugin_inst_id' not in data:
+                raise serializers.ValidationError("At least one of the fields "
+                                                  "'plugin_id_tree' or 'plugin_inst_id' "
+                                                  "must be provided")
         return data
 
     def validate_plugin_inst_id(self, plugin_inst_id):
