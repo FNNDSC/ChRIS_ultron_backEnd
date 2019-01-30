@@ -29,9 +29,9 @@ class ComputeResource(models.Model):
 class Plugin(models.Model):
     # default resource limits inserted at registration time
     defaults = {
-                'min_cpu_limit': 1000,   # in millicores
-                'min_memory_limit': 200, # in Mi
-                'max_limit': 2147483647  # maxint
+                'min_cpu_limit': 1000,    # in millicores
+                'min_memory_limit': 200,  # in Mi
+                'max_limit': 2147483647   # maxint
                }
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
@@ -57,13 +57,13 @@ class Plugin(models.Model):
     max_number_of_workers = models.IntegerField(null=True, blank=True,
                                                 default=defaults['max_limit'])
     min_cpu_limit = CPUField(null=True, blank=True,
-                             default=defaults['min_cpu_limit']) # In millicores
+                             default=defaults['min_cpu_limit'])  # In millicores
     max_cpu_limit = CPUField(null=True, blank=True,
-                             default=defaults['max_limit']) # In millicores
+                             default=defaults['max_limit'])  # In millicores
     min_memory_limit = MemoryField(null=True, blank=True,
-                                   default=defaults['min_memory_limit']) # In Mi
+                                   default=defaults['min_memory_limit'])  # In Mi
     max_memory_limit = MemoryField(null=True, blank=True,
-                                   default=defaults['max_limit']) # In Mi
+                                   default=defaults['max_limit'])  # In Mi
 
     class Meta:
         ordering = ('type',)
