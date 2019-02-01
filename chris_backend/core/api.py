@@ -156,7 +156,6 @@ urlpatterns = format_suffix_patterns([
         plugin_views.PluginPipingDetail.as_view(),
         name='pluginpiping-detail'),
 
-
     url(r'^v1/pipelines/$',
         plugin_views.PipelineList.as_view(),
         name='pipeline-list'),
