@@ -257,8 +257,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             plugin_id_list = list(json.loads(plugin_id_tree))
         except json.decoder.JSONDecodeError:
             raise serializers.ValidationError("Invalid JSON string %s" % plugin_id_tree)
+        except Exception:
+            raise serializers.ValidationError("Invalid tree list in %s" % plugin_id_tree)
         if len(plugin_id_list) == 0:
-            raise serializers.ValidationError("Invalid empty list %s" % plugin_id_tree)
+            raise serializers.ValidationError("Invalid empty list in %s" % plugin_id_tree)
 
         for d in plugin_id_list:
             try:
