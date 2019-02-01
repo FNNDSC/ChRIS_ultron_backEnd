@@ -132,7 +132,6 @@ urlpatterns = format_suffix_patterns([
         plugin_views.DefaultPipingPathParameterDetail.as_view(),
         name='defaultpipingpathparameter-detail'),
 
-
     url(r'^v1/pipelines/$',
         plugin_views.PipelineList.as_view(),
         name='pipeline-list'),
