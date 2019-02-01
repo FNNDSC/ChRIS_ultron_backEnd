@@ -85,7 +85,6 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/parameters/(?P<pk>[0-9]+)/$',
         plugin_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
 
-
     url(r'^v1/pipelines/$',
         plugin_views.PipelineList.as_view(),
         name='pipeline-list'),
@@ -169,6 +168,22 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/path-parameter/(?P<pk>[0-9]+)/$',
         plugininstance_views.PathParameterDetail.as_view(),
         name='pathparameter-detail'),
+
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/instances/$',
+        plugininstance_views.PipelineInstanceList.as_view(),
+        name='pipelineinstance-list'),
+
+    url(r'^v1/pipelines/instances/search/$',
+        plugininstance_views.PipelineInstanceListQuerySearch.as_view(),
+        name='pipelineinstance-list-query-search'),
+
+    url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/$',
+        plugininstance_views.PipelineInstanceDetail.as_view(),
+        name='pipelineinstance-detail'),
+
+    url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/parameters/$',
+        plugininstance_views.PipelineInstanceParameterList.as_view(),
+        name='pipelineinstance-parameter-list'),
 
 
     url(r'^v1/uploadedfiles/$',
