@@ -10,6 +10,8 @@ from plugininstances.models import PluginInstance
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import Pipeline, PluginPiping
+from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
+from .models import DefaultPathParameter, DefaultStringParameter
 from .fields import MemoryInt, CPUInt
 
 
@@ -375,3 +377,120 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
         model = PluginPiping
         fields = ('url', 'id', 'plugin_id', 'pipeline_id', 'previous_id', 'previous',
                   'plugin', 'pipeline')
+
+
+class DefaultStringParameterSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin_id = serializers.ReadOnlyField(source='plugin_param__plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin_param__plugin.name')
+    param_id = serializers.ReadOnlyField(source='plugin_param.id')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+    class Meta:
+        model = DefaultStringParameter
+        fields = ('url', 'id', 'value', 'type', 'param_name', 'param_id', 'pipeline',
+                  'plugin_name', 'plugin_id', 'pipeline_id', 'plugin_param')
+
+
+class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin_id = serializers.ReadOnlyField(source='plugin_param__plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin_param__plugin.name')
+    param_id = serializers.ReadOnlyField(source='plugin_param.id')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+    class Meta:
+        model = DefaultIntParameter
+        fields = ('url', 'id', 'value', 'type', 'param_name', 'param_id', 'pipeline',
+                  'plugin_name', 'plugin_id', 'pipeline_id', 'plugin_param')
+
+
+class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin_id = serializers.ReadOnlyField(source='plugin_param__plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin_param__plugin.name')
+    param_id = serializers.ReadOnlyField(source='plugin_param.id')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+    class Meta:
+        model = DefaultFloatParameter
+        fields = ('url', 'id', 'value', 'type', 'param_name', 'param_id', 'pipeline',
+                  'plugin_name', 'plugin_id', 'pipeline_id', 'plugin_param')
+
+
+class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin_id = serializers.ReadOnlyField(source='plugin_param__plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin_param__plugin.name')
+    param_id = serializers.ReadOnlyField(source='plugin_param.id')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+    class Meta:
+        model = DefaultBoolParameter
+        fields = ('url', 'id', 'value', 'type', 'param_name', 'param_id', 'pipeline',
+                  'plugin_name', 'plugin_id', 'pipeline_id', 'plugin_param')
+
+
+class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    plugin_id = serializers.ReadOnlyField(source='plugin_param__plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin_param__plugin.name')
+    param_id = serializers.ReadOnlyField(source='plugin_param.id')
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                      read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+    class Meta:
+        model = DefaultPathParameter
+        fields = ('url', 'id', 'value', 'type', 'param_name', 'param_id', 'pipeline',
+                  'plugin_name', 'plugin_id', 'pipeline_id', 'plugin_param')
+
+
+DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStringParameterSerializer,
+                         'integer': DefaultIntParameterSerializer,
+                         'float': DefaultFloatParameterSerializer,
+                         'boolean': DefaultBoolParameterSerializer,
+                         'path': DefaultPathParameterSerializer}
