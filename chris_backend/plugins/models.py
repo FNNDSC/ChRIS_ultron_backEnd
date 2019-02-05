@@ -164,3 +164,58 @@ class PipelineFilter(FilterSet):
         model = Pipeline
         fields = ['id', 'owner_username', 'name', 'category', 'description',
                   'authors', 'min_creation_date', 'max_creation_date']
+
+
+class DefaultStringParameter(models.Model):
+    value = models.CharField(max_length=200, blank=True)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                    related_name='string_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='string_default')
+
+    def __str__(self):
+        return self.value
+
+
+class DefaultIntParameter(models.Model):
+    value = models.IntegerField()
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                    related_name='integer_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='integer_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultFloatParameter(models.Model):
+    value = models.FloatField()
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                    related_name='float_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='float_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultBoolParameter(models.Model):
+    value = models.BooleanField(default=False, blank=True)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                    related_name='boolean_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='boolean_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultPathParameter(models.Model):
+    value = models.CharField(max_length=200, blank=True)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                    related_name='path_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='path_default')
+
+    def __str__(self):
+        return self.value
