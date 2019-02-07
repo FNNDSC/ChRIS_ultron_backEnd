@@ -206,7 +206,6 @@ class PipelineFilter(FilterSet):
                   'authors', 'min_creation_date', 'max_creation_date']
 
 
-<<<<<<< HEAD
 class PluginPiping(models.Model):
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
