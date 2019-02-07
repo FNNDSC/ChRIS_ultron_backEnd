@@ -143,7 +143,8 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(PipelineDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': ""}
+        template_data = {'name': "", 'locked': "", 'authors': "", 'category': "",
+                         'description': ""}
         return services.append_collection_template(response, template_data)
 
     def update(self, request, *args, **kwargs):
@@ -209,8 +210,8 @@ class PipelinePluginPipingList(generics.ListAPIView):
         Custom method to get the actual plugin pipings queryset for the pipeline.
         """
         pipeline = self.get_object()
-        return PluginPiping.objects.filter(pipeline=pipeline)
-
+        #return PluginPiping.objects.filter(pipeline=pipeline)
+        return pipeline.plugin_tree.all()
 
 class PluginPipingDetail(generics.RetrieveAPIView):
     """
