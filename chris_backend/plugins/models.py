@@ -120,6 +120,7 @@ class Pipeline(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
+    locked = models.BooleanField(default=True)
     authors = models.CharField(max_length=200, blank=True)
     category = models.CharField(max_length=100, blank=True)
     description = models.CharField(max_length=800, blank=True)
@@ -136,7 +137,8 @@ class Pipeline(models.Model):
 
 class PluginPiping(models.Model):
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                 related_name='plugin_tree')
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
 
@@ -168,7 +170,7 @@ class PipelineFilter(FilterSet):
 
 class DefaultStringParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='string_default')
@@ -179,7 +181,7 @@ class DefaultStringParameter(models.Model):
 
 class DefaultIntParameter(models.Model):
     value = models.IntegerField()
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='integer_default')
@@ -190,7 +192,7 @@ class DefaultIntParameter(models.Model):
 
 class DefaultFloatParameter(models.Model):
     value = models.FloatField()
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='float_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='float_default')
@@ -201,7 +203,7 @@ class DefaultFloatParameter(models.Model):
 
 class DefaultBoolParameter(models.Model):
     value = models.BooleanField(default=False, blank=True)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='boolean_default')
@@ -212,7 +214,7 @@ class DefaultBoolParameter(models.Model):
 
 class DefaultPathParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='path_default')
