@@ -160,8 +160,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginParameter
-        fields = ('url', 'id', 'name', 'type', 'optional', 'default', 'flag', 'action',
-                  'help', 'plugin')
+        fields = ('url', 'id', 'name', 'type', 'optional', 'default',
+                  'flag', 'action', 'help', 'plugin')
 
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
@@ -172,12 +172,14 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
     plugin_tree = serializers.HyperlinkedIdentityField(
         view_name='pipeline-pluginpiping-list')
+    default_parameters = serializers.HyperlinkedIdentityField(
+        view_name='pipeline-defaultparameter-list')
 
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'locked', 'authors', 'category', 'description',
                   'plugin_id_tree', 'plugin_inst_id', 'owner_username', 'plugins',
-                  'plugin_tree')
+                  'plugin_tree', 'default_parameters')
 
     def create(self, validated_data):
         """
