@@ -178,6 +178,10 @@ urlpatterns = format_suffix_patterns([
         plugin_views.PipelinePluginPipingList.as_view(),
         name='pipeline-pluginpiping-list'),
 
+    url(r'^v1/pipelines/(?P<pk>[0-9]+)/parameters/$',
+        plugin_views.PipelineDefaultParameterList.as_view(),
+        name='pipeline-defaultparameter-list'),
+
     url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
         plugin_views.PluginPipingDetail.as_view(),
         name='pluginpiping-detail'),
