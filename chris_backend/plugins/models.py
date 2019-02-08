@@ -13,8 +13,8 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("path", "Path values")]
 
 # table of equivalence between front-end API types and back-end types
-TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
-         'path': 'path'}
+TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool,
+         'path': str}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
@@ -115,6 +115,25 @@ class PluginParameter(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def default_value(self):
+        """
+        Custom property getter to return the default value after type conversion.
+        """
+        default = None
+        if self.optional:
+            try:
+                default = TYPES[self.type](self.default)
+            except (ValueError, TypeError):
+                pass
+            else:
+                if self.type == 'boolean':
+                    if self.default == "False":
+                        default = False
+                    elif self.default == "True":
+                        default = True
+        return default
+
 
 class Pipeline(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
@@ -147,6 +166,21 @@ class PluginPiping(models.Model):
 
     def __str__(self):
         return str(self.id)
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to save the default plugin parameters' values associated with this
+        piping.
+        """
+        super(PluginPiping, self).save(*args, **kwargs)
+        plugin = self.plugin
+        parameters = plugin.parameters.all()
+        for parameter in parameters:
+            default_param = DEFAULT_PARAMETER_MODELS[parameter.type]()
+            default_param.plugin_piping = self
+            default_param.plugin_param = parameter
+            default_param.value = parameter.default_value
+            default_param.save()
 
 
 class PipelineFilter(FilterSet):
@@ -221,3 +255,10 @@ class DefaultPathParameter(models.Model):
 
     def __str__(self):
         return self.value
+
+
+DEFAULT_PARAMETER_MODELS = {'string': DefaultStringParameter,
+                         'integer': DefaultIntParameter,
+                         'float': DefaultFloatParameter,
+                         'boolean': DefaultBoolParameter,
+                         'path': DefaultPathParameter}
