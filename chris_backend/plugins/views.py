@@ -255,6 +255,49 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         return self.filter_queryset(queryset)
 
 
+
+class PipelineDefaultParameterList(generics.ListAPIView):
+    """
+    A view for the collection of pipeline-specific plugin parameters' defaults.
+    """
+    queryset = Pipeline.objects.all()
+    serializer_class = DEFAULT_PARAMETER_SERIALIZERS['string']
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list with all the default parameter values used by the
+        queried pipeline.
+        """
+        queryset = self.get_default_parameters_queryset()
+        response = services.get_list_response(self, queryset)
+        results = response.data['results']
+        # the items' url must be corrected because this view always uses the same string
+        # serializer for any parameter type
+        for item in results:
+            item['url'] = item['url'].replace('string', item['type'])
+        return response
+
+    def get_default_parameters_queryset(self):
+        """
+        Custom method to get a queryset with all the default parameters regardless their
+        type.
+        """
+        pipeline = self.get_object()
+        queryset = []
+        queryset.extend(list(DefaultPathParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultStringParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultIntParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultFloatParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultBoolParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        return self.filter_queryset(queryset)
+
+
 class PluginPipingDetail(generics.RetrieveAPIView):
     """
     A plugin piping view.
