@@ -12,7 +12,8 @@ from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .serializers import GenericDefaultPipingParameterSerializer
-from .permissions import IsOwnerOrChrisOrReadOnly
+from .permissions import IsOwnerOrChrisOrNotLockedReadOnly, IsChirsOrOwnerOrNotLocked
+from .permissions import IsChirsOrOwnerAndLockedOrNotLockedReadOnly
 
 
 class PluginList(generics.ListAPIView):
@@ -97,9 +98,15 @@ class PipelineList(generics.ListCreateAPIView):
     """
     A view for the collection of pipelines.
     """
-    queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
     permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the pipelines
+        that are accessible to the currently authenticated user.
+        """
+        return Pipeline.get_accesible_pipelines(self.request.user)
 
     def perform_create(self, serializer):
         """
@@ -130,9 +137,15 @@ class PipelineListQuerySearch(generics.ListAPIView):
     A view for the collection of pipelines resulting from a query search.
     """
     serializer_class = PipelineSerializer
-    queryset = Pipeline.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PipelineFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the pipelines
+        that are accessible to the currently authenticated user.
+        """
+        return Pipeline.get_accesible_pipelines(self.request.user)
 
 
 class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -141,22 +154,28 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
         response = super(PipelineDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'name': "", 'locked': "", 'authors': "", 'category': "",
-                         'description': ""}
+        template_data = {'name': "", 'authors': "", 'category': "", 'description': ""}
+        pipeline = self.get_object()
+        if pipeline.locked:
+            template_data['locked'] = ""
         return services.append_collection_template(response, template_data)
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include required parameters if not in the request.
+        Overriden to include required parameters if not in the request and delete
+        'locked' parameter if the pipeline is not locked.
         """
         pipeline = self.get_object()
+        if not pipeline.locked and 'locked' in request.data:
+            # this pipeline was made available to the public so it cannot be locked
+            del request.data['locked']
         if 'name' not in request.data:
             request.data['name'] = pipeline.name  # name is required in the serializer
         return super(PipelineDetail, self).update(request, *args, **kwargs)
@@ -168,7 +187,8 @@ class PipelinePluginList(generics.ListAPIView):
     """
     queryset = Pipeline.objects.all()
     serializer_class = PluginSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrNotLockedReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -196,7 +216,8 @@ class PipelinePluginPipingList(generics.ListAPIView):
     """
     queryset = Pipeline.objects.all()
     serializer_class = PluginPipingSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrNotLockedReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -224,7 +245,8 @@ class PipelineDefaultParameterList(generics.ListAPIView):
     """
     queryset = Pipeline.objects.all()
     serializer_class = GenericDefaultPipingParameterSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrNotLockedReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
@@ -335,7 +357,7 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     """
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChirsOrOwnerOrNotLocked,)
 
 
 class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
@@ -345,7 +367,8 @@ class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
     queryset = DefaultPipingStrParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChirsOrOwnerAndLockedOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -364,7 +387,8 @@ class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['integer']
     queryset = DefaultPipingIntParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChirsOrOwnerAndLockedOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -383,7 +407,8 @@ class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['float']
     queryset = DefaultPipingFloatParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChirsOrOwnerAndLockedOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -402,7 +427,8 @@ class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['boolean']
     queryset = DefaultPipingBoolParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChirsOrOwnerAndLockedOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -421,7 +447,8 @@ class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['path']
     queryset = DefaultPipingPathParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChirsOrOwnerAndLockedOrNotLockedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
