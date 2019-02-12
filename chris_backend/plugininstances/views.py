@@ -8,7 +8,7 @@ from core.renderers import BinaryFileRenderer
 
 from plugins.models import Plugin, Pipeline
 from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
-from .models import StringParameter, FloatParameter, IntParameter
+from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
 from .models import PipelineInstance, PipelineInstanceFilter
 from .serializers import PARAMETER_SERIALIZERS
@@ -367,12 +367,12 @@ class PluginInstanceParameterList(generics.ListAPIView):
         return self.filter_queryset(queryset)
 
 
-class StringParameterDetail(generics.RetrieveAPIView):
+class StrParameterDetail(generics.RetrieveAPIView):
     """
     A string parameter view.
     """
     serializer_class = PARAMETER_SERIALIZERS['string']
-    queryset = StringParameter.objects.all()
+    queryset = StrParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
     
 
