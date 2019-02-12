@@ -12,6 +12,7 @@ from .models import StringParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
 from .models import PipelineInstance, PipelineInstanceFilter
 from .serializers import PARAMETER_SERIALIZERS
+from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .serializers import PipelineInstanceSerializer
 from .permissions import IsRelatedFeedOwnerOrChris
@@ -340,7 +341,7 @@ class PluginInstanceParameterList(generics.ListAPIView):
     """
     A view for the collection of parameters that the plugin instance was run with.
     """
-    serializer_class = PARAMETER_SERIALIZERS['string']
+    serializer_class = GenericParameterSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -350,13 +351,7 @@ class PluginInstanceParameterList(generics.ListAPIView):
         plugin instance.
         """
         queryset = self.get_parameters_queryset()
-        response = services.get_list_response(self, queryset)
-        results = response.data['results']
-        # the items' url must be corrected because this view always uses the same string
-        # serializer for any parameter type
-        for item in results:
-            item['url'] = item['url'].replace('string', item['type'])
-        return response
+        return services.get_list_response(self, queryset)
 
     def get_parameters_queryset(self):
         """
