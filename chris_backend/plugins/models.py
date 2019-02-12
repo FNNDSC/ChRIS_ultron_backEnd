@@ -13,8 +13,8 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("path", "Path values")]
 
 # table of equivalence between front-end API types and back-end types
-TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool,
-         'path': str}
+TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
+         'path': 'path'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
