@@ -6,11 +6,12 @@ from collectionjson import services
 
 from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
-from .models import DefaultPathParameter, DefaultStringParameter, DefaultIntParameter
-from .models import DefaultFloatParameter, DefaultBoolParameter
+from .models import DefaultPipingPathParameter, DefaultPipingStringParameter
+from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
+from .models import DefaultPipingBoolParameter
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
-from .serializers import DEFAULT_PARAMETER_SERIALIZERS
+from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .permissions import IsOwnerOrChrisOrReadOnly
 
 
@@ -214,8 +215,7 @@ class PipelinePluginPipingList(generics.ListAPIView):
         Custom method to get the actual plugin pipings queryset for the pipeline.
         """
         pipeline = self.get_object()
-        #return PluginPiping.objects.filter(pipeline=pipeline)
-        return pipeline.plugin_tree.all()
+        return pipeline.plugin_pipings.all()
 
 
 class PipelineDefaultParameterList(generics.ListAPIView):
@@ -223,7 +223,7 @@ class PipelineDefaultParameterList(generics.ListAPIView):
     A view for the collection of pipeline-specific plugin parameters' defaults.
     """
     queryset = Pipeline.objects.all()
-    serializer_class = DEFAULT_PARAMETER_SERIALIZERS['string']
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
     permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -247,15 +247,15 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         """
         pipeline = self.get_object()
         queryset = []
-        queryset.extend(list(DefaultPathParameter.objects.filter(
+        queryset.extend(list(DefaultPipingPathParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultStringParameter.objects.filter(
+        queryset.extend(list(DefaultPipingStringParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultIntParameter.objects.filter(
+        queryset.extend(list(DefaultPipingIntParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultFloatParameter.objects.filter(
+        queryset.extend(list(DefaultPipingFloatParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultBoolParameter.objects.filter(
+        queryset.extend(list(DefaultPipingBoolParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
         return self.filter_queryset(queryset)
 
@@ -266,4 +266,54 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     """
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingStringParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a string default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
+    queryset = DefaultPipingStringParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for an integer default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['integer']
+    queryset = DefaultPipingIntParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a float default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['float']
+    queryset = DefaultPipingFloatParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a boolean default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['boolean']
+    queryset = DefaultPipingBoolParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a path default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['path']
+    queryset = DefaultPipingPathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
