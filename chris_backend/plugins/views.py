@@ -270,11 +270,6 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         """
         queryset = self.get_default_parameters_queryset()
         response = services.get_list_response(self, queryset)
-        results = response.data['results']
-        # the items' url must be corrected because this view always uses the same string
-        # serializer for any parameter type
-        for item in results:
-            item['url'] = item['url'].replace('string', item['type'])
         return response
 
     def get_default_parameters_queryset(self):
