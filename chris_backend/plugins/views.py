@@ -6,9 +6,15 @@ from collectionjson import services
 
 from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
+from .models import DefaultPipingPathParameter, DefaultPipingStrParameter
+from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
+from .models import DefaultPipingBoolParameter
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
+from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
+from .serializers import GenericDefaultPipingParameterSerializer
 from .permissions import IsOwnerOrChrisOrReadOnly
+
 
 class PluginList(generics.ListAPIView):
     """
@@ -143,7 +149,8 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(PipelineDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': ""}
+        template_data = {'name': "", 'locked': "", 'authors': "", 'category': "",
+                         'description': ""}
         return services.append_collection_template(response, template_data)
 
     def update(self, request, *args, **kwargs):
@@ -209,7 +216,44 @@ class PipelinePluginPipingList(generics.ListAPIView):
         Custom method to get the actual plugin pipings queryset for the pipeline.
         """
         pipeline = self.get_object()
-        return PluginPiping.objects.filter(pipeline=pipeline)
+        return pipeline.plugin_pipings.all()
+
+
+class PipelineDefaultParameterList(generics.ListAPIView):
+    """
+    A view for the collection of pipeline-specific plugin parameters' defaults.
+    """
+    queryset = Pipeline.objects.all()
+    serializer_class = GenericDefaultPipingParameterSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list with all the default parameter values used by the
+        queried pipeline.
+        """
+        queryset = self.get_default_parameters_queryset()
+        response = services.get_list_response(self, queryset)
+        return response
+
+    def get_default_parameters_queryset(self):
+        """
+        Custom method to get a queryset with all the default parameters regardless their
+        type.
+        """
+        pipeline = self.get_object()
+        queryset = []
+        queryset.extend(list(DefaultPipingPathParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultPipingStrParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultPipingIntParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultPipingFloatParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        queryset.extend(list(DefaultPipingBoolParameter.objects.filter(
+            plugin_piping__pipeline=pipeline)))
+        return self.filter_queryset(queryset)
 
 
 class PluginPipingDetail(generics.RetrieveAPIView):
@@ -219,3 +263,98 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
     permission_classes = (permissions.IsAuthenticated,)
+
+
+class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a string default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
+    queryset = DefaultPipingStrParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingStrParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for an integer default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['integer']
+    queryset = DefaultPipingIntParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingIntParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a float default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['float']
+    queryset = DefaultPipingFloatParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingFloatParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a boolean default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['boolean']
+    queryset = DefaultPipingBoolParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingBoolParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
+
+class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
+    """
+    A view for a path default value for a plugin parameter in a pipeline's
+    plugin piping.
+    """
+    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['path']
+    queryset = DefaultPipingPathParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingPathParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)

@@ -10,11 +10,36 @@ from django_filters.rest_framework import FilterSet
 import swiftclient
 
 from feeds.models import Feed
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import ComputeResource, Plugin, PluginParameter, Pipeline
 from plugins.fields import CPUField, MemoryField
 
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
+
+
+class PipelineInstance(models.Model):
+    title = models.CharField(max_length=100, blank=True)
+    description = models.CharField(max_length=800, blank=True)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                 related_name='instances')
+
+    class Meta:
+        ordering = ('pipeline',)
+
+    def __str__(self):
+        return self.title
+
+
+class PipelineInstanceFilter(FilterSet):
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    pipeline_name = django_filters.CharFilter(field_name='pipeline__name',
+                                               lookup_expr='icontains')
+
+    class Meta:
+        model = PipelineInstance
+        fields = ['id', 'title', 'description', 'pipeline_name']
 
 
 class PluginInstance(models.Model):
@@ -30,6 +55,9 @@ class PluginInstance(models.Model):
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
                                     related_name='plugin_instances')
+    pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
+                                      on_delete=models.CASCADE,
+                                      related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
     memory_limit = MemoryField(null=True)
     number_of_workers = models.IntegerField(null=True)
@@ -208,7 +236,7 @@ class PluginInstanceFile(models.Model):
         return self.fname.name
 
 
-class StringParameter(models.Model):
+class StrParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='string_param')

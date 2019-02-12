@@ -2,22 +2,44 @@
 import os
 
 from django.core.exceptions import ObjectDoesNotExist
-
 from rest_framework import serializers
+from rest_framework.reverse import reverse
+
 from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
 
+from plugins.models import TYPES
 from plugins.fields import MemoryInt, CPUInt
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
-from .models import PathParameter, StringParameter
+from .models import PathParameter, StrParameter
+from .models import PipelineInstance
+
+
+class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True)
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    parameters = serializers.HyperlinkedIdentityField(
+        view_name='pipelineinstance-parameter-list')
+
+    class Meta:
+        model = PipelineInstance
+        fields = ('url', 'id', 'title', 'pipeline_id', 'description', 'pipeline')
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
+    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst__pipeline.id')
+    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst__pipeline.name')
+    pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     owner_username = serializers.ReadOnlyField(source='owner.username')
+    compute_resource_identifier = serializers.ReadOnlyField(
+        source='compute_resource.compute_resource_identifier')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
     descendants = serializers.HyperlinkedIdentityField(
@@ -26,19 +48,19 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         view_name='plugininstance-parameter-list')
     files = serializers.HyperlinkedIdentityField(
         view_name='plugininstancefile-list')
-    previous_id = serializers.ReadOnlyField(source='previous.id')
-    compute_resource_identifier = serializers.ReadOnlyField(
-        source='compute_resource.compute_resource_identifier')
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
+    pipeline_inst = serializers.HyperlinkedRelatedField(
+        view_name='pipelineinstance-detail', read_only=True)
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
                                                read_only=True)
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'previous_id', 'plugin_id', 'plugin_name', 'feed_id',
-                  'start_date', 'end_date', 'status', 'owner_username', 'previous',
-                  'feed', 'plugin', 'descendants', 'files', 'parameters',
+        fields = ('url', 'id', 'title', 'previous_id', 'plugin_id', 'plugin_name',
+                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'pipeline_inst',
+                  'feed_id', 'start_date', 'end_date', 'status', 'owner_username',
+                  'previous', 'feed', 'plugin', 'descendants', 'files', 'parameters',
                   'compute_resource_identifier', 'cpu_limit', 'memory_limit',
                   'number_of_workers','gpu_limit')
 
@@ -163,7 +185,7 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
         return url + os.path.basename(obj.fname.name)
 
 
-class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
+class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.SerializerMethodField()
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
@@ -171,14 +193,14 @@ class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)
 
+    class Meta:
+        model = StrParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
+                  'plugin_param')
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
-
-    class Meta:
-        model = StringParameter
-        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
-                  'plugin_param')
 
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -188,14 +210,15 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
 
     class Meta:
         model = IntParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
 
 
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -206,14 +229,14 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-    
     class Meta:
         model = FloatParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
 
 
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -224,14 +247,14 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-    
     class Meta:
         model = BoolParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
 
 
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -242,17 +265,53 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                  read_only=True)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
     class Meta:
         model = PathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
+
+
+class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.SerializerMethodField()
+    value = serializers.SerializerMethodField()
+    url = ItemLinkField('_get_url')
+    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
+                                                      read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    class Meta:
+        model = StrParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
+                  'plugin_param')
+
+    def _get_url(self, obj):
+        """
+        Custom method to get the correct url for the serialized object regardless of
+        its type.
+        """
+        request = self.context['request']
+        # here parameter detail view names are assumed to follow a convention
+        view_name = TYPES[obj.plugin_param.type] + 'parameter-detail'
+        return reverse(view_name, request=request, kwargs={"pk": obj.id})
+
+    def get_value(self, obj):
+        """
+        Overriden to get the default parameter value regardless of its type.
+        """
+        return obj.value
+
+    @staticmethod
+    def get_type(obj):
+        return obj.plugin_param.type
         
 
-PARAMETER_SERIALIZERS = {'string': StringParameterSerializer,
+PARAMETER_SERIALIZERS = {'string': StrParameterSerializer,
                          'integer': IntParameterSerializer,
                          'float': FloatParameterSerializer,
                          'boolean': BoolParameterSerializer,
