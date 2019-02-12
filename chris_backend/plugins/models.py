@@ -123,7 +123,7 @@ class PluginParameter(models.Model):
         return default.value if default else None
 
 
-class DefaultStringParameter(models.Model):
+class DefaultStrParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
                                         related_name='string_default')
@@ -237,7 +237,7 @@ class PluginPiping(models.Model):
             default_piping_param.save()
 
 
-class DefaultPipingStringParameter(models.Model):
+class DefaultPipingStrParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
@@ -292,7 +292,7 @@ class DefaultPipingPathParameter(models.Model):
         return self.value
 
 
-DEFAULT_PIPING_PARAMETER_MODELS = {'string': DefaultPipingStringParameter,
+DEFAULT_PIPING_PARAMETER_MODELS = {'string': DefaultPipingStrParameter,
                          'integer': DefaultPipingIntParameter,
                          'float': DefaultPipingFloatParameter,
                          'boolean': DefaultPipingBoolParameter,

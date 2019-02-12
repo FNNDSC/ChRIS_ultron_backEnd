@@ -113,8 +113,8 @@ urlpatterns = format_suffix_patterns([
         name='pluginpiping-detail'),
 
     url(r'^v1/pipelines/string-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingStringParameterDetail.as_view(),
-        name='defaultpipingstringparameter-detail'),
+        plugin_views.DefaultPipingStrParameterDetail.as_view(),
+        name='defaultpipingstrparameter-detail'),
 
     url(r'^v1/pipelines/integer-parameter/(?P<pk>[0-9]+)/$',
         plugin_views.DefaultPipingIntParameterDetail.as_view(),
@@ -174,8 +174,8 @@ urlpatterns = format_suffix_patterns([
         name='plugininstance-parameter-list'),
 
     url(r'^v1/plugins/string-parameter/(?P<pk>[0-9]+)/$',
-        plugininstance_views.StringParameterDetail.as_view(),
-        name='stringparameter-detail'),
+        plugininstance_views.StrParameterDetail.as_view(),
+        name='strparameter-detail'),
 
     url(r'^v1/plugins/integer-parameter/(?P<pk>[0-9]+)/$',
         plugininstance_views.IntParameterDetail.as_view(),

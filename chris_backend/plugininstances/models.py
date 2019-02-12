@@ -236,7 +236,7 @@ class PluginInstanceFile(models.Model):
         return self.fname.name
 
 
-class StringParameter(models.Model):
+class StrParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='string_param')

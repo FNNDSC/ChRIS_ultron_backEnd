@@ -13,10 +13,10 @@ from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import Pipeline, PluginPiping
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
-from .models import DefaultPathParameter, DefaultStringParameter
+from .models import DefaultPathParameter, DefaultStrParameter
 from .models import DefaultPipingFloatParameter, DefaultPipingIntParameter
 from .models import DefaultPipingBoolParameter, DefaultPipingPathParameter
-from .models import DefaultPipingStringParameter
+from .models import DefaultPipingStrParameter
 from .models import TYPES
 from .fields import MemoryInt, CPUInt
 
@@ -177,14 +177,14 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
         return obj.get_default()
 
 
-class DefaultStringParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.SerializerMethodField()
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
     class Meta:
-        model = DefaultStringParameter
+        model = DefaultStrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
     @staticmethod
@@ -469,7 +469,7 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
                   'plugin', 'pipeline')
 
 
-class DefaultPipingStringParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
@@ -484,7 +484,7 @@ class DefaultPipingStringParameterSerializer(serializers.HyperlinkedModelSeriali
                                                        read_only=True)
 
     class Meta:
-        model = DefaultPipingStringParameter
+        model = DefaultPipingStrParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
@@ -498,7 +498,7 @@ class DefaultPipingStringParameterSerializer(serializers.HyperlinkedModelSeriali
         """
         Overriden to generate a properly formatted message for validation errors.
         """
-        return super(DefaultPipingStringParameterSerializer, self).is_valid(
+        return super(DefaultPipingStrParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
 
 
@@ -651,7 +651,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
                                                        read_only=True)
 
     class Meta:
-        model = DefaultPipingStringParameter
+        model = DefaultPipingStrParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
@@ -678,14 +678,14 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
         return obj.plugin_param.type
 
 
-DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStringParameterSerializer,
+DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStrParameterSerializer,
                                  'integer': DefaultIntParameterSerializer,
                                  'float': DefaultFloatParameterSerializer,
                                  'boolean': DefaultBoolParameterSerializer,
                                  'path': DefaultPathParameterSerializer}
 
 
-DEFAULT_PIPING_PARAMETER_SERIALIZERS = {'string': DefaultPipingStringParameterSerializer,
+DEFAULT_PIPING_PARAMETER_SERIALIZERS = {'string': DefaultPipingStrParameterSerializer,
                                         'integer': DefaultPipingIntParameterSerializer,
                                         'float': DefaultPipingFloatParameterSerializer,
                                         'boolean': DefaultPipingBoolParameterSerializer,

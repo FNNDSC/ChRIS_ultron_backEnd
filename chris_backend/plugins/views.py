@@ -6,7 +6,7 @@ from collectionjson import services
 
 from .models import Plugin, PluginFilter, PluginParameter
 from .models import Pipeline, PipelineFilter, PluginPiping
-from .models import DefaultPipingPathParameter, DefaultPipingStringParameter
+from .models import DefaultPipingPathParameter, DefaultPipingStrParameter
 from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
 from .models import DefaultPipingBoolParameter
 from .serializers import PluginSerializer,  PluginParameterSerializer
@@ -245,7 +245,7 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         queryset = []
         queryset.extend(list(DefaultPipingPathParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultPipingStringParameter.objects.filter(
+        queryset.extend(list(DefaultPipingStrParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
         queryset.extend(list(DefaultPipingIntParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
@@ -265,20 +265,20 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
 
-class DefaultPipingStringParameterDetail(generics.RetrieveUpdateAPIView):
+class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
     """
     A view for a string default value for a plugin parameter in a pipeline's
     plugin piping.
     """
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
-    queryset = DefaultPipingStringParameter.objects.all()
+    queryset = DefaultPipingStrParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
-        response = super(DefaultPipingStringParameterDetail, self).retrieve(
+        response = super(DefaultPipingStrParameterDetail, self).retrieve(
             request, *args, **kwargs)
         template_data = {"value": ""}
         return services.append_collection_template(response, template_data)

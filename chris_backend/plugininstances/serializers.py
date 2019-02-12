@@ -12,7 +12,7 @@ from plugins.models import TYPES
 from plugins.fields import MemoryInt, CPUInt
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
-from .models import PathParameter, StringParameter
+from .models import PathParameter, StrParameter
 from .models import PipelineInstance
 
 
@@ -185,7 +185,7 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
         return url + os.path.basename(obj.fname.name)
 
 
-class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
+class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.SerializerMethodField()
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
@@ -194,7 +194,7 @@ class StringParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)
 
     class Meta:
-        model = StringParameter
+        model = StrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
@@ -286,7 +286,7 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
                                                        read_only=True)
 
     class Meta:
-        model = StringParameter
+        model = StrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
@@ -311,7 +311,7 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
         return obj.plugin_param.type
         
 
-PARAMETER_SERIALIZERS = {'string': StringParameterSerializer,
+PARAMETER_SERIALIZERS = {'string': StrParameterSerializer,
                          'integer': IntParameterSerializer,
                          'float': FloatParameterSerializer,
                          'boolean': BoolParameterSerializer,
