@@ -12,6 +12,7 @@ from .models import DefaultPipingBoolParameter
 from .serializers import PluginSerializer,  PluginParameterSerializer
 from .serializers import PipelineSerializer, PluginPipingSerializer
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
+from .serializers import GenericDefaultPipingParameterSerializer
 from .permissions import IsOwnerOrChrisOrReadOnly
 
 
@@ -223,7 +224,7 @@ class PipelineDefaultParameterList(generics.ListAPIView):
     A view for the collection of pipeline-specific plugin parameters' defaults.
     """
     queryset = Pipeline.objects.all()
-    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['string']
+    serializer_class = GenericDefaultPipingParameterSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -233,11 +234,6 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         """
         queryset = self.get_default_parameters_queryset()
         response = services.get_list_response(self, queryset)
-        results = response.data['results']
-        # the items' url must be corrected because this view always uses the same string
-        # serializer for any parameter type
-        for item in results:
-            item['url'] = item['url'].replace('string', item['type'])
         return response
 
     def get_default_parameters_queryset(self):
@@ -278,6 +274,15 @@ class DefaultPipingStringParameterDetail(generics.RetrieveUpdateAPIView):
     queryset = DefaultPipingStringParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingStringParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
 
 class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
     """
@@ -287,6 +292,15 @@ class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['integer']
     queryset = DefaultPipingIntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingIntParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
 
 
 class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
@@ -298,6 +312,15 @@ class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
     queryset = DefaultPipingFloatParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingFloatParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
 
 class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
     """
@@ -308,6 +331,15 @@ class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
     queryset = DefaultPipingBoolParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingBoolParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
+
 
 class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
     """
@@ -317,3 +349,12 @@ class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
     serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['path']
     queryset = DefaultPipingPathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(DefaultPipingPathParameterDetail, self).retrieve(
+            request, *args, **kwargs)
+        template_data = {"value": ""}
+        return services.append_collection_template(response, template_data)
