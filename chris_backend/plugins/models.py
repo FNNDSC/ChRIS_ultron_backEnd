@@ -186,6 +186,20 @@ class Pipeline(models.Model):
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def get_accesible_pipelines(user):
+        """
+        Custom method to get a filtered queryset with all the pipelines that are
+        accessible to a given user (not locked or otherwise own by the user).
+        """
+        queryset = Pipeline.objects.all()
+        # if the user is chris then return all the pipelines in the queryset
+        if user.username == 'chris':
+            return queryset
+        # construct the full lookup expression.
+        lookup = models.Q(locked=False) | models.Q(owner=user)
+        return queryset.filter(lookup)
+
 
 class PipelineFilter(FilterSet):
     min_creation_date = django_filters.DateFilter(field_name="creation_date",
