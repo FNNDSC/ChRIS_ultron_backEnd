@@ -13,8 +13,8 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("path", "Path values")]
 
 # table of equivalence between front-end API types and back-end types
-TYPES = {'string': str, 'integer': int, 'float': float, 'boolean': bool,
-         'path': str}
+TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
+         'path': 'path'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
@@ -103,7 +103,6 @@ class PluginParameter(models.Model):
     flag = models.CharField(max_length=52)
     action = models.CharField(max_length=20, default='store')
     optional = models.BooleanField(default=True)
-    default = models.CharField(max_length=200, blank=True)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
     help = models.TextField(blank=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE,
@@ -115,24 +114,58 @@ class PluginParameter(models.Model):
     def __str__(self):
         return self.name
 
-    @property
-    def default_value(self):
+    def get_default(self):
         """
-        Custom property getter to return the default value after type conversion.
+        Overriden to get the default parameter value regardless of type.
         """
-        default = None
-        if self.optional:
-            try:
-                default = TYPES[self.type](self.default)
-            except (ValueError, TypeError):
-                pass
-            else:
-                if self.type == 'boolean':
-                    if self.default == "False":
-                        default = False
-                    elif self.default == "True":
-                        default = True
-        return default
+        default_attr_name = '%s_default' % self.type
+        default = getattr(self, default_attr_name, None)
+        return default.value if default else None
+
+
+class DefaultStringParameter(models.Model):
+    value = models.CharField(max_length=200, blank=True)
+    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
+                                        related_name='string_default')
+
+    def __str__(self):
+        return self.value
+
+
+class DefaultIntParameter(models.Model):
+    value = models.IntegerField()
+    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
+                                        related_name='integer_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultFloatParameter(models.Model):
+    value = models.FloatField()
+    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
+                                        related_name='float_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultBoolParameter(models.Model):
+    value = models.BooleanField()
+    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
+                                        related_name='boolean_default')
+
+    def __str__(self):
+        return str(self.value)
+
+
+class DefaultPathParameter(models.Model):
+    value = models.CharField(max_length=200, blank=True)
+    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
+                                        related_name='path_default')
+
+    def __str__(self):
+        return self.value
 
 
 class Pipeline(models.Model):
@@ -154,35 +187,6 @@ class Pipeline(models.Model):
         return self.name
 
 
-class PluginPiping(models.Model):
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
-                                 related_name='plugin_tree')
-    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
-                                 related_name='next')
-
-    class Meta:
-        ordering = ('pipeline',)
-
-    def __str__(self):
-        return str(self.id)
-
-    def save(self, *args, **kwargs):
-        """
-        Overriden to save the default plugin parameters' values associated with this
-        piping.
-        """
-        super(PluginPiping, self).save(*args, **kwargs)
-        plugin = self.plugin
-        parameters = plugin.parameters.all()
-        for parameter in parameters:
-            default_param = DEFAULT_PARAMETER_MODELS[parameter.type]()
-            default_param.plugin_piping = self
-            default_param.plugin_param = parameter
-            default_param.value = parameter.default_value
-            default_param.save()
-
-
 class PipelineFilter(FilterSet):
     min_creation_date = django_filters.DateFilter(field_name="creation_date",
                                                   lookup_expr='gte')
@@ -202,63 +206,94 @@ class PipelineFilter(FilterSet):
                   'authors', 'min_creation_date', 'max_creation_date']
 
 
-class DefaultStringParameter(models.Model):
+class PluginPiping(models.Model):
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
+    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
+                                 related_name='plugin_pipings')
+    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
+                                 related_name='next')
+
+    class Meta:
+        ordering = ('pipeline',)
+
+    def __str__(self):
+        return str(self.id)
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to save the default plugin parameters' values associated with this
+        piping.
+        """
+        super(PluginPiping, self).save(*args, **kwargs)
+        plugin = self.plugin
+        parameters = plugin.parameters.all()
+        for parameter in parameters:
+            default_piping_param = DEFAULT_PIPING_PARAMETER_MODELS[parameter.type]()
+            default_piping_param.plugin_piping = self
+            default_piping_param.plugin_param = parameter
+            default = parameter.get_default()
+            if default is not None:  # use plugin's parameter default for piping's default
+                default_piping_param.value = default
+            default_piping_param.save()
+
+
+class DefaultPipingStringParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='string_default')
+                                     related_name='string_piping_default')
 
     def __str__(self):
         return self.value
 
 
-class DefaultIntParameter(models.Model):
-    value = models.IntegerField()
+class DefaultPipingIntParameter(models.Model):
+    value = models.IntegerField(default=1, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='integer_default')
+                                     related_name='integer_piping_default')
 
     def __str__(self):
         return str(self.value)
 
 
-class DefaultFloatParameter(models.Model):
-    value = models.FloatField()
+class DefaultPipingFloatParameter(models.Model):
+    value = models.FloatField(default=1.0, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='float_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='float_default')
+                                     related_name='float_piping_default')
 
     def __str__(self):
         return str(self.value)
 
 
-class DefaultBoolParameter(models.Model):
+class DefaultPipingBoolParameter(models.Model):
     value = models.BooleanField(default=False, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='boolean_default')
+                                     related_name='boolean_piping_default')
 
     def __str__(self):
         return str(self.value)
 
 
-class DefaultPathParameter(models.Model):
+class DefaultPipingPathParameter(models.Model):
     value = models.CharField(max_length=200, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='path_default')
+                                     related_name='path_piping_default')
 
     def __str__(self):
         return self.value
 
 
-DEFAULT_PARAMETER_MODELS = {'string': DefaultStringParameter,
-                         'integer': DefaultIntParameter,
-                         'float': DefaultFloatParameter,
-                         'boolean': DefaultBoolParameter,
-                         'path': DefaultPathParameter}
+DEFAULT_PIPING_PARAMETER_MODELS = {'string': DefaultPipingStringParameter,
+                         'integer': DefaultPipingIntParameter,
+                         'float': DefaultPipingFloatParameter,
+                         'boolean': DefaultPipingBoolParameter,
+                         'path': DefaultPipingPathParameter}
