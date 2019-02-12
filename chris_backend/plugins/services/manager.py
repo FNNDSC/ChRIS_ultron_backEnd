@@ -19,6 +19,7 @@ from django.utils import timezone
 from plugins.models import Plugin
 from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer, PluginParameterSerializer
+from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
 
 
 class PluginManager(object):
@@ -82,9 +83,16 @@ class PluginManager(object):
         plugin = plg_serializer.save(compute_resource=compute_resource)
         # collect parameters and validate and save them to the DB
         for parameter in parameters_data:
+            default = parameter['default'] if 'default' in parameter else None
+            del parameter['default']
             parameter_serializer = PluginParameterSerializer(data=parameter)
             parameter_serializer.is_valid(raise_exception=True)
-            parameter_serializer.save(plugin=plugin)
+            param = parameter_serializer.save(plugin=plugin)
+            if default is not None:
+                default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[param.type](
+                    data={'value': default})
+                default_param_serializer.is_valid(raise_exception=True)
+                default_param_serializer.save(plugin_param=param)
 
     def modify_plugin(self, args):
         """
@@ -114,6 +122,8 @@ class PluginManager(object):
             # collect existing and new parameters and validate and save them to the DB
             db_parameters = plugin.parameters.all()
             for parameter in parameters_data:
+                default = parameter['default'] if 'default' in parameter else None
+                del parameter['default']
                 db_param = [p for p in db_parameters if p.name == parameter['name']]
                 if db_param:
                     parameter_serializer = PluginParameterSerializer(db_param[0],
@@ -121,7 +131,17 @@ class PluginManager(object):
                 else:
                     parameter_serializer = PluginParameterSerializer(data=parameter)
                 parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin=plugin)
+                param = parameter_serializer.save(plugin=plugin)
+                if default is not None:
+                    db_default = param.get_default()
+                    if db_default is not None: # check if there is already a default in DB
+                        default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[
+                            param.type](db_default, data={'value': default})
+                    else:
+                        default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[
+                            param.type](data={'value': default})
+                    default_param_serializer.is_valid(raise_exception=True)
+                    default_param_serializer.save(plugin_param=param)
         elif compute_resource:
             plg_serializer = PluginSerializer(plugin)
             plugin = plg_serializer.save(compute_resource=compute_resource)
