@@ -56,7 +56,7 @@ class PluginInstance(models.Model):
     compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
                                     related_name='plugin_instances')
     pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
-                                      on_delete=models.CASCADE,
+                                      on_delete=models.SET_NULL,
                                       related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
     memory_limit = MemoryField(null=True)
