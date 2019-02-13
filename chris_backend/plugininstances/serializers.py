@@ -21,20 +21,21 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True)
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
-    parameters = serializers.HyperlinkedIdentityField(
-        view_name='pipelineinstance-parameter-list')
+    plugin_instances = serializers.HyperlinkedIdentityField(
+        view_name='pipelineinstance-plugininstance-list')
 
     class Meta:
         model = PipelineInstance
-        fields = ('url', 'id', 'title', 'pipeline_id', 'description', 'pipeline')
+        fields = ('url', 'id', 'title', 'pipeline_id', 'description',
+                  'previous_plugin_inst_id', 'pipeline', 'plugin_instances')
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
-    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst__pipeline.id')
-    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst__pipeline.name')
+    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst.pipeline.id')
+    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     owner_username = serializers.ReadOnlyField(source='owner.username')
