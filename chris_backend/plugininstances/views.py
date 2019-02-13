@@ -54,42 +54,41 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
                 parameters_dict[parameter.name] = requested_value
         # run the plugin's app
-        PluginAppManager.run_plugin_app(plugin_inst,
-                                        parameters_dict,
-                                        service='pfcon',
-                                        inputDirOverride='/share/incoming',
-                                        outputDirOverride='/share/outgoing')
+        # PluginAppManager.run_pipeline_instance(pipeline_inst,
+        #                                 parameters_dict,
+        #                                 service='pfcon',
+        #                                 inputDirOverride='/share/incoming',
+        #                                 outputDirOverride='/share/outgoing')
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return the list of instances for the queried plugin.
+        Overriden to return the list of pipeline instances for the queried pipeline.
         A document-level link relation, query list and a collection+json template are
         also added to the response.
         """
-        queryset = self.get_plugin_instances_queryset()
+        queryset = self.get_pipeline_instances_queryset()
         response = services.get_list_response(self, queryset)
-        plugin = self.get_object()
+        pipeline = self.get_object()
         # append query list
-        query_list = [reverse('plugininstance-list-query-search', request=request)]
+        query_list = [reverse('pipelineinstance-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
-        links = {'plugin': reverse('plugin-detail', request=request,
-                                   kwargs={"pk": plugin.id})}
+        links = {'pipeline': reverse('pipeline-detail', request=request,
+                                   kwargs={"pk": pipeline.id})}
         response = services.append_collection_links(response, links)
         # append write template
-        param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': "", 'previous_id': "", 'cpu_limit': "",
-                         'memory_limit': "", 'number_of_workers': "", 'gpu_limit': ""}
+        template_data = {'previous_plugin_inst_id': "", 'title': "", 'description': ""}
+        param_names = pipeline.get_pipings_parameters_names()
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)
 
-    def get_plugin_instances_queryset(self):
+    def get_pipeline_instances_queryset(self):
         """
         Custom method to get the actual pipeline instances' queryset.
         """
-        plugin = self.get_object()
-        return self.filter_queryset(plugin.instances.all())
+        pipeline = self.get_object()
+        return self.filter_queryset(pipeline.instances.all())
 
 
 class PipelineInstanceListQuerySearch(generics.ListAPIView):
@@ -110,50 +109,30 @@ class PipelineInstanceDetail(generics.RetrieveAPIView):
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overloaded method to check a plugin's instance status.
-        """
-        instance = self.get_object()
-        PluginAppManager.check_plugin_app_exec_status(instance)
-        response = super(PipelineInstanceDetail, self).retrieve(request, *args, **kwargs)
-        return response
 
-
-class PipelineInstanceParameterList(generics.ListAPIView):
+class PipelineInstancePluginInstanceList(generics.ListAPIView):
     """
-    A view for the collection of parameters that the pipeline instance was run with.
+    A view for the collection of plugin instances that compose the pipeline instance.
     """
-    serializer_class = PARAMETER_SERIALIZERS['string']
+    serializer_class = PluginInstanceSerializer
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list with all the parameter values used by the queried
-        plugin instance.
+        Overriden to return a list with all the plugin instances that are part of
+        the queried pipeline instance.
         """
-        queryset = self.get_parameters_queryset()
-        response = services.get_list_response(self, queryset)
-        results = response.data['results']
-        # the items' url must be corrected because this view always uses the same string
-        # serializer for any parameter type
-        for item in results:
-            item['url'] = item['url'].replace('string', item['type'])
-        return response
+        queryset = self.get_plugin_instances_queryset()
+        return services.get_list_response(self, queryset)
 
-    def get_parameters_queryset(self):
+    def get_plugin_instances_queryset(self):
         """
-        Custom method to get a queryset with all the parameters regardless their type.
+        Custom method to get a queryset with all the plugin instances that are part of
+        the queried pipeline instance.
         """
-        instance = self.get_object()
-        queryset = []
-        queryset.extend(list(instance.path_param.all()))
-        queryset.extend(list(instance.string_param.all()))
-        queryset.extend(list(instance.integer_param.all()))
-        queryset.extend(list(instance.float_param.all()))
-        queryset.extend(list(instance.boolean_param.all()))
-        return self.filter_queryset(queryset)
+        pipeline_inst = self.get_object()
+        return self.filter_queryset(pipeline_inst.plugin_instances)
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
