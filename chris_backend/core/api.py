@@ -108,7 +108,7 @@ urlpatterns = format_suffix_patterns([
         plugin_views.PipelineDefaultParameterList.as_view(),
         name='pipeline-defaultparameter-list'),
 
-    url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
+    url(r'^v1/pipelines/pipings/(?P<pk>[0-9]+)/$',
         plugin_views.PluginPipingDetail.as_view(),
         name='pluginpiping-detail'),
 
@@ -205,9 +205,9 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PipelineInstanceDetail.as_view(),
         name='pipelineinstance-detail'),
 
-    url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/parameters/$',
-        plugininstance_views.PipelineInstanceParameterList.as_view(),
-        name='pipelineinstance-parameter-list'),
+    url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/plugininstances/$',
+        plugininstance_views.PipelineInstancePluginInstanceList.as_view(),
+        name='pipelineinstance-plugininstance-list'),
 
 
     url(r'^v1/uploadedfiles/$',
