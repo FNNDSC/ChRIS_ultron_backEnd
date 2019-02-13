@@ -186,6 +186,22 @@ class Pipeline(models.Model):
     def __str__(self):
         return self.name
 
+    def get_pipings_parameters_names(self):
+        """
+        Custom method to get the list of all associated plugin pipings. The name of the
+        parameters is transformed to have the plugin id, piping id and previous piping
+        id as a prefix.
+        """
+        pipings = self.plugin_pipings.all()
+        param_names = []
+        for pip in pipings:
+            plg = pip.plugin
+            prev_pip_id = pip.previous.id if pip.previous else 'null'
+            # param name becomes <plugin.id>_<piping.id>_<previous_piping.id>_<param.name>
+            param_names.extend(['%s_%s_%s_%s' % (plg.id, pip.id, prev_pip_id, param.name)
+                                for param in plg.parameters.all()])
+        return param_names
+
     @staticmethod
     def get_accesible_pipelines(user):
         """
