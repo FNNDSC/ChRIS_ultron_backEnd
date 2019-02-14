@@ -36,23 +36,33 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         """
         # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
-        previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
-        previous = serializer.validate_previous(previous_id)
-        plugin = self.get_object()
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
-                                      compute_resource=plugin.compute_resource)
-        # collect parameters from the request and validate and save them to the DB
-        parameters = plugin.parameters.all()
-        parameters_dict = {}
-        for parameter in parameters:
-            if parameter.name in request_data:
-                requested_value = request_data[parameter.name]
-                data = {'value': requested_value}
-                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
-                parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
-                parameters_dict[parameter.name] = requested_value
+        previous_plugin_inst_id = request_data['previous_plugin_inst_id'] \
+            if 'previous_plugin_inst_id' in request_data else None
+        previous_plugin_inst = serializer.validate_previous_plugin_inst(
+            previous_plugin_inst_id)
+        pipeline = self.get_object()
+        self.pipeline_inst = serializer.save(pipeline=pipeline)
+        self.parsed_parameters = serializer.parse_parameters(request_data)
+        # create associated plugin instances and save them to the DB in the same
+        # tree order as the pipings in the pipeline
+        pipings_tree = pipeline.get_pipings_tree()
+        tree = pipings_tree['tree']
+        root_id = pipings_tree['root_id']
+        root_pip = tree[root_id]
+        plugin_inst = self.create_plugin_inst(root_pip, previous_plugin_inst)
+        # breath-first traversal
+        plugin_inst_queue = [plugin_inst]
+        pip_id_queue = [root_id]
+        while len(pip_id_queue):
+            curr_id = pip_id_queue.pop(0)
+            curr_plugin_inst = plugin_inst_queue.pop(0)
+            child_ids = tree[curr_id]['child_ids']
+            for id in child_ids:
+                pip = tree[id]['piping']
+                plugin_inst = self.create_plugin_inst(pip, curr_plugin_inst)
+                pip_id_queue.append(id)
+                plugin_inst_queue.append(plugin_inst)
+
         # run the plugin's app
         # PluginAppManager.run_pipeline_instance(pipeline_inst,
         #                                 parameters_dict,
@@ -89,6 +99,46 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         """
         pipeline = self.get_object()
         return self.filter_queryset(pipeline.instances.all())
+
+    def create_plugin_inst(self, piping, previous_inst):
+        """
+        Custom method to get the actual pipeline instances' queryset.
+        """
+        owner = self.request.user
+        plugin_inst = PluginInstance()
+        plugin_inst.pipeline_inst = self.pipeline_inst
+        plugin_inst.owner = owner
+        plugin_inst.plugin = piping.plugin
+        plugin_inst.previous = previous_inst
+        plugin_inst.compute_resource = piping.plugin.compute_resource
+        plugin_inst.save()
+        # collect parameters from the request and validate and save them to the DB
+        parameters = piping.plugin.parameters.all()
+        if piping.id in self.parsed_parameters:
+            for parameter in parameters:
+                if parameter.name in self.parsed_parameters[piping.id]:
+                    requested_value = self.parsed_parameters[piping.id][parameter.name]
+                    data = {'value': requested_value}
+                else:
+                    default = getattr(piping, parameter.type + '_param').get(
+                        plugin_param=parameter)
+                    data = {'value': default.value}
+                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](
+                    data=data)
+                parameter_serializer.is_valid(raise_exception=True)
+                parameter_serializer.save(plugin_inst=plugin_inst,
+                                          plugin_param=parameter)
+        else:
+            for parameter in parameters:
+                default = getattr(piping, parameter.type + '_param').get(
+                    plugin_param=parameter)
+                data = {'value': default.value}
+                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](
+                    data=data)
+                parameter_serializer.is_valid(raise_exception=True)
+                parameter_serializer.save(plugin_inst=plugin_inst,
+                                          plugin_param=parameter)
+        return plugin_inst
 
 
 class PipelineInstanceListQuerySearch(generics.ListAPIView):
