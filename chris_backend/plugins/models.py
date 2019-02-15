@@ -210,7 +210,7 @@ class Pipeline(models.Model):
         the piping and the list of child pipings' ids.
         """
         pipings = list(self.plugin_pipings.all())
-        root_pip = [pip for pip in pipings if not hasattr(pip, 'previous')][0]
+        root_pip = [pip for pip in pipings if not pip.previous][0]
         root_id = root_pip.id
         tree = {}
         tree[root_id] = {'piping': root_pip, 'child_ids':[]}
