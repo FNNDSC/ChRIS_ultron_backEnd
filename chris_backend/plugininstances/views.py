@@ -29,39 +29,49 @@ class PipelineInstanceList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner, a plugin and a previous plugin instance with
-        the newly created plugin instance before first saving to the DB. All the plugin
-        instance's parameters in the request are also properly saved to the DB. Finally
-        the plugin's app is run with the provided plugin instance's parameters.
+        Overriden to associate a pipeline with the newly created pipeline instance before
+        first saving to the DB. All the pipeline instance's parameters in the request are
+        parsed and properly saved to the DB with the corresponding plugin instances.
         """
-        # get previous plugin instance and create the new plugin instance
+        # get previous plugin instance
         request_data = serializer.context['request'].data
         previous_plugin_inst_id = request_data['previous_plugin_inst_id'] \
-            if 'previous_plugin_inst_id' in request_data else None
+            if 'previous_plugin_inst_id' in request_data else ""
         previous_plugin_inst = serializer.validate_previous_plugin_inst(
             previous_plugin_inst_id)
         pipeline = self.get_object()
-        self.pipeline_inst = serializer.save(pipeline=pipeline)
+        # parse an transform plugin parameter names in the request
         self.parsed_parameters = serializer.parse_parameters(request_data)
         # create associated plugin instances and save them to the DB in the same
         # tree order as the pipings in the pipeline
         pipings_tree = pipeline.get_pipings_tree()
         tree = pipings_tree['tree']
         root_id = pipings_tree['root_id']
-        root_pip = tree[root_id]
-        plugin_inst = self.create_plugin_inst(root_pip, previous_plugin_inst)
+        root_pip = tree[root_id]['piping']
+        plugin_inst_dict = self.create_plugin_inst(root_pip, previous_plugin_inst)
+        plugin_instances = [plugin_inst_dict]
         # breath-first traversal
-        plugin_inst_queue = [plugin_inst]
+        plugin_inst_queue = [plugin_inst_dict]
         pip_id_queue = [root_id]
         while len(pip_id_queue):
             curr_id = pip_id_queue.pop(0)
-            curr_plugin_inst = plugin_inst_queue.pop(0)
+            curr_plugin_inst_dict = plugin_inst_queue.pop(0)
             child_ids = tree[curr_id]['child_ids']
             for id in child_ids:
                 pip = tree[id]['piping']
-                plugin_inst = self.create_plugin_inst(pip, curr_plugin_inst)
+                plugin_inst_dict = self.create_plugin_inst(
+                    pip, curr_plugin_inst_dict['plugin_inst'])
+                plugin_instances.append(plugin_inst_dict)
                 pip_id_queue.append(id)
-                plugin_inst_queue.append(plugin_inst)
+                plugin_inst_queue.append(plugin_inst_dict)
+        # if no validation errors at this point then save to the DB
+        pipeline_inst = serializer.save(pipeline=pipeline)
+        for plg_inst_dict in plugin_instances:
+            plg_inst = plugin_inst_dict['plugin_inst']
+            plg_inst.pipeline_inst = pipeline_inst
+            plg_inst.save()
+            for param, param_serializer in plg_inst_dict['parameter_serializers']:
+                param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
         # run the plugin's app
         # PluginAppManager.run_pipeline_instance(pipeline_inst,
@@ -102,43 +112,32 @@ class PipelineInstanceList(generics.ListCreateAPIView):
 
     def create_plugin_inst(self, piping, previous_inst):
         """
-        Custom method to get the actual pipeline instances' queryset.
+        Custom method to create a pipeline instance and validate its parameters.
         """
         owner = self.request.user
         plugin_inst = PluginInstance()
-        plugin_inst.pipeline_inst = self.pipeline_inst
         plugin_inst.owner = owner
         plugin_inst.plugin = piping.plugin
         plugin_inst.previous = previous_inst
         plugin_inst.compute_resource = piping.plugin.compute_resource
-        plugin_inst.save()
-        # collect parameters from the request and validate and save them to the DB
+        # collect and validate parameters from the request
+        parsed_parameters = self.parsed_parameters
+        parameter_serializers = []
         parameters = piping.plugin.parameters.all()
-        if piping.id in self.parsed_parameters:
-            for parameter in parameters:
-                if parameter.name in self.parsed_parameters[piping.id]:
-                    requested_value = self.parsed_parameters[piping.id][parameter.name]
-                    data = {'value': requested_value}
-                else:
-                    default = getattr(piping, parameter.type + '_param').get(
-                        plugin_param=parameter)
-                    data = {'value': default.value}
-                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](
-                    data=data)
-                parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst,
-                                          plugin_param=parameter)
-        else:
-            for parameter in parameters:
-                default = getattr(piping, parameter.type + '_param').get(
-                    plugin_param=parameter)
+        for parameter in parameters:
+            if (piping.id in parsed_parameters) and (parameter.name in
+                                                     parsed_parameters[piping.id]):
+                request_value = parsed_parameters[piping.id][parameter.name]
+                data = {'value': request_value}
+            else:
+                default = getattr(piping, parameter.type + '_param').filter(
+                    plugin_param=parameter)[0]
                 data = {'value': default.value}
-                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](
-                    data=data)
-                parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst,
-                                          plugin_param=parameter)
-        return plugin_inst
+            parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
+            parameter_serializer.is_valid(raise_exception=True)
+            parameter_serializers.append((parameter, parameter_serializer))
+        return {'plugin_inst': plugin_inst,
+                'parameter_serializers': parameter_serializers}
 
 
 class PipelineInstanceListQuerySearch(generics.ListAPIView):
@@ -182,7 +181,7 @@ class PipelineInstancePluginInstanceList(generics.ListAPIView):
         the queried pipeline instance.
         """
         pipeline_inst = self.get_object()
-        return self.filter_queryset(pipeline_inst.plugin_instances)
+        return self.filter_queryset(pipeline_inst.plugin_instances.all())
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -205,10 +204,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
-                                      compute_resource=plugin.compute_resource)
-        # collect parameters from the request and validate and save them to the DB
+        # collect and validate parameters from the request
+        parameter_serializers = []
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
@@ -217,8 +214,15 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 data = {'value': requested_value}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
+                parameter_serializers.append((parameter, parameter_serializer))
                 parameters_dict[parameter.name] = requested_value
+        # if no validation errors at this point then save to the DB
+        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
+                                      previous=previous,
+                                      compute_resource=plugin.compute_resource)
+        for param, param_serializer in parameter_serializers:
+            param_serializer.save(plugin_inst=plugin_inst, plugin_param=param)
+
         # run the plugin's app
         PluginAppManager.run_plugin_app(plugin_inst,
                                   parameters_dict,
