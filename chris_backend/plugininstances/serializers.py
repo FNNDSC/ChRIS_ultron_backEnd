@@ -29,6 +29,14 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'title', 'pipeline_id', 'description',
                   'previous_plugin_inst_id', 'pipeline', 'plugin_instances')
 
+    def create(self, validated_data):
+        """
+        Overriden to delete 'previous_plugin_inst_id' from serializer data as it's not
+        a model field.
+        """
+        del validated_data['previous_plugin_inst_id']
+        return super(PipelineInstanceSerializer, self).create(validated_data)
+
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
@@ -253,6 +261,14 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(StrParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -270,6 +286,14 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = IntParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(IntParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     @staticmethod
     def get_type(obj):
@@ -289,6 +313,14 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(FloatParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -307,6 +339,14 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(BoolParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -324,6 +364,14 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = PathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(PathParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     @staticmethod
     def get_type(obj):
