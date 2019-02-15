@@ -186,6 +186,14 @@ class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultStrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(DefaultStrParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -200,6 +208,14 @@ class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DefaultIntParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(DefaultIntParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     @staticmethod
     def get_type(obj):
@@ -216,6 +232,14 @@ class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultFloatParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(DefaultFloatParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -231,6 +255,14 @@ class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultBoolParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(DefaultBoolParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
     @staticmethod
     def get_type(obj):
         return obj.plugin_param.type
@@ -245,6 +277,14 @@ class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DefaultPathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors
+        """
+        return super(DefaultPathParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     @staticmethod
     def get_type(obj):
