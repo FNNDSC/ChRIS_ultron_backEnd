@@ -67,7 +67,7 @@ class PluginInstance(models.Model):
         ordering = ('-start_date',)
 
     def __str__(self):
-        return str(self.id)
+        return self.title
 
     def save(self, *args, **kwargs):
         """
