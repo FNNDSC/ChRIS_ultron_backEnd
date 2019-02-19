@@ -40,10 +40,10 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         previous_plugin_inst = serializer.validate_previous_plugin_inst(
             previous_plugin_inst_id)
         pipeline = self.get_object()
-        # parse an transform plugin parameter names in the request
+        # parse and transform plugin parameter names in the request
         self.parsed_parameters = serializer.parse_parameters(request_data)
-        # create associated plugin instances and save them to the DB in the same
-        # tree order as the pipings in the pipeline
+        # create associated plugin instance for each piping in the pipeline in the same
+        # tree order as the pipings
         pipings_tree = pipeline.get_pipings_tree()
         tree = pipings_tree['tree']
         root_id = pipings_tree['root_id']
@@ -67,7 +67,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         # if no validation errors at this point then save to the DB
         pipeline_inst = serializer.save(pipeline=pipeline)
         for plg_inst_dict in plugin_instances:
-            plg_inst = plugin_inst_dict['plugin_inst']
+            plg_inst = plg_inst_dict['plugin_inst']
             plg_inst.pipeline_inst = pipeline_inst
             plg_inst.save()
             for param, param_serializer in plg_inst_dict['parameter_serializers']:
@@ -210,12 +210,12 @@ class PluginInstanceList(generics.ListCreateAPIView):
         parameters_dict = {}
         for parameter in parameters:
             if parameter.name in request_data:
-                requested_value = request_data[parameter.name]
-                data = {'value': requested_value}
+                request_value = request_data[parameter.name]
+                data = {'value': request_value}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
-                parameters_dict[parameter.name] = requested_value
+                parameters_dict[parameter.name] = request_value
         # if no validation errors at this point then save to the DB
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous,
