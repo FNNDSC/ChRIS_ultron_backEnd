@@ -69,12 +69,13 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 {'detail': err_str % previous_plugin_inst_id})
         return previous_plugin_inst
 
-    @staticmethod
-    def parse_parameters(request_data):
+    def parse_parameters(self):
         """
-        Custom method to parse pipeline instance parameters in a request data
+        Custom method to parse pipeline instance parameters in the request data
         dictionary.
         """
+        request_data = self.context['request'].data
+        # parameters name in the request have the form
         # < plugin.id > _ < piping.id > _ < previous_piping.id > _ < param.name >
         parsed_params_dict = {}
         for param in request_data:
@@ -142,7 +143,6 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
             validated_data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
         if 'memory_limit' not in validated_data:
             validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
-
         return super(PluginInstanceSerializer, self).create(validated_data)
 
     @collection_serializer_is_valid
