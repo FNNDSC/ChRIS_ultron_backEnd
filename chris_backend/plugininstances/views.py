@@ -41,7 +41,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
             previous_plugin_inst_id)
         pipeline = self.get_object()
         # parse and transform plugin parameter names in the request
-        self.parsed_parameters = serializer.parse_parameters(request_data)
+        self.parsed_parameters = serializer.parse_parameters()
         # create associated plugin instance for each piping in the pipeline in the same
         # tree order as the pipings
         pipings_tree = pipeline.get_pipings_tree()
@@ -65,13 +65,9 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                 pip_id_queue.append(id)
                 plugin_inst_queue.append(plugin_inst_dict)
         # if no validation errors at this point then save to the DB
-        pipeline_inst = serializer.save(pipeline=pipeline)
+        self.pipeline_inst = serializer.save(pipeline=pipeline)
         for plg_inst_dict in plugin_instances:
-            plg_inst = plg_inst_dict['plugin_inst']
-            plg_inst.pipeline_inst = pipeline_inst
-            plg_inst.save()
-            for param, param_serializer in plg_inst_dict['parameter_serializers']:
-                param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
+            self.save_plugin_inst(plg_inst_dict)
 
         # run the plugin's app
         # PluginAppManager.run_pipeline_instance(pipeline_inst,
@@ -138,6 +134,19 @@ class PipelineInstanceList(generics.ListCreateAPIView):
             parameter_serializers.append((parameter, parameter_serializer))
         return {'plugin_inst': plugin_inst,
                 'parameter_serializers': parameter_serializers}
+
+    def save_plugin_inst(self, plg_inst_dict):
+        """
+        Custom method to create a pipeline instance and validate its parameters.
+        """
+        plg_inst = plg_inst_dict['plugin_inst']
+        plg_inst.pipeline_inst = self.pipeline_inst
+        previous = plg_inst.previous
+        plg_inst.save()
+        plg_inst.previous = previous
+        plg_inst.save()
+        for param, param_serializer in plg_inst_dict['parameter_serializers']:
+            param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
 
 class PipelineInstanceListQuerySearch(generics.ListAPIView):
