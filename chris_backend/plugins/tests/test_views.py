@@ -1,15 +1,13 @@
 
 import logging
-import json
 
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-from django.conf import settings
 
 from rest_framework import status
 
-from plugins.models import Plugin, PluginParameter, Pipeline, PluginPiping
+from plugins.models import Plugin, PluginParameter
 from plugins.models import ComputeResource
 
 

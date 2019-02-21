@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class PluginsConfig(AppConfig):
+class PlugininstancesConfig(AppConfig):
     name = 'plugininstances'

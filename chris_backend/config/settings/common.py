@@ -33,10 +33,12 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    'feeds',
     'collectionjson',
+    'feeds',
     'plugins',
     'plugininstances',
+    'pipelines',
+    'pipelineinstances',
     'uploadedfiles',
     'users'
 ]

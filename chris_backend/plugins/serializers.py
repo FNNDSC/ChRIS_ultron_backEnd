@@ -1,22 +1,13 @@
 
-import json
-
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
-from rest_framework.reverse import reverse
 
 from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
 from plugininstances.models import PluginInstance
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
-from .models import Pipeline, PluginPiping
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
 from .models import DefaultPathParameter, DefaultStrParameter
-from .models import DefaultPipingFloatParameter, DefaultPipingIntParameter
-from .models import DefaultPipingBoolParameter, DefaultPipingPathParameter
-from .models import DefaultPipingStrParameter
-from .models import TYPES
 from .fields import MemoryInt, CPUInt
 
 
@@ -178,7 +169,7 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
@@ -189,19 +180,15 @@ class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(DefaultStrParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
 
 class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
@@ -212,19 +199,15 @@ class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(DefaultIntParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
 
 class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
@@ -235,19 +218,15 @@ class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(DefaultFloatParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
 
 class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
@@ -258,19 +237,15 @@ class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(DefaultBoolParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
 
 class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
                                                        read_only=True)
 
@@ -765,85 +740,8 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
         """
         Overriden to generate a properly formatted message for validation errors.
         """
-        return super(DefaultPipingBoolParameterSerializer, self).is_valid(
+        return super(DefaultPathParameterSerializer, self).is_valid(
             raise_exception=raise_exception)
-
-
-class DefaultPipingPathParameterSerializer(serializers.HyperlinkedModelSerializer):
-    previous_plugin_piping_id = serializers.ReadOnlyField(
-        source='plugin_piping.previous_id')
-    plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
-    plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.name')
-    param_id = serializers.ReadOnlyField(source='plugin_param.id')
-    param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
-
-    class Meta:
-        model = DefaultPipingPathParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_id', 'plugin_param')
-
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingPathParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
-
-class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerializer):
-    previous_plugin_piping_id = serializers.ReadOnlyField(
-        source='plugin_piping.previous_id')
-    plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
-    plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.name')
-    param_id = serializers.ReadOnlyField(source='plugin_param.id')
-    param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
-    value = serializers.SerializerMethodField()
-    url = ItemLinkField('_get_url')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
-
-    class Meta:
-        model = DefaultPipingStrParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_id', 'plugin_param')
-
-    def _get_url(self, obj):
-        """
-        Custom method to get the correct url for the serialized object regardless of
-        its type.
-        """
-        request = self.context['request']
-        # here default piping parameter detail view names are assumed to
-        # follow a convention
-        view_name = 'defaultpiping' + TYPES[obj.plugin_param.type] + 'parameter-detail'
-        return reverse(view_name, request=request, kwargs={"pk": obj.id})
-
-    def get_value(self, obj):
-        """
-        Overriden to get the default parameter value regardless of its type.
-        """
-        return obj.value
-
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
 
 
 DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStrParameterSerializer,
@@ -851,10 +749,3 @@ DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStrParameterSerializer,
                                  'float': DefaultFloatParameterSerializer,
                                  'boolean': DefaultBoolParameterSerializer,
                                  'path': DefaultPathParameterSerializer}
-
-
-DEFAULT_PIPING_PARAMETER_SERIALIZERS = {'string': DefaultPipingStrParameterSerializer,
-                                        'integer': DefaultPipingIntParameterSerializer,
-                                        'float': DefaultPipingFloatParameterSerializer,
-                                        'boolean': DefaultPipingBoolParameterSerializer,
-                                        'path': DefaultPipingPathParameterSerializer}
