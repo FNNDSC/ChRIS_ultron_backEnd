@@ -10,36 +10,12 @@ from django_filters.rest_framework import FilterSet
 import swiftclient
 
 from feeds.models import Feed
-from plugins.models import ComputeResource, Plugin, PluginParameter, Pipeline
+from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
+from pipelineinstances.models import PipelineInstance
 
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
-
-
-class PipelineInstance(models.Model):
-    title = models.CharField(max_length=100, blank=True)
-    description = models.CharField(max_length=800, blank=True)
-    pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
-                                 related_name='instances')
-
-    class Meta:
-        ordering = ('pipeline',)
-
-    def __str__(self):
-        return self.title
-
-
-class PipelineInstanceFilter(FilterSet):
-    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
-    description = django_filters.CharFilter(field_name='description',
-                                            lookup_expr='icontains')
-    pipeline_name = django_filters.CharFilter(field_name='pipeline__name',
-                                               lookup_expr='icontains')
-
-    class Meta:
-        model = PipelineInstance
-        fields = ['id', 'title', 'description', 'pipeline_name']
 
 
 class PluginInstance(models.Model):

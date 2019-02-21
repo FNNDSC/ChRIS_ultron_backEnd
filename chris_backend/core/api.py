@@ -7,6 +7,8 @@ from rest_framework.authtoken.views import obtain_auth_token
 from feeds import views as feed_views
 from plugins import views as plugin_views
 from plugininstances import views as plugininstance_views
+from pipelines import views as pipeline_views
+from pipelineinstances import views as pipelineinstance_views
 from uploadedfiles import views as uploadedfile_views
 from users import views as user_views
 
@@ -85,51 +87,52 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/plugins/parameters/(?P<pk>[0-9]+)/$',
         plugin_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
 
+
     url(r'^v1/pipelines/$',
-        plugin_views.PipelineList.as_view(),
+        pipeline_views.PipelineList.as_view(),
         name='pipeline-list'),
 
     url(r'^v1/pipelines/search/$',
-        plugin_views.PipelineListQuerySearch.as_view(),
+        pipeline_views.PipelineListQuerySearch.as_view(),
         name='pipeline-list-query-search'),
 
     url(r'^v1/pipelines/(?P<pk>[0-9]+)/$',
-        plugin_views.PipelineDetail.as_view(),
+        pipeline_views.PipelineDetail.as_view(),
         name='pipeline-detail'),
 
     url(r'^v1/pipelines/(?P<pk>[0-9]+)/plugins/$',
-        plugin_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
+        pipeline_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
 
     url(r'^v1/pipelines/(?P<pk>[0-9]+)/pipings/$',
-        plugin_views.PipelinePluginPipingList.as_view(),
+        pipeline_views.PipelinePluginPipingList.as_view(),
         name='pipeline-pluginpiping-list'),
 
     url(r'^v1/pipelines/(?P<pk>[0-9]+)/parameters/$',
-        plugin_views.PipelineDefaultParameterList.as_view(),
+        pipeline_views.PipelineDefaultParameterList.as_view(),
         name='pipeline-defaultparameter-list'),
 
     url(r'^v1/pipelines/pipings/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginPipingDetail.as_view(),
+        pipeline_views.PluginPipingDetail.as_view(),
         name='pluginpiping-detail'),
 
     url(r'^v1/pipelines/string-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingStrParameterDetail.as_view(),
+        pipeline_views.DefaultPipingStrParameterDetail.as_view(),
         name='defaultpipingstrparameter-detail'),
 
     url(r'^v1/pipelines/integer-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingIntParameterDetail.as_view(),
+        pipeline_views.DefaultPipingIntParameterDetail.as_view(),
         name='defaultpipingintparameter-detail'),
 
     url(r'^v1/pipelines/float-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingFloatParameterDetail.as_view(),
+        pipeline_views.DefaultPipingFloatParameterDetail.as_view(),
         name='defaultpipingfloatparameter-detail'),
 
     url(r'^v1/pipelines/boolean-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingBoolParameterDetail.as_view(),
+        pipeline_views.DefaultPipingBoolParameterDetail.as_view(),
         name='defaultpipingboolparameter-detail'),
 
     url(r'^v1/pipelines/path-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingPathParameterDetail.as_view(),
+        pipeline_views.DefaultPipingPathParameterDetail.as_view(),
         name='defaultpipingpathparameter-detail'),
 
 
@@ -193,20 +196,21 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PathParameterDetail.as_view(),
         name='pathparameter-detail'),
 
+
     url(r'^v1/pipelines/(?P<pk>[0-9]+)/instances/$',
-        plugininstance_views.PipelineInstanceList.as_view(),
+        pipelineinstance_views.PipelineInstanceList.as_view(),
         name='pipelineinstance-list'),
 
     url(r'^v1/pipelines/instances/search/$',
-        plugininstance_views.PipelineInstanceListQuerySearch.as_view(),
+        pipelineinstance_views.PipelineInstanceListQuerySearch.as_view(),
         name='pipelineinstance-list-query-search'),
 
     url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/$',
-        plugininstance_views.PipelineInstanceDetail.as_view(),
+        pipelineinstance_views.PipelineInstanceDetail.as_view(),
         name='pipelineinstance-detail'),
 
     url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/plugininstances/$',
-        plugininstance_views.PipelineInstancePluginInstanceList.as_view(),
+        pipelineinstance_views.PipelineInstancePluginInstanceList.as_view(),
         name='pipelineinstance-plugininstance-list'),
 
 
