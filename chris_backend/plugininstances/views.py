@@ -2,6 +2,7 @@
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -49,6 +50,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
                 parameters_dict[parameter.name] = request_value
+            elif not parameter.optional:
+                raise ValidationError({'detail': 'A valid %s is required for %s'
+                                                 % (parameter.type, parameter.name)})
         # if no validation errors at this point then save to the DB
         plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                       previous=previous,
