@@ -38,6 +38,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to create the pipeline and associate to it a tree of plugins computed
         either from an existing plugin instance or from a passed tree.
         """
+        validated_data.pop('locked', None)  # locked is not accepted at creation
         tree_dict = validated_data.pop('plugin_id_tree', None)
         root_plg_inst = validated_data.pop('plugin_inst_id', None)
         pipeline = super(PipelineSerializer, self).create(validated_data)
@@ -140,6 +141,20 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, Exception) as e:
             raise serializers.ValidationError(e)
         return tree_dict
+
+    def validate_locked(self, locked):
+        """
+        Overriden to raise a validation error when the locked value is false and there
+        are plugin parameters in the pipeline without default values.
+        """
+        error_msg = 'Pipeline can not be unlocked until all plugin parameters have ' \
+                    'default values'
+        if not locked and self.instance:
+            try:
+                self.instance.checkParameterDefaultValues()
+            except ValueError:
+                raise serializers.ValidationError(error_msg)
+        return locked
 
     @staticmethod
     def validate_tree(tree_dict):
