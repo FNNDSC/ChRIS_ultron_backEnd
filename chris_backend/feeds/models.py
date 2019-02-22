@@ -33,6 +33,13 @@ class Feed(models.Model):
         note.feed = self
         note.save()
 
+    def get_creator(self):
+        """
+        Custom method to get the user that created the feed.
+        """
+        plg_inst = self.plugin_instances.filter(plugin__type='fs')[0]
+        return plg_inst.owner
+
 
 class FeedFilter(FilterSet):
     min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')
