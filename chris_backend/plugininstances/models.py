@@ -246,7 +246,7 @@ class FloatParameter(models.Model):
 
 
 class BoolParameter(models.Model):
-    value = models.BooleanField(default=False, blank=True)
+    value = models.BooleanField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
