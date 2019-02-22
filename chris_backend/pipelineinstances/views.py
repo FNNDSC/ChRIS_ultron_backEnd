@@ -1,6 +1,7 @@
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.serializers import ValidationError
 
 from collectionjson import services
 from pipelines.models import Pipeline
@@ -122,7 +123,11 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                     plugin_param=parameter)[0]
                 data = {'value': default.value}
             parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
-            parameter_serializer.is_valid(raise_exception=True)
+            try:
+                parameter_serializer.is_valid(raise_exception=True)
+            except ValidationError:
+                raise ValidationError({'detail': 'A valid %s is required for %s'
+                                                 % (parameter.type, parameter.name)})
             parameter_serializers.append((parameter, parameter_serializer))
         return {'plugin_inst': plugin_inst,
                 'parameter_serializers': parameter_serializers}
