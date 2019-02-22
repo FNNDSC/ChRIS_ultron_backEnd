@@ -63,6 +63,14 @@ class Pipeline(models.Model):
                     tree[prev_id] = {'piping': pip.previous, 'child_ids': [pip.id]}
         return {'root_id': root_id, 'tree': tree}
 
+    def checkParameterDefaultValues(self):
+        """
+        Custom method to raise an exception if any of the plugin parameters associated to
+        any of the pipings in the pipeline doesn't have a default value.
+        """
+        for piping in self.plugin_pipings.all():
+            piping.checkParameterDefaultValues()
+
     @staticmethod
     def get_accesible_pipelines(user):
         """
@@ -123,13 +131,25 @@ class PluginPiping(models.Model):
             default_piping_param.plugin_piping = self
             default_piping_param.plugin_param = parameter
             default = parameter.get_default()
-            if default is not None:  # use plugin's parameter default for piping's default
-                default_piping_param.value = default
+            # use plugin's parameter default for piping's default
+            default_piping_param.value = default
             default_piping_param.save()
+
+    def checkParameterDefaultValues(self):
+        """
+        Custom method to raise an exception if any of the plugin parameters associated to
+        the piping doesn't have a default value.
+        """
+        for type in DEFAULT_PIPING_PARAMETER_MODELS:
+            typed_parameters = getattr(self, type + '_param')
+            for parameter in typed_parameters.all():
+                if parameter.value is None:
+                    raise ValueError('A default is required for parameter %s'
+                                     % parameter.plugin_param.name)
 
 
 class DefaultPipingStrParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
+    value = models.CharField(max_length=200, null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -140,7 +160,7 @@ class DefaultPipingStrParameter(models.Model):
 
 
 class DefaultPipingIntParameter(models.Model):
-    value = models.IntegerField(default=1, blank=True)
+    value = models.IntegerField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -151,7 +171,7 @@ class DefaultPipingIntParameter(models.Model):
 
 
 class DefaultPipingFloatParameter(models.Model):
-    value = models.FloatField(default=1.0, blank=True)
+    value = models.FloatField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='float_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -162,7 +182,7 @@ class DefaultPipingFloatParameter(models.Model):
 
 
 class DefaultPipingBoolParameter(models.Model):
-    value = models.BooleanField(default=False, blank=True)
+    value = models.BooleanField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -173,7 +193,7 @@ class DefaultPipingBoolParameter(models.Model):
 
 
 class DefaultPipingPathParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
+    value = models.CharField(max_length=200, null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -184,7 +204,7 @@ class DefaultPipingPathParameter(models.Model):
 
 
 DEFAULT_PIPING_PARAMETER_MODELS = {'string': DefaultPipingStrParameter,
-                         'integer': DefaultPipingIntParameter,
-                         'float': DefaultPipingFloatParameter,
-                         'boolean': DefaultPipingBoolParameter,
-                         'path': DefaultPipingPathParameter}
+                                   'integer': DefaultPipingIntParameter,
+                                   'float': DefaultPipingFloatParameter,
+                                   'boolean': DefaultPipingBoolParameter,
+                                   'path': DefaultPipingPathParameter}
