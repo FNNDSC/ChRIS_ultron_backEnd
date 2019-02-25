@@ -265,6 +265,11 @@ class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     def get_type(obj):
         return obj.plugin_param.type
 
+    def get_default(self, obj):
+        """
+        Overriden to get the default parameter value regardless of type.
+        """
+        return obj.get_default()
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id_tree = serializers.JSONField(write_only=True, required=False)
@@ -284,59 +289,32 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                   'plugin_id_tree', 'plugin_inst_id', 'owner_username', 'plugins',
                   'plugin_pipings', 'default_parameters', 'instances')
 
-    def create(self, validated_data):
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
         """
-        Overriden to create the pipeline and associate to it a tree of plugins computed
-        either from an existing plugin instance or from a passed tree.
+        Overriden to generate a properly formatted message for validation errors.
         """
-        tree_dict = validated_data.pop('plugin_id_tree', None)
-        root_plg_inst = validated_data.pop('plugin_inst_id', None)
-        pipeline = super(PipelineSerializer, self).create(validated_data)
+        return super(DefaultStrParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
-        if not tree_dict:  # generate tree_dict from passed plugin instance
-            tree_dict = {'root_index': 0, 'tree': []}
-            curr_ix = 0
-            queue = [root_plg_inst]
-            while len(queue) > 0:
-                visited_instance = queue.pop()
-                plg_id = visited_instance.plugin.id
-                child_instances = list(visited_instance.next.all())
-                queue.extend(child_instances)
-                lower_ix = curr_ix + 1
-                upper_ix = lower_ix + len(child_instances)
-                child_indices = list(range(lower_ix, upper_ix))
-                tree_dict['tree'].append({'plugin_id': plg_id,
-                                          'child_indices': child_indices})
-                curr_ix = upper_ix - 1
-        PipelineSerializer._add_plugin_tree_to_pipeline(pipeline, tree_dict)
-        return pipeline
 
-    def update(self, instance, validated_data):
-        """
-        Overriden to remove parameters that are not allowed to be used on update.
-        """
-        validated_data.pop('plugin_id_tree', None)
-        validated_data.pop('plugin_inst_id', None)
-        return super(PipelineSerializer, self).update(instance, validated_data)
+class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.ReadOnlyField(source='plugin_param.type')
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    class Meta:
+        model = DefaultIntParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
         Overriden to generate a properly formatted message for validation errors.
         """
-        return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
-
-    def validate(self, data):
-        """
-        Overriden to validate that at least one of two fields are in data
-        when creating a new pipeline.
-        """
-        if not self.instance:  # this validation only happens on create and not on update
-            if 'plugin_id_tree' not in data and 'plugin_inst_id' not in data:
-                raise serializers.ValidationError("At least one of the fields "
-                                                  "'plugin_id_tree' or 'plugin_inst_id' "
-                                                  "must be provided")
-        return data
+        return super(DefaultIntParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     def validate_plugin_inst_id(self, plugin_inst_id):
         """
@@ -520,91 +498,55 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(e)
         return tree_dict
 
-    @staticmethod
-    def validate_tree(tree_dict):
-        """
-        Custom method to validate whether the represented tree in tree_dict dictionary
-        is a single connected component.
-        """
-        root_ix = tree_dict['root_index']
-        tree = tree_dict['tree']
-        num_nodes = len(tree)
-        # breath-first traversal
-        nodes = []
-        queue = [root_ix]
-        while len(queue):
-            curr_ix = queue.pop(0)
-            nodes.append(curr_ix)
-            queue.extend(tree[curr_ix]['child_indices'])
-        if len(nodes) < num_nodes:
-            raise ValueError("Tree is not connected!")
+    class Meta:
+        model = DefaultFloatParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
-    @staticmethod
-    def get_tree(tree_list):
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
         """
-        Custom method to return a dictionary containing a list of nodes representing a
-        tree of plugins and the index of the root of the tree. Each node is a dictionary
-        containing the plugin id and the list of child indices.
+        Overriden to generate a properly formatted message for validation errors.
         """
-        try:
-            root_ix = [ix for ix,d in enumerate(tree_list)
-                       if d['previous_index'] is None][0]
-        except IndexError:
-            raise ValueError("Couldn't find the root of the tree in %s" % tree_list)
-        tree = [None] * len(tree_list)
-        tree[root_ix] = {'plugin_id': tree_list[root_ix]['plugin_id'], 'child_indices':[]}
-        for ix, d in enumerate(tree_list):
-            if ix != root_ix:
-                if not tree[ix]:
-                    tree[ix] = {'plugin_id': d['plugin_id'], 'child_indices': []}
-                prev_ix = d['previous_index']
-                try:
-                    if tree[prev_ix]:
-                        tree[prev_ix]['child_indices'].append(ix)
-                    else:
-                        tree[prev_ix] = {'plugin_id': tree_list[prev_ix]['plugin_id'],
-                                         'child_indices': [ix]}
-                except (IndexError, TypeError):
-                    raise ValueError("Invalid 'previous_index' for node %s" % d)
-        return {'root_index': root_ix, 'tree': tree}
-
-    @staticmethod
-    def _add_plugin_tree_to_pipeline(pipeline, tree_dict):
-        """
-        Internal custom method to associate a tree of plugins to a pipeline in the DB.
-        """
-        # here a piping precedes another piping if its corresponding plugin precedes
-        # the other piping's plugin in the pipeline
-        root_ix = tree_dict['root_index']
-        tree = tree_dict['tree']
-        root_plg = Plugin.objects.get(pk=tree[root_ix]['plugin_id'])
-        root_plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=root_plg)
-        root_plg_piping.save()
-        # breath-first traversal
-        piping_queue = [root_plg_piping]
-        ix_queue = [root_ix]
-        while len(piping_queue):
-            curr_ix = ix_queue.pop(0)
-            curr_piping = piping_queue.pop(0)
-            for ix in tree[curr_ix]['child_indices']:
-                plg = Plugin.objects.get(pk=tree[ix]['plugin_id'])
-                plg_piping = PluginPiping.objects.create(pipeline=pipeline, plugin=plg,
-                                                         previous=curr_piping)
-                plg_piping.save()
-                ix_queue.append(ix)
-                piping_queue.append(plg_piping)
+        return super(DefaultFloatParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
-class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
-    plugin_id = serializers.ReadOnlyField(source='plugin.id')
-    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
-    previous_id = serializers.ReadOnlyField(source='previous.id')
-    previous = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                 read_only=True)
-    plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
-                                                 read_only=True)
-    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
-                                                   read_only=True)
+class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.ReadOnlyField(source='plugin_param.type')
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    class Meta:
+        model = DefaultBoolParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(DefaultBoolParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
+
+
+class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
+    param_name = serializers.ReadOnlyField(source='plugin_param.name')
+    type = serializers.ReadOnlyField(source='plugin_param.type')
+    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
+                                                       read_only=True)
+
+    class Meta:
+        model = DefaultPathParameter
+        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
+
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(DefaultPathParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
     class Meta:
         model = PluginPiping
