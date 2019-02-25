@@ -2,158 +2,20 @@
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from plugins.models import Plugin, Pipeline
+from plugins.models import Plugin
 from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
 from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
-from .models import PipelineInstance, PipelineInstanceFilter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
-from .serializers import PipelineInstanceSerializer
 from .permissions import IsRelatedFeedOwnerOrChris
 from .services.manager import PluginAppManager
-
-
-class PipelineInstanceList(generics.ListCreateAPIView):
-    """
-    A view for the collection of pipeline instances.
-    """
-    serializer_class = PipelineInstanceSerializer
-    queryset = Pipeline.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def perform_create(self, serializer):
-        """
-        Overriden to associate an owner, a plugin and a previous plugin instance with
-        the newly created plugin instance before first saving to the DB. All the plugin
-        instance's parameters in the request are also properly saved to the DB. Finally
-        the plugin's app is run with the provided plugin instance's parameters.
-        """
-        # get previous plugin instance and create the new plugin instance
-        request_data = serializer.context['request'].data
-        previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
-        previous = serializer.validate_previous(previous_id)
-        plugin = self.get_object()
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
-                                      compute_resource=plugin.compute_resource)
-        # collect parameters from the request and validate and save them to the DB
-        parameters = plugin.parameters.all()
-        parameters_dict = {}
-        for parameter in parameters:
-            if parameter.name in request_data:
-                requested_value = request_data[parameter.name]
-                data = {'value': requested_value}
-                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
-                parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
-                parameters_dict[parameter.name] = requested_value
-        # run the plugin's app
-        PluginAppManager.run_plugin_app(plugin_inst,
-                                        parameters_dict,
-                                        service='pfcon',
-                                        inputDirOverride='/share/incoming',
-                                        outputDirOverride='/share/outgoing')
-
-    def list(self, request, *args, **kwargs):
-        """
-        Overriden to return the list of instances for the queried plugin.
-        A document-level link relation, query list and a collection+json template are
-        also added to the response.
-        """
-        queryset = self.get_plugin_instances_queryset()
-        response = services.get_list_response(self, queryset)
-        plugin = self.get_object()
-        # append query list
-        query_list = [reverse('plugininstance-list-query-search', request=request)]
-        response = services.append_collection_querylist(response, query_list)
-        # append document-level link relations
-        links = {'plugin': reverse('plugin-detail', request=request,
-                                   kwargs={"pk": plugin.id})}
-        response = services.append_collection_links(response, links)
-        # append write template
-        param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': "", 'previous_id': "", 'cpu_limit': "",
-                         'memory_limit': "", 'number_of_workers': "", 'gpu_limit': ""}
-        for name in param_names:
-            template_data[name] = ""
-        return services.append_collection_template(response, template_data)
-
-    def get_plugin_instances_queryset(self):
-        """
-        Custom method to get the actual pipeline instances' queryset.
-        """
-        plugin = self.get_object()
-        return self.filter_queryset(plugin.instances.all())
-
-
-class PipelineInstanceListQuerySearch(generics.ListAPIView):
-    """
-    A view for the collection of pipeline instances resulting from a query search.
-    """
-    serializer_class = PipelineInstanceSerializer
-    queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    filterset_class = PipelineInstanceFilter
-
-
-class PipelineInstanceDetail(generics.RetrieveAPIView):
-    """
-    A pipeline instance view.
-    """
-    serializer_class = PipelineInstanceSerializer
-    queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overloaded method to check a plugin's instance status.
-        """
-        instance = self.get_object()
-        PluginAppManager.check_plugin_app_exec_status(instance)
-        response = super(PipelineInstanceDetail, self).retrieve(request, *args, **kwargs)
-        return response
-
-
-class PipelineInstanceParameterList(generics.ListAPIView):
-    """
-    A view for the collection of parameters that the pipeline instance was run with.
-    """
-    serializer_class = PARAMETER_SERIALIZERS['string']
-    queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def list(self, request, *args, **kwargs):
-        """
-        Overriden to return a list with all the parameter values used by the queried
-        plugin instance.
-        """
-        queryset = self.get_parameters_queryset()
-        response = services.get_list_response(self, queryset)
-        results = response.data['results']
-        # the items' url must be corrected because this view always uses the same string
-        # serializer for any parameter type
-        for item in results:
-            item['url'] = item['url'].replace('string', item['type'])
-        return response
-
-    def get_parameters_queryset(self):
-        """
-        Custom method to get a queryset with all the parameters regardless their type.
-        """
-        instance = self.get_object()
-        queryset = []
-        queryset.extend(list(instance.path_param.all()))
-        queryset.extend(list(instance.string_param.all()))
-        queryset.extend(list(instance.integer_param.all()))
-        queryset.extend(list(instance.float_param.all()))
-        queryset.extend(list(instance.boolean_param.all()))
-        return self.filter_queryset(queryset)
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -176,20 +38,28 @@ class PluginInstanceList(generics.ListCreateAPIView):
         previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
-                                      compute_resource=plugin.compute_resource)
-        # collect parameters from the request and validate and save them to the DB
+        # collect and validate parameters from the request
+        parameter_serializers = []
         parameters = plugin.parameters.all()
         parameters_dict = {}
         for parameter in parameters:
             if parameter.name in request_data:
-                requested_value = request_data[parameter.name]
-                data = {'value': requested_value}
+                request_value = request_data[parameter.name]
+                data = {'value': request_value}
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
-                parameter_serializer.save(plugin_inst=plugin_inst, plugin_param=parameter)
-                parameters_dict[parameter.name] = requested_value
+                parameter_serializers.append((parameter, parameter_serializer))
+                parameters_dict[parameter.name] = request_value
+            elif not parameter.optional:
+                raise ValidationError({'detail': 'A valid %s is required for %s'
+                                                 % (parameter.type, parameter.name)})
+        # if no validation errors at this point then save to the DB
+        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
+                                      previous=previous,
+                                      compute_resource=plugin.compute_resource)
+        for param, param_serializer in parameter_serializers:
+            param_serializer.save(plugin_inst=plugin_inst, plugin_param=param)
+
         # run the plugin's app
         PluginAppManager.run_plugin_app(plugin_inst,
                                   parameters_dict,

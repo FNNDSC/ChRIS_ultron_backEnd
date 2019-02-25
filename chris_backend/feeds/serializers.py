@@ -118,6 +118,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
+    creator_username = serializers.SerializerMethodField()
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
     tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
     taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
@@ -130,8 +131,9 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'owner',
-                  'note', 'tags', 'taggings', 'comments', 'files', 'plugin_instances')
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
+                  'creator_username', 'owner', 'note', 'tags', 'taggings', 'comments',
+                  'files', 'plugin_instances')
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
@@ -151,6 +153,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 {'detail': "%s is not a registered user" % username})
         return new_owner
+
+    def get_creator_username(self, obj):
+        """
+        Overriden to get the username of the creator of the feed.
+        """
+        return obj.get_creator().username
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):

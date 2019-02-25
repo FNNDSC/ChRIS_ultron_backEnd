@@ -7,34 +7,19 @@ from rest_framework.reverse import reverse
 
 from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
-
 from plugins.models import TYPES
 from plugins.fields import MemoryInt, CPUInt
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
 from .models import PathParameter, StrParameter
-from .models import PipelineInstance
-
-
-class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
-    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
-    previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True)
-    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
-                                                   read_only=True)
-    parameters = serializers.HyperlinkedIdentityField(
-        view_name='pipelineinstance-parameter-list')
-
-    class Meta:
-        model = PipelineInstance
-        fields = ('url', 'id', 'title', 'pipeline_id', 'description', 'pipeline')
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
-    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst__pipeline.id')
-    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst__pipeline.name')
+    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst.pipeline.id')
+    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -79,13 +64,12 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
             validated_data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
         if 'memory_limit' not in validated_data:
             validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
-
         return super(PluginInstanceSerializer, self).create(validated_data)
 
     @collection_serializer_is_valid
     def is_valid(self, raise_exception=False):
         """
-        Overriden to generate a properly formatted message for validation errors
+        Overriden to generate a properly formatted message for validation errors.
         """
         return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
 
@@ -172,7 +156,7 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def _get_file_link(self, obj):
         """
-        Custom method to get the hyperlink to the actual file resource
+        Custom method to get the hyperlink to the actual file resource.
         """
         fields = self.fields.items()
         # get the current url
@@ -187,7 +171,7 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
 
 class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -198,14 +182,18 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(StrParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -216,14 +204,18 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(IntParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -234,14 +226,18 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(FloatParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -252,14 +248,18 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(BoolParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                  read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
@@ -270,14 +270,18 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
+    @collection_serializer_is_valid
+    def is_valid(self, raise_exception=False):
+        """
+        Overriden to generate a properly formatted message for validation errors.
+        """
+        return super(PathParameterSerializer, self).is_valid(
+            raise_exception=raise_exception)
 
 
 class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.SerializerMethodField()
+    type = serializers.ReadOnlyField(source='plugin_param.type')
     value = serializers.SerializerMethodField()
     url = ItemLinkField('_get_url')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
@@ -305,10 +309,6 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the default parameter value regardless of its type.
         """
         return obj.value
-
-    @staticmethod
-    def get_type(obj):
-        return obj.plugin_param.type
         
 
 PARAMETER_SERIALIZERS = {'string': StrParameterSerializer,
