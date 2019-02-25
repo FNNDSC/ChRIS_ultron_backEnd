@@ -135,80 +135,6 @@ urlpatterns = format_suffix_patterns([
         pipeline_views.DefaultPipingPathParameterDetail.as_view(),
         name='defaultpipingpathparameter-detail'),
 
-    url(r'^v1/pipelines/$',
-        plugin_views.PipelineList.as_view(),
-        name='pipeline-list'),
-
-    url(r'^v1/pipelines/search/$',
-        pipeline_views.PipelineListQuerySearch.as_view(),
-        name='pipeline-list-query-search'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/$',
-        pipeline_views.PipelineDetail.as_view(),
-        name='pipeline-detail'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/plugins/$',
-        pipeline_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/pipings/$',
-        pipeline_views.PipelinePluginPipingList.as_view(),
-        name='pipeline-pluginpiping-list'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/parameters/$',
-        plugin_views.PipelineDefaultParameterList.as_view(),
-        name='pipeline-defaultparameter-list'),
-
-    url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginPipingDetail.as_view(),
-        name='pluginpiping-detail'),
-
-    url(r'^v1/pipelines/$',
-        plugin_views.PipelineList.as_view(),
-        name='pipeline-list'),
-
-    url(r'^v1/pipelines/search/$',
-        plugin_views.PipelineListQuerySearch.as_view(),
-        name='pipeline-list-query-search'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/$',
-        plugin_views.PipelineDetail.as_view(),
-        name='pipeline-detail'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/plugins/$',
-        plugin_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/pipings/$',
-        plugin_views.PipelinePluginPipingList.as_view(),
-        name='pipeline-pluginpiping-list'),
-
-    url(r'^v1/pipelines/(?P<pk>[0-9]+)/parameters/$',
-        plugin_views.PipelineDefaultParameterList.as_view(),
-        name='pipeline-defaultparameter-list'),
-
-    url(r'^v1/pipings/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginPipingDetail.as_view(),
-        name='pluginpiping-detail'),
-
-    url(r'^v1/pipelines/string-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingStringParameterDetail.as_view(),
-        name='defaultpipingstringparameter-detail'),
-
-    url(r'^v1/pipelines/integer-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingIntParameterDetail.as_view(),
-        name='defaultpipingintparameter-detail'),
-
-    url(r'^v1/pipelines/float-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingFloatParameterDetail.as_view(),
-        name='defaultpipingfloatparameter-detail'),
-
-    url(r'^v1/pipelines/boolean-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingBoolParameterDetail.as_view(),
-        name='defaultpipingboolparameter-detail'),
-
-    url(r'^v1/pipelines/path-parameter/(?P<pk>[0-9]+)/$',
-        plugin_views.DefaultPipingPathParameterDetail.as_view(),
-        name='defaultpipingpathparameter-detail'),
-
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
         plugininstance_views.PluginInstanceList.as_view(),
@@ -240,47 +166,6 @@ urlpatterns = format_suffix_patterns([
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
         plugininstance_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugininstance_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugin_views.PluginInstanceFileDetail.as_view(),
         name='plugininstancefile-detail'),
 
     url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
