@@ -41,7 +41,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
         # collect and validate parameters from the request
         parameter_serializers = []
         parameters = plugin.parameters.all()
-        parameters_dict = {}
         for parameter in parameters:
             if parameter.name in request_data:
                 request_value = request_data[parameter.name]
@@ -49,23 +48,24 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
-                parameters_dict[parameter.name] = request_value
             elif not parameter.optional:
                 raise ValidationError({'detail': 'A valid %s is required for %s'
                                                  % (parameter.type, parameter.name)})
         # if no validation errors at this point then save to the DB
-        plugin_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                      previous=previous,
-                                      compute_resource=plugin.compute_resource)
+        plg_inst = serializer.save(owner=self.request.user, plugin=plugin,
+                                   previous=previous,
+                                   compute_resource=plugin.compute_resource)
+        parameters_dict = {}
         for param, param_serializer in parameter_serializers:
-            param_serializer.save(plugin_inst=plugin_inst, plugin_param=param)
+            param_inst = param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
+            parameters_dict[param.name] = param_inst.value
 
         # run the plugin's app
-        PluginAppManager.run_plugin_app(plugin_inst,
-                                  parameters_dict,
-                                  service             = 'pfcon',
-                                  inputDirOverride    = '/share/incoming',
-                                  outputDirOverride   = '/share/outgoing')
+        PluginAppManager.run_plugin_app(plg_inst,
+                                        parameters_dict,
+                                        service             = 'pfcon',
+                                        inputDirOverride    = '/share/incoming',
+                                        outputDirOverride   = '/share/outgoing')
 
     def list(self, request, *args, **kwargs):
         """

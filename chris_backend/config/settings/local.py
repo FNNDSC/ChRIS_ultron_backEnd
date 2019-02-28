@@ -11,6 +11,7 @@ Local settings
 from .common import *  # noqa
 import os
 import logging
+import swiftclient
 
 
 # avoid cluttered console output (for instance logging all the http requests)
@@ -34,7 +35,14 @@ SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
 SWIFT_CONTAINER_NAME = 'users'
-SWIFT_AUTO_CREATE_CONTAINER = True
+#SWIFT_AUTO_CREATE_CONTAINER = True
+# initiate a swift service connection and create 'users' container
+conn = swiftclient.Connection(
+    user=SWIFT_USERNAME,
+    key=SWIFT_KEY,
+    authurl=SWIFT_AUTH_URL,
+)
+conn.put_container(SWIFT_CONTAINER_NAME)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -96,4 +104,3 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 # ------------------------------------------------------------------------------
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
-
