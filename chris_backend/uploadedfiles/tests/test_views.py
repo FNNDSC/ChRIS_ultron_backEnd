@@ -185,8 +185,6 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
             key=settings.SWIFT_KEY,
             authurl=settings.SWIFT_AUTH_URL,
         )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
         # upload file to Swift storage
         with io.StringIO("test file") as file1:

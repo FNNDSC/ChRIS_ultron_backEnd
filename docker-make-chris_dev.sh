@@ -421,5 +421,10 @@ else
         docker-compose run --service-ports chris_dev
         echo ""
         windowBottom
+    else
+        title -d 1 "Restarting CUBE's Django development server in non-interactive mode..."
+        docker-compose restart chris_dev
+        echo ""
+        windowBottom
     fi
 fi
