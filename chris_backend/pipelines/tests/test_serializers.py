@@ -8,9 +8,11 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from plugininstances.models import PluginInstance
-from plugins.models import Plugin, PluginParameter, ComputeResource
-from pipelines.serializers import PipelineSerializer
+from plugins.models import Plugin
+from plugins.models import ComputeResource
+from plugins.models import PluginParameter, DefaultPathParameter, DefaultIntParameter
 from pipelines.models import Pipeline
+from pipelines.serializers import PipelineSerializer
 
 
 class SerializerTests(TestCase):
@@ -19,36 +21,51 @@ class SerializerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.plugin_name = "simplefsapp"
-        self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
-                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                            "description": "A simple chris fs app demo", "version": "0.1",
-                            "title": "Simple chris fs app", "license": "Opensource (MIT)",
-
-                            "parameters": [{"optional": True, "action": "store",
-                                            "help": "look up directory", "type": "path",
-                                            "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
-
-                            "selfpath": "/usr/src/simplefsapp",
-                            "selfexec": "simplefsapp.py", "execshell": "python3"}
-
+        self.plugin_fs_name = "simplefsapp"
+        self.plugin_fs_parameters = {'dir': {'type': 'path', 'optional': True,
+                                             'default': "./"}}
+        self.plugin_ds_name = "simpledsapp"
+        self.plugin_ds_parameters = {'dummyInt': {'type': 'integer', 'optional': True,
+                                                  'default': 111111}}
+        self.username = 'foo'
+        self.password = 'foo-pass'
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
 
-        # create a plugin
-        data = self.plugin_repr.copy()
-        parameters = self.plugin_repr['parameters']
-        del data['parameters']
-        data['compute_resource'] = self.compute_resource
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        # create plugins
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
+                                                       type='fs',
+                                                       compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
+                                                       type='ds',
+                                                       compute_resource=self.compute_resource)
+        # add plugins' parameters
+        (plg_param_fs, tf) = PluginParameter.objects.get_or_create(
+            plugin=plugin_fs,
+            name='dir',
+            type=self.plugin_fs_parameters['dir']['type'],
+            optional=self.plugin_fs_parameters['dir']['optional'])
+        default = self.plugin_fs_parameters['dir']['default']
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param_fs,
+                                                   value=default)  # set plugin parameter default
 
-        # add plugin's parameters
-        PluginParameter.objects.get_or_create(
-            plugin=plugin,
-            name=parameters[0]['name'],
-            type=parameters[0]['type'],
-            flag=parameters[0]['flag'])
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyInt',
+            type=self.plugin_ds_parameters['dummyInt']['type'],
+            optional=self.plugin_ds_parameters['dummyInt']['optional']
+        )
+        default = self.plugin_ds_parameters['dummyInt']['default']
+        DefaultIntParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=default)  # set plugin parameter default
+
+        # create user
+        user = User.objects.create_user(username=self.username, password=self.password)
+
+        # create a pipeline
+        self.pipeline_name = 'Pipeline1'
+        Pipeline.objects.get_or_create(name=self.pipeline_name, owner=user, category='test')
 
     def tearDown(self):
         # re-enable logging
@@ -59,32 +76,27 @@ class PipelineSerializerTests(SerializerTests):
 
     def setUp(self):
         super(PipelineSerializerTests, self).setUp()
-        self.username = 'foo'
-        self.password = 'bar'
-        self.pipeline_name = 'Pipeline1'
-        user = User.objects.create_user(username=self.username, password=self.password)
-        Pipeline.objects.get_or_create(name=self.pipeline_name, owner=user)
 
     def test_create(self):
         """
         Test whether overriden 'create' method successfully creates a new pipeline
         with a tree of associated plugins.
         """
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
         owner = User.objects.get(username=self.username)
         plugin_id_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
                          ', "previous_index": null}, {"plugin_id": ' + \
                          str(plugin_ds2.id) + ', "previous_index": 0}]'
-        data = {'name': 'Pipeline2', 'owner': owner, 'plugin_id_tree': plugin_id_tree}
+        data = {'name': 'Pipeline2', 'plugin_id_tree': plugin_id_tree}
 
         pipeline_serializer = PipelineSerializer(data=data)
         pipeline_serializer.is_valid(raise_exception=True)
+        pipeline_serializer.validated_data['owner'] = owner
         pipeline = pipeline_serializer.create(pipeline_serializer.validated_data)
         pipeline_plg_names = [plugin.name for plugin in pipeline.plugins.all()]
-        self.assertIn("mri_convert", pipeline_plg_names)
+        self.assertIn(self.plugin_ds_name, pipeline_plg_names)
         self.assertIn("mri_analyze", pipeline_plg_names)
 
     def test_update(self):
@@ -121,7 +133,7 @@ class PipelineSerializerTests(SerializerTests):
         owner = User.objects.get(username=self.username)
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        plugin_fs = Plugin.objects.get(name=self.plugin_name)
+        plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
         (plugin_fs_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin_fs,
                                                                     owner=owner,
                                                 compute_resource=self.compute_resource)
@@ -157,10 +169,10 @@ class PipelineSerializerTests(SerializerTests):
         Test whether overriden validate_plugin_id_tree method validates that the plugin
         tree contains existing plugins that are not of type 'fs'.
         """
-        plugin_fs = Plugin.objects.get(name=self.plugin_name)
+        plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        tree = '[{"plugin_id": ' + str(plugin_fs.id + 1) + ', "previous_index": null}]'
+        tree = '[{"plugin_id": ' + str(plugin_fs.id + 100) + ', "previous_index": null}]'
         with self.assertRaises(serializers.ValidationError):
             pipeline_serializer.validate_plugin_id_tree(tree)
         tree = '[{"plugin_id": ' + str(plugin_fs.id) + ', "previous_index": null}]'
@@ -174,8 +186,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
         tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "previous_index": null}]'
         with mock.patch('pipelines.serializers.PipelineSerializer.get_tree') as get_tree_mock:
             get_tree_mock.side_effect = ValueError
@@ -191,8 +202,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
         tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "previous_index": null}]'
         tree_dict = {'root_index': 0, 'tree': [{"plugin_id": plugin_ds.id, "child_indices": []}]}
         with mock.patch('pipelines.serializers.PipelineSerializer.validate_tree') as validate_tree_mock:
@@ -208,8 +218,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
         tree = [{"plugin_id": plugin_ds1.id, "child_indices": []},
@@ -226,8 +235,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
 
@@ -250,8 +258,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
         tree_list = [{"plugin_id": plugin_ds1.id, "previous_index": 0},
@@ -267,8 +274,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
 
@@ -291,8 +297,7 @@ class PipelineSerializerTests(SerializerTests):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
 
@@ -304,4 +309,4 @@ class PipelineSerializerTests(SerializerTests):
         pipeline_serializer._add_plugin_tree_to_pipeline(pipeline, tree_dict)
         pipeline_plg_names = [plugin.name for plugin in pipeline.plugins.all()]
         self.assertEqual(len(pipeline_plg_names), 3)
-        self.assertEqual(len([name for name in pipeline_plg_names if name == "mri_convert"]), 2)
+        self.assertEqual(len([name for name in pipeline_plg_names if name == self.plugin_ds_name]), 2)

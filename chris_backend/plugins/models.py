@@ -116,11 +116,10 @@ class PluginParameter(models.Model):
 
     def get_default(self):
         """
-        Overriden to get the default parameter value regardless of type.
+        Overriden to get the default parameter instance regardless of its type.
         """
         default_attr_name = '%s_default' % self.type
-        default = getattr(self, default_attr_name, None)
-        return default.value if default else None
+        return getattr(self, default_attr_name, None)
 
 
 class DefaultStrParameter(models.Model):

@@ -53,7 +53,7 @@ class ViewTests(TestCase):
                                             compute_resource=self.compute_resource)
         
         # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, title='test',
                                             compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
@@ -853,5 +853,45 @@ class FeedFileListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_feedfile_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class FeedPluginInstanceListViewTests(ViewTests):
+    """
+    Test the feed-plugininstance-list view.
+    """
+
+    def setUp(self):
+        super(FeedPluginInstanceListViewTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.list_url = reverse("feed-plugininstance-list", kwargs={"pk": feed.id})
+
+        # create two files in the DB "already uploaded" to the server from two different
+        # plugin instances that write to the same feed
+        plg_inst = PluginInstance.objects.get(title='test')
+
+        # create a second 'ds' plugin instance in the same feed tree
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name="mri_convert")
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                              previous_id= plg_inst.id,
+                                                              title='test1',
+                                                compute_resource=plugin.compute_resource)
+
+
+    def test_feed_plugin_instance_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        # it shows all the plugin instances associated to the feed
+        self.assertContains(response, "test")
+        self.assertContains(response, "test1")
+
+    def test_feed_plugin_instance_list_failure_not_related_feed_owner(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

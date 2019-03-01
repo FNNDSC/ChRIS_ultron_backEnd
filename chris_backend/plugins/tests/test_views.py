@@ -7,7 +7,8 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin, PluginParameter
+from plugins.models import Plugin
+from plugins.models import PluginParameter, DefaultPathParameter
 from plugins.models import ComputeResource
 
 
@@ -28,8 +29,16 @@ class ViewTests(TestCase):
                                  password=self.password)
 
         # create two plugins
-        Plugin.objects.get_or_create(name="pacspull", type="fs",
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name="simplefsapp", type="fs",
                                      compute_resource=self.compute_resource)
+        # add plugin's parameters
+        (plg_param, tf) = PluginParameter.objects.get_or_create(
+            plugin=plugin_fs,
+            name='dir',
+            type='path',
+            optional=True
+        )
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value="./")
         Plugin.objects.get_or_create(name="mri_convert", type="ds",
                                      compute_resource=self.compute_resource)
 
@@ -50,7 +59,7 @@ class PluginListViewTests(ViewTests):
     def test_plugin_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "pacspull")
+        self.assertContains(response, "simplefsapp")
         self.assertContains(response, "mri_convert")
 
     def test_plugin_list_failure_unauthenticated(self):
@@ -65,12 +74,12 @@ class PluginListQuerySearchViewTests(ViewTests):
 
     def setUp(self):
         super(PluginListQuerySearchViewTests, self).setUp()
-        self.list_url = reverse("plugin-list-query-search") + '?name=pacspull'
+        self.list_url = reverse("plugin-list-query-search") + '?name=simplefsapp'
 
     def test_plugin_list_query_search_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "pacspull")
+        self.assertContains(response, "simplefsapp")
         self.assertNotContains(response, "mri_convert")
 
     def test_plugin_list_query_search_failure_unauthenticated(self):
@@ -85,14 +94,14 @@ class PluginDetailViewTests(ViewTests):
 
     def setUp(self):
         super(PluginDetailViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(name="simplefsapp")
 
         self.read_url = reverse("plugin-detail", kwargs={"pk": plugin.id})
 
     def test_plugin_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
-        self.assertContains(response, "pacspull")
+        self.assertContains(response, "simplefsapp")
 
     def test_plugin_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
@@ -106,7 +115,7 @@ class PluginParameterListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginParameterListViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(name="simplefsapp")
         # self.corresponding_plugin_url = reverse("plugin-detail", kwargs={"pk": plugin.id})
         self.list_url = reverse("pluginparameter-list", kwargs={"pk": plugin.id})
 
@@ -134,17 +143,16 @@ class PluginParameterDetailViewTests(ViewTests):
 
     def setUp(self):
         super(PluginParameterDetailViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
-        # create a plugin parameter
-        (param, tf) = PluginParameter.objects.get_or_create(plugin=plugin,
-                                                            name='mrn', type='string')
-        self.read_url = reverse("pluginparameter-detail",
-                                kwargs={"pk": param.id})
+        # get the plugin parameter
+        param = PluginParameter.objects.get(name='dir')
+        self.read_url = reverse("pluginparameter-detail", kwargs={"pk": param.id})
 
     def test_plugin_parameter_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
-        self.assertContains(response, "mrn")
+        self.assertContains(response, "dir")
+        self.assertContains(response, "default")
+        self.assertContains(response, "./")
 
     def test_plugin_parameter_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)

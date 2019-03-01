@@ -10,6 +10,9 @@ from rest_framework import status
 
 from plugins.models import Plugin
 from plugins.models import ComputeResource
+from plugins.models import PluginParameter
+from plugins.models import DefaultPathParameter, DefaultBoolParameter
+from plugins.models import DefaultStrParameter, DefaultFloatParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping
 
 
@@ -19,21 +22,53 @@ class ViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.username = 'data/foo'
-        self.password = 'bar'
+        self.content_type = 'application/vnd.collection+json'
 
+        self.plugin_ds_name = "simpledsapp"
+        self.plugin_ds_parameters = {'dummyInt': {'type': 'integer', 'optional': True,
+                                                  'default': 111111}}
+        self.username = 'foo'
+        self.password = 'foo-pass'
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
 
-        # create API user
-        User.objects.create_user(username=self.username,
-                                 password=self.password)
-        
-        # create two plugins
-        Plugin.objects.get_or_create(name="pacspull", type="fs", 
-                                    compute_resource=self.compute_resource)
-        Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                    compute_resource=self.compute_resource)
+        # create plugin
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
+                                                       type='ds',
+                                                       compute_resource=self.compute_resource)
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyInt',
+            type=self.plugin_ds_parameters['dummyInt']['type'],
+            optional=self.plugin_ds_parameters['dummyInt']['optional']
+        )
+        default = self.plugin_ds_parameters['dummyInt']['default']
+        DefaultIntParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=default)  # set plugin parameter default
+
+        # create user
+        user = User.objects.create_user(username=self.username, password=self.password)
+
+        # create a pipeline
+        self.pipeline_name = 'Pipeline1'
+        (pipeline, tf) = Pipeline.objects.get_or_create(name=self.pipeline_name,
+                                                        owner=user, category='test')
+
+        # create two plugin pipings
+        self.pips = []
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline)
+        self.pips.append(pip)
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, previous=pip,
+                                                       pipeline=pipeline)
+        self.pips.append(pip)
+
+        # create another user
+        self.other_username = 'boo'
+        self.other_password = 'far'
+        User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
 
     def tearDown(self):
         # re-enable logging
@@ -47,15 +82,6 @@ class PipelineViewTests(ViewTests):
 
     def setUp(self):
         super(PipelineViewTests, self).setUp()
-        self.content_type = 'application/vnd.collection+json'
-        self.other_username = 'boo'
-        self.other_password = 'far'
-        self.pipeline_name = 'Pipeline1'
-        User.objects.create_user(username=self.other_username,
-                                 password=self.other_password)
-        user = User.objects.get(username=self.username)
-        Pipeline.objects.get_or_create(name=self.pipeline_name, owner=user,
-                                       category='test')
 
 
 class PipelineListViewTests(PipelineViewTests):
@@ -234,6 +260,33 @@ class PipelinePluginPipingListViewTests(PipelineViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class PipelineDefaultParameterListViewTests(PipelineViewTests):
+    """
+    Test the pipeline-defaultparameter-list view.
+    """
+
+    def setUp(self):
+        super(PipelineDefaultParameterListViewTests, self).setUp()
+        self.pipeline = Pipeline.objects.get(name="Pipeline1")
+        self.list_url = reverse("pipeline-defaultparameter-list",
+                                kwargs={"pk": self.pipeline.id})
+
+    def test_pipeline_default_parameter_list_success(self):
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        param = plugin_ds.parameters.get(name='dummyInt')
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, self.pips[0].id)
+        self.assertContains(response, self.pips[1].id)
+        self.assertContains(response, param.name)
+        self.assertContains(response, plugin_ds.name)
+        self.assertContains(response, 111111)
+
+    def test_pipeline_default_parameter_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class PluginPipingDetailViewTests(PipelineViewTests):
     """
     Test the pluginpiping-detail view.
@@ -241,15 +294,8 @@ class PluginPipingDetailViewTests(PipelineViewTests):
 
     def setUp(self):
         super(PluginPipingDetailViewTests, self).setUp()
-        pipeline = Pipeline.objects.get(name="Pipeline1")
-        # create plugins
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
-        # pipe one plugin into pipeline
-        (piping, tf) = PluginPiping.objects.get_or_create(pipeline=pipeline,
-                                                          plugin=plugin_ds, previous=None)
 
-        self.read_url = reverse("pluginpiping-detail", kwargs={"pk": piping.id})
+        self.read_url = reverse("pluginpiping-detail", kwargs={"pk": self.pips[0].id})
 
     def test_plugin_piping_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -260,3 +306,325 @@ class PluginPipingDetailViewTests(PipelineViewTests):
     def test_plugin_piping_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class DefaultPipingStrParameterDetailViewTests(ViewTests):
+    """
+    Test the defaultpipingstrparameter-detail view.
+    """
+
+    def setUp(self):
+        super(DefaultPipingStrParameterDetailViewTests, self).setUp()
+
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyStr',
+            type='string',
+            optional=True
+        )
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value='test')  # set plugin parameter default
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline, previous=self.pips[1])
+        default_param = pip.string_param.get(plugin_piping=pip)
+        self.read_update_url = reverse("defaultpipingstrparameter-detail", kwargs={"pk": default_param.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "value", "value": "updated"}]}})
+
+    def test_default_piping_str_parameter_detail_success_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "test")
+        #self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+
+    def test_default_piping_str_parameter_detail_failure_access_denied_pipeline_locked(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_piping_str_parameter_detail_success_pipeline_unlocked(self):
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "test")
+
+    def test_default_piping_str_parameter_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_str_parameter_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "updated")
+
+    def test_default_piping_str_parameter_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_str_parameter_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DefaultPipingPathParameterDetailViewTests(ViewTests):
+    """
+    Test the defaultpipingpathparameter-detail view.
+    """
+
+    def setUp(self):
+        super(DefaultPipingPathParameterDetailViewTests, self).setUp()
+
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyPath',
+            type='path',
+            optional=True
+        )
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value='./test')  # set plugin parameter default
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline, previous=self.pips[1])
+        default_param = pip.path_param.get(plugin_piping=pip)
+        self.read_update_url = reverse("defaultpipingpathparameter-detail", kwargs={"pk": default_param.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "value", "value": "./updated"}]}})
+
+    def test_default_piping_path_parameter_detail_success_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "./test")
+
+    def test_default_piping_path_parameter_detail_failure_access_denied_pipeline_locked(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_piping_path_parameter_detail_success_pipeline_unlocked(self):
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "./test")
+
+    def test_default_piping_path_parameter_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_path_parameter_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "./updated")
+
+    def test_default_piping_path_parameter_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_path_parameter_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DefaultPipingIntParameterDetailViewTests(ViewTests):
+    """
+    Test the defaultpipingintparameter-detail view.
+    """
+
+    def setUp(self):
+        super(DefaultPipingIntParameterDetailViewTests, self).setUp()
+
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline, previous=self.pips[1])
+        default_param = pip.integer_param.get(plugin_piping=pip)
+        self.read_update_url = reverse("defaultpipingintparameter-detail", kwargs={"pk": default_param.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "value", "value": 222222}]}})
+
+    def test_default_piping_int_parameter_detail_success_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, 111111)
+
+    def test_default_piping_int_parameter_detail_failure_access_denied_pipeline_locked(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_piping_int_parameter_detail_success_pipeline_unlocked(self):
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, 111111)
+
+    def test_default_piping_int_parameter_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_int_parameter_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, 222222)
+
+    def test_default_piping_int_parameter_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_int_parameter_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DefaultPipingFloatParameterDetailViewTests(ViewTests):
+    """
+    Test the defaultpipingfloatparameter-detail view.
+    """
+
+    def setUp(self):
+        super(DefaultPipingFloatParameterDetailViewTests, self).setUp()
+
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyFloat',
+            type='float',
+            optional=True
+        )
+        DefaultFloatParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=1.11111)  # set plugin parameter default
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline, previous=self.pips[1])
+        default_param = pip.float_param.get(plugin_piping=pip)
+        self.read_update_url = reverse("defaultpipingfloatparameter-detail", kwargs={"pk": default_param.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "value", "value": 1.22222}]}})
+
+    def test_default_piping_float_parameter_detail_success_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, 1.11111)
+
+    def test_default_piping_float_parameter_detail_failure_access_denied_pipeline_locked(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_piping_float_parameter_detail_success_pipeline_unlocked(self):
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, 1.11111)
+
+    def test_default_piping_float_parameter_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_float_parameter_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, 1.22222)
+
+    def test_default_piping_float_parameter_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_float_parameter_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class DefaultPipingBoolParameterDetailViewTests(ViewTests):
+    """
+    Test the defaultpipingboolparameter-detail view.
+    """
+
+    def setUp(self):
+        super(DefaultPipingBoolParameterDetailViewTests, self).setUp()
+
+        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        # add a parameter with a default
+        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ds,
+            name='dummyBool',
+            type='boolean',
+            optional=True
+        )
+        DefaultBoolParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=False)  # set plugin parameter default
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+                                                       pipeline=pipeline, previous=self.pips[1])
+        default_param = pip.boolean_param.get(plugin_piping=pip)
+        self.read_update_url = reverse("defaultpipingboolparameter-detail", kwargs={"pk": default_param.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "value", "value": "true"}]}})
+
+    def test_default_piping_bool_parameter_detail_success_owner(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "false")
+
+    def test_default_piping_bool_parameter_detail_failure_access_denied_pipeline_locked(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_default_piping_bool_parameter_detail_success_pipeline_unlocked(self):
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertContains(response, "false")
+
+    def test_default_piping_bool_parameter_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_bool_parameter_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "true")
+
+    def test_default_piping_bool_parameter_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_default_piping_bool_parameter_update_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

@@ -162,7 +162,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the default parameter value regardless of type.
         """
-        return obj.get_default()
+        default = obj.get_default()
+        return default.value if default else None
 
 
 class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):

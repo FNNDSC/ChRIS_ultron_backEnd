@@ -1,3 +1,4 @@
+
 from rest_framework import permissions
 
 
@@ -35,30 +36,22 @@ class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
 
 class IsRelatedFeedOwnerOrChris(permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object or superuser
-    'chris' to modify/edit a feed-related object (eg. a note).
+    Custom permission to only allow owners of a feed associated to an object or superuser
+    'chris' to modify/edit the object (eg. a note).
     """
 
     def has_object_permission(self, request, view, obj):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
-        #import pdb; pdb.set_trace()
         if request.user.username == 'chris':
             return True
-        if hasattr(obj.feed, 'all'):
-            owner_lists = [feed.owner.all() for feed in obj.feed.all()]
-            for owner_list in owner_lists:
-                if request.user in owner_list:
-                    return True
-        elif request.user in obj.feed.owner.all():
-            return True
-        return False
+        return request.user in obj.feed.owner.all()
 
 
 class IsRelatedTagOwnerOrChris(permissions.BasePermission):
     """
-    Custom permission to only allow owners of a related tag or superuser
-    'chris' to access an object (eg. a tagging).
+    Custom permission to only allow the owner of a tag associated to an object or
+    superuser 'chris' to access the object (eg. a tagging).
     """
 
     def has_object_permission(self, request, view, obj):
@@ -67,8 +60,3 @@ class IsRelatedTagOwnerOrChris(permissions.BasePermission):
         if (request.user.username == 'chris') or (request.user == obj.tag.owner):
             return True
         return False
-
-
-
-
-

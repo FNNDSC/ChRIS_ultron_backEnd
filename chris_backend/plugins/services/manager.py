@@ -57,12 +57,6 @@ class PluginManager(object):
         parser_remove.add_argument('name', help="Plugin's name")
 
         self.parser = parser
-        self.str_service        = ''
-
-        # Debug specifications
-        self.b_quiet            = False
-        self.b_useDebug         = True
-        self.str_debugFile      = '%s/tmp/debug-charm.log' % os.environ['HOME']
 
     def add_plugin(self, args):
         """

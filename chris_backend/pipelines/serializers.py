@@ -151,7 +151,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     'default values'
         if not locked and self.instance:
             try:
-                self.instance.checkParameterDefaultValues()
+                self.instance.check_parameter_default_values()
             except ValueError:
                 raise serializers.ValidationError(error_msg)
         return locked

@@ -7,7 +7,8 @@ from unittest import mock
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
 
-from plugins.models import Plugin, PluginParameter
+from plugins.models import Plugin
+from plugins.models import PluginParameter, DefaultPathParameter
 from plugininstances.models import PluginInstance, ComputeResource
 from plugininstances.services import manager
 
@@ -46,11 +47,15 @@ class PluginAppManagerTests(TestCase):
         (plugin_fs, tf) = Plugin.objects.get_or_create(**data)
 
         # add plugin's parameters
-        PluginParameter.objects.get_or_create(
+        (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
             name=parameters[0]['name'],
             type=parameters[0]['type'],
-            flag=parameters[0]['flag'])
+            flag=parameters[0]['flag'],
+            optional=parameters[0]['optional'],
+        )
+        default = parameters[0]['default']
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
         # create user
         User.objects.create_user(username=self.username, password=self.password)
