@@ -51,7 +51,20 @@ class FeedModelTests(TestCase):
         # create a plugin instance that in turn creates a new feed
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                             compute_resource=plugin.compute_resource)
         pl_inst.feed.name = self.feed_name
         self.assertEqual(Note.objects.count(), 1)
+
+    def test_get_creator(self):
+        """
+        Test whether custom get_creator method properly return the user that created the
+        feed.
+        """
+        # create a plugin instance that in turn creates a new feed
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_name)
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                            compute_resource=plugin.compute_resource)
+        feed_creator = pl_inst.feed.get_creator()
+        self.assertEqual(feed_creator, user)

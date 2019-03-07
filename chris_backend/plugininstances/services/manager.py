@@ -3,8 +3,6 @@ Plugin app manager module that provides functionality to run and check the execu
 status of a plugin app.
 """
 
-import time
-
 from django.conf import settings
 
 from .charm import Charm
@@ -99,27 +97,6 @@ class PluginAppManager(object):
         # registration occurs via a call to the overloaded retrieve() method in PluginInstanceDetail in
         # plugins/views.py.
         #
-
-    @staticmethod
-    def check_apps_exec_server(**kwargs):
-        """
-        Check if a remote server instance is servicing requests.
-        """
-        # pudb.set_trace()
-        chris_service = Charm(**kwargs)
-        chris_service.app_service_checkIfAvailable(**kwargs)
-        # Wait a bit for transients
-        time.sleep(5)
-
-    @staticmethod
-    def shutdown_apps_exec_server(**kwargs):
-        """
-        Shutdown a remote server instance.
-        """
-        chris_service = Charm(**kwargs)
-        chris_service.app_service_shutdown(**kwargs)
-        # Wait a bit for transients
-        time.sleep(5)
 
     @staticmethod
     def check_plugin_app_exec_status(plugin_inst):

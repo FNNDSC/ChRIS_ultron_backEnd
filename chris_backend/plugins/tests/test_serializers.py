@@ -5,7 +5,9 @@ from unittest import mock
 from django.test import TestCase
 from rest_framework import serializers
 
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import Plugin
+from plugins.models import PluginParameter, DefaultPathParameter
+from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer
 
 
@@ -40,11 +42,15 @@ class SerializerTests(TestCase):
         (plugin, tf) = Plugin.objects.get_or_create(**data)
 
         # add plugin's parameters
-        PluginParameter.objects.get_or_create(
+        (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
             type=parameters[0]['type'],
-            flag=parameters[0]['flag'])
+            flag=parameters[0]['flag'],
+            optional=parameters[0]['optional']
+        )
+        default = parameters[0]['default']
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
     def tearDown(self):
         # re-enable logging

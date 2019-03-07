@@ -27,9 +27,9 @@ class Pipeline(models.Model):
 
     def get_pipings_parameters_names(self):
         """
-        Custom method to get the list of all associated plugin pipings. The name of the
-        parameters is transformed to have the plugin id, piping id and previous piping
-        id as a prefix.
+        Custom method to get the list of all the plugin parameter names for all the
+        associated plugin pipings. The name of the parameters is transformed to have the
+        plugin id, piping id and previous piping id as a prefix.
         """
         pipings = self.plugin_pipings.all()
         param_names = []
@@ -63,13 +63,13 @@ class Pipeline(models.Model):
                     tree[prev_id] = {'piping': pip.previous, 'child_ids': [pip.id]}
         return {'root_id': root_id, 'tree': tree}
 
-    def checkParameterDefaultValues(self):
+    def check_parameter_default_values(self):
         """
         Custom method to raise an exception if any of the plugin parameters associated to
         any of the pipings in the pipeline doesn't have a default value.
         """
         for piping in self.plugin_pipings.all():
-            piping.checkParameterDefaultValues()
+            piping.check_parameter_default_values()
 
     @staticmethod
     def get_accesible_pipelines(user):
@@ -132,10 +132,10 @@ class PluginPiping(models.Model):
             default_piping_param.plugin_param = parameter
             default = parameter.get_default()
             # use plugin's parameter default for piping's default
-            default_piping_param.value = default
+            default_piping_param.value = default.value if default else None
             default_piping_param.save()
 
-    def checkParameterDefaultValues(self):
+    def check_parameter_default_values(self):
         """
         Custom method to raise an exception if any of the plugin parameters associated to
         the piping doesn't have a default value.

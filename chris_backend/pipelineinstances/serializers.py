@@ -71,12 +71,13 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         parsed_params_dict = {}
         for param in request_data:
             try:
-                id_list = param.split('_')[:3]
+                param_elements = param.split('_')
+                id_list = param_elements[:3]
                 piping_id = int(id_list[1])
             except Exception:
                 pass
             else:
-                param_name = '_'.join(id_list[3:])
+                param_name = '_'.join(param_elements[3:])
                 if piping_id in parsed_params_dict:
                     parsed_params_dict[piping_id][param_name] = request_data[param]
                 else:

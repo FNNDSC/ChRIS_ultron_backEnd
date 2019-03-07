@@ -4,25 +4,28 @@ import os
 import io
 from unittest import mock
 
-import swiftclient
-
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
 from feeds.models import Feed
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import Plugin
+from plugins.models import ComputeResource
+from plugins.models import PluginParameter, DefaultPathParameter
 from plugininstances.models import PluginInstance, PluginInstanceFile
-        
-      
-class PluginInstanceModelTests(TestCase):
-    
+from plugininstances.models import PluginInstanceFilter
+from plugininstances.models import swiftclient
+
+
+class ModelTests(TestCase):
+
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
         self.plugin_fs_name = "simplefsapp"
-        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': False}}
+        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,
+                                             'default': "./"}}
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_parameters = {'prefix': {'type': 'string', 'optional': False}}
         self.username = 'foo'
@@ -32,17 +35,20 @@ class PluginInstanceModelTests(TestCase):
 
         # create plugins
         (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                    type='fs',
-                                                    compute_resource=self.compute_resource)
+                                                       type='fs',
+                                                       compute_resource=self.compute_resource)
         (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                    type='ds',
-                                                    compute_resource=self.compute_resource)
+                                                       type='ds',
+                                                       compute_resource=self.compute_resource)
         # add plugins' parameters
-        PluginParameter.objects.get_or_create(
+        (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
             name='dir',
             type=self.plugin_fs_parameters['dir']['type'],
             optional=self.plugin_fs_parameters['dir']['optional'])
+        default = self.plugin_fs_parameters['dir']['default']
+        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
+
         PluginParameter.objects.get_or_create(
             plugin=plugin_ds,
             name='prefix',
@@ -51,11 +57,14 @@ class PluginInstanceModelTests(TestCase):
 
         # create user
         User.objects.create_user(username=self.username,
-                                        password=self.password)
+                                 password=self.password)
 
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.DEBUG)
+
+
+class PluginInstanceModelTests(ModelTests):
 
     def test_save_creates_new_feed_just_after_fs_plugininstance_is_created(self):
         """
@@ -71,9 +80,9 @@ class PluginInstanceModelTests(TestCase):
         self.assertEqual(Feed.objects.count(), 1)
         self.assertEqual(pl_inst.feed.name,pl_inst.plugin.name)
 
-    def test_save_do_not_create_new_feed_just_after_ds_plugininstance_is_created(self):
+    def test_save_does_not_create_new_feed_just_after_ds_plugininstance_is_created(self):
         """
-        Test whether overriden save method do not create a feed just after a 'ds' plugin 
+        Test whether overriden save method does not create a feed just after a 'ds' plugin
         instance is created.
         """
         # create a 'fs' plugin instance
@@ -105,6 +114,33 @@ class PluginInstanceModelTests(TestCase):
                                                 compute_resource=plugin.compute_resource)
         root_instance = plg_inst.get_root_instance()
         self.assertEqual(root_instance, plg_inst_root)
+
+    def test_get_descendant_instances(self):
+        """
+        Test whether custom get_descendant_instances method returns all the plugin
+        instances that are a descendant of a plugin instance
+        """
+        # create a 'fs' plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+        # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
+        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        plg_inst1 = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=plg_inst_root,
+                                                compute_resource=plugin.compute_resource)
+        # create another 'ds' plugin instance whose previous is the previous 'ds' plugin
+        # instance
+        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        plg_inst2 = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=plg_inst1,
+                                                compute_resource=plugin.compute_resource)
+        decend_instances = plg_inst_root.get_descendant_instances()
+        self.assertEqual(len(decend_instances), 3)
+        self.assertEqual(decend_instances[0], plg_inst_root)
+        self.assertEqual(decend_instances[1], plg_inst1)
+        self.assertEqual(decend_instances[2], plg_inst2)
 
     def test_get_output_path(self):
         """
@@ -201,3 +237,35 @@ class PluginInstanceModelTests(TestCase):
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')
+
+
+class PluginInstanceFilterModelTests(ModelTests):
+
+    def test_filter_by_root_id(self):
+        """
+        Test whether custom filter_by_root_id method returns the plugin instances in a
+        queryset with a common root plugin instance.
+        """
+        # create a 'fs' plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+        # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
+        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        plg_inst1 = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=plg_inst_root,
+                                                compute_resource=plugin.compute_resource)
+        # create another 'ds' plugin instance whose previous is the previous 'ds' plugin
+        # instance
+        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        plg_inst2 = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                previous=plg_inst1,
+                                                compute_resource=plugin.compute_resource)
+        queryset = PluginInstance.objects.all()
+        value = plg_inst1.id
+        filter = PluginInstanceFilter()
+        filtered_queryset = filter.filter_by_root_id(queryset, "", value)
+        self.assertEqual(len(filtered_queryset), 2)
+        self.assertEqual(filtered_queryset[0], plg_inst1)
+        self.assertEqual(filtered_queryset[1], plg_inst2)
