@@ -4,6 +4,7 @@ from rest_framework.reverse import reverse
 
 from collectionjson import services
 from plugins.serializers import PluginSerializer
+
 from .models import Pipeline, PipelineFilter, PluginPiping
 from .models import DefaultPipingPathParameter, DefaultPipingStrParameter
 from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter

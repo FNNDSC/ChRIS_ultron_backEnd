@@ -1,13 +1,12 @@
 
 from django.conf import settings
-
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 
+import swiftclient
+
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
-
-import swiftclient
 
 from .models import UploadedFile, uploaded_file_path
 from .serializers import UploadedFileSerializer
@@ -130,5 +129,3 @@ class UploadedFileResource(generics.GenericAPIView):
         """
         user_file = self.get_object()
         return Response(user_file.fname)
-
-

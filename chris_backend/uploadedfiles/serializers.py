@@ -2,11 +2,10 @@
 import os
 
 from django.core.exceptions import ObjectDoesNotExist
-
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
-from collectionjson.services import collection_serializer_is_valid
+
 from .models import UploadedFile
 
 
@@ -21,16 +20,9 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         model = UploadedFile
         fields = ('url', 'id', 'upload_path', 'fname', 'file_resource', 'owner')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors
-        """
-        return super(UploadedFileSerializer, self).is_valid(raise_exception=raise_exception)
-
     def _get_file_link(self, obj):
         """
-        Custom method to get the hyperlink to the actual file resource
+        Custom method to get the hyperlink to the actual file resource.
         """
         fields = self.fields.items()
         # get the current url
@@ -49,7 +41,7 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         # remove leading and trailing slashes
         path = path.strip('/')
         if not path:
-            raise serializers.ValidationError({'detail': "Invalid file path!"})
+            raise serializers.ValidationError({'upload_path': ["Invalid file path."]})
         path = os.path.join('/', path)
         try:
             # check if path for this file already exists in the db
@@ -58,4 +50,4 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         except ObjectDoesNotExist:
             return path
         else:
-            raise serializers.ValidationError({'detail': "File already exists!"})
+            raise serializers.ValidationError({'upload_path': ["File already exists."]})

@@ -5,10 +5,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
 from plugins.models import Plugin, TYPES
 from plugininstances.models import PluginInstance
+
 from .models import Pipeline, PluginPiping
 from .models import DefaultPipingFloatParameter, DefaultPipingIntParameter
 from .models import DefaultPipingBoolParameter, DefaultPipingPathParameter
@@ -69,13 +69,6 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         validated_data.pop('plugin_inst_id', None)
         return super(PipelineSerializer, self).update(instance, validated_data)
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(PipelineSerializer, self).is_valid(raise_exception=raise_exception)
-
     def validate(self, data):
         """
         Overriden to validate that at least one of two fields are in data
@@ -83,9 +76,9 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         """
         if not self.instance:  # this validation only happens on create and not on update
             if 'plugin_id_tree' not in data and 'plugin_inst_id' not in data:
-                raise serializers.ValidationError("At least one of the fields "
-                                                  "'plugin_id_tree' or 'plugin_inst_id' "
-                                                  "must be provided")
+                raise serializers.ValidationError(
+                    {'non_field_errors': ["At least one of the fields 'plugin_id_tree' "
+                                          "or 'plugin_inst_id' must be provided."]})
         return data
 
     def validate_plugin_inst_id(self, plugin_inst_id):
@@ -95,13 +88,15 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         try:
             plg_inst = PluginInstance.objects.get(pk=plugin_inst_id)
         except ObjectDoesNotExist:
-            raise serializers.ValidationError("Couldn't find any plugin instance with id "
-                                              "%s" % plugin_inst_id)
+            raise serializers.ValidationError(
+                {'plugin_inst_id': ["Couldn't find any plugin instance with id %s." %
+                                    plugin_inst_id]})
         plg = plg_inst.plugin
         if plg.type == 'fs':
-            raise serializers.ValidationError("%s is a plugin of type 'fs' and therefore "
-                                              "can not be used as the root of a new "
-                                              "pipeline" % plg.name)
+            raise serializers.ValidationError(
+                {'plugin_inst_id':
+                     ["Plugin instance of %s which is of type 'fs' and therefore can "
+                      "not be used as the root of a new pipeline." % plg.name]})
         return plg_inst
 
     def validate_plugin_id_tree(self, plugin_id_tree):
@@ -113,11 +108,14 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         try:
             plugin_id_list = list(json.loads(plugin_id_tree))
         except json.decoder.JSONDecodeError:
-            raise serializers.ValidationError("Invalid JSON string %s" % plugin_id_tree)
+            raise serializers.ValidationError(
+                {'plugin_id_tree': ["Invalid JSON string %s." % plugin_id_tree]})
         except Exception:
-            raise serializers.ValidationError("Invalid tree list in %s" % plugin_id_tree)
+            raise serializers.ValidationError(
+                {'plugin_id_tree': ["Invalid tree list in %s" % plugin_id_tree]})
         if len(plugin_id_list) == 0:
-            raise serializers.ValidationError("Invalid empty list in %s" % plugin_id_tree)
+            raise serializers.ValidationError(
+                {'plugin_id_tree': ["Invalid empty list in %s" % plugin_id_tree]})
 
         for d in plugin_id_list:
             try:
@@ -125,21 +123,22 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 plg_id = d['plugin_id']
                 plg = Plugin.objects.get(pk=plg_id)
             except ObjectDoesNotExist:
-                raise serializers.ValidationError("Couldn't find any plugin with id %s" %
-                                                  plg_id)
+                raise serializers.ValidationError(
+                    {'plugin_id_tree': ["Couldn't find any plugin with id %s" % plg_id]})
             except Exception:
-                raise serializers.ValidationError("%s must be a JSON object with "
-                                                  "'plugin_id' and 'previous_index' "
-                                                  "properties" % d)
+                raise serializers.ValidationError(
+                    {'plugin_id_tree':
+                         ["Object %s must be a JSON object with 'plugin_id' and "
+                          "'previous_index' properties." % d]})
             if plg.type == 'fs':
-                raise serializers.ValidationError("%s is a plugin of type 'fs' and "
-                                                  "therefore can not be used to create a "
-                                                  "pipeline" % plg)
+                raise serializers.ValidationError(
+                    {'plugin_id_tree': ["Plugin %s is of type 'fs' and therefore can "
+                                        "not be used to create a pipeline." % plg]})
         try:
             tree_dict = PipelineSerializer.get_tree(plugin_id_list)
             PipelineSerializer.validate_tree(tree_dict)
         except (ValueError, Exception) as e:
-            raise serializers.ValidationError(e)
+            raise serializers.ValidationError({'plugin_id_tree': [str(e)]})
         return tree_dict
 
     def validate_locked(self, locked):
@@ -148,12 +147,12 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         are plugin parameters in the pipeline without default values.
         """
         error_msg = 'Pipeline can not be unlocked until all plugin parameters have ' \
-                    'default values'
+                    'default values.'
         if not locked and self.instance:
             try:
                 self.instance.check_parameter_default_values()
             except ValueError:
-                raise serializers.ValidationError(error_msg)
+                raise serializers.ValidationError({'locked': [error_msg]})
         return locked
 
     @staticmethod
@@ -268,14 +267,6 @@ class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingStrParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
@@ -296,14 +287,6 @@ class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingIntParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -326,14 +309,6 @@ class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializ
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingFloatParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
@@ -355,14 +330,6 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingBoolParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultPipingPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
@@ -383,14 +350,6 @@ class DefaultPipingPathParameterSerializer(serializers.HyperlinkedModelSerialize
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_id', 'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPipingPathParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerializer):

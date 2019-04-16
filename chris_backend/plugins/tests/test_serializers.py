@@ -65,9 +65,11 @@ class PluginSerializerTests(SerializerTests):
         when the app worker descriptor cannot be converted to a positive integer.
         """
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_workers_descriptor('one')
+            descriptor_dict = {'name': 'min_number_of_workers', 'value': 'one'}
+            PluginSerializer.validate_app_workers_descriptor(descriptor_dict)
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_workers_descriptor(0)
+            descriptor_dict = {'name': 'max_number_of_workers', 'value': 0}
+            PluginSerializer.validate_app_workers_descriptor(descriptor_dict)
 
     def test_validate_app_cpu_descriptor(self):
         """
@@ -75,8 +77,10 @@ class PluginSerializerTests(SerializerTests):
         when the app cpu descriptor cannot be converted to a fields.CPUInt.
         """
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_cpu_descriptor('100me')
-            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100m'))
+            descriptor_dict = {'name': 'min_cpu_limit', 'value': '100me'}
+            PluginSerializer.validate_app_cpu_descriptor(descriptor_dict)
+            descriptor_dict = {'name': 'max_cpu_limit', 'value': '100m'}
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor(descriptor_dict))
 
     def test_validate_app_memory_descriptor(self):
         """
@@ -84,9 +88,12 @@ class PluginSerializerTests(SerializerTests):
         when the app memory descriptor cannot be converted to a fields.MemoryInt.
         """
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_cpu_descriptor('100me')
-            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100mi'))
-            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor('100gi'))
+            descriptor_dict = {'name': 'min_memory_limit', 'value': '100me'}
+            PluginSerializer.validate_app_cpu_descriptor(descriptor_dict)
+            descriptor_dict = {'name': 'min_memory_limit', 'value': '100mi'}
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor(descriptor_dict))
+            descriptor_dict = {'name': 'max_memory_limit', 'value': '100gi'}
+            self.assertEqual(100, PluginSerializer.validate_app_cpu_descriptor(descriptor_dict))
 
     def test_validate_app_gpu_descriptor(self):
         """
@@ -94,19 +101,24 @@ class PluginSerializerTests(SerializerTests):
         when the gpu descriptor cannot be converted to a non-negative integer.
         """
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_gpu_descriptor('one')
+            descriptor_dict = {'name': 'min_gpu_limit', 'value': 'one'}
+            PluginSerializer.validate_app_gpu_descriptor(descriptor_dict)
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_gpu_descriptor(-1)
+            descriptor_dict = {'name': 'max_gpu_limit', 'value': -1}
+            PluginSerializer.validate_app_gpu_descriptor(descriptor_dict)
 
     def test_validate_app_int_descriptor(self):
         """
         Test whether custom validate_app_int_descriptor method raises a ValidationError
         when the descriptor cannot be converted to a non-negative integer.
         """
+        error_msg = "This field must be a non-negative integer."
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_int_descriptor('one')
+            descriptor_dict = {'name': 'field_name', 'value': 'one'}
+            PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
         with self.assertRaises(serializers.ValidationError):
-            PluginSerializer.validate_app_int_descriptor(-1)
+            descriptor_dict = {'name': 'field_name', 'value': -1}
+            PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
 
     def test_validate_app_descriptor_limits(self):
         """
@@ -188,7 +200,8 @@ class PluginSerializerTests(SerializerTests):
         data['min_number_of_workers'] = 4
         plg_serializer.validate_app_workers_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_workers_descriptor.assert_called_with(4)
+        plg_serializer.validate_app_workers_descriptor.assert_called_with(
+            {'name': 'min_number_of_workers', 'value': 4})
 
     def test_validate_validates_max_number_of_workers(self):
         """
@@ -202,7 +215,8 @@ class PluginSerializerTests(SerializerTests):
         data['max_number_of_workers'] = 5
         plg_serializer.validate_app_workers_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_workers_descriptor.assert_called_with(5)
+        plg_serializer.validate_app_workers_descriptor.assert_called_with(
+            {'name': 'max_number_of_workers', 'value': 5})
 
     def test_validate_validates_min_gpu_limit(self):
         """
@@ -216,7 +230,8 @@ class PluginSerializerTests(SerializerTests):
         data['min_gpu_limit'] = 1
         plg_serializer.validate_app_gpu_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_gpu_descriptor.assert_called_with(1)
+        plg_serializer.validate_app_gpu_descriptor.assert_called_with(
+            {'name': 'min_gpu_limit', 'value': 1})
 
     def test_validate_validates_max_gpu_limit(self):
         """
@@ -230,7 +245,8 @@ class PluginSerializerTests(SerializerTests):
         data['max_gpu_limit'] = 2
         plg_serializer.validate_app_gpu_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_gpu_descriptor.assert_called_with(2)
+        plg_serializer.validate_app_gpu_descriptor.assert_called_with(
+            {'name': 'max_gpu_limit', 'value': 2})
 
     def test_validate_validates_min_cpu_limit(self):
         """
@@ -244,7 +260,8 @@ class PluginSerializerTests(SerializerTests):
         data['min_cpu_limit'] = 100
         plg_serializer.validate_app_cpu_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_cpu_descriptor.assert_called_with(100)
+        plg_serializer.validate_app_cpu_descriptor.assert_called_with(
+            {'name': 'min_cpu_limit', 'value': 100})
 
     def test_validate_validates_max_cpu_limit(self):
         """
@@ -258,7 +275,8 @@ class PluginSerializerTests(SerializerTests):
         data['max_cpu_limit'] = 200
         plg_serializer.validate_app_cpu_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_cpu_descriptor.assert_called_with(200)
+        plg_serializer.validate_app_cpu_descriptor.assert_called_with(
+            {'name': 'max_cpu_limit', 'value': 200})
 
     def test_validate_validates_min_memory_limit(self):
         """
@@ -272,7 +290,8 @@ class PluginSerializerTests(SerializerTests):
         data['min_memory_limit'] = 10000
         plg_serializer.validate_app_memory_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_memory_descriptor.assert_called_with(10000)
+        plg_serializer.validate_app_memory_descriptor.assert_called_with(
+            {'name': 'min_memory_limit', 'value': 10000})
 
     def test_validate_validates_max_memory_limit(self):
         """
@@ -286,4 +305,5 @@ class PluginSerializerTests(SerializerTests):
         data['max_memory_limit'] = 100000
         plg_serializer.validate_app_memory_descriptor = mock.Mock()
         plg_serializer.validate(data)
-        plg_serializer.validate_app_memory_descriptor.assert_called_with(100000)
+        plg_serializer.validate_app_memory_descriptor.assert_called_with(
+            {'name': 'max_memory_limit', 'value': 100000})
