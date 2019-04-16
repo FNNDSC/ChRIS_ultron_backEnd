@@ -3,6 +3,7 @@ from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
 from collectionjson import services
+
 from .models import Plugin, PluginFilter, PluginParameter
 from .serializers import PluginSerializer, PluginParameterSerializer
 

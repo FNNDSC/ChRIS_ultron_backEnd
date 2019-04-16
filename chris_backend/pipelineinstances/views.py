@@ -8,6 +8,7 @@ from pipelines.models import Pipeline
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import PARAMETER_SERIALIZERS
+
 from .models import PipelineInstance, PipelineInstanceFilter
 from .serializers import PipelineInstanceSerializer
 

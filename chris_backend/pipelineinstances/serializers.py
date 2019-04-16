@@ -2,8 +2,8 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from collectionjson.services import collection_serializer_is_valid
 from plugininstances.models import PluginInstance
+
 from .models import PipelineInstance
 
 
@@ -28,14 +28,6 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         del validated_data['previous_plugin_inst_id']
         return super(PipelineInstanceSerializer, self).create(validated_data)
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(PipelineInstanceSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
     def validate_previous_plugin_inst(self, previous_plugin_inst_id):
         """
         Custom method to check that an integer id is provided for previous instance. Then
@@ -44,20 +36,22 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         if not previous_plugin_inst_id:
             raise serializers.ValidationError(
-                {'detail': "A previous plugin instance id is required"})
+                {'previous_plugin_inst_id':
+                     ["A previous plugin instance id is required."]})
         try:
             pk = int(previous_plugin_inst_id)
             previous_plugin_inst = PluginInstance.objects.get(pk=pk)
         except (ValueError, ObjectDoesNotExist):
-            err_str = "Couldn't find any 'previous' plugin instance with id %s"
             raise serializers.ValidationError(
-                {'detail': err_str % previous_plugin_inst_id})
+                {'previous_plugin_inst_id':
+                     ["Couldn't find any 'previous' plugin instance with id %s."]})
         # check that the user can run plugins within this feed
         user = self.context['request'].user
         if user not in previous_plugin_inst.feed.owner.all():
-            err_str = "User is not an owner of feed for previous instance with id %s"
             raise serializers.ValidationError(
-                {'detail': err_str % previous_plugin_inst_id})
+                {'previous_plugin_inst_id':
+                     ["User is not an owner of feed for previous instance with id %s." %
+                      previous_plugin_inst_id]})
         return previous_plugin_inst
 
     def parse_parameters(self):

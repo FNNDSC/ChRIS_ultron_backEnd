@@ -6,8 +6,8 @@ from rest_framework.serializers import ValidationError
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
-
 from plugins.models import Plugin
+
 from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
 from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter

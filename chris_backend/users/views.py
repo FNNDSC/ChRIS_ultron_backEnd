@@ -1,6 +1,5 @@
 
 from django.contrib.auth.models import User
-
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 
@@ -55,4 +54,3 @@ class UserDetail(generics.RetrieveUpdateAPIView):
         password = serializer.validated_data.get("password")
         user.set_password(password)
         user.save()
-

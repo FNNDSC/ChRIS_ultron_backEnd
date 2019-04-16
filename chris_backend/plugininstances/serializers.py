@@ -5,10 +5,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from collectionjson.services import collection_serializer_is_valid
 from collectionjson.fields import ItemLinkField
 from plugins.models import TYPES
 from plugins.fields import MemoryInt, CPUInt
+
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
 from .models import PathParameter, StrParameter
@@ -66,13 +66,6 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
             validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
         return super(PluginInstanceSerializer, self).create(validated_data)
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(PluginInstanceSerializer, self).is_valid(raise_exception=raise_exception)
-
     def validate_previous(self, previous_id):
         """
         Custom method to check that an id is provided for previous instance when
@@ -87,20 +80,20 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         if plugin.type=='ds':
             if not previous_id:
                 raise serializers.ValidationError(
-                    {'detail': "A previous plugin instance id is required"})
+                    {'previous_id': ["This field is required."]})
             try:
                 pk = int(previous_id)
                 previous = PluginInstance.objects.get(pk=pk)
             except (ValueError, ObjectDoesNotExist):
-                err_str = "Couldn't find any 'previous' plugin instance with id %s"
+                err_str = "Couldn't find any 'previous' plugin instance with id %s."
                 raise serializers.ValidationError(
-                    {'detail': err_str % previous_id})
+                    {'previous_id': [err_str % previous_id]})
             # check that the user can run plugins within this feed
             user = self.context['request'].user
             if user not in previous.feed.owner.all():
-                err_str = "User is not an owner of feed for previous instance with id %s"
+                err_str = "User is not an owner of feed for previous instance with id %s."
                 raise serializers.ValidationError(
-                    {'detail': err_str % previous_id})
+                    {'previous_id': [err_str % previous_id]})
         return previous
 
     def validate_gpu_limit(self, gpu_limit):
@@ -138,7 +131,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     @staticmethod
     def validate_value_within_interval(val, min_val, max_val, val_str):
         if val < min_val or val > max_val:
-            raise serializers.ValidationError({'detail':"%s out of range." % val_str})
+            raise serializers.ValidationError({val_str:
+                                                   ["This field value is out of range."]})
 
 
 class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
@@ -182,14 +176,6 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(StrParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -203,14 +189,6 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = IntParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(IntParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -226,14 +204,6 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(FloatParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -248,14 +218,6 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(BoolParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -269,14 +231,6 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = PathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(PathParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):

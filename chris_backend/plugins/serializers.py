@@ -1,7 +1,6 @@
 
 from rest_framework import serializers
 
-from collectionjson.services import collection_serializer_is_valid
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
@@ -40,101 +39,101 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         # validate compute-related descriptors
         if 'min_number_of_workers' in data:
             data['min_number_of_workers'] = self.validate_app_workers_descriptor(
-                data['min_number_of_workers'])
+                {'name': 'min_number_of_workers', 'value': data['min_number_of_workers']})
 
         if 'max_number_of_workers' in data:
             data['max_number_of_workers'] = self.validate_app_workers_descriptor(
-                data['max_number_of_workers'])
+                {'name': 'max_number_of_workers', 'value': data['max_number_of_workers']})
 
         if 'min_gpu_limit' in data:
             data['min_gpu_limit'] = self.validate_app_gpu_descriptor(
-                data['min_gpu_limit'])
+                {'name': 'min_gpu_limit', 'value': data['min_gpu_limit']})
 
         if 'max_gpu_limit' in data:
             data['max_gpu_limit'] = self.validate_app_gpu_descriptor(
-                data['max_gpu_limit'])
+                {'name': 'max_gpu_limit', 'value': data['max_gpu_limit']})
 
         if 'min_cpu_limit' in data:
             data['min_cpu_limit'] = self.validate_app_cpu_descriptor(
-                data['min_cpu_limit'])
+                {'name': 'min_cpu_limit', 'value': data['min_cpu_limit']})
 
         if 'max_cpu_limit' in data:
             data['max_cpu_limit'] = self.validate_app_cpu_descriptor(
-            data['max_cpu_limit'])
+                {'name': 'max_cpu_limit', 'value': data['max_cpu_limit']})
 
         if 'min_memory_limit' in data:
             data['min_memory_limit'] = self.validate_app_memory_descriptor(
-                data['min_memory_limit'])
+                {'name': 'min_memory_limit', 'value': data['min_memory_limit']})
 
         if 'max_memory_limit' in data:
             data['max_memory_limit'] = self.validate_app_memory_descriptor(
-                data['max_memory_limit'])
+                {'name': 'max_memory_limit', 'value': data['max_memory_limit']})
 
         # validate descriptor limits
         err_msg = "Minimum number of workers should be less than maximum number of " \
-                  "workers"
+                  "workers."
         self.validate_app_descriptor_limits(data, 'min_number_of_workers',
                                             'max_number_of_workers', err_msg)
-        err_msg = "Minimum cpu limit should be less than maximum cpu limit"
+        err_msg = "Minimum cpu limit should be less than maximum cpu limit."
         self.validate_app_descriptor_limits(data, 'min_cpu_limit', 'max_cpu_limit',
                                             err_msg)
-        err_msg = "Minimum memory limit should be less than maximum memory limit"
+        err_msg = "Minimum memory limit should be less than maximum memory limit."
         self.validate_app_descriptor_limits(data, 'min_memory_limit',
                                             'max_memory_limit', err_msg)
-        err_msg = "Minimum gpu limit should be less than maximum gpu limit"
+        err_msg = "Minimum gpu limit should be less than maximum gpu limit."
         self.validate_app_descriptor_limits(data, 'min_gpu_limit', 'max_gpu_limit',
                                             err_msg)
         return data
 
     @staticmethod
-    def validate_app_workers_descriptor(descriptor):
+    def validate_app_workers_descriptor(descriptor_dict):
         """
         Custom method to validate plugin maximum and minimum workers descriptors.
         """
-        error_msg = "Minimum and maximum number of workers must be positive integers"
-        int_d = PluginSerializer.validate_app_int_descriptor(descriptor, error_msg)
+        error_msg = "This field must be a positive integer."
+        int_d = PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
         if int_d < 1:
-            raise serializers.ValidationError(error_msg)
+            raise serializers.ValidationError({descriptor_dict['name']: [error_msg]})
         return int_d
 
     @staticmethod
-    def validate_app_cpu_descriptor(descriptor):
+    def validate_app_cpu_descriptor(descriptor_dict):
         """
         Custom method to validate plugin maximum and minimum cpu descriptors.
         """
         try:
-            return CPUInt(descriptor)
+            return CPUInt(descriptor_dict['value'])
         except ValueError as e:
-            raise serializers.ValidationError(str(e))
+            raise serializers.ValidationError({descriptor_dict['name']: [str(e)]})
 
     @staticmethod
-    def validate_app_memory_descriptor(descriptor):
+    def validate_app_memory_descriptor(descriptor_dict):
         """
         Custom method to validate plugin maximum and minimum memory descriptors.
         """
         try:
-            return MemoryInt(descriptor)
+            return MemoryInt(descriptor_dict['value'])
         except ValueError as e:
-            raise serializers.ValidationError(str(e))
+            raise serializers.ValidationError({descriptor_dict['name']: [str(e)]})
 
     @staticmethod
-    def validate_app_gpu_descriptor(descriptor):
+    def validate_app_gpu_descriptor(descriptor_dict):
         """
         Custom method to validate plugin maximum and minimum gpu descriptors.
         """
-        error_msg = "Minimum and maximum gpu must be non-negative integers"
-        return PluginSerializer.validate_app_int_descriptor(descriptor, error_msg)
+        error_msg = "This field must be a non-negative integer."
+        return PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
 
     @staticmethod
-    def validate_app_int_descriptor(descriptor, error_msg=''):
+    def validate_app_int_descriptor(descriptor_dict, error_msg):
         """
         Custom method to validate a positive integer descriptor.
         """
         try:
-            int_d = int(descriptor)
+            int_d = int(descriptor_dict['value'])
             assert int_d >= 0
         except (ValueError, AssertionError):
-            raise serializers.ValidationError(error_msg)
+            raise serializers.ValidationError({descriptor_dict['name']: [error_msg]})
         return int_d
 
     @staticmethod
@@ -145,7 +144,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         """
         if (min_descriptor_name in app_repr) and (max_descriptor_name in app_repr) \
                 and (app_repr[max_descriptor_name] < app_repr[min_descriptor_name]):
-            raise serializers.ValidationError(error_msg)
+            raise serializers.ValidationError({'non_field_errors': [error_msg]})
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -176,14 +175,6 @@ class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultStrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultStrParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -194,14 +185,6 @@ class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DefaultIntParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultIntParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -214,14 +197,6 @@ class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultFloatParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultFloatParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -233,14 +208,6 @@ class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = DefaultBoolParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultBoolParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
-
 
 class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
@@ -251,14 +218,6 @@ class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DefaultPathParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
-
-    @collection_serializer_is_valid
-    def is_valid(self, raise_exception=False):
-        """
-        Overriden to generate a properly formatted message for validation errors.
-        """
-        return super(DefaultPathParameterSerializer, self).is_valid(
-            raise_exception=raise_exception)
 
 
 DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStrParameterSerializer,
