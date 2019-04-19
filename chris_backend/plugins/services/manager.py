@@ -170,7 +170,18 @@ class PluginManager(object):
         Get a plugin app representation from the ChRIS store.
         """
         store_client = StoreClient(store_url, username, password, timeout)
-        return store_client.get_plugin(name)
+        plg = store_client.get_plugin(name)
+        parameters = []
+        offset = 0
+        limit = 30
+        while True:
+            result = store_client.get_plugin_parameters(plg['id'], {'limit': limit,
+                                                                    'offset': offset})
+            parameters.extend(result['data'])
+            offset += limit
+            if not result['hasNextPage']: break
+        plg['parameters'] = parameters
+        return plg
 
     @staticmethod
     def get_plugin(name):
