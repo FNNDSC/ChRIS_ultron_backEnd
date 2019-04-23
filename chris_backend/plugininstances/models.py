@@ -172,14 +172,21 @@ class PluginInstanceFilter(FilterSet):
     feed_id = django_filters.CharFilter(field_name='feed_id',
                                                lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
+    plugin_id = django_filters.CharFilter(field_name='plugin_id',
+                                               lookup_expr='exact')
     plugin_name = django_filters.CharFilter(field_name='plugin__name',
                                                lookup_expr='icontains')
+    plugin_name_exact = django_filters.CharFilter(field_name='plugin__name',
+                                                  lookup_expr='exact')
+    plugin_version = django_filters.CharFilter(field_name='plugin__version',
+                                                  lookup_expr='exact')
 
     class Meta:
         model = PluginInstance
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
                   'max_end_date', 'root_id', 'title', 'status', 'owner_username',
-                  'feed_id', 'plugin_name']
+                  'feed_id', 'plugin_id', 'plugin_name', 'plugin_name_exact',
+                  'plugin_version']
 
     def filter_by_root_id(self, queryset, name, value):
         """

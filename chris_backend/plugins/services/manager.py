@@ -1,5 +1,6 @@
 """
-Plugin manager module that provides functionality to add, modify and delete plugins.
+Plugin manager module that provides functionality to add, modify and delete plugins
+through the CLI.
 """
 
 import os
@@ -37,6 +38,9 @@ class PluginManager(object):
                                 help="Compute resource where the plugin's instances run")
         parser_add.add_argument('storeurl',
                                 help="Url of ChRIS store where the plugin is registered")
+        parser_add.add_argument('-v', '--version', help="Plugin's version. If not "
+                                                        "provided then the latest "
+                                                        "version is fetched.")
         parser_add.add_argument('--storeusername', help="Username for the ChRIS store")
         parser_add.add_argument('--storepassword', help="Password for the ChRIS store")
         parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
@@ -44,6 +48,7 @@ class PluginManager(object):
         # create the parser for the "modify" command
         parser_modify = subparsers.add_parser('modify', help='Modify existing plugin')
         parser_modify.add_argument('name', help="Plugin's name")
+        parser_modify.add_argument('version', help="Plugin's version")
         parser_modify.add_argument('--computeresource',
                                 help="Compute resource where the plugin's instances run")
         parser_modify.add_argument('--storeurl',
@@ -55,6 +60,7 @@ class PluginManager(object):
         # create the parser for the "remove" command
         parser_remove = subparsers.add_parser('remove', help='Remove an existing plugin')
         parser_remove.add_argument('name', help="Plugin's name")
+        parser_remove.add_argument('version', help="Plugin's version")
 
         self.parser = parser
 
@@ -62,80 +68,69 @@ class PluginManager(object):
         """
         Register/add a new plugin to the system.
         """
-        timeout = 30
-        if args.storetimeout:
-            timeout = args.storetimeout
         plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
+                                                             args.version,
                                                              args.storeusername,
-                                                             args.storepassword, timeout)
+                                                             args.storepassword,
+                                                             args.storetimeout)
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
         plg_serializer.is_valid(raise_exception=True)
+
+        # collect parameters and validate and save them to the DB
+        parameters_serializers = []
+        for parameter in parameters_data:
+            default = None
+            if 'default' in parameter:
+                default = parameter['default']
+                del parameter['default']
+            parameter_serializer = PluginParameterSerializer(data=parameter)
+            parameter_serializer.is_valid(raise_exception=True)
+            serializer_dict = {'serializer': parameter_serializer,
+                               'default_serializer': None}
+            if default is not None:
+                param_type = parameter['type']
+                default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[param_type](
+                    data={'value': default})
+                default_param_serializer.is_valid(raise_exception=True)
+                serializer_dict['default_serializer'] = default_param_serializer
+            parameters_serializers.append(serializer_dict)
+
+        # if no validation errors at this point then save to the DB
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier=args.computeresource)
         plugin = plg_serializer.save(compute_resource=compute_resource)
-        # collect parameters and validate and save them to the DB
-        for parameter in parameters_data:
-            default = parameter['default'] if 'default' in parameter else None
-            del parameter['default']
-            parameter_serializer = PluginParameterSerializer(data=parameter)
-            parameter_serializer.is_valid(raise_exception=True)
-            param = parameter_serializer.save(plugin=plugin)
-            if default is not None:
-                default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[param.type](
-                    data={'value': default})
-                default_param_serializer.is_valid(raise_exception=True)
-                default_param_serializer.save(plugin_param=param)
+        for param_serializer_dict in parameters_serializers:
+            param = param_serializer_dict['serializer'].save(plugin=plugin)
+            if param_serializer_dict['default_serializer'] is not None:
+                param_serializer_dict['default_serializer'].save(plugin_param=param)
 
     def modify_plugin(self, args):
         """
         Modify an existing/registered plugin and add the current date as a new plugin
         modification date.
         """
-        plugin = self.get_plugin(args.name)
+        plugin = self.get_plugin(args.name, args.version)
         compute_resource = None
         plg_repr = None
         if args.computeresource:
             (compute_resource, tf) = ComputeResource.objects.get_or_create(
                 compute_resource_identifier=args.computeresource)
         if args.storeurl:
-            timeout = 30
-            if args.storetimeout:
-                timeout = args.storetimeout
             plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
+                                                                 args.version,
                                                                  args.storeusername,
                                                                  args.storepassword,
-                                                                 timeout)
+                                                                 args.storetimeout)
         if plg_repr:
-            parameters_data = plg_repr['parameters']
             del plg_repr['parameters']
             plg_serializer = PluginSerializer(plugin, data=plg_repr)
             plg_serializer.is_valid(raise_exception=True)
-            plugin = plg_serializer.save(compute_resource=compute_resource)
-            # collect existing and new parameters and validate and save them to the DB
-            db_parameters = plugin.parameters.all()
-            for parameter in parameters_data:
-                default = parameter['default'] if 'default' in parameter else None
-                del parameter['default']
-                db_param = [p for p in db_parameters if p.name == parameter['name']]
-                if db_param:
-                    parameter_serializer = PluginParameterSerializer(db_param[0],
-                                                                     data=parameter)
-                else:
-                    parameter_serializer = PluginParameterSerializer(data=parameter)
-                parameter_serializer.is_valid(raise_exception=True)
-                param = parameter_serializer.save(plugin=plugin)
-                if default is not None:
-                    db_default = param.get_default()
-                    if db_default is not None: # check if there is already a default in DB
-                        default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[
-                            param.type](db_default, data={'value': default})
-                    else:
-                        default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[
-                            param.type](data={'value': default})
-                    default_param_serializer.is_valid(raise_exception=True)
-                    default_param_serializer.save(plugin_param=param)
+            if compute_resource:
+                plugin = plg_serializer.save(compute_resource=compute_resource)
+            else:
+                plugin = plg_serializer.save()
         elif compute_resource:
             plg_serializer = PluginSerializer(plugin)
             plugin = plg_serializer.save(compute_resource=compute_resource)
@@ -148,7 +143,7 @@ class PluginManager(object):
         """
         Remove an existing/registered plugin from the system.
         """
-        plugin = self.get_plugin(args.name)
+        plugin = self.get_plugin(args.name, args.version)
         plugin.delete()
 
     def run(self, args=None):
@@ -164,16 +159,16 @@ class PluginManager(object):
             self.remove_plugin(options)
 
     @staticmethod
-    def get_plugin_representation_from_store(name, store_url, username=None,
+    def get_plugin_representation_from_store(name, store_url, version=None, username=None,
                                              password=None, timeout=30):
         """
         Get a plugin app representation from the ChRIS store.
         """
         store_client = StoreClient(store_url, username, password, timeout)
-        plg = store_client.get_plugin(name)
+        plg = store_client.get_plugin(name, version)
         parameters = []
         offset = 0
-        limit = 30
+        limit = 50
         while True:
             result = store_client.get_plugin_parameters(plg['id'], {'limit': limit,
                                                                     'offset': offset})
@@ -184,14 +179,15 @@ class PluginManager(object):
         return plg
 
     @staticmethod
-    def get_plugin(name):
+    def get_plugin(name, version):
         """
         Get an existing plugin.
         """
         try:
-            plugin = Plugin.objects.get(name=name)
+            plugin = Plugin.objects.get(name=name, version=version)
         except Plugin.DoesNotExist:
-            raise NameError("Couldn't find '%s' plugin in the system" % name)
+            raise NameError("Couldn't find '%s' plugin with version %s in the system" %
+                            (name, version))
         return plugin
 
 

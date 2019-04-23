@@ -62,8 +62,8 @@ class PluginManagerTests(TestCase):
         """
         Test whether the manager can return a plugin object.
         """
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        self.assertEqual(plugin, self.pl_manager.get_plugin(self.plugin_fs_name))
+        plugin = Plugin.objects.get(name=self.plugin_fs_name, version="0.1")
+        self.assertEqual(plugin, self.pl_manager.get_plugin(self.plugin_fs_name, "0.1"))
 
     def test_mananger_can_add_plugin(self):
         """
@@ -73,37 +73,38 @@ class PluginManagerTests(TestCase):
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
-        self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/'])
+        self.pl_manager.run(['add', 'testapp', 'host', 'http://localhost:8010/api/v1/',
+                             '--version', '0.1'])
         self.assertEqual(Plugin.objects.count(), 2)
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
-            'testapp', 'http://localhost:8010/api/v1/', None, None, 30)
+            'testapp', 'http://localhost:8010/api/v1/', '0.1', None, None, None)
 
     def test_mananger_can_modify_plugin(self):
         """
         Test whether the manager can modify an existing plugin.
         """
-        self.plugin_repr['selfexec'] = 'testapp.py'
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        self.plugin_repr['dock_image'] = 'fnndsc/pl-simplefsapp1111'
+        plugin = Plugin.objects.get(name=self.plugin_fs_name, version='0.1')
         initial_modification_date = plugin.modification_date
         time.sleep(1)
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
-        self.pl_manager.run(['modify', self.plugin_fs_name, '--computeresource', 'host1',
-                             '--storeurl', 'http://localhost:8010/api/v1/'])
+        self.pl_manager.run(['modify', self.plugin_fs_name, '0.1', '--computeresource',
+                             'host1', '--storeurl', 'http://localhost:8010/api/v1/'])
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
-            'simplefsapp', 'http://localhost:8010/api/v1/', None, None, 30)
+            'simplefsapp', 'http://localhost:8010/api/v1/', '0.1', None, None, None)
 
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         self.assertTrue(plugin.modification_date > initial_modification_date)
-        self.assertEqual(plugin.selfexec,'testapp.py')
+        self.assertEqual(plugin.dock_image,'fnndsc/pl-simplefsapp1111')
         self.assertEqual(plugin.compute_resource.compute_resource_identifier, 'host1')
 
     def test_mananger_can_remove_plugin(self):
         """
         Test whether the manager can remove an existing plugin from the system.
         """
-        self.pl_manager.run(['remove', self.plugin_fs_name])
+        self.pl_manager.run(['remove', self.plugin_fs_name, "0.1"])
         self.assertEqual(Plugin.objects.count(), 0)
         self.assertEqual(PluginParameter.objects.count(), 0)
