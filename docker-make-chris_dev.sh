@@ -22,6 +22,16 @@
 #   It creates a pattern of directories and symbolic links that reflect the
 #   declarative environment of the docker-compose.yml contents.
 #
+# TYPICAL CASES:
+#
+#   Run full CUBE instantiation with tests:
+#
+#       *destroy* ; sudo rm -fr FS; rm -fr FS; *make*
+#
+#   Skip unit and integration tests and the intro:
+#
+#       *destroy* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
+# 
 # ARGS
 #
 #   -U
@@ -258,6 +268,12 @@ else
     windowBottom
 
     cd $HERE
+    title -d 1 "Removing old cache files on" " $(pwd)"
+    find . -iname ".pyc" -exec sudo rm -fr {} \; 2>/dev/null
+    find . -type d -iname "*pycache*" -exec sudo rm -fr {} \; 2>/dev/null
+    windowBottom
+
+    cd $HERE
     title -d 1 "Changing permissions to 755 on" " $(pwd)"
     echo "chmod -R 755 $(pwd)"
     chmod -R 755 $(pwd)
@@ -355,12 +371,21 @@ else
     echo ""
     windowBottom
 
-    # Declare an array variable for the list of plugin names to be automatically registered
-    # Add a new plugin name to the list for it to be automatically registered
+    #
+    # Plugin array list for list of plugin names to be registered in the dev
+    # syste
+    #
     # If the main module name within a plugin is different than the plugin name,
-    # separate the plugin and module strings with a '/' characater (see below):
-    declare -a plugins=( "simplefsapp"
+    # separate the plugin and module strings with a '/' characater (see below).
+    #
+    # Indicate a specific remote compute environment with a [:<env>] 
+    # specification.
+    #
+    declare -a plugins=( 
+                         "simplefsapp"
+                         "simplefsapp_moc:moc"
                          "simpledsapp"
+                         "simpledsapp_moc:moc"
                          "pacsquery"
                          "pacsretrieve"
                          "s3retrieve"
@@ -380,8 +405,9 @@ else
             echo "Pulling latest version of all fnndsc plugin containers..."
             for plugin in "${plugins[@]}" ; do
                 printf "${Cyan}%-25s${NC} <--- ${LightBlue}[ dockerhub ]${NC}: " "[ $plugin ]"                
-                dockerhubRepo=$(echo $plugin | awk -F\/ '{print $1}')
-                moduleName=$(echo $plugin | awk -F\/ '{print $2}')
+                dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
+                dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
+                moduleName=$(echo $plugin           | awk -F\/ '{print $2}')
                 if (( ! ${#moduleName} )) ; then
                     moduleName=$dockerhubRepo
                 fi
@@ -398,8 +424,9 @@ else
     title -d 1 "Automatically uploading some plugins to the ChRIS store ..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
-        dockerhubRepo=$(echo $plugin | awk -F\/ '{print $1}')
-        moduleName=$(echo $plugin | awk -F\/ '{print $2}')
+        dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
+        dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
+        moduleName=$(echo $plugin           | awk -F\/ '{print $2}')
         if (( ! ${#moduleName} )) ; then
             moduleName=$dockerhubRepo
         fi
@@ -416,10 +443,17 @@ else
     title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
-        dockerhubRepo=$(echo $plugin | awk -F\/ '{print $1}')
+        dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
+        remoteCompute=$(echo $dockerhubRepo | awk -F\: '{print $2}')
+        dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
+        if (( ${#remoteCompute} )) ; then
+            computeEnv=$remoteCompute
+        else
+            computeEnv=$COMPUTEENV            ``
+        fi
         printf "%8s" "${STEP}.$i: "
-        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$COMPUTEENV${NC}..." "[ $dockerhubRepo ]"
-        docker-compose exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $COMPUTEENV http://chrisstore:8010/api/v1/
+        printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$computeEnv${NC}..." "[ $dockerhubRepo ]"
+        docker-compose exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $computeEnv http://chrisstore:8010/api/v1/
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
