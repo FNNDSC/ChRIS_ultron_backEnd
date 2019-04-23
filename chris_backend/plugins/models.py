@@ -35,7 +35,7 @@ class Plugin(models.Model):
                }
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
     execshell = models.CharField(max_length=50)
@@ -66,6 +66,7 @@ class Plugin(models.Model):
                                    default=defaults['max_limit'])  # In Mi
 
     class Meta:
+        unique_together = ('name', 'version',)
         ordering = ('type',)
 
     def __str__(self):
@@ -86,6 +87,7 @@ class PluginFilter(FilterSet):
                                                   lookup_expr='lte')
 
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
@@ -94,8 +96,9 @@ class PluginFilter(FilterSet):
 
     class Meta:
         model = Plugin
-        fields = ['id', 'name', 'title', 'dock_image', 'type', 'category', 'authors',
-                  'description', 'min_creation_date', 'max_creation_date']
+        fields = ['id', 'name', 'name_exact', 'version', 'title', 'dock_image', 'type',
+                  'category', 'authors', 'description', 'min_creation_date',
+                  'max_creation_date']
 
 
 class PluginParameter(models.Model):

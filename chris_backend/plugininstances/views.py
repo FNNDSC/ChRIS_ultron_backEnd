@@ -49,8 +49,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
             elif not parameter.optional:
-                raise ValidationError({'detail': 'A valid %s is required for %s'
-                                                 % (parameter.type, parameter.name)})
+                raise ValidationError({parameter.name: ["This field is required."]})
         # if no validation errors at this point then save to the DB
         plg_inst = serializer.save(owner=self.request.user, plugin=plugin,
                                    previous=previous,
