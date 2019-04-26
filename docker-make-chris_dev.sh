@@ -214,10 +214,11 @@ else
     if (( ! b_skipIntro )) ; then 
         title -d 1 "Will use containers with following version info:"
         for CONTAINER in ${A_CONTAINER[@]} ; do
-            if [[   $CONTAINER != "chris_dev_backend"   && \
-                    $CONTAINER != "pl-pacsretrieve"     && \
-                    $CONTAINER != "pl-pacsquery"        && \
-                    $CONTAINER != "docker-swift-onlyone"     && \
+            if [[   $CONTAINER != "chris_dev_backend"    && \
+                    $CONTAINER != "chris_store"          && \
+                    $CONTAINER != "pl-pacsretrieve"      && \
+                    $CONTAINER != "pl-pacsquery"         && \
+                    $CONTAINER != "docker-swift-onlyone" && \
                     $CONTAINER != "swarm" ]] ; then
                 CMD="docker run ${CREPO}/$CONTAINER --version"
                 printf "${White}%40s\t\t" "${CREPO}/$CONTAINER"
@@ -330,17 +331,10 @@ else
     windowBottom
 
     title -d 1 "Waiting until mysql servers are ready to accept connections..."
-    # CUBE dev DB
+    # When CUBE dev DB is ready the ChRIS store DB should be ready too
     docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
-    # Chris store DB
-    docker-compose exec chris_store_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
-    windowBottom
-
-    title -d 1 "Applying migrations..."
-    docker-compose exec chris_dev python manage.py migrate
-    docker-compose exec chrisstore python manage.py migrate # temporary until we switch to truly production Chris store
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
