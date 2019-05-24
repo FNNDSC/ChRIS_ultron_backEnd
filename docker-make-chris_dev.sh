@@ -434,6 +434,32 @@ else
     done
     windowBottom
 
+    title -d 1 "Automatically creating a locked pipeline (mutable by the owner and not available to other users) in the ChRIS STORE"
+    echo "Creating pipeline named 's3retrieve-simpledsapp' ..."
+
+    S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve.py --version)
+    SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp.py --version)
+    STR1='[{"plugin_name": "s3retrieve", "plugin_version": "'
+    STR2='", "plugin_parameter_defaults": [{"name": "awssecretkey", "default": "somekey"},{"name": "awskeyid", "default": "somekeyid"}], "previous_index": null},
+    {"plugin_name": "simpledsapp", "plugin_version": "'
+    STR3='", "previous_index": 0}]'
+    PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
+
+    docker-compose exec chrisstore python pipelines/services/manager.py add "s3retrieve-simpledsapp" cubeadmin "${PLUGIN_TREE}"
+    windowBottom
+
+    title -d 1 "Automatically creating an unlocked pipeline (unmutable and available to all users) in the ChRIS STORE"
+    echo "Creating pipeline named 'simpledsapp-simpledsapp-simpledsapp' ..."
+
+    STR4='[{"plugin_name": "simpledsapp", "plugin_version": "'
+    STR5='", "previous_index": null},{"plugin_name": "simpledsapp", "plugin_version": "'
+    STR6='", "previous_index": 0},{"plugin_name": "simpledsapp", "plugin_version": "'
+    STR7='", "previous_index": 0}]'
+    PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
+
+    docker-compose exec chrisstore python pipelines/services/manager.py add "simpledsapp-simpledsapp-simpledsapp" cubeadmin "${PLUGIN_TREE}" --unlock
+    windowBottom
+
     title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
@@ -465,6 +491,20 @@ else
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
     echo ""
+    windowBottom
+
+    title -d 1 "Automatically creating a locked pipeline (mutable by the owner and not available to other users) in CUBE"
+    echo "Creating pipeline named 's3retrieve-simpledsapp' ..."
+
+    PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
+    docker-compose exec chris_dev python pipelines/services/manager.py add "s3retrieve-simpledsapp" cube "${PLUGIN_TREE}"
+    windowBottom
+
+    title -d 1 "Automatically creating an unlocked pipeline (unmutable and available to all users) in CUBE"
+    echo "Creating pipeline named 'simpledsapp-simpledsapp-simpledsapp' ..."
+
+    PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
+    docker-compose exec chris_dev python pipelines/services/manager.py add "simpledsapp-simpledsapp-simpledsapp" cube "${PLUGIN_TREE}" --unlock
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then

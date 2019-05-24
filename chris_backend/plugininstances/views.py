@@ -224,16 +224,10 @@ class PluginInstanceParameterList(generics.ListAPIView):
 
     def get_parameters_queryset(self):
         """
-        Custom method to get a queryset with all the parameters regardless their type.
+        Custom method to get a queryset with all the parameters regardless of their type.
         """
         instance = self.get_object()
-        queryset = []
-        queryset.extend(list(instance.path_param.all()))
-        queryset.extend(list(instance.string_param.all()))
-        queryset.extend(list(instance.integer_param.all()))
-        queryset.extend(list(instance.float_param.all()))
-        queryset.extend(list(instance.boolean_param.all()))
-        return self.filter_queryset(queryset)
+        return self.filter_queryset(instance.get_parameter_instances())
 
 
 class StrParameterDetail(generics.RetrieveAPIView):
