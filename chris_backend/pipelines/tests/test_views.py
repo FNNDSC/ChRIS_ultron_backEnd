@@ -99,12 +99,12 @@ class PipelineListViewTests(PipelineViewTests):
         (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
                                                 compute_resource=self.compute_resource)
 
-        plugin_id_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
+        plugin_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
                          ', "previous_index": null}, {"plugin_id": ' + \
                          str(plugin_ds2.id) + ', "previous_index": 0}]'
         post = json.dumps(
             {"template": {"data": [{"name": "name", "value": "Pipeline2"},
-                                   {"name": "plugin_id_tree", "value": plugin_id_tree}]}})
+                                   {"name": "plugin_tree", "value": plugin_tree}]}})
 
         # make API request
         self.client.login(username=self.username, password=self.password)

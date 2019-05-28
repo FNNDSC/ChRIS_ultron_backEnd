@@ -2,7 +2,7 @@
 from rest_framework import permissions
 
 
-class IsOwnerOrChrisOrNotLockedReadOnly(permissions.BasePermission):
+class IsChrisOrOwnerOrNotLockedReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow owners of an object or superuser
     'chris' to modify/edit it. Read only is allowed to other users only
@@ -18,7 +18,7 @@ class IsOwnerOrChrisOrNotLockedReadOnly(permissions.BasePermission):
         return (request.method in permissions.SAFE_METHODS) and not obj.locked
 
 
-class IsChirsOrOwnerAndLockedOrNotLockedReadOnly(permissions.BasePermission):
+class IsChrisOrOwnerAndLockedOrNotLockedReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow read/write access to the Superuser Chris or the
     object's owner when corresponding pipeline is locked. Read only access is granted to
@@ -40,7 +40,7 @@ class IsChirsOrOwnerAndLockedOrNotLockedReadOnly(permissions.BasePermission):
             return request.method in permissions.SAFE_METHODS
 
 
-class IsChirsOrOwnerOrNotLocked(permissions.BasePermission):
+class IsChrisOrOwnerOrNotLocked(permissions.BasePermission):
     """
     Custom permission to only allow access to the Superuser Chris or the object's owner.
     Access is granted to any other user when corresponding pipeline is not locked.
