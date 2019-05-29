@@ -351,12 +351,12 @@ else
 
     title -d 1 "Creating two ChRIS STORE API users"
     echo ""
-    echo "Setting superuser chris:chris1234 ..."
+    echo "Setting superuser chris:chris1234..."
     docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;'
     docker-compose exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
     echo ""
-    echo "Setting normal user cubeadmin:cubeadmin1234 ..."
+    echo "Setting normal user cubeadmin:cubeadmin1234..."
     docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
     docker-compose exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
@@ -415,7 +415,7 @@ else
         fi
     windowBottom
 
-    title -d 1 "Automatically uploading some plugins to the ChRIS store ..."
+    title -d 1 "Automatically uploading some plugins to the ChRIS store..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
         dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
@@ -434,11 +434,10 @@ else
     done
     windowBottom
 
-    title -d 1 "Automatically creating a locked pipeline (mutable by the owner and not available to other users) in the ChRIS STORE"
+    title -d 1 "Automatically creating a locked pipeline in the ChRIS STORE" "(mutable by the owner and not available to other users)"
     S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve.py --version)
     SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp.py --version)
     PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    echo "Creating pipeline named '$PIPELINE_NAME' ..."
 
     STR1='[{"plugin_name": "s3retrieve", "plugin_version": "'
     STR2='", "plugin_parameter_defaults": [{"name": "awssecretkey", "default": "somekey"},{"name": "awskeyid", "default": "somekeyid"}], "previous_index": null},
@@ -447,11 +446,11 @@ else
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
 
     docker-compose exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}"
+    echo "Created pipeline named '$PIPELINE_NAME'"
     windowBottom
 
-    title -d 1 "Automatically creating an unlocked pipeline (unmutable and available to all users) in the ChRIS STORE"
+    title -d 1 "Automatically creating an unlocked pipeline in the ChRIS STORE" "(unmutable and available to all users)"
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    echo "Creating pipeline named '$PIPELINE_NAME' ..."
 
     STR4='[{"plugin_name": "simpledsapp", "plugin_version": "'
     STR5='", "previous_index": null},{"plugin_name": "simpledsapp", "plugin_version": "'
@@ -460,9 +459,10 @@ else
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
 
     docker-compose exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
+    echo "Created pipeline named '$PIPELINE_NAME'"
     windowBottom
 
-    title -d 1 "Automatically registering some plugins from the ChRIS store to CUBE..."
+    title -d 1 "Automatically registering some plugins from the ChRIS store into CUBE..."
     declare -i i=1
     for plugin in "${plugins[@]}"; do
         dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
@@ -483,43 +483,43 @@ else
 
     title -d 1 "Creating two ChRIS API users"
     echo ""
-    echo "Setting superuser chris:chris1234 ..."
+    echo "Setting superuser chris:chris1234..."
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;'
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
     echo ""
-    echo "Setting normal user cube:cube1234 ..."
+    echo "Setting normal user cube:cube1234..."
     docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
     docker-compose exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
     echo ""
     windowBottom
 
-    title -d 1 "Automatically creating a locked pipeline (mutable by the owner and not available to other users) in CUBE"
+    title -d 1 "Automatically creating a locked pipeline in CUBE" "(mutable by the owner and not available to other users)"
     PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    echo "Creating pipeline named '$PIPELINE_NAME' ..."
 
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     docker-compose exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}"
+    echo "Created pipeline named '$PIPELINE_NAME'"
     windowBottom
 
-    title -d 1 "Automatically creating an unlocked pipeline (unmutable and available to all users) in CUBE"
+    title -d 1 "Automatically creating an unlocked pipeline in CUBE" "(unmutable and available to all users)"
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    echo "Creating pipeline named '$PIPELINE_NAME' ..."
 
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     docker-compose exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock
+    echo "Created pipeline named '$PIPELINE_NAME'"
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then
-        title -d 1 "Restarting CUBE's Django development server in interactive mode..."
+        title -d 1 "Restarting CUBE's Django development server" "in interactive mode..."
         docker-compose stop chris_dev
         docker-compose rm -f chris_dev
         docker-compose run --service-ports chris_dev
         echo ""
         windowBottom
     else
-        title -d 1 "Restarting CUBE's Django development server in non-interactive mode..."
+        title -d 1 "Restarting CUBE's Django development server" "in non-interactive mode..."
         docker-compose restart chris_dev
         echo ""
         windowBottom

@@ -2,6 +2,8 @@
 
 source ./decorate.sh
 
+declare -i STEP=0
+
 title -d 1 "Destroying ChRIS containerized development environment" "from ./docker-compose.yml"
 windowBottom
 
