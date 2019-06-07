@@ -78,13 +78,10 @@ class PluginManager(object):
         plg_serializer = PluginSerializer(data=plg_repr)
         plg_serializer.is_valid(raise_exception=True)
 
-        # collect parameters and validate and save them to the DB
+        # collect and validate parameters
         parameters_serializers = []
         for parameter in parameters_data:
-            default = None
-            if 'default' in parameter:
-                default = parameter['default']
-                del parameter['default']
+            default = parameter.pop('default', None)
             parameter_serializer = PluginParameterSerializer(data=parameter)
             parameter_serializer.is_valid(raise_exception=True)
             serializer_dict = {'serializer': parameter_serializer,
