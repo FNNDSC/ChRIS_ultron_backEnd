@@ -105,9 +105,10 @@ class PluginParameter(models.Model):
     name = models.CharField(max_length=50)
     flag = models.CharField(max_length=52)
     action = models.CharField(max_length=20, default='store')
-    optional = models.BooleanField(default=True)
+    optional = models.BooleanField(default=False)
     type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
     help = models.TextField(blank=True)
+    ui_exposed = models.BooleanField(default=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE,
                                related_name='parameters')
     

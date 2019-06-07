@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 
-from .models import Plugin, PluginParameter
+from .models import Plugin, PluginParameter, TYPES
 from .models import ComputeResource
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
 from .models import DefaultPathParameter, DefaultStrParameter
@@ -156,7 +156,7 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PluginParameter
         fields = ('url', 'id', 'name', 'type', 'optional', 'default',
-                  'flag', 'action', 'help', 'plugin')
+                  'flag', 'action', 'help', 'ui_exposed', 'plugin')
 
     def get_default(self, obj):
         """
