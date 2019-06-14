@@ -312,8 +312,6 @@ else
         printf "${Yellow}\nThis script will now exit with code '1'.\n\n"
         exit 1
     fi
-
-
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
@@ -330,8 +328,7 @@ else
     fi
     windowBottom
 
-    title -d 1 "Waiting until mysql servers are ready to accept connections..."
-    # When CUBE dev DB is ready the ChRIS store DB should be ready too
+    title -d 1 "Waiting until mysql server is ready to accept connections..."
     docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
@@ -348,6 +345,10 @@ else
         docker-compose exec chris_dev python manage.py test --tag integration
         windowBottom
     fi
+
+    title -d 1 "Waiting until the ChRIS store is ready to accept connections..."
+    docker-compose exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/ 2> /dev/null; do sleep 5; done;'
+    windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
     echo ""
