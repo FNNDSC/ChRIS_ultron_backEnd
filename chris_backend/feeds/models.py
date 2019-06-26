@@ -77,6 +77,17 @@ class Tag(models.Model):
         return self.name
 
 
+class TagFilter(FilterSet):
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    color = django_filters.CharFilter(field_name='color', lookup_expr='icontains')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                               lookup_expr='exact')
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'color', 'owner_username']
+
+
 class Tagging(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     tag = models.ForeignKey(Tag, on_delete=models.CASCADE)

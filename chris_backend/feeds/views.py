@@ -7,7 +7,9 @@ from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import PluginInstanceFileSerializer
 
-from .models import Note, Tag, Tagging, Feed, FeedFilter, Comment
+from .models import Feed, FeedFilter
+from .models import Tag, TagFilter
+from .models import Note, Comment, Tagging
 from .serializers import FeedSerializer, NoteSerializer
 from .serializers import TagSerializer, TaggingSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
@@ -60,10 +62,25 @@ class TagList(generics.ListCreateAPIView):
         Overriden to append document-level link relations and a collection+json template.
         """
         response = super(TagList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('tag-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request)}
         response = services.append_collection_links(response, links)
+        # append write template
         template_data = {"name": "", "color": ""}
         return services.append_collection_template(response, template_data)
+
+
+class TagListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of tags resulting from a query search.
+    """
+    serializer_class = TagSerializer
+    queryset = Tag.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = TagFilter
 
 
 class TagDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -264,7 +281,10 @@ class FeedList(generics.ListAPIView):
         # append document-level link relations
         user = self.request.user
         links = {'plugins': reverse('plugin-list', request=request),
+                 'plugin_instances': reverse('allplugininstance-list', request=request),
                  'pipelines': reverse('pipeline-list', request=request),
+                 'pipeline_instances': reverse('allpipelineinstance-list',
+                                               request=request),
                  'tags': reverse('tag-list', request=request),
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
@@ -347,14 +367,17 @@ class CommentList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the comments for the queried feed.
-        A collection+json template is also added to the response.
+        A collection+json write template and document-level link relation are also
+        added to the response.
         """
         queryset = self.get_comments_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
+        # append document-level link relations
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
+        # append write template
         template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)
 

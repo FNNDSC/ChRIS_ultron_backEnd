@@ -59,6 +59,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/tags/$',
         feed_views.TagList.as_view(), name='tag-list'),
 
+    url(r'^v1/tags/search/$',
+        feed_views.TagListQuerySearch.as_view(), name='tag-list-query-search'),
+
     url(r'^v1/tags/(?P<pk>[0-9]+)/$',
         feed_views.TagDetail.as_view(), name='tag-detail'),
 
@@ -140,9 +143,13 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PluginInstanceList.as_view(),
         name='plugininstance-list'),
 
+    url(r'^v1/plugins/instances/$',
+        plugininstance_views.AllPluginInstanceList.as_view(),
+        name='allplugininstance-list'),
+
     url(r'^v1/plugins/instances/search/$',
-        plugininstance_views.PluginInstanceListQuerySearch.as_view(),
-        name='plugininstance-list-query-search'),
+        plugininstance_views.AllPluginInstanceListQuerySearch.as_view(),
+        name='allplugininstance-list-query-search'),
 
     url(r'^v1/plugins/instances/(?P<pk>[0-9]+)/$',
         plugininstance_views.PluginInstanceDetail.as_view(),
@@ -201,9 +208,13 @@ urlpatterns = format_suffix_patterns([
         pipelineinstance_views.PipelineInstanceList.as_view(),
         name='pipelineinstance-list'),
 
+    url(r'^v1/pipelines/instances/$',
+        pipelineinstance_views.AllPipelineInstanceList.as_view(),
+        name='allpipelineinstance-list'),
+
     url(r'^v1/pipelines/instances/search/$',
-        pipelineinstance_views.PipelineInstanceListQuerySearch.as_view(),
-        name='pipelineinstance-list-query-search'),
+        pipelineinstance_views.AllPipelineInstanceListQuerySearch.as_view(),
+        name='allpipelineinstance-list-query-search'),
 
     url(r'^v1/pipelines/instances/(?P<pk>[0-9]+)/$',
         pipelineinstance_views.PipelineInstanceDetail.as_view(),
@@ -215,13 +226,20 @@ urlpatterns = format_suffix_patterns([
 
 
     url(r'^v1/uploadedfiles/$',
-        uploadedfile_views.UploadedFileList.as_view(), name='uploadedfile-list'),
+        uploadedfile_views.UploadedFileList.as_view(),
+        name='uploadedfile-list'),
+
+    url(r'^v1/uploadedfiles/search/$',
+        uploadedfile_views.UploadedFileListQuerySearch.as_view(),
+        name='uploadedfile-list-query-search'),
 
     url(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/$',
-        uploadedfile_views.UploadedFileDetail.as_view(), name='uploadedfile-detail'),
+        uploadedfile_views.UploadedFileDetail.as_view(),
+        name='uploadedfile-detail'),
 
     url(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/.*$',
-        uploadedfile_views.UploadedFileResource.as_view(), name='uploadedfile-resource'),
+        uploadedfile_views.UploadedFileResource.as_view(),
+        name='uploadedfile-resource'),
 
 ])
 

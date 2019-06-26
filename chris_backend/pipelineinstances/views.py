@@ -15,7 +15,7 @@ from .serializers import PipelineInstanceSerializer
 
 class PipelineInstanceList(generics.ListCreateAPIView):
     """
-    A view for the collection of pipeline instances.
+    A view for the collection of pipeline-specific instances.
     """
     serializer_class = PipelineInstanceSerializer
     queryset = Pipeline.objects.all()
@@ -73,15 +73,12 @@ class PipelineInstanceList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return the list of pipeline instances for the queried pipeline.
-        A document-level link relation, query list and a collection+json template are
-        also added to the response.
+        A document-level link relation and a collection+json template are also added to
+        the response.
         """
         queryset = self.get_pipeline_instances_queryset()
         response = services.get_list_response(self, queryset)
         pipeline = self.get_object()
-        # append query list
-        query_list = [reverse('pipelineinstance-list-query-search', request=request)]
-        response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'pipeline': reverse('pipeline-detail', request=request,
                                    kwargs={"pk": pipeline.id})}
@@ -145,6 +142,37 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         plg_inst.save()
         for param, param_serializer in plg_inst_dict['parameter_serializers']:
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
+
+
+class AllPipelineInstanceList(generics.ListAPIView):
+    """
+    A view for the collection of all pipeline instances.
+    """
+    serializer_class = PipelineInstanceSerializer
+    queryset = PipelineInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to add a query list and document-level link relation to the response.
+        """
+        response = super(AllPipelineInstanceList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('allpipelineinstance-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
+        links = {'pipelines': reverse('pipeline-list', request=request)}
+        return services.append_collection_links(response, links)
+
+
+class AllPipelineInstanceListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of pipeline instances resulting from a query search.
+    """
+    serializer_class = PipelineInstanceSerializer
+    queryset = PipelineInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = PipelineInstanceFilter
 
 
 class PipelineInstanceListQuerySearch(generics.ListAPIView):

@@ -68,16 +68,12 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return the list of instances for the queried plugin.
-        A document-level link relation, query list and a collection+json template are
-        also added to the response.
+        Overriden to return the list of instances for the queried plugin. A document-level
+        link relation and a collection+json template are also added to the response.
         """
         queryset = self.get_plugin_instances_queryset()
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
-        # append query list
-        query_list = [reverse('plugininstance-list-query-search', request=request)]
-        response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}
@@ -98,7 +94,28 @@ class PluginInstanceList(generics.ListCreateAPIView):
         return self.filter_queryset(plugin.instances.all())
 
 
-class PluginInstanceListQuerySearch(generics.ListAPIView):
+class AllPluginInstanceList(generics.ListAPIView):
+    """
+    A view for the collection of all plugin instances.
+    """
+    serializer_class = PluginInstanceSerializer
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to add a query list and document-level link relation to the response.
+        """
+        response = super(AllPluginInstanceList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('allplugininstance-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
+        links = {'plugins': reverse('plugin-list', request=request)}
+        return services.append_collection_links(response, links)
+
+
+class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of plugin instances resulting from a query search.
     """

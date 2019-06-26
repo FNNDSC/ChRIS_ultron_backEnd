@@ -1,5 +1,7 @@
 
 from django.db import models
+import django_filters
+from django_filters.rest_framework import FilterSet
 
 
 def uploaded_file_path(instance, filename):
@@ -18,3 +20,20 @@ class UploadedFile(models.Model):
 
     def __str__(self):
         return self.upload_path
+
+
+class UploadedFileFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(field_name='creation_date',
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name='creation_date',
+                                                 lookup_expr='lte')
+
+    upload_path = django_filters.CharFilter(field_name='upload_path',
+                                            lookup_expr='icontains')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                               lookup_expr='exact')
+
+    class Meta:
+        model = UploadedFile
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'upload_path',
+                  'owner_username']

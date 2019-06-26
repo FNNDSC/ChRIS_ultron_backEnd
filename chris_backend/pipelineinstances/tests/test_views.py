@@ -139,8 +139,8 @@ class PipelineInstanceListQuerySearchViewTests(ViewTests):
     def setUp(self):
         super(PipelineInstanceListQuerySearchViewTests, self).setUp()
 
-        self.query_url1 = reverse("pipelineinstance-list-query-search") + "?title=PipelineInst"
-        self.query_url2 = reverse("pipelineinstance-list-query-search") + "?pipeline_name=" + \
+        self.query_url1 = reverse("allpipelineinstance-list-query-search") + "?title=PipelineInst"
+        self.query_url2 = reverse("allpipelineinstance-list-query-search") + "?pipeline_name=" + \
                           self.pipeline_name
 
     def test_pipeline_instance_query_search_list_success(self):
@@ -156,7 +156,7 @@ class PipelineInstanceListQuerySearchViewTests(ViewTests):
         self.assertContains(response, "PipelineInst1")
         self.assertContains(response, "PipelineMyInst")
 
-    def test_plugin_instance_query_search_list_failure_unauthenticated(self):
+    def test_pipeline_instance_query_search_list_failure_unauthenticated(self):
         response = self.client.get(self.query_url1)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
