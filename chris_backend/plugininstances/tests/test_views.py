@@ -281,7 +281,7 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         # set second instance's status
         inst.status = STATUS_TYPES[2]
 
-        self.list_url = reverse("plugininstance-list-query-search") + '?status=' + \
+        self.list_url = reverse("allplugininstance-list-query-search") + '?status=' + \
                         STATUS_TYPES[0]
 
     def test_plugin_instance_query_search_list_success(self):

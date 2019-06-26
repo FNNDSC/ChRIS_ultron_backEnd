@@ -1,6 +1,7 @@
 
 from django.conf import settings
 from rest_framework import generics, permissions
+from rest_framework.reverse import reverse
 from rest_framework.response import Response
 
 import swiftclient
@@ -8,7 +9,7 @@ import swiftclient
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import UploadedFile, uploaded_file_path
+from .models import UploadedFile, UploadedFileFilter, uploaded_file_path
 from .serializers import UploadedFileSerializer
 from .permissions import IsOwnerOrChris
 
@@ -51,9 +52,22 @@ class UploadedFileList(generics.ListCreateAPIView):
         A collection+json template is also added to the response.
         """
         response = super(UploadedFileList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('uploadedfile-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
         # append write template
         template_data = {'upload_path': "", 'fname': ""}
         return services.append_collection_template(response, template_data)
+
+
+class UploadedFileListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of uploaded files resulting from a query search.
+    """
+    serializer_class = UploadedFileSerializer
+    queryset = UploadedFile.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = UploadedFileFilter
 
 
 class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
