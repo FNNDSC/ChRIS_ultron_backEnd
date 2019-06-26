@@ -175,16 +175,6 @@ class AllPipelineInstanceListQuerySearch(generics.ListAPIView):
     filterset_class = PipelineInstanceFilter
 
 
-class PipelineInstanceListQuerySearch(generics.ListAPIView):
-    """
-    A view for the collection of pipeline instances resulting from a query search.
-    """
-    serializer_class = PipelineInstanceSerializer
-    queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    filterset_class = PipelineInstanceFilter
-
-
 class PipelineInstanceDetail(generics.RetrieveAPIView):
     """
     A pipeline instance view.
