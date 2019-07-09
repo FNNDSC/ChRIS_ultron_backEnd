@@ -41,6 +41,9 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/(?P<pk>[0-9]+)/comments/$',
         feed_views.CommentList.as_view(), name='comment-list'),
 
+    url(r'^v1/(?P<pk>[0-9]+)/comments/search/$',
+        feed_views.CommentListQuerySearch.as_view(), name='comment-list-query-search'),
+
     url(r'^v1/comments/(?P<pk>[0-9]+)/$',
         feed_views.CommentDetail.as_view(), name='comment-detail'),
 
@@ -163,19 +166,19 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PluginInstanceFileList.as_view(),
         name='plugininstancefile-list'),
 
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
+    url(r'^v1/files/$',
+        plugininstance_views.AllPluginInstanceFileList.as_view(),
+        name='allplugininstancefile-list'),
+
+    url(r'^v1/files/search/$',
+        plugininstance_views.AllPluginInstanceFileListQuerySearch.as_view(),
+        name='allplugininstancefile-list-query-search'),
+
+    url(r'^v1/files/(?P<pk>[0-9]+)/$',
         plugininstance_views.PluginInstanceFileDetail.as_view(),
         name='plugininstancefile-detail'),
 
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/$',
-        plugininstance_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    url(r'^v1/plugins/instances/files/(?P<pk>[0-9]+)/.*$',
+    url(r'^v1/files/(?P<pk>[0-9]+)/.*$',
         plugininstance_views.FileResource.as_view(),
         name='plugininstancefile-resource'),
 

@@ -8,7 +8,8 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from plugins.models import Plugin
 
-from .models import PluginInstance, PluginInstanceFilter, PluginInstanceFile
+from .models import PluginInstance, PluginInstanceFilter
+from .models import PluginInstanceFile, PluginInstanceFileFilter
 from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter
 from .serializers import PARAMETER_SERIALIZERS
@@ -196,6 +197,56 @@ class PluginInstanceFileList(generics.ListAPIView):
         """
         instance = self.get_object()
         return self.filter_queryset(instance.files.all())
+
+
+class AllPluginInstanceFileList(generics.ListAPIView):
+    """
+    A view for the collection of all plugin instance files written to all the feeds the
+    the authenticated user owns.
+    """
+    serializer_class = PluginInstanceFileSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to add a query list to the response.
+        """
+        response = super(AllPluginInstanceFileList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('allplugininstancefile-list-query-search', request=request)]
+        return services.append_collection_querylist(response, query_list)
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the feed files
+        written to feeds owned by the currently authenticated user.
+        """
+        user = self.request.user
+        # if the user is chris then return all the files in the system
+        if user.username == 'chris':
+            return PluginInstanceFile.objects.all()
+        return PluginInstanceFile.objects.filter(plugin_inst__feed__owner=user)
+
+
+class AllPluginInstanceFileListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of plugin instance files written to all the feeds the
+    the authenticated user owns and resulting from a query search.
+    """
+    serializer_class = PluginInstanceFileSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = PluginInstanceFileFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the feed files
+        written to feeds owned by the currently authenticated user.
+        """
+        user = self.request.user
+        # if the user is chris then return all the files in the system
+        if user.username == 'chris':
+            return PluginInstanceFile.objects.all()
+        return PluginInstanceFile.objects.filter(plugin_inst__feed__owner=user)
 
 
 class PluginInstanceFileDetail(generics.RetrieveAPIView):

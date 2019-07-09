@@ -1,4 +1,5 @@
 
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
@@ -9,7 +10,8 @@ from plugininstances.serializers import PluginInstanceFileSerializer
 
 from .models import Feed, FeedFilter
 from .models import Tag, TagFilter
-from .models import Note, Comment, Tagging
+from .models import Comment, CommentFilter
+from .models import Note, Tagging
 from .serializers import FeedSerializer, NoteSerializer
 from .serializers import TagSerializer, TaggingSerializer, CommentSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
@@ -47,7 +49,7 @@ class TagList(generics.ListCreateAPIView):
         """
         user = self.request.user
         # if the user is chris then return all the tags in the system
-        if (user.username == 'chris'):
+        if user.username == 'chris':
             return Tag.objects.all()
         return Tag.objects.filter(owner=user)
 
@@ -266,7 +268,7 @@ class FeedList(generics.ListAPIView):
         """
         user = self.request.user
         # if the user is chris then return all the feeds in the system
-        if (user.username == 'chris'):
+        if user.username == 'chris':
             return Feed.objects.all()
         return Feed.objects.filter(owner=user)
 
@@ -280,7 +282,8 @@ class FeedList(generics.ListAPIView):
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         user = self.request.user
-        links = {'plugins': reverse('plugin-list', request=request),
+        links = {'files': reverse('allplugininstancefile-list', request=request),
+                 'plugins': reverse('plugin-list', request=request),
                  'plugin_instances': reverse('allplugininstance-list', request=request),
                  'pipelines': reverse('pipeline-list', request=request),
                  'pipeline_instances': reverse('allpipelineinstance-list',
@@ -306,7 +309,7 @@ class FeedListQuerySearch(generics.ListAPIView):
         """
         user = self.request.user
         # if the user is chris then return all the feeds in the system
-        if (user.username == 'chris'):
+        if user.username == 'chris':
             return Feed.objects.all()
         return Feed.objects.filter(owner=user)
 
@@ -373,6 +376,10 @@ class CommentList(generics.ListCreateAPIView):
         queryset = self.get_comments_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
+        # append query list
+        query_list = [reverse('comment-list-query-search', request=request,
+                              kwargs={"pk": feed.id})]
+        response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
@@ -387,6 +394,23 @@ class CommentList(generics.ListCreateAPIView):
         """
         feed = self.get_object()
         return self.filter_queryset(feed.comments.all())
+
+
+class CommentListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of feed-specific comments resulting from a query search.
+    """
+    serializer_class = CommentSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = CommentFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is comprised by the feed-specific
+        comments.
+        """
+        feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
+        return feed.comments.all()
 
 
 class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
