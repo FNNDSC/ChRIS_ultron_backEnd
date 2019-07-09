@@ -460,6 +460,82 @@ class PluginInstanceFileListViewTests(PluginInstanceFileViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class AllPluginInstanceFileListViewTests(PluginInstanceFileViewTests):
+    """
+    Test the allplugininstancefile-list view.
+    """
+
+    def setUp(self):
+        super(AllPluginInstanceFileListViewTests, self).setUp()
+
+        # create a plugin instance file associated to the plugin instance
+        plg_inst = self.plg_inst
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'test_file.txt'
+        plg_inst_file.save()
+
+        self.list_url = reverse("allplugininstancefile-list")
+
+    def test_all_plugin_instance_file_create_failure_post_not_allowed(self):
+        self.client.login(username=self.username, password=self.password)
+        # try to create a new plugin file with a POST request to the list
+        # POST request using multipart/form-data to be able to upload file
+        with io.StringIO("test file") as f:
+            post = {"fname": f}
+            response = self.client.post(self.list_url, data=post)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_all_plugin_instance_file_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "test_file.txt")
+
+    def test_all_plugin_instance_file_list_from_shared_feed_success(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        plg_inst = self.plg_inst
+        user1 = User.objects.get(username=self.username)
+        user2 = User.objects.get(username=self.other_username)
+        plg_inst.feed.owner.set([user1, user2])
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "test_file.txt")
+
+    def test_all_plugin_instance_file_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_all_plugin_instance_file_list_files_in_not_owned_feeds_inaccessible(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertNotContains(response, "test_file.txt")
+
+
+class AllPluginInstanceFileListQuerySearchViewTests(PluginInstanceFileViewTests):
+    """
+    Test the allplugininstancefile-list-query-search view.
+    """
+
+    def setUp(self):
+        super(AllPluginInstanceFileListQuerySearchViewTests, self).setUp()
+
+        # create a plugin instance file associated to the plugin instance
+        plg_inst = self.plg_inst
+        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
+        plg_inst_file.fname.name = 'test_file.txt'
+        plg_inst_file.save()
+
+        self.list_url = reverse("allplugininstancefile-list-query-search") + '?id=' + \
+                        str(plg_inst_file.id)
+
+    def test_plugin_instance_query_search_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, 'test_file.txt')
+
+    def test_plugin_instance_query_search_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class PluginInstanceFileDetailViewTests(PluginInstanceFileViewTests):
     """
     Test the plugininstancefile-detail view.

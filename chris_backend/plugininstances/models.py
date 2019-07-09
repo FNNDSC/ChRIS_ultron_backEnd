@@ -226,10 +226,26 @@ class PluginInstanceFile(models.Model):
                                     related_name='files')
 
     class Meta:
-        ordering = ('fname',)
+        ordering = ('-fname',)
 
     def __str__(self):
         return self.fname.name
+
+
+class PluginInstanceFileFilter(FilterSet):
+    min_creation_date = django_filters.DateFilter(field_name='creation_date',
+                                                  lookup_expr='gte')
+    max_creation_date = django_filters.DateFilter(field_name='creation_date',
+                                                  lookup_expr='lte')
+    plugin_inst_id = django_filters.CharFilter(field_name='plugin_inst_id',
+                                               lookup_expr='exact')
+    feed_id = django_filters.CharFilter(field_name='plugin_inst__feed_id',
+                                               lookup_expr='exact')
+
+    class Meta:
+        model = PluginInstanceFile
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'plugin_inst_id',
+                  'feed_id']
 
 
 class StrParameter(models.Model):

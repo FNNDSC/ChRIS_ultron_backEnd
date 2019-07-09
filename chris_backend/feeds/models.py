@@ -111,3 +111,10 @@ class Comment(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class CommentFilter(FilterSet):
+
+    class Meta:
+        model = Comment
+        fields = ['id']
