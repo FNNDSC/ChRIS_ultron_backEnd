@@ -398,7 +398,7 @@ class CommentList(generics.ListCreateAPIView):
 
 class CommentListQuerySearch(generics.ListAPIView):
     """
-    A view for the collection of tags resulting from a query search.
+    A view for the collection of feed-specific comments resulting from a query search.
     """
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -406,8 +406,8 @@ class CommentListQuerySearch(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset that is only comprised by the tags
-        owned by the currently authenticated user.
+        Overriden to return a custom queryset that is comprised by the feed-specific
+        comments.
         """
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
         return feed.comments.all()
