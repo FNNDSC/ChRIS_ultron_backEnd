@@ -12,10 +12,13 @@ import swiftclient
 from feeds.models import Feed
 from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
+from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
 
+from .services.manager import PluginAppManager
 
-STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError']
+
+STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError', 'cancelled']
 
 
 class PluginInstance(models.Model):
@@ -55,11 +58,12 @@ class PluginInstance(models.Model):
                 self.feed = self._save_feed()
             if self.plugin.type == 'ds':
                 self.feed = self.previous.feed
+        self._set_compute_defaults()
         super(PluginInstance, self).save(*args, **kwargs)
             
     def _save_feed(self):
         """
-        Custom method to create and save a new feed to the DB.
+        Custom internal method to create and save a new feed to the DB.
         """
         feed = Feed()
         feed.name = self.plugin.name
@@ -67,6 +71,19 @@ class PluginInstance(models.Model):
         feed.owner.set([self.owner])
         feed.save()
         return feed
+
+    def _set_compute_defaults(self):
+        """
+        Custom internal method to set compute-related defaults.
+        """
+        if not self.cpu_limit:
+            self.cpu_limit = CPUInt(self.plugin.min_cpu_limit)
+        if not self.memory_limit:
+            self.memory_limit = MemoryInt(self.plugin.min_memory_limit)
+        if not self.number_of_workers:
+            self.number_of_workers = self.plugin.min_number_of_workers
+        if not self.gpu_limit:
+            self.gpu_limit = self.plugin.min_gpu_limit
 
     def get_root_instance(self):
         """
@@ -173,6 +190,34 @@ class PluginInstance(models.Model):
             'pollLoop':     pollLoop
         }
 
+    def cancel(self):
+        """
+        Custom method to cancel the execution of the app corresponding to this plugin
+        instance.
+        """
+        if self.status == 'started':
+            PluginAppManager.cancel_plugin_app_exec(self)
+            self.status = 'cancelled'
+            self.save()
+
+    def run(self, parameters_dict):
+        """
+        Custom method to run the app corresponding to this plugin instance.
+        """
+        PluginAppManager.run_plugin_app(self,
+                                        parameters_dict,
+                                        service             = 'pfcon',
+                                        inputDirOverride    = '/share/incoming',
+                                        outputDirOverride   = '/share/outgoing')
+
+    def check_exec_status(self):
+        """
+        Custom method to check the execution status of the app corresponding to this
+        plugin instance.
+        """
+        if self.status == 'started':
+            PluginAppManager.check_plugin_app_exec_status(self)
+
 
 class PluginInstanceFilter(FilterSet):
     min_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='gte')
@@ -182,24 +227,24 @@ class PluginInstanceFilter(FilterSet):
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
-    feed_id = django_filters.CharFilter(field_name='feed_id',
-                                               lookup_expr='exact')
+    feed_id = django_filters.CharFilter(field_name='feed_id', lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
-    plugin_id = django_filters.CharFilter(field_name='plugin_id',
-                                               lookup_expr='exact')
+    plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
+    pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
+                                                 lookup_expr='exact')
     plugin_name = django_filters.CharFilter(field_name='plugin__name',
-                                               lookup_expr='icontains')
+                                            lookup_expr='icontains')
     plugin_name_exact = django_filters.CharFilter(field_name='plugin__name',
                                                   lookup_expr='exact')
     plugin_version = django_filters.CharFilter(field_name='plugin__version',
-                                                  lookup_expr='exact')
+                                               lookup_expr='exact')
 
     class Meta:
         model = PluginInstance
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
                   'max_end_date', 'root_id', 'title', 'status', 'owner_username',
                   'feed_id', 'plugin_id', 'plugin_name', 'plugin_name_exact',
-                  'plugin_version']
+                  'plugin_version', 'pipeline_inst_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """

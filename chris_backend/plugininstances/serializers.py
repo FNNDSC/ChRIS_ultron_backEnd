@@ -7,7 +7,6 @@ from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
 from plugins.models import TYPES
-from plugins.fields import MemoryInt, CPUInt
 
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
@@ -48,24 +47,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'pipeline_inst', 'feed_id', 'start_date', 'end_date', 'status',
                   'owner_username', 'previous', 'feed', 'plugin', 'descendants', 'files',
                   'parameters', 'compute_resource_identifier', 'cpu_limit',
-                  'memory_limit', 'number_of_workers','gpu_limit')
-
-    def create(self, validated_data):
-        """
-        Overriden to provide compute-related defaults before creating a new plugin
-        instance.
-        """
-        plugin = self.context['view'].get_object()
-
-        if 'gpu_limit' not in validated_data:
-            validated_data['gpu_limit'] = plugin.min_gpu_limit
-        if 'number_of_workers' not in validated_data:
-            validated_data['number_of_workers'] = plugin.min_number_of_workers
-        if 'cpu_limit' not in validated_data:
-            validated_data['cpu_limit'] = CPUInt(plugin.min_cpu_limit)
-        if 'memory_limit' not in validated_data:
-            validated_data['memory_limit'] = MemoryInt(plugin.min_memory_limit)
-        return super(PluginInstanceSerializer, self).create(validated_data)
+                  'memory_limit', 'number_of_workers', 'gpu_limit')
 
     def validate_previous(self, previous_id):
         """
@@ -96,6 +78,13 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'previous_id': [err_str % previous_id]})
         return previous
+
+    def validate_status(self, status):
+        if self.instance and (status != 'cancelled' or
+                              self.instance.status not in ['started', 'cancelled']):
+            raise serializers.ValidationError(["Can not change status from %s to %s." %
+                                               (self.instance.status, status)])
+        return status
 
     def validate_gpu_limit(self, gpu_limit):
         plugin = self.context['view'].get_object()

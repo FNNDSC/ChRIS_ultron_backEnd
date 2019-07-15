@@ -9,7 +9,10 @@ from .models import PipelineInstance
 
 class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
-    previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True)
+    pipeline_name = serializers.ReadOnlyField(source='pipeline.name')
+    previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
+                                                       required=False)
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
     plugin_instances = serializers.HyperlinkedIdentityField(
@@ -17,8 +20,10 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PipelineInstance
-        fields = ('url', 'id', 'title', 'pipeline_id', 'description',
-                  'previous_plugin_inst_id', 'pipeline', 'plugin_instances')
+        fields = ('url', 'id', 'title', 'pipeline_id', 'pipeline_name', 'owner_username',
+                  'description', 'previous_plugin_inst_id', 'pipeline',
+                  'plugin_instances', 'cpu_limit', 'memory_limit',
+                  'number_of_workers', 'gpu_limit')
 
     def create(self, validated_data):
         """
@@ -36,8 +41,7 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         if not previous_plugin_inst_id:
             raise serializers.ValidationError(
-                {'previous_plugin_inst_id':
-                     ["A previous plugin instance id is required."]})
+                {'previous_plugin_inst_id': ["This field is required."]})
         try:
             pk = int(previous_plugin_inst_id)
             previous_plugin_inst = PluginInstance.objects.get(pk=pk)

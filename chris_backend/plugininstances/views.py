@@ -1,5 +1,6 @@
 
-from rest_framework import generics, permissions
+from rest_framework import generics
+from rest_framework import permissions
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
@@ -15,8 +16,7 @@ from .models import BoolParameter, PathParameter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
-from .permissions import IsRelatedFeedOwnerOrChris
-from .services.manager import PluginAppManager
+from .permissions import IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -26,6 +26,14 @@ class PluginInstanceList(generics.ListCreateAPIView):
     serializer_class = PluginInstanceSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'status' from the request as it must take the default
+        value on creation.
+        """
+        self.request.data.pop('status', None)
+        return super(PluginInstanceList, self).create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         """
@@ -61,11 +69,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
             parameters_dict[param.name] = param_inst.value
 
         # run the plugin's app
-        PluginAppManager.run_plugin_app(plg_inst,
-                                        parameters_dict,
-                                        service             = 'pfcon',
-                                        inputDirOverride    = '/share/incoming',
-                                        outputDirOverride   = '/share/outgoing')
+        plg_inst.run(parameters_dict)
 
     def list(self, request, *args, **kwargs):
         """
@@ -81,8 +85,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': "", 'previous_id': "", 'cpu_limit':"",
-                         'memory_limit':"", 'number_of_workers':"", 'gpu_limit':""}
+        template_data = {'title': "", 'previous_id': "", 'cpu_limit': "",
+                         'memory_limit': "", 'number_of_workers': "", 'gpu_limit': ""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)
@@ -126,22 +130,57 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     filterset_class = PluginInstanceFilter
 
         
-class PluginInstanceDetail(generics.RetrieveAPIView):
+class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A plugin instance view.
     """
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overloaded method to check a plugin's instance status.
+        Overriden to check a plugin's instance status.
         """
         instance = self.get_object()
-        PluginAppManager.check_plugin_app_exec_status(instance)
+        instance.check_exec_status()
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
-        return response
+        template_data = {'title': '', 'status': ''}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove descriptors that are not allowed to be updated before
+        serializer validation.
+        """
+        data = self.request.data
+        data.pop('gpu_limit', None)
+        data.pop('number_of_workers', None)
+        data.pop('cpu_limit', None)
+        data.pop('memory_limit', None)
+        return super(PluginInstanceDetail, self).update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        """
+        Overriden to cancel this plugin instance and all its descendants' execution .
+        """
+        if 'status' in self.request.data:
+            instance = self.get_object()
+            descendants = instance.get_descendant_instances()
+            for inst in descendants:
+                inst.cancel()
+        super(PluginInstanceDetail, self).perform_update(serializer)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to cancel the plugin instance execution before deleting it. All the
+        descendant instances are also cancelled before they are deleted by the DB CASCADE.
+        """
+        instance = self.get_object()
+        descendants = instance.get_descendant_instances()
+        for inst in descendants:
+            inst.cancel()
+        return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
 
 
 class PluginInstanceDescendantList(generics.ListAPIView):

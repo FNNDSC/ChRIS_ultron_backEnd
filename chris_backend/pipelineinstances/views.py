@@ -1,6 +1,8 @@
 
 from rest_framework import generics, permissions
+from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from collectionjson import services
@@ -8,9 +10,11 @@ from pipelines.models import Pipeline
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import PARAMETER_SERIALIZERS
+from plugins.fields import MemoryInt, CPUInt
 
 from .models import PipelineInstance, PipelineInstanceFilter
 from .serializers import PipelineInstanceSerializer
+from .permissions import IsOwnerOrChrisOrReadOnly
 
 
 class PipelineInstanceList(generics.ListCreateAPIView):
@@ -59,7 +63,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                 pip_id_queue.append(id)
                 plugin_inst_queue.append(plugin_inst_dict)
         # if no validation errors at this point then save to the DB
-        self.pipeline_inst = serializer.save(pipeline=pipeline)
+        self.pipeline_inst = serializer.save(owner=self.request.user, pipeline=pipeline)
         for plg_inst_dict in plugin_instances:
             self.save_plugin_inst(plg_inst_dict)
 
@@ -84,7 +88,9 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                                    kwargs={"pk": pipeline.id})}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'previous_plugin_inst_id': "", 'title': "", 'description': ""}
+        template_data = {'previous_plugin_inst_id': "", 'title': "", 'description': "",
+                         'cpu_limit': "", 'memory_limit': "", 'number_of_workers': "",
+                         'gpu_limit': ""}
         param_names = pipeline.get_pipings_parameters_names()
         for name in param_names:
             template_data[name] = ""
@@ -135,11 +141,44 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         Custom method to save a plugin instance and its parameters to the DB.
         """
         plg_inst = plg_inst_dict['plugin_inst']
-        plg_inst.pipeline_inst = self.pipeline_inst
+        plg = plg_inst.plugin
+        pipeline_inst = self.pipeline_inst
+        plg_inst.pipeline_inst = pipeline_inst
+        plg_inst.title = pipeline_inst.title
+        # set cpu limit
+        if pipeline_inst.cpu_limit:
+            plg_inst.cpu_limit = pipeline_inst.cpu_limit
+            if plg_inst.cpu_limit < CPUInt(plg.min_cpu_limit):
+                plg_inst.cpu_limit = CPUInt(plg.min_cpu_limit)
+            if plg_inst.cpu_limit > CPUInt(plg.max_cpu_limit):
+                plg_inst.cpu_limit = CPUInt(plg.max_cpu_limit)
+        # set memory limit
+        if pipeline_inst.memory_limit:
+            plg_inst.memory_limit = pipeline_inst.memory_limit
+            if plg_inst.memory_limit < MemoryInt(plg.min_memory_limit):
+                plg_inst.memory_limit = MemoryInt(plg.min_memory_limit)
+            if plg_inst.memory_limit > MemoryInt(plg.max_memory_limit):
+                plg_inst.memory_limit = MemoryInt(plg.max_memory_limit)
+        # set number of workers
+        if pipeline_inst.number_of_workers:
+            plg_inst.number_of_workers = pipeline_inst.number_of_workers
+            if plg_inst.number_of_workers < plg.number_of_workers:
+                plg_inst.number_of_workers = plg.min_number_of_workers
+            if plg_inst.number_of_workers > plg.max_number_of_workers:
+                plg_inst.number_of_workers = plg.max_number_of_workers
+        # set gpu limit
+        if pipeline_inst.gpu_limit:
+            plg_inst.gpu_limit = pipeline_inst.gpu_limit
+            if plg_inst.gpu_limit < plg.min_gpu_limit:
+                plg_inst.gpu_limit = plg.min_gpu_limit
+            if plg_inst.gpu_limit > plg.max_gpu_limit:
+                plg_inst.gpu_limit = plg.max_gpu_limit
+        # save plugin instance
         previous = plg_inst.previous
         plg_inst.save()
         plg_inst.previous = previous
         plg_inst.save()
+        # save plugin instance's parameters
         for param, param_serializer in plg_inst_dict['parameter_serializers']:
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
@@ -175,13 +214,43 @@ class AllPipelineInstanceListQuerySearch(generics.ListAPIView):
     filterset_class = PipelineInstanceFilter
 
 
-class PipelineInstanceDetail(generics.RetrieveAPIView):
+class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A pipeline instance view.
     """
     serializer_class = PipelineInstanceSerializer
     queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template to the response.
+        """
+        response = super(PipelineInstanceDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {'title': '', 'description': ''}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove descriptors that are not allowed to be updated before
+        serializer validation.
+        """
+        data = self.request.data
+        data.pop('gpu_limit', None)
+        data.pop('number_of_workers', None)
+        data.pop('cpu_limit', None)
+        data.pop('memory_limit', None)
+        return super(PipelineInstanceDetail, self).update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to check that non of the associated plugin instances is in the
+        'started' status before attempting to delete the pipeline instance.
+        """
+        pipeline_inst = self.get_object()
+        for plg_inst in pipeline_inst.plugin_instances.all():
+            plg_inst.cancell()
+        return super(PipelineInstanceDetail, self).destroy(request, *args, **kwargs)
 
 
 class PipelineInstancePluginInstanceList(generics.ListAPIView):

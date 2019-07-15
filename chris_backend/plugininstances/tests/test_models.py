@@ -15,6 +15,7 @@ from plugins.models import PluginParameter, DefaultPathParameter
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PluginInstanceFilter
 from plugininstances.models import swiftclient
+from plugininstances.models import PluginAppManager
 
 
 class ModelTests(TestCase):
@@ -237,6 +238,62 @@ class PluginInstanceModelTests(ModelTests):
 
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')
+
+    def test_cancel(self):
+        """
+        Test whether custom cancel method cancels the execution of the app corresponding
+        to a plugin instance.
+        """
+        # create a 'fs' plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                compute_resource=plugin.compute_resource)
+
+        self.assertEqual(plg_inst.status, 'started')
+        with mock.patch.object(PluginAppManager, 'cancel_plugin_app_exec',
+                               return_value=None) as manager_cancel_plugin_app_exec_mock:
+            plg_inst.cancel()
+            # check that manager's cancel_plugin_app_exec method was called once
+            manager_cancel_plugin_app_exec_mock.assert_called_once()
+        self.assertEqual(plg_inst.status, 'cancelled')
+
+    def test_run(self):
+        """
+        Test whether custom run method starts the execution of the app corresponding
+        to a plugin instance.
+        """
+        with mock.patch.object(PluginAppManager, 'run_plugin_app',
+                               return_value=None) as run_plugin_app_mock:
+            user = User.objects.get(username=self.username)
+            plugin = Plugin.objects.get(name=self.plugin_fs_name)
+            plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                     compute_resource=plugin.compute_resource)
+            self.assertEqual(plg_inst.status, 'started')
+            parameters_dict = {'dir': './'}
+            plg_inst.run(parameters_dict)
+            self.assertEqual(plg_inst.status, 'started')
+            # check that manager's run_plugin_app method was called with appropriate args
+            run_plugin_app_mock.assert_called_with(plg_inst,
+                                                   parameters_dict,
+                                                   service             = 'pfcon',
+                                                   inputDirOverride    = '/share/incoming',
+                                                   outputDirOverride   = '/share/outgoing')
+
+    def test_check_exec_status(self):
+        """
+        Test whether custom check_exec_status method checks the execution status of the
+        app corresponding to a plugin instance.
+        """
+        with mock.patch.object(PluginAppManager, 'check_plugin_app_exec_status',
+                               return_value=None) as check_plugin_app_exec_status_mock:
+            user = User.objects.get(username=self.username)
+            plugin = Plugin.objects.get(name=self.plugin_fs_name)
+            plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
+                                                     compute_resource=plugin.compute_resource)
+            plg_inst.check_exec_status()
+            # check that manager's check_plugin_app_exec_status method was called once
+            check_plugin_app_exec_status_mock.assert_called_once()
 
 
 class PluginInstanceFilterModelTests(ModelTests):
