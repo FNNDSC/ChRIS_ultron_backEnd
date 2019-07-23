@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 
-from .models import Plugin, PluginParameter, TYPES
+from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
 from .models import DefaultPathParameter, DefaultStrParameter

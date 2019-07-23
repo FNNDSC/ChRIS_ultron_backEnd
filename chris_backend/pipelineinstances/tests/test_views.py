@@ -15,7 +15,6 @@ from plugins.models import PluginParameter, DefaultPathParameter, DefaultIntPara
 from plugininstances.models import PluginInstance
 from pipelines.models import Pipeline, PluginPiping
 from pipelineinstances.models import PipelineInstance
-from pipelineinstances import views
 
 
 class ViewTests(TestCase):
@@ -34,6 +33,7 @@ class ViewTests(TestCase):
                                                   'default': 111111}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
 
@@ -121,7 +121,9 @@ class PipelineInstanceListViewTests(ViewTests):
 
     def test_pipeline_instance_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
-        PipelineInstance.objects.get_or_create(title="PipelineInst1", pipeline=pipeline)
+        owner = User.objects.get(username=self.username)
+        PipelineInstance.objects.get_or_create(title="PipelineInst1", pipeline=pipeline,
+                                               owner=owner)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "PipelineInst1")
@@ -145,8 +147,11 @@ class PipelineInstanceListQuerySearchViewTests(ViewTests):
 
     def test_pipeline_instance_query_search_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
-        PipelineInstance.objects.get_or_create(title="PipelineInst1", pipeline=pipeline)
-        PipelineInstance.objects.get_or_create(title="PipelineMyInst", pipeline=pipeline)
+        owner = User.objects.get(username=self.username)
+        PipelineInstance.objects.get_or_create(title="PipelineInst1", pipeline=pipeline,
+                                               owner=owner)
+        PipelineInstance.objects.get_or_create(title="PipelineMyInst", pipeline=pipeline,
+                                               owner=owner)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.query_url1)
         # response should only contain the instances that match the query
@@ -169,18 +174,58 @@ class PipelineInstanceDetailViewTests(ViewTests):
     def setUp(self):
         super(PipelineInstanceDetailViewTests, self).setUp()
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        owner = User.objects.get(username=self.username)
         (pipeline_inst, tf) = PipelineInstance.objects.get_or_create(title="PipelineInst1",
-                                                                     pipeline=pipeline)
-        self.read_url = reverse("pipelineinstance-detail", kwargs={"pk": pipeline_inst.id})
+                                                                     pipeline=pipeline,
+                                                                     owner=owner)
+        self.read_update_delete_url = reverse("pipelineinstance-detail", kwargs={"pk": pipeline_inst.id})
 
     def test_pipeline_instance_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "PipelineInst1")
 
     def test_pipeline_instance_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pipeline_instance_update_success(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Test pipeline instance"}]}})
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "Test pipeline instance")
+
+    def test_pipeline_instance_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data={},
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pipeline_instance_update_failure_access_denied(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Test pipeline instance"}]}})
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pipeline_instance_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(PipelineInstance.objects.count(), 0)
+
+    def test_pipeline_instance_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pipeline_instance_delete_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class PipelineInstancePluginInstanceListViewTests(ViewTests):
@@ -191,8 +236,10 @@ class PipelineInstancePluginInstanceListViewTests(ViewTests):
     def setUp(self):
         super(PipelineInstancePluginInstanceListViewTests, self).setUp()
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        owner = User.objects.get(username=self.username)
         (self.pipeline_inst, tf) = PipelineInstance.objects.get_or_create(title="PipelineInst1",
-                                                                     pipeline=pipeline)
+                                                                          pipeline=pipeline,
+                                                                          owner=owner)
         self.list_url = reverse("pipelineinstance-plugininstance-list",
                                 kwargs={"pk": self.pipeline_inst.id})
 

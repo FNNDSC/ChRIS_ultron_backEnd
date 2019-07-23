@@ -1,5 +1,7 @@
 
 from rest_framework import generics, permissions
+from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from collectionjson import services
@@ -101,6 +103,15 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         if 'name' not in request.data:
             request.data['name'] = pipeline.name  # name is required in the serializer
         return super(PipelineDetail, self).update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to check that the pipeline is locked before attempting to delete it.
+        """
+        pipeline = self.get_object()
+        if not pipeline.locked:
+            return Response(status=status.HTTP_304_NOT_MODIFIED)
+        return super(PipelineDetail, self).destroy(request, *args, **kwargs)
 
 
 class PipelinePluginList(generics.ListAPIView):

@@ -103,6 +103,7 @@ class PipelineInstanceSerializerTests(SerializerTests):
         pipeline_inst_serializer = PipelineInstanceSerializer(data=data)
         pipeline_inst_serializer.is_valid(raise_exception=True)
         pipeline_inst_serializer.validated_data['pipeline'] = pipeline
+        pipeline_inst_serializer.validated_data['owner'] = owner
         pipeline_inst = pipeline_inst_serializer.create(pipeline_inst_serializer.validated_data)
         self.assertNotIn('previous_plugin_inst_id', pipeline_inst_serializer.validated_data)
         self.assertIsInstance(pipeline_inst, PipelineInstance)

@@ -109,3 +109,10 @@ class PluginAppManager(object):
         )
         str_responseStatus = chris_service.app_statusCheckAndRegister()
         return str_responseStatus
+
+    @staticmethod
+    def cancel_plugin_app_exec(plugin_inst):
+        """
+        Cancel a plugin's app execution. It connects to the remote service to cancel job.
+        """
+        pass

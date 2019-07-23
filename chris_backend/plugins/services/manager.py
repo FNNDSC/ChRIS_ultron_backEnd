@@ -138,9 +138,12 @@ class PluginManager(object):
 
     def remove_plugin(self, args):
         """
-        Remove an existing/registered plugin from the system.
+        Remove an existing/registered plugin from the system. All the associated plugin
+        instances are cancelled before they are deleted by the DB CASCADE.
         """
         plugin = self.get_plugin(args.name, args.version)
+        for plg_inst in plugin.instances.all():
+            plg_inst.cancel()
         plugin.delete()
 
     def run(self, args=None):

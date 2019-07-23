@@ -7,7 +7,6 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from plugins.fields import MemoryInt, CPUInt
 from plugins.models import Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
@@ -70,23 +69,6 @@ class PluginInstanceSerializerTests(SerializerTests):
                      'owner': self.user,
                      'compute_resource': self.plugin.compute_resource}
 
-    def test_create(self):
-        """
-        Test whether overriden 'create' method adds default values for gpu_limit,
-        number_of_workers, cpu_limit and memory_limit.
-        """
-        data = self.data
-        plugin = self.plugin
-        plg_inst_serializer = PluginInstanceSerializer(data=data)
-        plg_inst_serializer.is_valid(raise_exception=True)
-        plg_inst_serializer.context['view'] = mock.Mock()
-        plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
-        plg_inst_serializer.create(data)
-        self.assertEqual(data['gpu_limit'], plugin.min_gpu_limit)
-        self.assertEqual(data['number_of_workers'], plugin.min_number_of_workers)
-        self.assertEqual(data['cpu_limit'], CPUInt(plugin.min_cpu_limit))
-        self.assertEqual(data['memory_limit'], MemoryInt(plugin.min_memory_limit))
-
     def test_validate_previous(self):
         """
         Test whether custom validate_previous method returns a previous instance or
@@ -119,6 +101,27 @@ class PluginInstanceSerializerTests(SerializerTests):
         self.assertEqual(previous, pl_inst_fs)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_previous('')
+
+    def test_validate_status(self):
+        """
+        Test whether overriden validate_status method raises a serializers.ValidationError
+        when the status is not 'cancelled' or the current instance status is not 'started'
+        or 'cancelled'.
+        """
+        plugin = self.plugin
+        owner = self.user
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
+                                                compute_resource=plugin.compute_resource)
+        plg_inst_serializer = PluginInstanceSerializer(plg_inst)
+        with self.assertRaises(serializers.ValidationError):
+            plg_inst_serializer.validate_status('finishedSuccessfully')
+
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
+                                                compute_resource=plugin.compute_resource)
+        plg_inst.status = 'finishedSuccessfully'
+        plg_inst_serializer = PluginInstanceSerializer(plg_inst)
+        with self.assertRaises(serializers.ValidationError):
+            plg_inst_serializer.validate_status('cancelled')
 
     def test_validate_gpu_limit(self):
         """
