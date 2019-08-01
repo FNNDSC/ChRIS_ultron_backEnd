@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
 [![Code Climate](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd/badges/gpa.svg)](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd)
 
-Back end for ChRIS Ultron. This is a Django-MySQL project.
+The core back end for the ChRIS system, also known by the anacronym "CUBE". Internally this is instantiated as Django-mysql project offering a collection+json REST API.
 
 ## ChRIS development and testing
 
