@@ -1,7 +1,7 @@
 #!/bin/bash
 
 EXT=""
-SWIFTIP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
+SWIFTIP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}' | head -n 1)
 SWIFTPORT=8080
 SWIFTPATHPREFIX=""
 PULLDIR="./"
