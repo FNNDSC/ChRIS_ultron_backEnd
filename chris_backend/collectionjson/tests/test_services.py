@@ -7,8 +7,6 @@ from django.test import TestCase
 
 from rest_framework.routers import DefaultRouter
 
-from collection_json import Collection
-
 from collectionjson import services
 
 from .models import Moron
@@ -24,7 +22,6 @@ class SimpleGetTest(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
         self.response = self.client.get(self.endpoint)
-        self.collection = Collection.from_json(self.response.content.decode('utf8'))
 
     def tearDown(self):
         # re-enable logging
@@ -69,7 +66,6 @@ class FunctionTests(SimpleGetTest):
         to its response argument
         """
         response = self.response
-        request = response.renderer_context['request']
         links = {"morons": self.endpoint}
         response = services.append_collection_links(response, links)
         self.assertEqual(response.data['collection_links'],
@@ -92,7 +88,6 @@ class FunctionTests(SimpleGetTest):
         queries template list to it response argument
         """
         response = self.response
-        request = response.renderer_context['request']
         query_urls = [self.endpoint]
         response = services.append_collection_querylist(response, query_urls)
         self.assertEqual(response.data['queries'],

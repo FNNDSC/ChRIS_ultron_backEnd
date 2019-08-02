@@ -151,6 +151,10 @@ class CollectionJsonRenderer(JSONRenderer):
 
         if 'template' in data:
             collection['template'] = data.pop('template')
+
+        if 'count' in data:
+            collection['total'] = data['count']
+
         return {'collection': collection}
 
     def render(self, data, media_type=None, renderer_context=None):
