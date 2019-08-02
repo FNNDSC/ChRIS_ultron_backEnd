@@ -9,6 +9,6 @@ collection-json==0.1.1
 pfurl>=1.3.20.0
 pfmisc>=1.3.30
 pytz==2016.7
-python-chrisstoreclient==0.0.9
+python-chrisstoreclient==0.1.1
 
 
