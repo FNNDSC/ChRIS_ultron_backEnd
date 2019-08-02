@@ -1,5 +1,6 @@
 
 import logging
+import json
 
 from django.conf.urls import url, include
 from django.test.utils import override_settings
@@ -28,7 +29,9 @@ class SimpleGetTest(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
         self.response = self.client.get(self.endpoint)
-        self.collection = Collection.from_json(self.response.content.decode('utf8'))
+        content = json.loads(self.response.content.decode('utf8'))
+        self.total = content['collection'].pop('total', None)  # remove the non-standard 'total' property
+        self.collection = Collection.from_json(json.dumps(content))
 
     def tearDown(self):
         # re-enable logging
@@ -55,6 +58,9 @@ class TestCollectionJsonRenderer(SimpleGetTest):
     def test_it_has_an_href(self):
         href = self.collection.href
         self.assertEqual(href, 'http://testserver/rest-api/dummy/')
+
+    def test_it_has_the_correct_total(self):
+        self.assertEqual(self.total, 1)
 
     def get_dummy(self):
         return self.collection.items[0]
