@@ -130,6 +130,8 @@ class FeedSerializerTests(SerializerTests):
 
     def setUp(self):
         super(FeedSerializerTests, self).setUp()
+        feed = Feed.objects.get(name=self.feedname)
+        self.feed_serializer = FeedSerializer(feed)
 
     def test_validate_new_owner(self):
         """
@@ -137,11 +139,49 @@ class FeedSerializerTests(SerializerTests):
         or raises a serializers.ValidationError when the proposed new owner is
         not a system-registered user.
         """
-        feed = Feed.objects.get(name=self.feedname)
-        feed_serializer = FeedSerializer(feed)
         new_owner = User.objects.get(username=self.other_username)
-        user_inst = feed_serializer.validate_new_owner(new_owner.username)
+        user_inst = self.feed_serializer.validate_new_owner(new_owner.username)
         self.assertEqual(user_inst, new_owner)
 
         with self.assertRaises(serializers.ValidationError):
-            feed_serializer.validate_new_owner('not a registered user')
+            self.feed_serializer.validate_new_owner('not a registered user')
+
+    def test_get_creator_username(self):
+        """
+        Test whether overriden get_creator_username method returns the username of the
+        user that created the feed.
+        """
+        creator_username = self.feed_serializer.get_creator_username(self.feed_serializer.instance)
+        self.assertEqual(creator_username, self.username)
+
+    def test_get_started_jobs(self):
+        """
+        Test whether overriden get_started_jobs method returns the correct number of
+        associated plugin instances in 'started' status.
+        """
+        count = self.feed_serializer.get_started_jobs(self.feed_serializer.instance)
+        self.assertEqual(count, 1)
+
+    def test_get_finished_jobs(self):
+        """
+        Test whether overriden get_finished_jobs method returns the correct number of
+        associated plugin instances in 'finishedSuccessfully' status.
+        """
+        count = self.feed_serializer.get_finished_jobs(self.feed_serializer.instance)
+        self.assertEqual(count, 0)
+
+    def test_get_errored_jobs(self):
+        """
+        Test whether overriden get_errored_jobs method returns the correct number of
+        associated plugin instances in 'finishedWithError' status.
+        """
+        started_jobs = self.feed_serializer.get_errored_jobs(self.feed_serializer.instance)
+        self.assertEqual(started_jobs, 0)
+
+    def test_get_cancelled_jobs(self):
+        """
+        Test whether overriden get_cancelled_jobs method returns the correct number of
+        associated plugin instances in 'cancelled' status.
+        """
+        started_jobs = self.feed_serializer.get_cancelled_jobs(self.feed_serializer.instance)
+        self.assertEqual(started_jobs, 0)
