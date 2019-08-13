@@ -40,6 +40,13 @@ class Feed(models.Model):
         plg_inst = self.plugin_instances.filter(plugin__type='fs')[0]
         return plg_inst.owner
 
+    def get_plugin_instances_status_count(self, status):
+        """
+        Custom method to get the number of associated plugin instances with a given
+        execution status.
+        """
+        return self.plugin_instances.filter(status=status).count()
+
 
 class FeedFilter(FilterSet):
     min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')

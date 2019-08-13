@@ -37,8 +37,14 @@ class FeedModelTests(TestCase):
             optional=self.plugin_parameters['mrn']['optional'])
 
         # create user
-        User.objects.create_user(username=self.username,
+        user = User.objects.create_user(username=self.username,
                                         password=self.password)
+
+        # create a plugin instance that in turn creates a new feed
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
+                                                 compute_resource=plugin.compute_resource)
+        plg_inst.feed.name = self.feed_name
+        plg_inst.feed.save()
 
     def tearDown(self):
         # re-enable logging
@@ -48,23 +54,29 @@ class FeedModelTests(TestCase):
         """
         Test whether overriden save method creates a note just after a feed is created.
         """
-        # create a plugin instance that in turn creates a new feed
-        user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
-        pl_inst.feed.name = self.feed_name
         self.assertEqual(Note.objects.count(), 1)
 
     def test_get_creator(self):
         """
-        Test whether custom get_creator method properly return the user that created the
+        Test whether custom get_creator method properly returns the user that created the
         feed.
         """
-        # create a plugin instance that in turn creates a new feed
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
-        feed_creator = pl_inst.feed.get_creator()
+        feed = Feed.objects.get(name=self.feed_name)
+        feed_creator = feed.get_creator()
         self.assertEqual(feed_creator, user)
+
+    def test_get_plugin_instances_status_count(self):
+        """
+        Test whether custom get_plugin_instances_status_count method properly returns
+        the number of plugin instances with a specific exec status.
+        """
+        feed = Feed.objects.get(name=self.feed_name)
+        count = feed.get_plugin_instances_status_count('started')
+        self.assertEqual(count, 1)
+        count = feed.get_plugin_instances_status_count('finishedSuccessfully')
+        self.assertEqual(count, 0)
+        count = feed.get_plugin_instances_status_count('finishedWithError')
+        self.assertEqual(count, 0)
+        count = feed.get_plugin_instances_status_count('cancelled')
+        self.assertEqual(count, 0)
