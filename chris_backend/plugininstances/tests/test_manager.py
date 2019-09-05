@@ -6,6 +6,9 @@ from unittest import mock
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
+from django.conf import settings
+
+import swiftclient
 
 from plugins.models import Plugin
 from plugins.models import PluginParameter, DefaultPathParameter
@@ -184,10 +187,18 @@ class PluginAppManagerTests(TestCase):
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
 
-        # if pl_inst.status != 'finishedSuccessfully':
-        #     pudb.set_trace()
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')
-        str_ABSfileCreatedByPlugin  = '/' + str_fileCreatedByPlugin
-        self.assertTrue(os.path.isfile(str_ABSfileCreatedByPlugin))
+        # initiate a Swift service connection
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        # make sure str_fileCreatedByPlugin file was created in Swift storage
+        object_list = conn.get_container(
+            settings.SWIFT_CONTAINER_NAME,
+            prefix=str_fileCreatedByPlugin,
+            full_listing=True)[1]
+        self.assertEqual(object_list[0]['name'], str_fileCreatedByPlugin)

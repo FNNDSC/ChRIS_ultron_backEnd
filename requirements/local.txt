@@ -3,6 +3,4 @@
 django-debug-toolbar==1.11
 django-extensions==2.1.4
 coverage==4.5.2
-mod-wsgi-httpd==2.4.35.1
-mod-wsgi==4.6.5
 pudb==2017.1.4

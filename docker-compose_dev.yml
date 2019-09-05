@@ -13,7 +13,11 @@ version: '3'
 services:
 
   chris_dev:
-    image:  ${CREPO}/chris
+    image: ${CREPO}/chris:dev
+    volumes:
+      - ./chris_backend:/home/localuser/chris_backend
+    environment:
+      - CHRIS_DEBUG_QUIET
     ports:
       - "8000:8000"
     depends_on:
@@ -23,10 +27,10 @@ services:
       - pfcon_service
     labels:
       name: "ChRIS_ultron_backEnd"
-      role: "Backend production server"
+      role: "Backend development server"
 
   chris_dev_db:
-    image:  mysql:5
+    image: mysql:5
     volumes:
       - chris_dev_db_data:/var/lib/mysql
     environment:
@@ -36,10 +40,10 @@ services:
       - MYSQL_PASSWORD=Chris1234
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
-      role: "Backend production database"
+      role: "Backend development database"
 
   chrisstore:
-    image:  ${CREPO}/chris_store
+    image: ${CREPO}/chris_store
     ports:
       - "8010:8010"
     depends_on:
@@ -51,7 +55,7 @@ services:
 
   chris_store_dev_db:
     # using the dev DB temporary until we switch to a truly production Chris Store
-    image:  mysql:5
+    image: mysql:5
     volumes:
       - chris_store_dev_db_data:/var/lib/mysql
     environment:
@@ -64,7 +68,7 @@ services:
       role: "Chris store database"
 
   swift_service:
-    image:  fnndsc/docker-swift-onlyone
+    image: fnndsc/docker-swift-onlyone
     volumes:
       - swift_storage:/srv
     ports:
@@ -74,7 +78,7 @@ services:
       role: "swift object storage service"
 
   pfcon_service:
-    image:  ${CREPO}/pfcon${TAG}
+    image: ${CREPO}/pfcon${TAG}
     volumes:
       - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
@@ -92,7 +96,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image:  ${CREPO}/pfioh${TAG}
+    image: ${CREPO}/pfioh${TAG}
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -115,7 +119,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image:  ${CREPO}/pman${TAG}
+    image: ${CREPO}/pman${TAG}
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -5,6 +5,7 @@ charm - ChRIS / pfcon interface.
 """
 
 import  os
+from os.path import expanduser
 import  pprint
 import  json
 import  pudb
@@ -554,7 +555,8 @@ class Charm():
         """
 
         b_status                = False
-        str_squashFilePath      = '/squash/unspecifiedSquashFile.txt'
+        squashdir = os.path.join(expanduser("~"), 'data/squash')
+        str_squashFilePath      = os.path.join(squashdir, 'unspecifiedSquashFile.txt')
         str_squashFileMessage   = 'Unspecified message.'
         d_ret                   = {
             'status':               b_status,
@@ -664,12 +666,13 @@ class Charm():
             if k == 'inputdir': str_inputdir    = v
 
         # First, check and return on illegal dir specs
+        homedir = expanduser("~")
         if str_inputdir == '/' or str_inputdir == './':
             if str_inputdir == '/':
-                str_squashFile  = '/squashRoot/squashRoot.txt'
+                str_squashFile  = os.path.join(homedir, 'data/squashRoot/squashRoot.txt')
                 str_squashMsg   = 'Illegal dir spec, "/", passed to plugin.'
             if str_inputdir == './':
-                str_squashFile  = '/squashHereDir/squashHereDir.txt'
+                str_squashFile  = os.path.join(homedir, 'data/squashHereDir/squashHereDir.txt')
                 str_squashMsg   = 'Illegal dir spec, "./", passed to plugin.'
             d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
                 squashFilePath      = str_squashFile,
@@ -685,7 +688,7 @@ class Charm():
                         )
         b_pathValid     = d_objExists['status']
         if not b_pathValid:
-            str_squashFile  = '/data/squashInvalidDir/squashInvalidDir.txt'
+            str_squashFile  = os.path.join(homedir, 'data/squashInvalidDir/squashInvalidDir.txt')
             str_squashMsg   = 'Path specified in object storage does not exist!'
             d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
                 squashFilePath      = str_squashFile,
@@ -905,14 +908,15 @@ class Charm():
             '
             """ % str_dmsgStat 
             # pudb.set_trace()
-            if os.path.exists('/data'):
-                if not os.path.exists('/data/tmp'):
-                    os.makedirs('/data/tmp')
+            datadir = os.path.join(expanduser("~"), 'data')
+            if os.path.exists(datadir):
+                if not os.path.exists(os.path.join(datadir, 'tmp')):
+                    os.makedirs(os.path.join(datadir, 'tmp'))
                 self.dp.qprint( str_pfurlCmdExec, 
-                                teeFile = '/data/tmp/dmsg-exec-%s.json' % str_serviceName, 
+                                teeFile = os.path.join(datadir, 'tmp/dmsg-exec-%s.json' % str_serviceName),
                                 teeMode = 'w+')
                 self.dp.qprint( str_pfurlCmdStatus, 
-                                teeFile = '/data/tmp/dmsg-stat-%s.json' % str_serviceName, 
+                                teeFile = os.path.join(datadir, 'tmp/dmsg-stat-%s.json' % str_serviceName),
                                 teeMode = 'w+')
             else:
                 self.dp.qprint( str_pfurlCmdExec, 
@@ -991,27 +995,31 @@ class Charm():
             d_register      = self.c_pluginInst.register_output_files(
                                                 swiftState = d_swiftState
             )
-            str_registrationMsg = """
-            Registering output files...
 
-            pfcon swift poll loops      = %d
-            charm swift poll loops      = %d
-            swift prefix path           = %s
+            # This doesn't work when CUBE container is not started as root
+            # str_registrationMsg = """
+            # Registering output files...
+            #
+            # pfcon swift poll loops      = %d
+            # charm swift poll loops      = %d
+            # swift prefix path           = %s
+            #
+            # In total, registered %d objects.
+            #
+            # Object list:\n""" % (
+            #         d_register['pollLoop'],
+            #         currentPoll,
+            #         d_register['outputPath'],
+            #         d_register['total']
+            # )
+            # #pudb.set_trace()
+            # for obj in d_register['l_object']:
+            #     str_registrationMsg += obj['name'] + '\n'
+            # self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
+            #                 teeFile = 'os.path.join(expanduser("~"), 'data/tmp/registrationMsg-%s.txt' %  str(self.d_pluginInst['id'])),
+            #                 teeMode = 'w+')
 
-            In total, registered %d objects. 
 
-            Object list:\n""" % ( 
-                    d_register['pollLoop'],
-                    currentPoll,
-                    d_register['outputPath'],
-                    d_register['total']
-            )
-            #pudb.set_trace()
-            for obj in d_register['l_object']:
-                str_registrationMsg += obj['name'] + '\n'
-            self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
-                            teeFile = '/data/tmp/registrationMsg-%s.txt' %  str(self.d_pluginInst['id']),
-                            teeMode = 'w+')
             str_responseStatus          = 'finishedSuccessfully'
             self.c_pluginInst.status    = str_responseStatus
             self.c_pluginInst.end_date  = timezone.now()

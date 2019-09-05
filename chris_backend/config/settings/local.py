@@ -62,11 +62,6 @@ DATABASES['default']['TEST'] = {'CHARSET': 'utf8'}
 DATABASES['default']['HOST'] = 'chris_dev_db'
 DATABASES['default']['PORT'] = '3306'
 
-# Feed file storage
-MEDIA_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR))) + '/users'
-if not os.path.exists(MEDIA_ROOT):
-    os.makedirs(MEDIA_ROOT)
-
 # Mail settings
 # ------------------------------------------------------------------------------
 EMAIL_HOST = 'localhost'
@@ -91,10 +86,6 @@ DEBUG_TOOLBAR_CONFIG = {
 # django-extensions
 # ------------------------------------------------------------------------------
 INSTALLED_APPS += ['django_extensions']
-
-# mod_wsgi express development server (multithreaded and supports Https)
-# ------------------------------------------------------------------------------
-INSTALLED_APPS += ['mod_wsgi.server']
 
 # TESTING
 # ------------------------------------------------------------------------------
