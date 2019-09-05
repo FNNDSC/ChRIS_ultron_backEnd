@@ -20,7 +20,7 @@
 #   complete backend dev environment.
 #
 #   It creates a pattern of directories and symbolic links that reflect the
-#   declarative environment of the docker-compose.yml contents.
+#   declarative environment of the docker-compose_dev.yml contents.
 #
 # TYPICAL CASES:
 #
@@ -163,7 +163,7 @@ if (( $# == 1 )) ; then
 fi
 
 declare -a A_CONTAINER=(
-    "chris_dev_backend"
+    "chris:dev"
     "chris_store"
     "pfcon${TAG}"
     "pfurl${TAG}"
@@ -192,8 +192,8 @@ title -d 1 "Setting global exports..."
 windowBottom
 
 if (( b_restart )) ; then
-    docker-compose stop ${RESTART}_service && docker-compose rm -f ${RESTART}_service
-    docker-compose run --service-ports ${RESTART}_service
+    docker-compose -f docker-compose_dev.yml stop ${RESTART}_service && docker-compose -f docker-compose_dev.yml rm -f ${RESTART}_service
+    docker-compose -f docker-compose_dev.yml run --service-ports ${RESTART}_service
 else
     title -d 1 "Using <$CREPO> family containers..."
     if (( ! b_skipIntro )) ; then 
@@ -214,7 +214,7 @@ else
     if (( ! b_skipIntro )) ; then 
         title -d 1 "Will use containers with following version info:"
         for CONTAINER in ${A_CONTAINER[@]} ; do
-            if [[   $CONTAINER != "chris_dev_backend"    && \
+            if [[   $CONTAINER != "chris:dev"    && \
                     $CONTAINER != "chris_store"          && \
                     $CONTAINER != "pl-pacsretrieve"      && \
                     $CONTAINER != "pl-pacsquery"         && \
@@ -226,12 +226,12 @@ else
                 echo -e "$Green$Ver"
             fi
         done
-        # Determine the versions of pfurl *inside* pfcon/chris_dev_backend/pl-pacs*
+        # Determine the versions of pfurl *inside* pfcon/chris:dev/pl-pacs*
         CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${TAG} --version"
         printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pfcon${TAG}"
         Ver=$(echo $CMD | sh | grep Version)
         echo -e "$Green$Ver"
-        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris_dev_backend --version"
+        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris:dev --version"
         printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
         Ver=$(echo $CMD | sh | grep Version)
         echo -e "$Green$Ver"
@@ -256,8 +256,8 @@ else
     windowBottom
 
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
-    docker-compose stop
-    docker-compose rm -vf
+    docker-compose -f docker-compose_dev.yml stop
+    docker-compose -f docker-compose_dev.yml rm -vf
     for CONTAINER in ${A_CONTAINER[@]} ; do
         printf "%30s" "$CONTAINER"
         docker ps -a                                                        |\
@@ -266,12 +266,6 @@ else
             sh >/dev/null
         printf "${Green}%20s${NC}\n" "done"
     done
-    windowBottom
-
-    cd $HERE
-    title -d 1 "Removing old cache files on" " $(pwd)"
-    find . -iname ".pyc" -exec sudo rm -fr {} \; 2>/dev/null
-    find . -type d -iname "*pycache*" -exec sudo rm -fr {} \; 2>/dev/null
     windowBottom
 
     cd $HERE
@@ -314,11 +308,11 @@ else
     fi
     windowBottom
 
-    title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose.yml"
+    title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose_dev.yml"
     # export HOST_IP=$(ip route | grep -v docker | awk '{if(NF==11) print $9}')
     # echo "Exporting HOST_IP=$HOST_IP as environment var..."
-    echo "docker-compose up -d"
-    docker-compose up -d
+    echo "docker-compose -f docker-compose_dev.yml up -d"
+    docker-compose -f docker-compose_dev.yml up -d
     windowBottom
 
     title -d 1 "Pause for manual restart of services?"
@@ -329,40 +323,40 @@ else
     windowBottom
 
     title -d 1 "Waiting until mysql server is ready to accept connections..."
-    docker-compose exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
+    docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
-    docker-compose exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
+    docker-compose -f docker-compose_dev.yml exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
         title -d 1 "Running Django Unit tests..."
-        docker-compose exec chris_dev python manage.py test --exclude-tag integration
+        docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --exclude-tag integration
         windowBottom
     fi
 
     if (( ! b_skipIntegrationTests )) ; then
         title -d 1 "Running Django Integration tests..."
-        docker-compose exec chris_dev python manage.py test --tag integration
+        docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --tag integration
         windowBottom
     fi
 
     title -d 1 "Waiting until the ChRIS store is ready to accept connections..."
-    docker-compose exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/ 2> /dev/null; do sleep 5; done;'
+    docker-compose -f docker-compose_dev.yml exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
     echo ""
     echo "Setting superuser chris:chris1234..."
-    docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;'
-    docker-compose exec chrisstore /bin/bash -c \
+    docker-compose -f docker-compose_dev.yml exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;'
+    docker-compose -f docker-compose_dev.yml exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
     echo ""
     echo "Setting normal user cubeadmin:cubeadmin1234..."
-    docker-compose exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
-    docker-compose exec chrisstore /bin/bash -c \
+    docker-compose -f docker-compose_dev.yml exec chrisstore /bin/bash -c 'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;'
+    docker-compose -f docker-compose_dev.yml exec chrisstore /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"'
     echo ""
-    docker-compose restart chrisstore
+    docker-compose -f docker-compose_dev.yml restart chrisstore
     echo ""
     windowBottom
 
@@ -429,7 +423,7 @@ else
         printf "${Cyan}%-28s${NC} ---> ${LightBlue}[ ChRIS store ]${NC}... " "[ $dockerhubRepo ]"
         PLUGIN_DOCK="fnndsc/pl-${dockerhubRepo}"
         PLUGIN_REP=$(docker run --rm "$PLUGIN_DOCK" "${moduleName}.py" --json 2> /dev/null;)
-        docker-compose exec chrisstore python plugins/services/manager.py add "${dockerhubRepo}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
+        docker-compose -f docker-compose_dev.yml exec chrisstore python plugins/services/manager.py add "${dockerhubRepo}" cubeadmin https://github.com/FNNDSC "$PLUGIN_DOCK" --descriptorstring "$PLUGIN_REP"
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
@@ -447,7 +441,7 @@ else
     STR3='", "previous_index": 0}]'
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
 
-    docker-compose exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
+    docker-compose -f docker-compose_dev.yml exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
 
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     echo "Creating pipeline named '$PIPELINE_NAME'"
@@ -457,7 +451,7 @@ else
     STR7='", "previous_index": 0}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
 
-    docker-compose exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
+    docker-compose -f docker-compose_dev.yml exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
     windowBottom
 
     title -d 1 "Automatically registering some plugins from the ChRIS store into CUBE..."
@@ -473,7 +467,7 @@ else
         fi
         printf "%8s" "${STEP}.$i: "
         printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$computeEnv${NC}..." "[ $dockerhubRepo ]"
-        docker-compose exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $computeEnv http://chrisstore:8010/api/v1/
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $computeEnv http://chrisstore:8010/api/v1/
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
@@ -482,13 +476,13 @@ else
     title -d 1 "Creating two ChRIS API users"
     echo ""
     echo "Setting superuser chris:chris1234..."
-    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;'
-    docker-compose exec chris_dev /bin/bash -c \
+    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;'
+    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"'
     echo ""
     echo "Setting normal user cube:cube1234..."
-    docker-compose exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
-    docker-compose exec chris_dev /bin/bash -c \
+    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c 'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;'
+    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
     'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"'
     echo ""
     windowBottom
@@ -498,7 +492,7 @@ else
     echo "Creating pipeline named '$PIPELINE_NAME'"
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
 
-    docker-compose exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}"
+    docker-compose -f docker-compose_dev.yml exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}"
     windowBottom
 
     title -d 1 "Automatically creating an unlocked pipeline in CUBE" "(unmutable and available to all users)"
@@ -506,19 +500,19 @@ else
     echo "Creating pipeline named '$PIPELINE_NAME'"
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
 
-    docker-compose exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock
+    docker-compose -f docker-compose_dev.yml exec chris_dev python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock
     windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then
         title -d 1 "Restarting CUBE's Django development server" "in interactive mode..."
-        docker-compose stop chris_dev
-        docker-compose rm -f chris_dev
-        docker-compose run --service-ports chris_dev
+        docker-compose -f docker-compose_dev.yml stop chris_dev
+        docker-compose -f docker-compose_dev.yml rm -f chris_dev
+        docker-compose -f docker-compose_dev.yml run --service-ports chris_dev
         echo ""
         windowBottom
     else
         title -d 1 "Restarting CUBE's Django development server" "in non-interactive mode..."
-        docker-compose restart chris_dev
+        docker-compose -f docker-compose_dev.yml restart chris_dev
         echo ""
         windowBottom
     fi
