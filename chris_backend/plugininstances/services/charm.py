@@ -907,7 +907,17 @@ class Charm():
             %s
             '
             """ % str_dmsgStat 
-            # pudb.set_trace()
+
+            ###
+            # NB: This is a good break point in charm to pause 
+            #     execution and not keep interrupting downstream
+            #     service for status data that might break debugging
+            #     context in services like 'pfcon'
+            #
+            #     Simply comment/uncomment the break point and "Next"
+            #     along to the self.app_service_call
+            ##
+            ## pudb.set_trace()
             datadir = os.path.join(expanduser("~"), 'data')
             if os.path.exists(datadir):
                 if not os.path.exists(os.path.join(datadir, 'tmp')):
