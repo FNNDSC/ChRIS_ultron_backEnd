@@ -214,7 +214,7 @@ else
     if (( ! b_skipIntro )) ; then 
         title -d 1 "Will use containers with following version info:"
         for CONTAINER in ${A_CONTAINER[@]} ; do
-            if [[   $CONTAINER != "chris:dev"    && \
+            if [[   $CONTAINER != "chris:dev"            && \
                     $CONTAINER != "chris_store"          && \
                     $CONTAINER != "pl-pacsretrieve"      && \
                     $CONTAINER != "pl-pacsquery"         && \
@@ -235,13 +235,13 @@ else
         printf "${White}%40s\t\t" "pfurl inside ${CREPO}/CUBE"
         Ver=$(echo $CMD | sh | grep Version)
         echo -e "$Green$Ver"
-        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
-        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -e "$Green$Ver"
-        CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
-        printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
-        Ver=$(echo $CMD | sh | grep Version)
+        # CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsquery --version"
+        # printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsquery"
+        # Ver=$(echo $CMD | sh | grep Version)
+        # echo -e "$Green$Ver"
+        # CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
+        # printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
+        # Ver=$(echo $CMD | sh | grep Version)
         echo -e "$Green$Ver"
         windowBottom
     fi
@@ -271,6 +271,7 @@ else
     cd $HERE
     title -d 1 "Changing permissions to 755 on" " $(pwd)"
     echo "chmod -R 755 $(pwd)"
+    sudo find . -type d -iname __pycache__ -exec rm -fr {} \;
     chmod -R 755 $(pwd)
     windowBottom
 
@@ -375,8 +376,6 @@ else
                          "simplefsapp_moc:moc"
                          "simpledsapp"
                          "simpledsapp_moc:moc"
-                         "pacsquery"
-                         "pacsretrieve"
                          "s3retrieve"
                          "s3push"
                          "dircopy"
@@ -387,6 +386,10 @@ else
                          "freesurfer_pp"
                          "z2labelmap"
                          "mri10yr06mo01da_normal"
+                         "mpcs_moc:moc"
+                         "freesurfer_pp_moc:moc"
+                         "z2labelmap_moc:moc"
+                         "mri10yr06mo01da_normal_moc:moc"
     )
 
     title -d 1 "Checking on container plugins..."
