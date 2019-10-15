@@ -242,7 +242,7 @@ else
         # CMD="docker run --rm --entrypoint /usr/local/bin/pfurl ${CREPO}/pl-pacsretrieve --version"
         # printf "${White}%40s\t\t" "pfurl inside ${CREPO}/pl-pacsretrieve"
         # Ver=$(echo $CMD | sh | grep Version)
-        echo -e "$Green$Ver"
+        # echo -e "$Green$Ver"
         windowBottom
     fi
 
