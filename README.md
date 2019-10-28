@@ -6,6 +6,20 @@ The core back end for the ChRIS system, also known by the anacronym "CUBE". Inte
 
 ## ChRIS development and testing
 
+## TL;DR
+
+If you read nothing else on this page, and just want to get an instance of ChRIS CUBE up and running with no mess, no fuss (and assuming you have `docker` and friends as described elsewhere on this page):
+
+```bash
+git clone https://github.com/FNNDSC/ChRIS_ultron_backend
+cd ChRIS_ultron_backend
+# Run full CUBE instantiation with tests:
+*destroy* ; sudo rm -fr FS; rm -fr FS; *make*
+
+# Skip unit and integration tests and the intro:
+*destroy* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
+```
+
 ### Abstract
 
 This page describes how to quickly get the set of services comprising the backend up and running for development and how to run the automated tests.
