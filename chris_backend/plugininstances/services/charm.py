@@ -117,6 +117,10 @@ class Charm():
         self.LC                     = 40
         self.RC                     = 40
 
+        # A job ID prefix string. Necessary since some schedulers require
+        # a minimum job ID string length
+        self.str_jidPrefix          = '000'
+
         for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs         = val
             if key == 'd_args':         self.d_args            = val
@@ -803,7 +807,7 @@ class Charm():
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
                 self.str_inputdir   = d_fs['d_manage']['d_handle']['inputdir']
-            str_serviceName = str(self.d_pluginInst['id'])
+            str_serviceName = self.str_jidPrefix + str(self.d_pluginInst['id'])
             d_msg = \
             {   
                 "action": "coordinate",
@@ -853,7 +857,7 @@ class Charm():
                     'cmd':               "%s %s" % (self.c_pluginInst.plugin.execshell, self.str_cmd),
                     'threaded':          True,
                     'auid':              self.c_pluginInst.owner.username,
-                    'jid':               str(self.d_pluginInst['id']),
+                    'jid':               str_serviceName,
                     'number_of_workers': str(self.d_pluginInst['number_of_workers']),
                     'cpu_limit':         str(self.d_pluginInst['cpu_limit']),
                     'memory_limit':      str(self.d_pluginInst['memory_limit']),
@@ -960,7 +964,7 @@ class Charm():
             "action": "status",
             "meta": {
                     "remote": {
-                        "key":       str(self.d_pluginInst['id'])
+                        "key":       self.str_jidPrefix + str(self.d_pluginInst['id'])
                     }
             }
         }
@@ -1064,7 +1068,7 @@ class Charm():
             "action": "search",
             "meta": {
                 "key":      "jid",
-                "value":    str(self.d_pluginInst['id']),
+                "value":    self.str_jidPrefix + str(self.d_pluginInst['id']),
                 "job":      "0",
                 "when":     "end",
                 "field":    "stderr"
