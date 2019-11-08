@@ -119,7 +119,7 @@ class Charm():
 
         # A job ID prefix string. Necessary since some schedulers require
         # a minimum job ID string length
-        self.str_jidPrefix          = '000'
+        self.str_jidPrefix          = 'chris-jid-'
 
         for key, val in kwargs.items():
             if key == 'app_args':       self.l_appArgs         = val
