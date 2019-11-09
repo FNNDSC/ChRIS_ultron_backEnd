@@ -247,7 +247,7 @@ class PluginInstanceDetailViewTests(ViewTests):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(2)
+                time.sleep(4)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
