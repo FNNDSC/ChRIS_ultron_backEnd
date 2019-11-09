@@ -237,8 +237,8 @@ class PluginInstanceDetailViewTests(ViewTests):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 2 second intervals.
-        maxLoopTries    = 20
+        # max number of attempts at 5 second intervals.
+        maxLoopTries    = 40
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
@@ -247,7 +247,7 @@ class PluginInstanceDetailViewTests(ViewTests):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(2)
+                time.sleep(5)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
