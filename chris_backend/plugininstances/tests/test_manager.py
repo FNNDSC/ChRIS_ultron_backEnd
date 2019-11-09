@@ -174,7 +174,7 @@ class PluginAppManagerTests(TestCase):
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 2 second intervals.
-        maxLoopTries    = 20
+        maxLoopTries    = 30
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
@@ -182,7 +182,7 @@ class PluginAppManagerTests(TestCase):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(4)
+                time.sleep(5)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
