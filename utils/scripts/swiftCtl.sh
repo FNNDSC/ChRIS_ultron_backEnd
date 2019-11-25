@@ -109,7 +109,7 @@ function CMD_eval
         eval $CMD
 }
 
-while getopts E:C:P:p:A:VO:D: option ; do 
+while getopts E:C:P:p:A:VO:D:S: option ; do 
 	case "$option"
 	in
                 D)      PUSHDIR=$OPTARG                 ;;
