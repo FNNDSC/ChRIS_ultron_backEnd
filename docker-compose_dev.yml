@@ -44,23 +44,38 @@ services:
 
   chrisstore:
     image: ${CREPO}/chris_store
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_ALLOWED_HOSTS=*
+      - DJANGO_SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+      - DJANGO_CORS_ORIGIN_ALLOW_ALL=true
+      - DJANGO_CORS_ORIGIN_WHITELIST=babymri.org
+      - DATABASE_HOST=chris_store_db
+      - DATABASE_PORT=3306
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
+      - MYSQL_ROOT_PASSWORD=rootp
+      - MYSQL_DATABASE=chris_store
+      - MYSQL_USER=chris
+      - MYSQL_PASSWORD=Chris1234
+      - SWIFT_USERNAME=chris:chris1234
+      - SWIFT_KEY=testing
+      - SWIFT_CONTAINER_NAME=store_users
     ports:
       - "8010:8010"
     depends_on:
-      - chris_store_dev_db
+      - chris_store_db
       - swift_service
     labels:
       name: "ChRIS_store"
       role: "Chris store service"
 
-  chris_store_dev_db:
-    # using the dev DB temporary until we switch to a truly production Chris Store
+  chris_store_db:
     image: mysql:5
     volumes:
-      - chris_store_dev_db_data:/var/lib/mysql
+      - chris_store_db_data:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_store_dev
+      - MYSQL_DATABASE=chris_store
       - MYSQL_USER=chris
       - MYSQL_PASSWORD=Chris1234
     labels:
@@ -70,12 +85,16 @@ services:
   swift_service:
     image: fnndsc/docker-swift-onlyone
     volumes:
-      - swift_storage:/srv
+      - swift_storage_dev:/srv
+    environment:
+      - SWIFT_USERNAME=chris:chris1234
+      - SWIFT_KEY=testing
+      - SWIFT_CONTAINER_NAME=store_users
     ports:
       - "8080:8080"
     labels:
-      name: "swift"
-      role: "swift object storage service"
+      name: "Swift"
+      role: "Swift object storage service"
 
   pfcon_service:
     image: ${CREPO}/pfcon${TAG}
@@ -132,5 +151,5 @@ services:
 
 volumes:
   chris_dev_db_data:
-  chris_store_dev_db_data:
-  swift_storage:
+  chris_store_db_data:
+  swift_storage_dev:
