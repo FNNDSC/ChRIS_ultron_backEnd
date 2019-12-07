@@ -26,8 +26,10 @@ install:
 
 before_script:
   - chmod -R 755 $(pwd)
+  - mkdir -p FS/local
   - mkdir -p FS/remote
-  - chmod 777 FS/remote
+  - mkdir -p FS/data
+  - chmod -R 777 FS
   - export STOREBASE=$(pwd)/FS/remote
   - docker-compose -f docker-compose_dev.yml up -d
   - docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'

@@ -5,23 +5,24 @@ Production Configurations
 """
 
 from .common import *  # noqa
-import json
+from environs import Env, EnvValidationError
 
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
 from django.core.exceptions import ImproperlyConfigured
 
-# JSON-based secrets module
-with open("secrets.json") as f:
-    secrets = json.loads(f.read())
 
-def get_secret(setting, secrets=secrets):
+# Environment variables-based secrets
+env = Env()
+env.read_env()  # also read .env file, if it exists
+
+
+def get_secret(setting, secret_type=env):
     """Get the secret variable or return explicit exception."""
     try:
-        return secrets[setting]
-    except KeyError:
-        error_msg = "Set the {0} environment variable".format(setting)
-        raise ImproperlyConfigured(error_msg)
+        return secret_type(setting)
+    except EnvValidationError as e:
+        raise ImproperlyConfigured(str(e))
 
 
 # SECRET CONFIGURATION
@@ -35,21 +36,36 @@ SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
 # See https://docs.djangoproject.com/en/1.6/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS')
+ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
 
 # DATABASE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Raises ImproperlyConfigured exception if DATABASE_URL not in os.environ
-DATABASES['default']['NAME'] = get_secret('DATABASE_NAME')
-DATABASES['default']['USER'] = get_secret('DATABASE_USER')
-DATABASES['default']['PASSWORD'] = get_secret('DATABASE_PASSWORD')
+DATABASES['default']['NAME'] = get_secret('MYSQL_DATABASE')
+DATABASES['default']['USER'] = get_secret('MYSQL_USER')
+DATABASES['default']['PASSWORD'] = get_secret('MYSQL_PASSWORD')
 DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 
-# FEED FILE STORAGE
-MEDIA_ROOT = get_secret('MEDIA_ROOT')
+
+# SWIFT SERVICE CONFIGURATION
+# ------------------------------------------------------------------------------
+DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
+SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
+SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
+SWIFT_KEY = get_secret('SWIFT_KEY')
+SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
+SWIFT_AUTO_CREATE_CONTAINER = True
+
+
+# PFCON SERVICE CONFIGURATION
+# ------------------------------------------------------------------------------
+PFCON = {
+    'host': get_secret('PFCON_HOST'),
+    'port': get_secret('PFCON_PORT')
+}
 
 
 # LOGGING CONFIGURATION
@@ -104,7 +120,5 @@ LOGGING = {
 
 # corsheaders
 # ------------------------------------------------------------------------------
-CORS_ORIGIN_ALLOW_ALL = False
-CORS_ORIGIN_WHITELIST = (
-'babymri.org'
-)
+CORS_ORIGIN_ALLOW_ALL = get_secret('DJANGO_CORS_ORIGIN_ALLOW_ALL', env.bool)
+CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)

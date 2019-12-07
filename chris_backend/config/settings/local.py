@@ -23,6 +23,13 @@ logging.disable(logging.DEBUG)
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
+# Hosts/domain names that are valid for this site
+# See https://docs.djangoproject.com/en/1.6/ref/settings/#allowed-hosts
+ALLOWED_HOSTS = ['*']
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
 # pfcon service settings
 PFCON = {
     'host': 'pfcon_service',
@@ -43,9 +50,6 @@ conn = swiftclient.Connection(
     authurl=SWIFT_AUTH_URL,
 )
 conn.put_container(SWIFT_CONTAINER_NAME)
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 # debug control output
 CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}

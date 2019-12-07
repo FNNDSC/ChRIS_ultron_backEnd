@@ -101,7 +101,7 @@ pip freeze --local
 Start CUBE from the repository source directory by running the make bash script
 
 ```bash
-./docker-make-chris_dev.sh
+./docker-make.sh
 ```
 All the steps performed by the above script are properly documented in the script itself. 
 
@@ -156,7 +156,7 @@ docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
 ### Using httpie to play with the REST API 
 A simple GET request:
 ```bash
-http http://localhost:8000/api/v1/
+http -a cube:cube1234 http://localhost:8000/api/v1/
 ```
 A simple POST request:
 ```bash
@@ -175,7 +175,7 @@ swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list user
 Stop and remove CUBE services and storage space by running the destroy bash script from the repository source directory
 
 ```bash
-./docker-destroy-chris_dev.sh
+./docker-destroy.sh
 ```
 
 

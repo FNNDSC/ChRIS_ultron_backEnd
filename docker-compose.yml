@@ -13,60 +13,64 @@ version: '3'
 services:
 
   chris_dev:
-    image:  ${CREPO}/chris
+    image: ${CREPO}/chris
+    env_file:
+      - ./secrets/.chris.env
+      - ./secrets/.chris_db.env
+      - ./secrets/.swift_service.env
+      - ./secrets/.pfcon_service.env
     ports:
       - "8000:8000"
     depends_on:
-      - chris_dev_db
+      - chris_db
       - chrisstore
       - swift_service
       - pfcon_service
     labels:
       name: "ChRIS_ultron_backEnd"
-      role: "Backend production server"
+      role: "Production server using Apache's mod_wsgi"
 
-  chris_dev_db:
-    image:  mysql:5
+  chris_db:
+    image: mysql:5
     volumes:
-      - chris_dev_db_data:/var/lib/mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_dev
-      - MYSQL_USER=chris
-      - MYSQL_PASSWORD=Chris1234
+      - chris_db_data:/var/lib/mysql
+    env_file:
+      - ./secrets/.chris_db.env
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
-      role: "Backend production database"
+      role: "Production MySQL database"
 
   chrisstore:
-    image:  ${CREPO}/chris_store
+    image: ${CREPO}/chris_store
+    env_file:
+      - ./secrets/.chris_store.env
+      - ./secrets/.chris_store_db.env
+      - ./secrets/.swift_service.env
     ports:
       - "8010:8010"
     depends_on:
-      - chris_store_dev_db
+      - chris_store_db
       - swift_service
     labels:
       name: "ChRIS_store"
       role: "Chris store service"
 
-  chris_store_dev_db:
-    # using the dev DB temporary until we switch to a truly production Chris Store
-    image:  mysql:5
+  chris_store_db:
+    image: mysql:5
     volumes:
-      - chris_store_dev_db_data:/var/lib/mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_store_dev
-      - MYSQL_USER=chris
-      - MYSQL_PASSWORD=Chris1234
+      - chris_store_db_data:/var/lib/mysql
+    env_file:
+      - ./secrets/.chris_store_db.env
     labels:
       name: "ChRIS_store MySQL Database"
       role: "Chris store database"
 
   swift_service:
-    image:  fnndsc/docker-swift-onlyone
+    image: fnndsc/docker-swift-onlyone
     volumes:
       - swift_storage:/srv
+    env_file:
+      - ./secrets/.swift_service.env
     ports:
       - "8080:8080"
     labels:
@@ -74,10 +78,13 @@ services:
       role: "swift object storage service"
 
   pfcon_service:
-    image:  ${CREPO}/pfcon${TAG}
+    image: ${CREPO}/pfcon${TAG}
     volumes:
       - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
+    env_file:
+      - ./secrets/.pfcon_service.env
+      - ./secrets/.swift_service.env
     ports:
       - "5005:5005"
     depends_on:
@@ -92,7 +99,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image:  ${CREPO}/pfioh${TAG}
+    image: ${CREPO}/pfioh${TAG}
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -115,7 +122,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image:  ${CREPO}/pman${TAG}
+    image: ${CREPO}/pman${TAG}
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -127,6 +134,6 @@ services:
       role: "pman service"
 
 volumes:
-  chris_dev_db_data:
-  chris_store_dev_db_data:
+  chris_db_data:
+  chris_store_db_data:
   swift_storage:

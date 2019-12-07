@@ -40,7 +40,6 @@ RUN apt-get update \
   && apt-get install -y libssl-dev libcurl4-openssl-dev               \
   && apt-get install -y apache2 apache2-dev                           \
   && apt-get install -y bsdmainutils vim net-tools inetutils-ping    \
-  && pip install --upgrade pip                                        \
   && pip install -r ${REQPATH}/local.txt                           \
   && useradd -u $UID -ms /bin/bash localuser                        \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
