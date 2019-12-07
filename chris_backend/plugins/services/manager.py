@@ -8,15 +8,14 @@ import sys
 from argparse import ArgumentParser
 from chrisstoreclient.client import StoreClient
 
-if "DJANGO_SETTINGS_MODULE" not in os.environ:
-    # django needs to be loaded (eg. when this script is run from the command line)
+if __name__ == '__main__':
+    # django needs to be loaded when this script is run standalone from the command line
     sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
     import django
     django.setup()
 
 from django.utils import timezone
-
 from plugins.models import Plugin
 from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer, PluginParameterSerializer

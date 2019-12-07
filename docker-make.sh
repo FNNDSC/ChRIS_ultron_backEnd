@@ -2,11 +2,11 @@
 #
 # NAME
 #
-#   docker-make-chris_dev.sh
+#   docker-make.sh
 #
 # SYNPOSIS
 #
-#   docker-make-chris_dev.sh    [-r <service>]                  \
+#   docker-make.sh    [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
@@ -16,7 +16,7 @@
 #
 # DESC
 # 
-#   'docker-make-chris_dev.sh' is the main entry point for instantiating a 
+#   'docker-make.sh' is the main entry point for instantiating a
 #   complete backend dev environment.
 #
 #   It creates a pattern of directories and symbolic links that reflect the
@@ -271,7 +271,6 @@ else
     cd $HERE
     title -d 1 "Changing permissions to 755 on" " $(pwd)"
     echo "chmod -R 755 $(pwd)"
-    sudo find . -type d -iname __pycache__ -exec rm -fr {} \;
     chmod -R 755 $(pwd)
     windowBottom
 
@@ -280,12 +279,9 @@ else
     rm -fr ./FS 
     echo "${STEP}.2: Create tree structure for remote services in host filesystem..."
     mkdir -p FS/local
-    chmod 777 FS/local
     mkdir -p FS/remote
-    chmod 777 FS/remote
-    mkdir -p FS/data 
-    chmod 777 FS/data
-    chmod 777 FS
+    mkdir -p FS/data
+    chmod -R 777 FS
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
