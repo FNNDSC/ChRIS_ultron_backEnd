@@ -274,10 +274,7 @@ else
     chmod -R 755 $(pwd)
     windowBottom
 
-    title -d 1 "Creating tmp dirs for volume mounting into containers..."
-    echo "${STEP}.1: Remove tree root 'FS'.."
-    rm -fr ./FS 
-    echo "${STEP}.2: Create tree structure for remote services in host filesystem..."
+    title -d 1 "Checking required FS directory tree for remote services in host filesystem..."
     mkdir -p FS/local
     mkdir -p FS/remote
     mkdir -p FS/data
@@ -303,6 +300,7 @@ else
         printf "${Yellow}\nThis script will now exit with code '1'.\n\n"
         exit 1
     fi
+    echo "Done."
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " " ./docker-compose_dev.yml"
@@ -319,7 +317,7 @@ else
     fi
     windowBottom
 
-    title -d 1 "Waiting until mysql server is ready to accept connections..."
+    title -d 1 "Waiting until ChRIS database server is ready to accept connections..."
     docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose -f docker-compose_dev.yml exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
@@ -337,8 +335,8 @@ else
         windowBottom
     fi
 
-    title -d 1 "Waiting until the ChRIS store is ready to accept connections..."
-    docker-compose -f docker-compose_dev.yml exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/ 2> /dev/null; do sleep 5; done;'
+    title -d 1 "Waiting until ChRIS store is ready to accept connections..."
+    docker-compose -f docker-compose_dev.yml exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"

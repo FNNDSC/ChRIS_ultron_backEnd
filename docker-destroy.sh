@@ -12,11 +12,13 @@ echo
 echo
 if [[ $REPLY =~ ^[Yy]$ ]] ; then
     docker-compose -f docker-compose_dev.yml down -v
+    echo "Removing ./FS tree"
+    rm -fr ./FS
 else
     docker-compose -f docker-compose_dev.yml down
 fi
 windowBottom
 
-title -d 1 "Stopping the swarm..."
+title -d 1 "Stopping swarm cluster..."
     docker swarm leave --force
 windowBottom

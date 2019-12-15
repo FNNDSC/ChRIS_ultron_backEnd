@@ -19,17 +19,16 @@
 #   docker run -ti --entrypoint /bin/bash local/chris
 #
 
-
 FROM fnndsc/ubuntu-python3:latest
 MAINTAINER fnndsc "dev@babymri.org"
 
-ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements" VERSION="0.1"
-COPY ["./requirements", "${REQPATH}"]
-COPY ["./docker-entrypoint.sh", "/usr/src"]
-
 # Pass a UID on build command line (see above) to set internal UID
 ARG UID=1001
-ENV UID=$UID
+ENV UID=$UID  VERSION="0.1"
+
+ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
+COPY ["./requirements", "${REQPATH}"]
+COPY ["./docker-entrypoint.sh", "/usr/src"]
 
 RUN apt-get update \
   && apt-get install -y libmysqlclient-dev                            \

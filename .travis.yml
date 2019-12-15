@@ -41,6 +41,8 @@ script:
   - docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test
 
 after_script:
+  - docker-compose -f docker-compose_dev.yml down -v
+  - rm -fr ./FS
   - docker swarm leave --force
 
 notifications:

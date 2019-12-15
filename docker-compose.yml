@@ -12,7 +12,7 @@ version: '3'
 
 services:
 
-  chris_dev:
+  chris:
     image: ${CREPO}/chris
     env_file:
       - ./secrets/.chris.env
@@ -78,7 +78,7 @@ services:
       role: "swift object storage service"
 
   pfcon_service:
-    image: ${CREPO}/pfcon${TAG}
+    image: ${CREPO}/pfcon
     volumes:
       - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
@@ -99,7 +99,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image: ${CREPO}/pfioh${TAG}
+    image: ${CREPO}/pfioh
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -122,7 +122,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image: ${CREPO}/pman${TAG}
+    image: ${CREPO}/pman
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

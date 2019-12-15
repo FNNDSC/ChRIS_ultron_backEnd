@@ -9,9 +9,9 @@
 #
 #   docker build -t local/chris:dev -f Dockerfile_dev .
 #
-# In the case of a proxy (located at say 10.41.13.4:3128), do:
+# In the case of a proxy (located at say proxy.tch.harvard.edu:3128), do:
 #
-#    export PROXY="http://10.41.13.4:3128"
+#    export PROXY="http://proxy.tch.harvard.edu:3128"
 #    docker build --build-arg http_proxy=${PROXY} --build-arg UID=$UID -t local/chris:dev -f Dockerfile_dev .
 #
 # To run an interactive shell inside this container, do:
