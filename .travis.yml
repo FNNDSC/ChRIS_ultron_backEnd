@@ -25,6 +25,7 @@ install:
   - travis_wait docker build -t fnndsc/chris:dev -f Dockerfile_dev .
 
 before_script:
+  - docker swarm init --advertise-addr 127.0.0.1
   - chmod -R 755 $(pwd)
   - mkdir -p FS/local
   - mkdir -p FS/remote
@@ -34,7 +35,6 @@ before_script:
   - docker-compose -f docker-compose_dev.yml up -d
   - docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
   - docker-compose -f docker-compose_dev.yml exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
-  - docker swarm init --advertise-addr 127.0.0.1
 
 # command to run both Unit and Integration tests
 script:
