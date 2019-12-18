@@ -16,7 +16,7 @@ G_SYNOPSIS="
 
 	    The user that will own the plugin in the ChRIS store.
 
-	PLUGIN
+    PLUGIN
 
 	    Plugin's name.
 

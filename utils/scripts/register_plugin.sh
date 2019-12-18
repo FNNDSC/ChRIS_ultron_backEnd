@@ -12,7 +12,7 @@ G_SYNOPSIS="
 
  ARGS
 
-	PLUGIN
+    PLUGIN
 
 	    Plugin's name.
 
