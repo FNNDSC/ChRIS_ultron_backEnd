@@ -29,11 +29,12 @@ G_SYNOPSIS="
 
 "
 
-if [[ "$#" -eq 0 ]] || [[ "$#" -gt 2 ]]; then
+if [[ "$#" -lt 2 ]] || [[ "$#" -gt 2 ]]; then
     echo "$G_SYNOPSIS"
     exit 1
 fi
 
+USER=$1
 FILE=$2
 PLUGIN_ARRAY=()
 DOCK_ARRAY=()
@@ -44,18 +45,13 @@ while read -r plugin dock repo; do
     REPO_ARRAY+=($repo)
 done < "$FILE"
 
-USER=$1
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 declare -i i=1
 for index in "${!PLUGIN_ARRAY[@]}"; do
     plugin=${PLUGIN_ARRAY[$index]}
     dock=${DOCK_ARRAY[$index]}
     repo=${REPO_ARRAY[$index]}
-    echo " "
-    echo "$i: Uploading user=$USER  plugin=$plugin  image=$dock  repo=$repo..."
-    docker pull $dock
-    PLUGIN_REP=$(docker run --rm "${dock}" "${plugin}.py" --json 2> /dev/null;)
-    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris_store python plugins/services/manager.py add "$plugin" "$USER" "$repo" "$dock" --descriptorstring "$PLUGIN_REP"
+    echo "[$i]"
+    "${DIR}/upload_plugin.sh" $USER $plugin $dock $repo
     ((i++))
 done
-echo " "
