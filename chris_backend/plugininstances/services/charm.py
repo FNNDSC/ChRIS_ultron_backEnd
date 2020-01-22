@@ -375,7 +375,11 @@ class Charm():
             d_ret['status'] = False
 
         if b_prependBucketPath:
-            d_ret['prependBucketPath']  = self.c_pluginInst.owner.username + '/uploads'
+            # d_ret['prependBucketPath']  = self.c_pluginInst.owner.username + '/uploads'
+	    # The following line should "root" requests to swift storage to the user
+	    # space and allow for access/dircopy to the feed space and not only 
+	    # the 'uploads' space.
+            d_ret['prependBucketPath']  = self.c_pluginInst.owner.username
 
         return d_ret
 
