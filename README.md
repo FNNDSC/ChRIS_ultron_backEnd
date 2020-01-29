@@ -1,6 +1,7 @@
 # ChRIS_ultron_backEnd
 [![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
-[![Code Climate](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd/badges/gpa.svg)](https://codeclimate.com/github/FNNDSC/ChRIS_ultron_backEnd)
+![License][license-badge]
+![Last Commit][last-commit-badge]
 
 The core back end for the ChRIS system, also known by the anacronym "CUBE". Internally this is instantiated as Django-mysql project offering a collection+json REST API.
 
@@ -208,3 +209,6 @@ Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backe
 #### Wiki.
 
 Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki).
+
+[license-badge]: https://img.shields.io/github/license/fnndsc/ChRIS_ultron_backEnd.svg
+[last-commit-badge]: https://img.shields.io/github/last-commit/fnndsc/ChRIS_ultron_backEnd.svg
