@@ -29,7 +29,7 @@ class ViewTests(TestCase):
 
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
-        self.username = 'data/foo'
+        self.username = 'foo'
         self.password = 'bar'
         self.other_username = 'boo'
         self.other_password = 'far'
@@ -67,7 +67,7 @@ class PluginInstanceListViewTests(ViewTests):
         plugin = Plugin.objects.get(name="pacspull")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(
-            {"template": {"data": [{"name": "dir", "value": "./"}]}})
+            {"template": {"data": [{"name": "dir", "value": self.username}]}})
 
     def test_plugin_instance_create_success(self):
         with mock.patch.object(views.PluginInstance, 'run',
@@ -83,7 +83,7 @@ class PluginInstanceListViewTests(ViewTests):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
             # check that the run method was called with appropriate args
-            parameters_dict = {'dir': './'}
+            parameters_dict = {'dir': self.username}
             run_mock.assert_called_with(parameters_dict)
 
     @tag('integration')
@@ -120,12 +120,7 @@ class PluginInstanceListViewTests(ViewTests):
             type=parameters[0]['type'],
             flag=parameters[0]['flag'])
 
-        # create a plugin's instance
-        user = User.objects.get(username=self.username)
-        PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
-
-        # make POST API request
+        # make POST API request to create a plugin instance
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
@@ -225,7 +220,7 @@ class PluginInstanceDetailViewTests(ViewTests):
 
         # run the plugin instance
         PluginAppManager.run_plugin_app(  pl_inst,
-                                    {'dir': './'},
+                                    {'dir': self.username},
                                     service             = 'pfcon',
                                     inputDirOverride    = '/share/incoming',
                                     outputDirOverride   = '/share/outgoing')
@@ -237,8 +232,8 @@ class PluginInstanceDetailViewTests(ViewTests):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 5 second intervals.
-        maxLoopTries    = 40
+        # max number of attempts at 3 second intervals.
+        maxLoopTries    = 20
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
@@ -247,7 +242,7 @@ class PluginInstanceDetailViewTests(ViewTests):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(5)
+                time.sleep(3)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
@@ -435,7 +430,7 @@ class PluginInstanceParameterListViewTests(ViewTests):
 
         # create two plugin parameter instances associated to the plugin instance
         PathParameter.objects.get_or_create(plugin_inst=inst, plugin_param=param1,
-                                            value="./")
+                                            value=self.username)
         FloatParameter.objects.get_or_create(plugin_inst=inst, plugin_param=param2,
                                              value=3.14)
 
@@ -445,7 +440,7 @@ class PluginInstanceParameterListViewTests(ViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         self.assertContains(response, "param1")
-        self.assertContains(response, "./")
+        self.assertContains(response, self.username)
         self.assertContains(response, "param2")
         self.assertContains(response, 3.14)
 

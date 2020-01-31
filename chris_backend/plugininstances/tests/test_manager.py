@@ -36,7 +36,7 @@ class PluginAppManagerTests(TestCase):
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
 
         self.plugin_fs_name = "simplefsapp"
-        self.username = 'data/foo'
+        self.username = 'foo'
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -79,7 +79,7 @@ class PluginAppManagerTests(TestCase):
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
                 pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                             compute_resource=plugin.compute_resource)
-                parameter_dict = {'dir': './'}
+                parameter_dict = {'dir': self.username}
 
                 manager.PluginAppManager.run_plugin_app(pl_inst,
                                                parameter_dict,
@@ -113,7 +113,7 @@ class PluginAppManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                             compute_resource=plugin.compute_resource)
-        parameter_dict = {'dir': './'}
+        parameter_dict = {'dir': self.username}
         manager.PluginAppManager.run_plugin_app(pl_inst,
                                        parameter_dict,
                                        service             = 'pfcon',
@@ -160,7 +160,7 @@ class PluginAppManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
                                 compute_resource=plugin.compute_resource)
-        parameter_dict = {'dir': './'}
+        parameter_dict = {'dir': self.username}
 
         manager.PluginAppManager.run_plugin_app(pl_inst,
                                        parameter_dict,
@@ -173,8 +173,8 @@ class PluginAppManagerTests(TestCase):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 5 second intervals.
-        maxLoopTries    = 40
+        # max number of attempts at 3 second intervals.
+        maxLoopTries    = 20
         currentLoop     = 1
         b_checkAgain    = True
         while b_checkAgain:
@@ -182,7 +182,7 @@ class PluginAppManagerTests(TestCase):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(5)
+                time.sleep(3)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
