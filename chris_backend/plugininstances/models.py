@@ -350,7 +350,7 @@ class BoolParameter(models.Model):
 
 
 class PathParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
+    value = models.CharField(max_length=200)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,

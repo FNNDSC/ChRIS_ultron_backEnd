@@ -30,7 +30,7 @@ This page describes how to quickly get the set of services comprising the backen
 #### Install latest Docker and Docker Compose. Currently tested platforms
 * ``Docker 17.04.0+``
 * ``Docker Compose 1.10.0+``
-* ``Ubuntu (16.04/17.04/17.10) and MAC OS X 10.11+``
+* ``Ubuntu (16.04+) and MAC OS X 10.11+``
 
 #### Make sure to add your computer user to the ``docker group`` in your machine
 

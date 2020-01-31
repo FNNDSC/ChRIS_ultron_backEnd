@@ -18,7 +18,7 @@ class ViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.username = 'data/foo'
+        self.username = 'foo'
         self.password = 'bar'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(

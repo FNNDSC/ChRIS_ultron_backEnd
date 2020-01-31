@@ -42,26 +42,32 @@ class PluginInstanceList(generics.ListCreateAPIView):
         instance's parameters in the request are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
+        user = self.request.user
         # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
         previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
+
         # collect and validate parameters from the request
         parameter_serializers = []
         parameters = plugin.parameters.all()
         for parameter in parameters:
             if parameter.name in request_data:
-                request_value = request_data[parameter.name]
-                data = {'value': request_value}
-                parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
+                data = {'value': request_data[parameter.name]}
+                param_type = parameter.type
+                if param_type == 'path': # this serializer needs the user to be passed
+                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data,
+                                                                             user=user)
+                else:
+                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
             elif not parameter.optional:
                 raise ValidationError({parameter.name: ["This field is required."]})
+
         # if no validation errors at this point then save to the DB
-        plg_inst = serializer.save(owner=self.request.user, plugin=plugin,
-                                   previous=previous,
+        plg_inst = serializer.save(owner=user, plugin=plugin, previous=previous,
                                    compute_resource=plugin.compute_resource)
         parameters_dict = {}
         for param, param_serializer in parameter_serializers:
