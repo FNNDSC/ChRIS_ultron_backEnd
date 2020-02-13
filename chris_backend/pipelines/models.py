@@ -167,7 +167,7 @@ class PluginPiping(models.Model):
 
 
 class DefaultPipingStrParameter(models.Model):
-    value = models.CharField(max_length=200, null=True)
+    value = models.CharField(max_length=600, null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -222,22 +222,7 @@ class DefaultPipingBoolParameter(models.Model):
         return str(self.value)
 
 
-class DefaultPipingPathParameter(models.Model):
-    value = models.CharField(max_length=200, null=True)
-    plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
-                                    related_name='path_param')
-    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
-                                     related_name='path_piping_default')
-
-    class Meta:
-        unique_together = ('plugin_piping', 'plugin_param',)
-
-    def __str__(self):
-        return self.value
-
-
 DEFAULT_PIPING_PARAMETER_MODELS = {'string': DefaultPipingStrParameter,
                                    'integer': DefaultPipingIntParameter,
                                    'float': DefaultPipingFloatParameter,
-                                   'boolean': DefaultPipingBoolParameter,
-                                   'path': DefaultPipingPathParameter}
+                                   'boolean': DefaultPipingBoolParameter}

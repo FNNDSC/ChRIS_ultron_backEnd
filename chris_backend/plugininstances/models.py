@@ -14,7 +14,6 @@ from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
-
 from .services.manager import PluginAppManager
 
 
@@ -266,7 +265,7 @@ class PluginInstanceFilter(FilterSet):
 
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=2048)
+    fname = models.FileField(max_length=4000)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='files')
 
@@ -294,7 +293,7 @@ class PluginInstanceFileFilter(FilterSet):
 
 
 class StrParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
+    value = models.CharField(max_length=600, blank=True)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -350,11 +349,25 @@ class BoolParameter(models.Model):
 
 
 class PathParameter(models.Model):
-    value = models.CharField(max_length=200)
+    value = models.CharField(max_length=20000)  # this string can be a list of long paths
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='path_inst')
+
+    class Meta:
+        unique_together = ('plugin_inst', 'plugin_param',)
+
+    def __str__(self):
+        return self.value
+
+
+class UnextpathParameter(models.Model):
+    value = models.CharField(max_length=20000)  # this string can be a list of long paths
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='unextpath_param')
+    plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
+                                     related_name='unextpath_inst')
 
     class Meta:
         unique_together = ('plugin_inst', 'plugin_param',)

@@ -11,7 +11,7 @@ from django.conf import settings
 from feeds.models import Feed
 from plugins.models import Plugin
 from plugins.models import ComputeResource
-from plugins.models import PluginParameter, DefaultPathParameter
+from plugins.models import PluginParameter, DefaultStrParameter
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PluginInstanceFilter
 from plugininstances.models import swiftclient
@@ -24,7 +24,7 @@ class ModelTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.plugin_fs_name = "simplefsapp"
+        self.plugin_fs_name = "simplecopyapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,
                                              'default': "./"}}
         self.plugin_ds_name = "simpledsapp"
@@ -48,7 +48,7 @@ class ModelTests(TestCase):
             type=self.plugin_fs_parameters['dir']['type'],
             optional=self.plugin_fs_parameters['dir']['optional'])
         default = self.plugin_fs_parameters['dir']['default']
-        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
         PluginParameter.objects.get_or_create(
             plugin=plugin_ds,

@@ -97,11 +97,10 @@ class PluginInstanceListViewTests(ViewTests):
                             "title": "Simple chris fs app",
                             "license": "Opensource (MIT)",
 
-                            "parameters": [{"optional": True, "action": "store",
+                            "parameters": [{"optional": False, "action": "store",
                                             "help": "look up directory",
                                             "type": "path",
-                                            "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
+                                            "name": "dir", "flag": "--dir"}],
 
                             "selfpath": "/usr/src/simplefsapp",
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
@@ -188,11 +187,10 @@ class PluginInstanceDetailViewTests(ViewTests):
                        "title": "Simple chris fs app",
                        "license": "Opensource (MIT)",
 
-                       "parameters": [{"optional": True, "action": "store",
+                       "parameters": [{"optional": False, "action": "store",
                                        "help": "look up directory",
                                        "type": "path",
-                                       "name": "dir", "flag": "--dir",
-                                       "default": "./"}],
+                                       "name": "dir", "flag": "--dir"}],
 
                        "selfpath": "/usr/src/simplefsapp",
                        "selfexec": "simplefsapp.py", "execshell": "python3"}
@@ -205,7 +203,7 @@ class PluginInstanceDetailViewTests(ViewTests):
         (plugin, tf) = Plugin.objects.get_or_create(**data)
 
         # add plugin's parameters
-        PluginParameter.objects.get_or_create(
+        (pl_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
             type=parameters[0]['type'],
@@ -214,7 +212,9 @@ class PluginInstanceDetailViewTests(ViewTests):
         # create a plugin's instance
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
+                                                             compute_resource=plugin.compute_resource)
+        PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
+                                            value=self.username)
         self.read_update_delete_url = reverse("plugininstance-detail",
                                               kwargs={"pk": pl_inst.id})
 

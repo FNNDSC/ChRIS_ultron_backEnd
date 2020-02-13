@@ -10,11 +10,11 @@ from .fields import CPUField, MemoryField
 # front-end API types
 TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("boolean", "Boolean values"), ("integer", "Integer values"),
-                ("path", "Path values")]
+                ("path", "Path values"), ("unextpath", "Unextracted path values")]
 
 # table of equivalence between front-end API types and back-end types
 TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
-         'path': 'path'}
+         'path': 'path', 'unextpath': 'unextpath'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
@@ -127,7 +127,7 @@ class PluginParameter(models.Model):
 
 
 class DefaultStrParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
+    value = models.CharField(max_length=600, blank=True)
     plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
                                         related_name='string_default')
 
@@ -160,12 +160,3 @@ class DefaultBoolParameter(models.Model):
 
     def __str__(self):
         return str(self.value)
-
-
-class DefaultPathParameter(models.Model):
-    value = models.CharField(max_length=200, blank=True)
-    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
-                                        related_name='path_default')
-
-    def __str__(self):
-        return self.value

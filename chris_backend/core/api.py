@@ -137,10 +137,6 @@ urlpatterns = format_suffix_patterns([
         pipeline_views.DefaultPipingBoolParameterDetail.as_view(),
         name='defaultpipingboolparameter-detail'),
 
-    url(r'^v1/pipelines/path-parameter/(?P<pk>[0-9]+)/$',
-        pipeline_views.DefaultPipingPathParameterDetail.as_view(),
-        name='defaultpipingpathparameter-detail'),
-
 
     url(r'^v1/plugins/(?P<pk>[0-9]+)/instances/$',
         plugininstance_views.PluginInstanceList.as_view(),
