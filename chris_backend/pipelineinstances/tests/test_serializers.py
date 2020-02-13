@@ -10,7 +10,7 @@ from rest_framework import serializers
 from plugininstances.models import PluginInstance
 from plugins.models import Plugin
 from plugins.models import ComputeResource
-from plugins.models import PluginParameter, DefaultPathParameter, DefaultIntParameter
+from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping
 from pipelineinstances.models import PipelineInstance
 from pipelineinstances.serializers import PipelineInstanceSerializer
@@ -23,7 +23,7 @@ class SerializerTests(TestCase):
         logging.disable(logging.CRITICAL)
 
         self.plugin_fs_name = "simplefsapp"
-        self.plugin_fs_parameters = {'dir': {'type': 'path', 'optional': True,
+        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,
                                              'default': "./"}}
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_parameters = {'dummyInt': {'type': 'integer', 'optional': True,
@@ -47,7 +47,7 @@ class SerializerTests(TestCase):
             type=self.plugin_fs_parameters['dir']['type'],
             optional=self.plugin_fs_parameters['dir']['optional'])
         default = self.plugin_fs_parameters['dir']['default']
-        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param_fs,
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_fs,
                                                    value=default)  # set plugin parameter default
 
         # add a parameter with a default

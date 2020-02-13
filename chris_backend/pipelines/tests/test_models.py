@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 
 from plugins.models import Plugin
 from plugins.models import ComputeResource
-from plugins.models import PluginParameter, DefaultPathParameter, DefaultIntParameter
+from plugins.models import PluginParameter, DefaultIntParameter
 from pipelines.models import Pipeline
 from pipelines.models import PluginPiping
 from pipelines.models import DEFAULT_PIPING_PARAMETER_MODELS

@@ -4,7 +4,7 @@ import logging
 from django.test import TestCase
 
 from plugins.models import Plugin
-from plugins.models import PluginParameter, DefaultPathParameter
+from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
 
 
@@ -14,8 +14,8 @@ class ModelTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.plugin_fs_name = "simplefsapp"
-        self.plugin_fs_parameters = {'dir': {'type': 'path', 'optional': True,
+        self.plugin_fs_name = "simplecopyapp"
+        self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,
                                              'default': "./"}}
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
                                                         compute_resource_identifier="host")
@@ -31,7 +31,7 @@ class ModelTests(TestCase):
             optional=self.plugin_fs_parameters['dir']['optional']
         )
         default = self.plugin_fs_parameters['dir']['default']
-        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
     def tearDown(self):
         # re-enable logging

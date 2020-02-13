@@ -6,9 +6,9 @@ from django.test import TestCase
 from rest_framework import serializers
 
 from plugins.models import Plugin
-from plugins.models import PluginParameter, DefaultPathParameter
+from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
-from plugins.serializers import PluginSerializer
+from plugins.serializers import PluginSerializer, PluginParameterSerializer
 
 
 class SerializerTests(TestCase):
@@ -17,19 +17,19 @@ class SerializerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.plugin_name = "simplefsapp"
-        self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
+        self.plugin_name = "simplecopyapp"
+        self.plugin_repr = {"name": "simplecopyapp", "dock_image": "fnndsc/pl-simplecopyapp",
                             "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
                             "description": "A simple chris fs app demo", "version": "0.1",
                             "title": "Simple chris fs app", "license": "Opensource (MIT)",
 
                             "parameters": [{"optional": True, "action": "store",
-                                            "help": "look up directory", "type": "path",
+                                            "help": "look up directory", "type": "string",
                                             "name": "dir", "flag": "--dir",
                                             "default": "./"}],
 
-                            "selfpath": "/usr/src/simplefsapp",
-                            "selfexec": "simplefsapp.py", "execshell": "python3"}
+                            "selfpath": "/usr/src/simplecopyapp",
+                            "selfexec": "simplecopyapp.py", "execshell": "python3"}
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier="host")
@@ -50,7 +50,7 @@ class SerializerTests(TestCase):
             optional=parameters[0]['optional']
         )
         default = parameters[0]['default']
-        DefaultPathParameter.objects.get_or_create(plugin_param=plg_param, value=default)
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param, value=default)
 
     def tearDown(self):
         # re-enable logging
@@ -307,3 +307,19 @@ class PluginSerializerTests(SerializerTests):
         plg_serializer.validate(data)
         plg_serializer.validate_app_memory_descriptor.assert_called_with(
             {'name': 'max_memory_limit', 'value': 100000})
+
+
+class PluginParameterSerializerTests(SerializerTests):
+
+    def test_validate_validates_parameters_of_path_type_and_optional(self):
+        """
+        Test whether overriden validate method raises a ValidationError when
+        a plugin parameter is optional anf of type 'path' or 'unextpath'.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            plg_param_serializer = PluginParameterSerializer()
+            plg_param_serializer.validate({'optional': True, 'type': 'path'})
+        with self.assertRaises(serializers.ValidationError):
+
+            plg_param_serializer = PluginParameterSerializer()
+            plg_param_serializer.validate({'optional': True, 'type': 'unextpath'})

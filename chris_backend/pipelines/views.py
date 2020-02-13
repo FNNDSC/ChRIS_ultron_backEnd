@@ -8,9 +8,8 @@ from collectionjson import services
 from plugins.serializers import PluginSerializer
 
 from .models import Pipeline, PipelineFilter, PluginPiping
-from .models import DefaultPipingPathParameter, DefaultPipingStrParameter
+from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
 from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
-from .models import DefaultPipingBoolParameter
 from .serializers import PipelineSerializer, PluginPipingSerializer
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .serializers import GenericDefaultPipingParameterSerializer
@@ -197,8 +196,6 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         """
         pipeline = self.get_object()
         queryset = []
-        queryset.extend(list(DefaultPipingPathParameter.objects.filter(
-            plugin_piping__pipeline=pipeline)))
         queryset.extend(list(DefaultPipingStrParameter.objects.filter(
             plugin_piping__pipeline=pipeline)))
         queryset.extend(list(DefaultPipingIntParameter.objects.filter(
@@ -294,26 +291,6 @@ class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
         Overriden to append a collection+json template.
         """
         response = super(DefaultPipingBoolParameterDetail, self).retrieve(
-            request, *args, **kwargs)
-        template_data = {"value": ""}
-        return services.append_collection_template(response, template_data)
-
-
-class DefaultPipingPathParameterDetail(generics.RetrieveUpdateAPIView):
-    """
-    A view for a path default value for a plugin parameter in a pipeline's
-    plugin piping.
-    """
-    serializer_class = DEFAULT_PIPING_PARAMETER_SERIALIZERS['path']
-    queryset = DefaultPipingPathParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrOwnerAndLockedOrNotLockedReadOnly,)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Overriden to append a collection+json template.
-        """
-        response = super(DefaultPipingPathParameterDetail, self).retrieve(
             request, *args, **kwargs)
         template_data = {"value": ""}
         return services.append_collection_template(response, template_data)

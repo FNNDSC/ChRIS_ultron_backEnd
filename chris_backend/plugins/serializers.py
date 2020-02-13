@@ -4,7 +4,7 @@ from rest_framework import serializers
 from .models import Plugin, PluginParameter
 from .models import ComputeResource
 from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
-from .models import DefaultPathParameter, DefaultStrParameter
+from .models import DefaultStrParameter
 from .fields import MemoryInt, CPUInt
 
 
@@ -158,6 +158,18 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'name', 'type', 'optional', 'default',
                   'flag', 'action', 'help', 'ui_exposed', 'plugin')
 
+    def validate(self, data):
+        """
+        Overriden to check that optional is always false for parameters of type 'path'
+        and 'unextpath'.
+        """
+        optional = data.get('optional')
+        param_type = data.get('type')
+        if optional and param_type in ('path', 'unextpath'):
+            error_msg = "Parameters of type 'path' or 'unextpath' cannot be optional."
+            raise serializers.ValidationError({'non_field_errors': [error_msg]})
+        return data
+
     def get_default(self, obj):
         """
         Overriden to get the default parameter value regardless of type.
@@ -210,19 +222,7 @@ class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
 
 
-class DefaultPathParameterSerializer(serializers.HyperlinkedModelSerializer):
-    param_name = serializers.ReadOnlyField(source='plugin_param.name')
-    type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
-
-    class Meta:
-        model = DefaultPathParameter
-        fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_param')
-
-
 DEFAULT_PARAMETER_SERIALIZERS = {'string': DefaultStrParameterSerializer,
                                  'integer': DefaultIntParameterSerializer,
                                  'float': DefaultFloatParameterSerializer,
-                                 'boolean': DefaultBoolParameterSerializer,
-                                 'path': DefaultPathParameterSerializer}
+                                 'boolean': DefaultBoolParameterSerializer}

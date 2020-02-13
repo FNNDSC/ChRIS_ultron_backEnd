@@ -10,7 +10,8 @@ from rest_framework import serializers
 from plugins.models import Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
-from plugininstances.serializers import PathParameterSerializer
+from plugininstances.serializers import (PathParameterSerializer,
+                                         UnextpathParameterSerializer)
 
 
 class SerializerTests(TestCase):
@@ -220,9 +221,11 @@ class PathParameterSerializerTests(SerializerTests):
         """
         path_parm_serializer = PathParameterSerializer(user=self.user)
         with self.assertRaises(serializers.ValidationError):
-            path_parm_serializer.validate_value(self.username + 'another')
+            value = "{}/uploads, anotheruser".format(self.username)
+            path_parm_serializer.validate_value(value)
         with self.assertRaises(serializers.ValidationError):
-            path_parm_serializer.validate_value(self.username + 'another/uploads')
+            value = "{}, anotheruser/uploads".format(self.username, self.username)
+            path_parm_serializer.validate_value(value)
 
     def test_validate_value_fail_invalid_feed_path(self):
         """
@@ -250,7 +253,8 @@ class PathParameterSerializerTests(SerializerTests):
 
     def test_validate_value_success(self):
         """
-        Test whether overriden validate_value method successfully returns a valid path.
+        Test whether overriden validate_value method successfully returns a valid
+        string of paths separated by comma.
         """
         user = User.objects.get(username=self.username)
         user1 = User.objects.create_user(username=self.other_username,
@@ -260,6 +264,76 @@ class PathParameterSerializerTests(SerializerTests):
                                                 compute_resource=plugin.compute_resource)
         pl_inst.feed.owner.set([user1, user])
         path_parm_serializer = PathParameterSerializer(user=user)
-        path = self.other_username + '/feed_%s' % pl_inst.feed.id
-        returned_path = path_parm_serializer.validate_value(path)
-        self.assertEqual(path, returned_path)
+        value = "{}, {}/feed_{} ".format(self.username, self.other_username,
+                                         pl_inst.feed.id)
+        returned_value = path_parm_serializer.validate_value(value)
+        self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
+                                                                self.other_username,
+                                                                pl_inst.feed.id))
+
+
+class UnextpathParameterSerializerTests(SerializerTests):
+
+    def setUp(self):
+        super(UnextpathParameterSerializerTests, self).setUp()
+        self.plugin = Plugin.objects.get(name=self.plugin_name)
+        self.user = User.objects.get(username=self.username)
+        self.other_username = 'boo'
+        self.other_password = 'far'
+
+    def test_validate_value_fail_denied_acces_other_user_space(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access another user's space.
+        """
+        path_parm_serializer = UnextpathParameterSerializer(user=self.user)
+        with self.assertRaises(serializers.ValidationError):
+            value = "{}/uploads, anotheruser".format(self.username)
+            path_parm_serializer.validate_value(value)
+        with self.assertRaises(serializers.ValidationError):
+            value = "{}, anotheruser/uploads".format(self.username, self.username)
+            path_parm_serializer.validate_value(value)
+
+    def test_validate_value_fail_invalid_feed_path(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access another user's invalid feed path.
+        """
+        user = User.objects.get(username=self.username)
+        user1 = User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
+        plugin = self.plugin
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
+                                                compute_resource=plugin.compute_resource)
+        path_parm_serializer = UnextpathParameterSerializer(user=user)
+        # but feed id
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(self.other_username + '/feed_butnumber')
+        # feed id does not exist in the DB
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(self.other_username + '/feed_%s' %
+                                                (pl_inst.feed.id + 1))
+        # user is not owner of this existing feed
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(self.other_username + '/feed_%s' %
+                                                pl_inst.feed.id)
+
+    def test_validate_value_success(self):
+        """
+        Test whether overriden validate_value method successfully returns a valid
+        string of paths separated by comma.
+        """
+        user = User.objects.get(username=self.username)
+        user1 = User.objects.create_user(username=self.other_username,
+                                         password=self.other_password)
+        plugin = self.plugin
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
+                                                compute_resource=plugin.compute_resource)
+        pl_inst.feed.owner.set([user1, user])
+        path_parm_serializer = UnextpathParameterSerializer(user=user)
+        value = "{}, {}/feed_{} ".format(self.username, self.other_username,
+                                         pl_inst.feed.id)
+        returned_value = path_parm_serializer.validate_value(value)
+        self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
+                                                                self.other_username,
+                                                                pl_inst.feed.id))

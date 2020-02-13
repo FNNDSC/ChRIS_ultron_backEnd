@@ -12,7 +12,7 @@ from plugins.models import Plugin
 from .models import PluginInstance, PluginInstanceFilter
 from .models import PluginInstanceFile, PluginInstanceFileFilter
 from .models import StrParameter, FloatParameter, IntParameter
-from .models import BoolParameter, PathParameter
+from .models import BoolParameter, PathParameter, UnextpathParameter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
@@ -56,7 +56,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
             if parameter.name in request_data:
                 data = {'value': request_data[parameter.name]}
                 param_type = parameter.type
-                if param_type == 'path': # this serializer needs the user to be passed
+                if param_type in ('path', 'unextpath'):
+                    # these serializers need the user to be passed
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data,
                                                                              user=user)
                 else:
@@ -385,4 +386,13 @@ class PathParameterDetail(generics.RetrieveAPIView):
     """
     serializer_class = PARAMETER_SERIALIZERS['path']
     queryset = PathParameter.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class UnextpathParameterDetail(generics.RetrieveAPIView):
+    """
+    A unextpath parameter view.
+    """
+    serializer_class = PARAMETER_SERIALIZERS['unextpath']
+    queryset = UnextpathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
