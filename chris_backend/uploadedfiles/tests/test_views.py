@@ -19,7 +19,7 @@ from uploadedfiles import views
 
 class UploadedFileViewTests(TestCase):
     """
-    Generic uploadedfile view tests' setup and tearDown
+    Generic uploadedfile view tests' setup and tearDown.
     """
 
     def setUp(self):
@@ -54,7 +54,7 @@ class UploadedFileViewTests(TestCase):
 
 class UploadedFileListViewTests(UploadedFileViewTests):
     """
-    Test the uploadedfile-list view
+    Test the uploadedfile-list view.
     """
 
     def setUp(self):
@@ -100,7 +100,7 @@ class UploadedFileListViewTests(UploadedFileViewTests):
 
 class UploadedFileDetailViewTests(UploadedFileViewTests):
     """
-    Test the uploadedfile-detail view
+    Test the uploadedfile-detail view.
     """
 
     def setUp(self):
@@ -156,7 +156,7 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
 
 class UploadedFileResourceViewTests(UploadedFileViewTests):
     """
-    Test the uploadedfile-resource view
+    Test the uploadedfile-resource view.
     """
 
     def setUp(self):

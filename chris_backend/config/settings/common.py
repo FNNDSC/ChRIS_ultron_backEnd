@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'pipelines',
     'pipelineinstances',
     'uploadedfiles',
+    'pacsfiles',
     'users'
 ]
 
