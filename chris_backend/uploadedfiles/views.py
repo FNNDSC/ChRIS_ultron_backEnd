@@ -48,8 +48,8 @@ class UploadedFileList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return the list of instances for the queried plugin.
-        A collection+json template is also added to the response.
+        Overriden to append document-level link relations and a collection+json
+        template to the response.
         """
         response = super(UploadedFileList, self).list(request, *args, **kwargs)
         # append query list
@@ -72,7 +72,7 @@ class UploadedFileListQuerySearch(generics.ListAPIView):
 
 class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
     """
-    A feed's file view.
+    An uploaded file view.
     """
     queryset = UploadedFile.objects.all()
     serializer_class = UploadedFileSerializer

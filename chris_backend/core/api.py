@@ -10,6 +10,7 @@ from plugininstances import views as plugininstance_views
 from pipelines import views as pipeline_views
 from pipelineinstances import views as pipelineinstance_views
 from uploadedfiles import views as uploadedfile_views
+from pacsfiles import views as pacsfile_views
 from users import views as user_views
 
 # API v1 endpoints
@@ -239,6 +240,23 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/.*$',
         uploadedfile_views.UploadedFileResource.as_view(),
         name='uploadedfile-resource'),
+
+
+    url(r'^v1/pacsfiles/$',
+        pacsfile_views.PACSFileList.as_view(),
+        name='pacsfile-list'),
+
+    url(r'^v1/pacsfiles/search/$',
+        pacsfile_views.PACSFileListQuerySearch.as_view(),
+        name='pacsfile-list-query-search'),
+
+    url(r'^v1/pacsfiles/(?P<pk>[0-9]+)/$',
+        pacsfile_views.PACSFileDetail.as_view(),
+        name='pacsfile-detail'),
+
+    url(r'^v1/pacsfiles/(?P<pk>[0-9]+)/.*$',
+        pacsfile_views.PACSFileResource.as_view(),
+        name='pacsfile-resource'),
 
 ])
 
