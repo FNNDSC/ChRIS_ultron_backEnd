@@ -13,7 +13,7 @@ version: '3'
 services:
 
   chris:
-    image: local/chris
+    image: ${CREPO}/chris
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -34,7 +34,7 @@ services:
       role: "Production server using Apache's mod_wsgi"
 
   worker:
-    image: local/chris
+    image: ${CREPO}/chris
     command: celery -A core worker -c 1 -l info -Q main
     env_file:
       - ./secrets/.chris.env
