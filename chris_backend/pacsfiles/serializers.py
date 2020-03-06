@@ -1,6 +1,4 @@
 
-import time
-
 from django.conf import settings
 from rest_framework import serializers
 
@@ -50,24 +48,20 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["Missing components! Path must be of the form:"
                  "PACS/<MRN>-<PATIENTNAME>/<STUDY>/<SERIES>/<actualDICOMfile>."])
-        # initiate a Swift service connection to verify that the file is
-        # indeed already in Swift
+        # verify that the file is indeed already in Swift
         conn = swiftclient.Connection(user=settings.SWIFT_USERNAME,
                                       key=settings.SWIFT_KEY,
                                       authurl=settings.SWIFT_AUTH_URL)
-        object_list = []
-        for _ in range(20):
-            object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME,
-                                             prefix=path)[1]
-            if object_list:
-                break
-            time.sleep(0.2)
+        object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
         if not object_list:
-            raise serializers.ValidationError(
-                ["Could not find this path!"])
+            raise serializers.ValidationError(["Could not find this path!"])
         return path
 
     def validate(self, data):
+        """
+        Overriden to validate the calculated API descriptors from the provided path
+        and check whether the path is already registered.
+        """
         path = data.get('path')
         path_parts = path.split('/')
         mrn = path_parts[1].split('-')[0]

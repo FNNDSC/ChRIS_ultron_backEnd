@@ -193,7 +193,7 @@ class PluginInstanceModelTests(ModelTests):
                                return_value=None) as conn_init_mock:
             with mock.patch.object(swiftclient.Connection, 'get_container',
                                    return_value=container_data) as conn_get_container_mock:
-                pl_inst.register_output_files()
+                pl_inst.register_output_files(swiftState={'d_swiftstore': {'filesPushed': 1}})
                 conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
                                                   key=settings.SWIFT_KEY,
                                                   authurl=settings.SWIFT_AUTH_URL,)
@@ -231,7 +231,7 @@ class PluginInstanceModelTests(ModelTests):
                             contents=file1.read(),
                             content_type='text/plain')
 
-        plg_inst.register_output_files()
+        plg_inst.register_output_files(swiftState={'d_swiftstore': {'filesPushed': 1}})
         self.assertEqual(PluginInstanceFile.objects.count(), 1)
         plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=plg_inst)
         self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')

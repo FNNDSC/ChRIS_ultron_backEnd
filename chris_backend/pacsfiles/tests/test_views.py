@@ -60,7 +60,12 @@ class PACSFileListViewTests(PACSFileViewTests):
 
     @tag('integration')
     def test_integration_pacsfile_create_success(self):
+        chris_username = 'chris'
+        chris_password = 'chris1234'
+        User.objects.create_user(username=chris_username, password=chris_password)
+
         path = 'PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
+
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,
@@ -75,8 +80,8 @@ class PACSFileListViewTests(PACSFileViewTests):
             conn.put_object(settings.SWIFT_CONTAINER_NAME, path,
                             contents=file1.read(),
                             content_type='text/plain')
-        # make the POST request
-        self.client.login(username=self.username, password=self.password)
+        # make the POST request using the chris user
+        self.client.login(username=chris_username, password=chris_password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -88,6 +93,12 @@ class PACSFileListViewTests(PACSFileViewTests):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacsfile_create_failure_permission_denied_not_chris_user(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_pacsfile_list_success(self):
         self.client.login(username=self.username, password=self.password)

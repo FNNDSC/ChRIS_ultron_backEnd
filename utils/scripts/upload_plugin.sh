@@ -8,7 +8,7 @@ G_SYNOPSIS="
 
  SYNOPSIS
 
-	upload_plugins.sh USER PLUGIN DOCK REPO
+	upload_plugin.sh USER PLUGIN DOCK REPO
 
  ARGS
 

@@ -17,6 +17,7 @@ from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly
+from .tasks import check_plugin_instance_exec_status
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -150,7 +151,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to check a plugin's instance status.
         """
         instance = self.get_object()
-        instance.check_exec_status()
+        check_plugin_instance_exec_status.delay(instance.id)  # call async task
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)

@@ -8,6 +8,7 @@ from core.renderers import BinaryFileRenderer
 
 from .models import PACSFile, PACSFileFilter
 from .serializers import PACSFileSerializer
+from .permissions import IsChrisOrReadOnly
 
 
 class PACSFileList(generics.ListCreateAPIView):
@@ -16,7 +17,7 @@ class PACSFileList(generics.ListCreateAPIView):
     """
     queryset = PACSFile.objects.all()
     serializer_class = PACSFileSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """

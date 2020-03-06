@@ -5,15 +5,17 @@ import time
 import io
 from unittest import mock, skip
 
-from django.test import TestCase, tag
+from django.test import TestCase, TransactionTestCase, tag
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
-
 from rest_framework import status
 
 import swiftclient
+from celery.contrib.testing.worker import start_worker
 
+from core.celery import app as celery_app
+from core.celery import task_routes
 from plugins.models import Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PathParameter, FloatParameter, STATUS_TYPES
@@ -53,6 +55,63 @@ class ViewTests(TestCase):
                                     compute_resource=self.compute_resource)
 
     def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.DEBUG)
+
+
+class TasksViewTests(TransactionTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # route tasks to this worker by using the default 'celery' queue
+        # that is exclusively used for the automated tests
+        celery_app.conf.update(task_routes=None)
+        cls.celery_worker = start_worker(celery_app,
+                                         concurrency=2,
+                                         perform_ping_check=False)
+        cls.celery_worker.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.celery_worker.__exit__(None, None, None)
+        # reset routes to the original queues
+        celery_app.conf.update(task_routes=task_routes)
+
+    def setUp(self):
+        super().setUp()
+
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
+        self.chris_username = 'chris'
+        self.chris_password = 'chris12'
+        self.username = 'foo'
+        self.password = 'bar'
+        self.other_username = 'boo'
+        self.other_password = 'far'
+
+        self.content_type = 'application/vnd.collection+json'
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            compute_resource_identifier="host")
+
+        # create the chris superuser and two additional users
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+        User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+        # create two plugins
+        Plugin.objects.get_or_create(name="pacspull", type="fs",
+                                     compute_resource=self.compute_resource)
+        Plugin.objects.get_or_create(name="mri_convert", type="ds",
+                                     compute_resource=self.compute_resource)
+
+    def tearDown(self):
+        super().tearDown()
         # re-enable logging
         logging.disable(logging.DEBUG)
 
@@ -146,7 +205,7 @@ class PluginInstanceListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class PluginInstanceDetailViewTests(ViewTests):
+class PluginInstanceDetailViewTests(TasksViewTests):
     """
     Test the plugininstance-detail view.
     """
@@ -166,15 +225,15 @@ class PluginInstanceDetailViewTests(ViewTests):
                                               kwargs={"pk": self.pl_inst.id})
 
     def test_plugin_instance_detail_success(self):
-        with mock.patch.object(views.PluginInstance, 'check_exec_status',
-                               return_value=None) as check_exec_status_mock:
+        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
+                               return_value=None) as delay_mock:
             # make API request
             self.client.login(username=self.username, password=self.password)
             response = self.client.get(self.read_update_delete_url)
             self.assertContains(response, "pacspull")
 
             # check that the check_exec_status method was called once
-            check_exec_status_mock.assert_called_once()
+            delay_mock.assert_called_with(self.pl_inst.id)
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):
@@ -219,11 +278,10 @@ class PluginInstanceDetailViewTests(ViewTests):
                                               kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
-        PluginAppManager.run_plugin_app(  pl_inst,
-                                    {'dir': self.username},
-                                    service             = 'pfcon',
-                                    inputDirOverride    = '/share/incoming',
-                                    outputDirOverride   = '/share/outgoing')
+        PluginAppManager.run_plugin_app(pl_inst, {'dir': self.username},
+                                        service='pfcon',
+                                        inputDirOverride='/share/incoming',
+                                        outputDirOverride='/share/outgoing')
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)
@@ -231,18 +289,19 @@ class PluginInstanceDetailViewTests(ViewTests):
         self.assertContains(response, "simplefsapp")
 
         # In the following we keep checking the status until the job ends with
-        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 3 second intervals.
-        maxLoopTries    = 20
-        currentLoop     = 1
-        b_checkAgain    = True
+        # 'finishedSuccessfully'. The code runs in a lazy loop pcoll with a
+        # max number of attempts at 10 second intervals.
+        maxLoopTries = 10
+        currentLoop = 1
+        b_checkAgain = True
+        time.sleep(10)
         while b_checkAgain:
-            response            = self.client.get(self.read_update_delete_url)
-            str_responseStatus  = response.data['status']
+            response = self.client.get(self.read_update_delete_url)
+            str_responseStatus = response.data['status']
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(3)
+                time.sleep(10)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
