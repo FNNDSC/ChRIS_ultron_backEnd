@@ -196,6 +196,8 @@ if (( b_restart )) ; then
     docker-compose -f docker-compose_dev.yml run --service-ports ${RESTART}_service
 else
     title -d 1 "Using <$CREPO> family containers..."
+    docker pull mysql:5
+    docker pull rabbitmq:3
     if (( ! b_skipIntro )) ; then 
     if [[ $CREPO == "fnndsc" ]] ; then
             echo "Pulling latest version of all containers..."
@@ -321,6 +323,10 @@ else
     docker-compose -f docker-compose_dev.yml exec chris_dev_db sh -c 'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;'
     # Give all permissions to chris user in the DB. This is required for the Django tests:
     docker-compose -f docker-compose_dev.yml exec chris_dev_db mysql -uroot -prootp -e 'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"'
+    windowBottom
+
+    title -d 1 "Waiting until CUBE is ready to accept connections..."
+    docker-compose -f docker-compose_dev.yml exec chris_dev sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then

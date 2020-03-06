@@ -32,7 +32,7 @@ This page describes how to quickly get the set of services comprising the backen
 * ``Docker Compose 1.10.0+``
 * ``Ubuntu (16.04+) and MAC OS X 10.11+``
 
-#### Make sure to add your computer user to the ``docker group`` in your machine
+#### On a Linux machine make sure to add your computer user to the ``docker group``
 
 #### Install virtualenv
 ```bash

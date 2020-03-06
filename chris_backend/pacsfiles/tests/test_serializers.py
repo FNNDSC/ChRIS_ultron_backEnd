@@ -1,12 +1,11 @@
 
 import logging
+import time
 import io
 from unittest import mock
 
 from django.test import TestCase, tag
 from django.conf import settings
-from django.contrib.auth.models import User
-
 from rest_framework import serializers
 
 from pacsfiles.models import PACSFile
@@ -98,6 +97,11 @@ class PACSFileSerializerTests(TestCase):
         with io.StringIO("test file") as file1:
             conn.put_object(settings.SWIFT_CONTAINER_NAME, path, contents=file1.read(),
                             content_type='text/plain')
+        for _ in range(20):
+            object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
+            if object_list:
+                break
+            time.sleep(0.2)
         self.assertEqual(pacsfiles_serializer.validate_path(path), path)
 
         # delete file from Swift storage

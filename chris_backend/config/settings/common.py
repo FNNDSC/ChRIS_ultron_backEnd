@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'collectionjson',
+    'core',
     'feeds',
     'plugins',
     'plugininstances',

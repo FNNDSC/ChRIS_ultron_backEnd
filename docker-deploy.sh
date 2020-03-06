@@ -52,6 +52,7 @@ if [[ "$1" == 'up' ]]; then
     "fnndsc/chris"
     "fnndsc/chris_store"
     "mysql:5"
+    "rabbitmq:3"
     "fnndsc/pfcon"
     "fnndsc/pfurl"
     "fnndsc/pfioh"

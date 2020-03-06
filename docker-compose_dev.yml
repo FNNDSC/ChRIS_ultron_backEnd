@@ -13,7 +13,7 @@ version: '3'
 services:
 
   chris_dev:
-    image: ${CREPO}/chris:dev
+    image: local/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend
     environment:
@@ -22,12 +22,32 @@ services:
       - "8000:8000"
     depends_on:
       - chris_dev_db
-      - chrisstore
       - swift_service
+      - queue
+      - worker
+      - chrisstore
       - pfcon_service
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
+
+  worker:
+    image: local/chris:dev
+    volumes:
+      - ./chris_backend:/home/localuser/chris_backend
+    command: celery -A core worker -c 1 -l DEBUG -Q main
+    environment:
+      - CELERY_RDB_HOST=0.0.0.0
+    ports:
+      - "6900:6900"
+    depends_on:
+      - chris_dev_db
+      - swift_service
+      - queue
+      - pfcon_service
+    labels:
+      name: "ChRIS_ultron_backEnd Asynchronous Worker"
+      role: "Backend development async worker"
 
   chris_dev_db:
     image: mysql:5
@@ -41,6 +61,12 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Backend development database"
+
+  queue:
+    image: rabbitmq:3
+    labels:
+      name: "ChRIS_ultron_backEnd Asynchronous Task Queue"
+      role: "Backend development async task queue"
 
   chrisstore:
     image: ${CREPO}/chris_store

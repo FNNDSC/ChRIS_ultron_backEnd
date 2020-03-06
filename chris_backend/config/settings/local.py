@@ -99,3 +99,18 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 # ------------------------------------------------------------------------------
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
+
+
+# Celery settings
+
+# testing (enable worker to use the temporary Django testing DB)
+INSTALLED_APPS += ['celery.contrib.testing.tasks', 'django_celery_results']
+CELERY_RESULT_BACKEND = 'django-db'  # a result backend is needed for tests
+CELERY_RESULT_SERIALIZER = 'json'
+
+#CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
+CELERY_BROKER_URL = 'pyamqp://queue:5672'
+
+#: Only add pickle to this list if your broker is secured
+#: from unwanted access (see userguide/security.html)
+CELERY_ACCEPT_CONTENT = ['json']

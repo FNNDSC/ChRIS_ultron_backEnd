@@ -46,3 +46,10 @@ COPY --chown=localuser ["./chris_backend", "${APPROOT}"]
 WORKDIR $APPROOT
 ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
 EXPOSE 8000
+
+CMD ["mod_wsgi-express", "start-server", "config/wsgi.py", "--host", "0.0.0.0", "--port", "8000", "--processes", "8", "--server-root", "/home/localuser/mod_wsgi-0.0.0.0:8000"]
+#mod_wsgi-express setup-server config/wsgi.py --host 0.0.0.0 --port 8000 --processes 8 --server-name localhost --server-root /home/localuser/mod_wsgi-0.0.0.0:8000
+#to start daemon:
+#/home/localuser/mod_wsgi-0.0.0.0:8000/apachectl start
+#to stop deamon
+#/home/localuser/mod_wsgi-0.0.0.0:8000/apachectl stop

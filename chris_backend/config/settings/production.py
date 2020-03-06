@@ -5,11 +5,12 @@ Production Configurations
 """
 
 from .common import *  # noqa
-from environs import Env, EnvValidationError
-
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
 from django.core.exceptions import ImproperlyConfigured
+
+from environs import Env, EnvValidationError
+import swiftclient
 
 
 # Environment variables-based secrets
@@ -58,6 +59,13 @@ SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
 SWIFT_KEY = get_secret('SWIFT_KEY')
 SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
 SWIFT_AUTO_CREATE_CONTAINER = True
+# initiate a swift service connection and create 'users' container
+conn = swiftclient.Connection(
+    user=SWIFT_USERNAME,
+    key=SWIFT_KEY,
+    authurl=SWIFT_AUTH_URL,
+)
+conn.put_container(SWIFT_CONTAINER_NAME)
 
 
 # PFCON SERVICE CONFIGURATION
@@ -66,6 +74,11 @@ PFCON = {
     'host': get_secret('PFCON_HOST'),
     'port': get_secret('PFCON_PORT')
 }
+
+
+# CHARM DEBUG CONTROL OUTPUT
+CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
+CHRIS_DEBUG['quiet'] = get_secret('CHRIS_DEBUG_QUIET', env.bool)
 
 
 # LOGGING CONFIGURATION
@@ -122,3 +135,14 @@ LOGGING = {
 # ------------------------------------------------------------------------------
 CORS_ORIGIN_ALLOW_ALL = get_secret('DJANGO_CORS_ORIGIN_ALLOW_ALL', env.bool)
 CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)
+
+
+# Celery settings
+
+#CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
+CELERY_BROKER_URL = get_secret('CELERY_BROKER_URL')
+
+#: Only add pickle to this list if your broker is secured
+#: from unwanted access (see userguide/security.html)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

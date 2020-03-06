@@ -13,7 +13,7 @@ version: '3'
 services:
 
   chris:
-    image: ${CREPO}/chris
+    image: local/chris
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -23,12 +23,33 @@ services:
       - "8000:8000"
     depends_on:
       - chris_db
-      - chrisstore
       - swift_service
+      - queue
+      - worker
+      - chrisstore
       - pfcon_service
+    restart: on-failure
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Production server using Apache's mod_wsgi"
+
+  worker:
+    image: local/chris
+    command: celery -A core worker -c 1 -l info -Q main
+    env_file:
+      - ./secrets/.chris.env
+      - ./secrets/.chris_db.env
+      - ./secrets/.swift_service.env
+      - ./secrets/.pfcon_service.env
+    depends_on:
+      - chris_db
+      - swift_service
+      - queue
+      - pfcon_service
+    restart: on-failure
+    labels:
+      name: "ChRIS_ultron_backEnd Asynchronous Worker"
+      role: "Production async worker"
 
   chris_db:
     image: mysql:5
@@ -36,9 +57,17 @@ services:
       - chris_db_data:/var/lib/mysql
     env_file:
       - ./secrets/.chris_db.env
+    restart: on-failure
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Production MySQL database"
+
+  queue:
+    image: rabbitmq:3
+    restart: on-failure
+    labels:
+      name: "ChRIS_ultron_backEnd Asynchronous Task Queue"
+      role: "Production async task queue"
 
   chrisstore:
     image: ${CREPO}/chris_store
@@ -51,6 +80,7 @@ services:
     depends_on:
       - chris_store_db
       - swift_service
+    restart: on-failure
     labels:
       name: "ChRIS_store"
       role: "Chris store service"
@@ -61,6 +91,7 @@ services:
       - chris_store_db_data:/var/lib/mysql
     env_file:
       - ./secrets/.chris_store_db.env
+    restart: on-failure
     labels:
       name: "ChRIS_store MySQL Database"
       role: "Chris store database"
@@ -73,6 +104,7 @@ services:
       - ./secrets/.swift_service.env
     ports:
       - "8080:8080"
+    restart: on-failure
     labels:
       name: "swift"
       role: "swift object storage service"
@@ -91,6 +123,7 @@ services:
       - swift_service
       - pman_service
       - pfioh_service
+    restart: on-failure
     labels:
       name: "pfcon"
       role: "pfcon service"
@@ -105,6 +138,7 @@ services:
       - ./FS/remote:/hostFS/storeBase
     ports:
       - "5055:5055"
+    restart: on-failure
     labels:
       name: "pfioh"
       role: "pfioh service"
@@ -129,6 +163,7 @@ services:
       - ./FS/remote:/hostFS/storeBase
     ports:
       - "5010:5010"
+    restart: on-failure
     labels:
       name: "pman"
       role: "pman service"
