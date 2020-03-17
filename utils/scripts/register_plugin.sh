@@ -37,5 +37,5 @@ COMP_ENV=$2
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 echo "Registering plugin=$PLUGIN  compute environment=$COMP_ENV..."
 echo " "
-docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add "${PLUGIN}" "$COMP_ENV" http://chrisstore:8010/api/v1/
+docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add "${PLUGIN}" "$COMP_ENV"
 echo " "

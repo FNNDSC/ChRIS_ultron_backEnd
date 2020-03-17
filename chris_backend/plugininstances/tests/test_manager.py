@@ -193,7 +193,7 @@ class PluginAppManagerTests(TestCase):
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             else:
-                time.sleep(3)
+                time.sleep(5)
             currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False

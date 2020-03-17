@@ -5,8 +5,6 @@ through the CLI.
 
 import os
 import sys
-from argparse import ArgumentParser
-from chrisstoreclient.client import StoreClient
 
 if __name__ == '__main__':
     # django needs to be loaded when this script is run standalone from the command line
@@ -16,6 +14,11 @@ if __name__ == '__main__':
     django.setup()
 
 from django.utils import timezone
+from django.conf import settings
+
+from argparse import ArgumentParser
+from chrisstoreclient.client import StoreClient
+
 from plugins.models import Plugin
 from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer, PluginParameterSerializer
@@ -35,13 +38,9 @@ class PluginManager(object):
         parser_add.add_argument('name', help="Plugin's name")
         parser_add.add_argument('computeresource',
                                 help="Compute resource where the plugin's instances run")
-        parser_add.add_argument('storeurl',
-                                help="Url of ChRIS store where the plugin is registered")
         parser_add.add_argument('-v', '--version', help="Plugin's version. If not "
                                                         "provided then the latest "
                                                         "version is fetched.")
-        parser_add.add_argument('--storeusername', help="Username for the ChRIS store")
-        parser_add.add_argument('--storepassword', help="Password for the ChRIS store")
         parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
 
         # create the parser for the "modify" command
@@ -50,10 +49,8 @@ class PluginManager(object):
         parser_modify.add_argument('version', help="Plugin's version")
         parser_modify.add_argument('--computeresource',
                                 help="Compute resource where the plugin's instances run")
-        parser_modify.add_argument('--storeurl',
-                                help="Url of ChRIS store where the plugin is registered")
-        parser_modify.add_argument('--storeusername', help="Username for the ChRIS store")
-        parser_modify.add_argument('--storepassword', help="Password for the ChRIS store")
+        parser_modify.add_argument('--updatefromstore', action='store_true',
+                                   help="Update plugin representation from ChRIS store")
         parser_modify.add_argument('--storetimeout', help="ChRIS store request timeout")
 
         # create the parser for the "remove" command
@@ -63,15 +60,11 @@ class PluginManager(object):
 
         self.parser = parser
 
-    def add_plugin(self, args):
+    def add_plugin(self, name, version, compute_identifier, timeout=30):
         """
         Register/add a new plugin to the system.
         """
-        plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
-                                                             args.version,
-                                                             args.storeusername,
-                                                             args.storepassword,
-                                                             args.storetimeout)
+        plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
@@ -95,30 +88,27 @@ class PluginManager(object):
 
         # if no validation errors at this point then save to the DB
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier=args.computeresource)
+            compute_resource_identifier=compute_identifier)
         plugin = plg_serializer.save(compute_resource=compute_resource)
         for param_serializer_dict in parameters_serializers:
             param = param_serializer_dict['serializer'].save(plugin=plugin)
             if param_serializer_dict['default_serializer'] is not None:
                 param_serializer_dict['default_serializer'].save(plugin_param=param)
+        return plugin
 
-    def modify_plugin(self, args):
+    def modify_plugin(self, name, version, compute_identifier, fetch, timeout=30):
         """
         Modify an existing/registered plugin and add the current date as a new plugin
         modification date.
         """
-        plugin = self.get_plugin(args.name, args.version)
+        plugin = self.get_plugin(name, version)
         compute_resource = None
         plg_repr = None
-        if args.computeresource:
+        if compute_identifier:
             (compute_resource, tf) = ComputeResource.objects.get_or_create(
-                compute_resource_identifier=args.computeresource)
-        if args.storeurl:
-            plg_repr = self.get_plugin_representation_from_store(args.name, args.storeurl,
-                                                                 args.version,
-                                                                 args.storeusername,
-                                                                 args.storepassword,
-                                                                 args.storetimeout)
+                compute_resource_identifier=compute_identifier)
+        if fetch:
+            plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
         if plg_repr:
             del plg_repr['parameters']
             plg_serializer = PluginSerializer(plugin, data=plg_repr)
@@ -134,13 +124,14 @@ class PluginManager(object):
         if plg_repr or compute_resource:
             plugin.modification_date = timezone.now()
             plugin.save()
+        return plugin
 
-    def remove_plugin(self, args):
+    def remove_plugin(self, name, version):
         """
         Remove an existing/registered plugin from the system. All the associated plugin
         instances are cancelled before they are deleted by the DB CASCADE.
         """
-        plugin = self.get_plugin(args.name, args.version)
+        plugin = self.get_plugin(name, version)
         for plg_inst in plugin.instances.all():
             plg_inst.cancel()
         plugin.delete()
@@ -151,19 +142,21 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
-            self.add_plugin(options)
+            self.add_plugin(options.name, options.version, options.computeresource,
+                            options.storetimeout)
         elif options.subparser_name == 'modify':
-            self.modify_plugin(options)
+            self.modify_plugin(options.name, options.version, options.computeresource,
+                               options.updatefromstore, options.storetimeout)
         elif options.subparser_name == 'remove':
-            self.remove_plugin(options)
+            self.remove_plugin(options.name, options.version)
 
     @staticmethod
-    def get_plugin_representation_from_store(name, store_url, version=None, username=None,
-                                             password=None, timeout=30):
+    def get_plugin_representation_from_store(name, version=None, timeout=30):
         """
         Get a plugin app representation from the ChRIS store.
         """
-        store_client = StoreClient(store_url, username, password, timeout)
+        store_url = settings.CHRIS_STORE_URL
+        store_client = StoreClient(store_url, None, None, timeout)
         plg = store_client.get_plugin(name, version)
         parameters = []
         offset = 0

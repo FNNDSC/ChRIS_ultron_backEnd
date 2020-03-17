@@ -30,19 +30,13 @@ ALLOWED_HOSTS = ['*']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# pfcon service settings
-PFCON = {
-    'host': 'pfcon_service',
-    'port': '5005'
-}
-
 # swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
 SWIFT_CONTAINER_NAME = 'users'
-#SWIFT_AUTO_CREATE_CONTAINER = True
+SWIFT_AUTO_CREATE_CONTAINER = True
 # initiate a swift service connection and create 'users' container
 conn = swiftclient.Connection(
     user=SWIFT_USERNAME,
@@ -50,6 +44,15 @@ conn = swiftclient.Connection(
     authurl=SWIFT_AUTH_URL,
 )
 conn.put_container(SWIFT_CONTAINER_NAME)
+
+# ChRIS store settings
+CHRIS_STORE_URL = 'http://chrisstore:8010/api/v1/'
+
+# pfcon service settings
+PFCON = {
+    'host': 'pfcon_service',
+    'port': '5005'
+}
 
 # debug control output
 CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
@@ -71,7 +74,6 @@ DATABASES['default']['PORT'] = '3306'
 EMAIL_HOST = 'localhost'
 EMAIL_PORT = 1025
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
 
 # django-debug-toolbar
 # ------------------------------------------------------------------------------
