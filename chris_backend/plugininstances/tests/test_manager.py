@@ -184,20 +184,19 @@ class PluginAppManagerTests(TestCase):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 3 second intervals.
-        maxLoopTries    = 20
-        currentLoop     = 1
-        b_checkAgain    = True
+        # max number of attempts at 10 second intervals.
+        maxLoopTries = 10
+        currentLoop = 1
+        b_checkAgain = True
         while b_checkAgain:
             str_responseStatus = manager.PluginAppManager.check_plugin_app_exec_status(pl_inst)
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
-            else:
-                time.sleep(5)
-            currentLoop += 1
+            elif currentLoop < maxLoopTries:
+                time.sleep(10)
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
-
+            currentLoop += 1
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         str_fileCreatedByPlugin     = os.path.join(pl_inst.get_output_path(), 'out.txt')

@@ -289,7 +289,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertContains(response, "simplefsapp")
 
         # In the following we keep checking the status until the job ends with
-        # 'finishedSuccessfully'. The code runs in a lazy loop pcoll with a
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
         maxLoopTries = 10
         currentLoop = 1
@@ -300,11 +300,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             str_responseStatus = response.data['status']
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
-            else:
+            elif currentLoop < maxLoopTries:
                 time.sleep(10)
-            currentLoop += 1
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
+            currentLoop += 1
         self.assertContains(response, "finishedSuccessfully")
 
     def test_plugin_instance_detail_failure_unauthenticated(self):

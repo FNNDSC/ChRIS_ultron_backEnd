@@ -16,11 +16,13 @@ class PluginAdminFormTests(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        super().setUpClass()
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
     @classmethod
     def tearDownClass(cls):
+        super().tearDownClass()
         # re-enable logging
         logging.disable(logging.DEBUG)
 
@@ -87,11 +89,13 @@ class PluginAdminTests(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        super().setUpClass()
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
     @classmethod
     def tearDownClass(cls):
+        super().tearDownClass()
         # re-enable logging
         logging.disable(logging.DEBUG)
 
