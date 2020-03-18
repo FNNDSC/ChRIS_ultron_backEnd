@@ -25,7 +25,6 @@ services:
       - chris_db
       - swift_service
       - queue
-      - worker
       - chrisstore
       - pfcon_service
     restart: on-failure
@@ -35,6 +34,7 @@ services:
 
   worker:
     image: ${CREPO}/chris
+    entrypoint: ''
     command: celery -A core worker -c 1 -l info -Q main
     env_file:
       - ./secrets/.chris.env

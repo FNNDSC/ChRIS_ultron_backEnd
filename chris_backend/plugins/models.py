@@ -33,9 +33,12 @@ class Plugin(models.Model):
                 'min_memory_limit': 200,  # in Mi
                 'max_limit': 2147483647   # maxint
                }
+    name = models.CharField(max_length=100)
+    version = models.CharField(max_length=10)
+    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
+                        related_name='plugins')
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
-    name = models.CharField(max_length=100)
     dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
     execshell = models.CharField(max_length=50)
@@ -47,9 +50,6 @@ class Plugin(models.Model):
     description = models.CharField(max_length=800)
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50)
-    version = models.CharField(max_length=10)
-    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
-                        related_name='plugins')
     min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     max_gpu_limit = models.IntegerField(null=True, blank=True,
                                         default=defaults['max_limit'])

@@ -68,6 +68,10 @@ conn = swiftclient.Connection(
 conn.put_container(SWIFT_CONTAINER_NAME)
 
 
+# CHRIS STORE SERVICE CONFIGURATION
+CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
+
+
 # PFCON SERVICE CONFIGURATION
 # ------------------------------------------------------------------------------
 PFCON = {
@@ -128,6 +132,11 @@ LOGGING = {
         }
     }
 }
+
+
+# STATIC FILES (CSS, JavaScript, Images)
+STATIC_ROOT = get_secret('STATIC_ROOT')
+
 
 # Your production stuff: Below this line define 3rd party library settings
 

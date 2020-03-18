@@ -24,7 +24,6 @@ services:
       - chris_dev_db
       - swift_service
       - queue
-      - worker
       - chrisstore
       - pfcon_service
     labels:
@@ -35,6 +34,7 @@ services:
     image: ${CREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend
+    entrypoint: ''
     command: celery -A core worker -c 1 -l DEBUG -Q main
     environment:
       - CELERY_RDB_HOST=0.0.0.0
