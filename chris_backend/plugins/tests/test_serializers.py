@@ -26,7 +26,7 @@ class SerializerTests(TestCase):
                             "parameters": [{"optional": True, "action": "store",
                                             "help": "look up directory", "type": "string",
                                             "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
+                                            "short_flag": "-d", "default": "./"}],
 
                             "selfpath": "/usr/src/simplecopyapp",
                             "selfexec": "simplecopyapp.py", "execshell": "python3"}
