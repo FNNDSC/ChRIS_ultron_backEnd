@@ -31,7 +31,7 @@ class SerializerTests(TestCase):
                             "parameters": [{"optional": True, "action": "store",
                                             "help": "look up directory", "type": "path",
                                             "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
+                                            "short_flag": "-d", "default": "./"}],
 
                             "selfpath": "/usr/src/simplefsapp",
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
@@ -51,7 +51,9 @@ class SerializerTests(TestCase):
             plugin=plugin,
             name=parameters[0]['name'],
             type=parameters[0]['type'],
-            flag=parameters[0]['flag'])
+            flag=parameters[0]['flag'],
+            short_flag=parameters[0]['short_flag']
+        )
 
         # create user
         User.objects.create_user(username=self.username, password=self.password)

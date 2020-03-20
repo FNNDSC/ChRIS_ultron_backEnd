@@ -25,7 +25,7 @@ class PluginManagerTests(TestCase):
                             "parameters": [{"optional": True, "action": "store",
                                             "help": "look up directory", "type": "string",
                                             "name": "dir", "flag": "--dir",
-                                            "default": "./"}],
+                                            "short_flag": "-d", "default": "./"}],
 
                             "selfpath": "/usr/src/simplecopyapp",
                             "selfexec": "simplecopyapp.py", "execshell": "python3"}
@@ -49,6 +49,7 @@ class PluginManagerTests(TestCase):
             name=parameters[0]['name'],
             type=parameters[0]['type'],
             flag=parameters[0]['flag'],
+            short_flag=parameters[0]['short_flag'],
             optional=parameters[0]['optional']
         )
         default = parameters[0]['default']

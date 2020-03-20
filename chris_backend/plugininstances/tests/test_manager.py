@@ -29,7 +29,8 @@ class PluginAppManagerTests(TestCase):
 
                             "parameters": [{"optional": False, "action": "store",
                                             "help": "look up directory", "type": "path",
-                                            "name": "dir", "flag": "--dir"}],
+                                            "name": "dir", "flag": "--dir",
+                                            "short_flag": "-d"}],
 
                             "selfpath": "/usr/src/simplefsapp",
                             "selfexec": "simplefsapp.py", "execshell": "python3"}

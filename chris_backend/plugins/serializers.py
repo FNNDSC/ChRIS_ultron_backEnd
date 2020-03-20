@@ -155,8 +155,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginParameter
-        fields = ('url', 'id', 'name', 'type', 'optional', 'default',
-                  'flag', 'action', 'help', 'ui_exposed', 'plugin')
+        fields = ('url', 'id', 'name', 'type', 'optional', 'default', 'flag',
+                  'short_flag', 'action', 'help', 'ui_exposed', 'plugin')
 
     def validate(self, data):
         """

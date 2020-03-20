@@ -51,4 +51,5 @@ WORKDIR $APPROOT
 ENTRYPOINT ["/usr/src/docker-entrypoint_dev.sh"]
 EXPOSE 8000
 
+# Start ChRIS development server
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

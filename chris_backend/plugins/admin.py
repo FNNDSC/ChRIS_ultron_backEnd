@@ -21,9 +21,9 @@ class PluginAdminForm(forms.ModelForm):
         plugin to the DB.
         """
         if self.instance.pk is None:  # create plugin operation
-            name = self.cleaned_data['name']
-            version = self.cleaned_data['version']
-            compute_resource = self.cleaned_data['compute_resource']
+            name = self.cleaned_data.get('name')
+            version = self.cleaned_data.get('version')
+            compute_resource = self.cleaned_data.get('compute_resource')
             pl_manager = PluginManager()
             try:
                 self.instance = pl_manager.add_plugin(name, version, compute_resource)
