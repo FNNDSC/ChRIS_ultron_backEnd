@@ -1,4 +1,4 @@
-# ChRIS_ultron_backEnd
+# ![ChRIS logo](https://github.com/FNNDSC/ChRIS_ultron_backEnd/blob/master/docs/assets/logo_chris.png) ChRIS_ultron_backEnd
 [![Build Status](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd.svg?branch=master)](https://travis-ci.org/FNNDSC/ChRIS_ultron_backEnd)
 ![License][license-badge]
 ![Last Commit][last-commit-badge]
