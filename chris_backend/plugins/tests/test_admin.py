@@ -40,7 +40,7 @@ class PluginAdminFormTests(TestCase):
         self.plugin.version = self.plugin_version
         self.plugin.compute_resource = self.compute_resource
 
-    def test_clean_validate_and_save_plugin_descriptors(self):
+    def test_clean_validate_name_version_and_save_plugin_descriptors(self):
         """
         Test whether overriden clean method validates the full set of plugin descriptors
         and save the newly created plugin to the DB.
@@ -63,6 +63,32 @@ class PluginAdminFormTests(TestCase):
             self.assertIsNotNone(form.instance.pk)
             add_plugin_mock.assert_called_with(self.plugin_name, self.plugin_version,
                                                'host')
+
+    def test_clean_validate_url_and_save_plugin_descriptors(self):
+        """
+        Test whether overriden clean method validates the full set of plugin descriptors
+        and save the newly created plugin to the DB.
+        """
+        # mock manager's add_plugin_by_url method
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(name=self.plugin_name,
+                                                             version=self.plugin_version,
+                                                compute_resource=self.compute_resource)
+        plugin_store_url = "http://127.0.0.1:8010/api/v1/1/"
+        with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
+                               return_value=plugin) as add_plugin_by_url_mock:
+            plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+            form = plugin_admin.form
+            form.instance = self.plugin
+            form.cleaned_data = {'url': plugin_store_url,
+                                 'compute_resource': 'host'}
+            self.assertIsNone(form.instance.pk)
+            form.clean(form)
+            self.assertEqual(form.cleaned_data.get('name'), self.plugin_name)
+            self.assertEqual(form.cleaned_data.get('version'), self.plugin_version)
+            self.assertNotIn('url', form.cleaned_data)
+            self.assertEqual(form.instance, plugin)
+            self.assertIsNotNone(form.instance.pk)
+            add_plugin_by_url_mock.assert_called_with(plugin_store_url, 'host')
 
     def test_clean_raises_validation_error_if_cannot_add_plugin(self):
         """
@@ -109,7 +135,7 @@ class PluginAdminTests(TestCase):
         with mock.patch.object(pl_admin.admin.ModelAdmin, 'add_view',
                                return_value=None) as add_view_mock:
             plugin_admin.add_view(request_mock)
-            self.assertIs(plugin_admin.fields, pl_admin.add_view_fields)
+            self.assertEqual(len(plugin_admin.fieldsets), 3)
             self.assertEqual(len(plugin_admin.readonly_fields), 0)
             add_view_mock.assert_called_with(plugin_admin, request_mock, '', None)
 
@@ -123,10 +149,10 @@ class PluginAdminTests(TestCase):
         with mock.patch.object(pl_admin.admin.ModelAdmin, 'change_view',
                                return_value=None) as change_view_mock:
             plugin_admin.change_view(request_mock, 1)
-            self.assertIs(plugin_admin.fields, pl_admin.all_fields)
             self.assertNotIn('compute_resource', plugin_admin.readonly_fields)
-            self.assertEqual(len(plugin_admin.readonly_fields) + 1,
-                             len(plugin_admin.fields))
+            self.assertEqual(len(plugin_admin.fieldsets), 2)
+            self.assertEqual(len(plugin_admin.readonly_fields),
+                             len(plugin_admin.fieldsets[1][1]['fields']))
             change_view_mock.assert_called_with(plugin_admin, request_mock, 1, '', None)
 
     def test_save_model(self):

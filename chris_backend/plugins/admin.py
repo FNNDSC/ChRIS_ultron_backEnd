@@ -7,13 +7,14 @@ from .models import Plugin, ComputeResource
 from .services.manager import PluginManager
 
 
-add_view_fields = ['name', 'version', 'compute_resource']
 readonly_fields = [fld.name for fld in Plugin._meta.fields if
                    fld.name != 'compute_resource']
-all_fields = ['compute_resource'] + readonly_fields
 
 
 class PluginAdminForm(forms.ModelForm):
+    name = forms.CharField(max_length=100, required=False)
+    version = forms.CharField(max_length=10, required=False)
+    url = forms.URLField(max_length=300, required=False)
 
     def clean(self):
         """
@@ -21,14 +22,26 @@ class PluginAdminForm(forms.ModelForm):
         plugin to the DB.
         """
         if self.instance.pk is None:  # create plugin operation
-            name = self.cleaned_data.get('name')
-            version = self.cleaned_data.get('version')
-            compute_resource = self.cleaned_data.get('compute_resource')
             pl_manager = PluginManager()
-            try:
-                self.instance = pl_manager.add_plugin(name, version, compute_resource)
-            except Exception as e:
-                raise forms.ValidationError(e)
+            compute_resource = self.cleaned_data.get('compute_resource')
+            url = self.cleaned_data.pop('url', None)
+            if url:
+                try:
+                    self.instance = pl_manager.add_plugin_by_url(url, compute_resource)
+                    self.cleaned_data['name'] = self.instance.name  # set name form data
+                except Exception as e:
+                    raise forms.ValidationError(e)
+            else:
+                name = self.cleaned_data.get('name')
+                if not name:
+                    raise forms.ValidationError("A plugin's name or url is required")
+                # get user-provided version (can be blank)
+                version = self.cleaned_data.get('version')
+                try:
+                    self.instance = pl_manager.add_plugin(name, version, compute_resource)
+                except Exception as e:
+                    raise forms.ValidationError(e)
+            self.cleaned_data['version'] = self.instance.version  # set version form data
 
 
 class PluginAdmin(admin.ModelAdmin):
@@ -37,12 +50,17 @@ class PluginAdmin(admin.ModelAdmin):
     search_fields = ['name', 'version']
     list_filter = ['compute_resource', 'type', 'creation_date', 'modification_date',
                    'category']
+    change_form_template = 'admin/plugins/change_form.html'
 
     def add_view(self, request, form_url='', extra_context=None):
         """
         Overriden to only show the required fields in the add plugin page.
         """
-        self.fields = add_view_fields
+        self.fieldsets = [
+            ('Choose associated compute resource', {'fields': ['compute_resource']}),
+            ('Identify plugin by name and version', {'fields': [('name', 'version')]}),
+            ('Or identify plugin by url', {'fields': ['url']}),
+        ]
         self.readonly_fields = []
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
@@ -50,7 +68,10 @@ class PluginAdmin(admin.ModelAdmin):
         """
         Overriden to show all plugin's fields in the view plugin page.
         """
-        self.fields = all_fields
+        self.fieldsets = [
+            ('Associated compute resource', {'fields': ['compute_resource']}),
+            ('Plugin properties', {'fields': readonly_fields}),
+        ]
         self.readonly_fields = readonly_fields
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)

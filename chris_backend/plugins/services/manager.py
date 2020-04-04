@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.conf import settings
 
 from argparse import ArgumentParser
+from argparse import ArgumentError
 from chrisstoreclient.client import StoreClient
 
 from plugins.models import Plugin
@@ -35,9 +36,11 @@ class PluginManager(object):
 
         # create the parser for the "add" command
         parser_add = subparsers.add_parser('add', help='Add a new plugin')
-        parser_add.add_argument('name', help="Plugin's name")
         parser_add.add_argument('computeresource',
                                 help="Compute resource where the plugin's instances run")
+        group = parser_add.add_mutually_exclusive_group()
+        group.add_argument('--name', help="Plugin's name")
+        group.add_argument('--url', help="Plugin's url")
         parser_add.add_argument('-v', '--version', help="Plugin's version. If not "
                                                         "provided then the latest "
                                                         "version is fetched.")
@@ -62,9 +65,31 @@ class PluginManager(object):
 
     def add_plugin(self, name, version, compute_identifier, timeout=30):
         """
-        Register/add a new plugin to the system.
+        Register/add a new plugin identified by its name and version from the ChRIS store
+        into the system.
         """
         plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
+        return self._add_plugin(plg_repr, compute_identifier)
+
+    def add_plugin_by_url(self, url, compute_identifier, timeout=30):
+        """
+        Register/add a new plugin identified by its ChRIS store url from the store into
+        the system.
+        """
+        plg_repr = self.get_plugin_representation_from_store_by_url(url, timeout)
+        return self._add_plugin(plg_repr, compute_identifier)
+
+    def _add_plugin(self, plg_repr, compute_identifier):
+        """
+        Private utility method to register/add a new plugin into the system.
+        """
+        try:
+            self.get_plugin(plg_repr['name'], plg_repr['version'])
+        except NameError:
+            pass
+        else:
+            raise NameError("Plugin already exists in the system!")
+
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
@@ -142,8 +167,14 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
-            self.add_plugin(options.name, options.version, options.computeresource,
+            if options.url:
+                self.add_plugin_by_url(options.url, options.computeresource,
+                                       options.storetimeout)
+            elif options.name:
+                self.add_plugin(options.name, options.version, options.computeresource,
                             options.storetimeout)
+            else:
+                raise ArgumentError('Either a name or a url must be provided.')
         elif options.subparser_name == 'modify':
             self.modify_plugin(options.name, options.version, options.computeresource,
                                options.updatefromstore, options.storetimeout)
@@ -158,16 +189,24 @@ class PluginManager(object):
         store_url = settings.CHRIS_STORE_URL
         store_client = StoreClient(store_url, None, None, timeout)
         plg = store_client.get_plugin(name, version)
-        parameters = []
-        offset = 0
-        limit = 50
-        while True:
-            result = store_client.get_plugin_parameters(plg['id'], {'limit': limit,
-                                                                    'offset': offset})
-            parameters.extend(result['data'])
-            offset += limit
-            if not result['hasNextPage']: break
-        plg['parameters'] = parameters
+        plg['parameters'] = PluginManager.get_plugin_parameters_from_store(plg['id'],
+                                                                           timeout)
+        return plg
+
+    @staticmethod
+    def get_plugin_representation_from_store_by_url(url, timeout=30):
+        """
+        Get a plugin app representation from the ChRIS store given the url of the plugin.
+        """
+        store_url = settings.CHRIS_STORE_URL
+        store_client = StoreClient(store_url, None, None, timeout)
+        result = store_client.get_data_from_collection(store_client.get(url))
+        if result['data']:
+            plg = result['data'][0]
+        else:
+            raise NameError('Could not find plugin with url %s.' % url)
+        plg['parameters'] = PluginManager.get_plugin_parameters_from_store(plg['id'],
+                                                                           timeout)
         return plg
 
     @staticmethod
@@ -178,9 +217,27 @@ class PluginManager(object):
         try:
             plugin = Plugin.objects.get(name=name, version=version)
         except Plugin.DoesNotExist:
-            raise NameError("Couldn't find '%s' plugin with version %s in the system" %
+            raise NameError("Couldn't find '%s' plugin with version %s in the system." %
                             (name, version))
         return plugin
+
+    @staticmethod
+    def get_plugin_parameters_from_store(plg_id, timeout=30):
+        """
+        Get a plugin's parameters representation from the ChRIS store.
+        """
+        store_url = settings.CHRIS_STORE_URL
+        store_client = StoreClient(store_url, None, None, timeout)
+        parameters = []
+        offset = 0
+        limit = 50
+        while True:
+            result = store_client.get_plugin_parameters(plg_id, {'limit': limit,
+                                                                 'offset': offset})
+            parameters.extend(result['data'])
+            offset += limit
+            if not result['hasNextPage']: break
+        return parameters
 
 
 # ENTRYPOINT
