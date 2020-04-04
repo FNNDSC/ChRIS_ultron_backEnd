@@ -68,7 +68,8 @@ class PluginManagerTests(TestCase):
 
     def test_mananger_can_add_plugin(self):
         """
-        Test whether the manager can add a new plugin to the system.
+        Test whether the manager can add a new plugin to the system given its name
+        and version.
         """
         self.plugin_repr['name'] = 'testapp'
         # mock manager's get_plugin_representation_from_store static method
@@ -80,6 +81,22 @@ class PluginManagerTests(TestCase):
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'testapp', '0.1', 30)
+
+    def test_mananger_can_add_plugin_by_url(self):
+        """
+        Test whether the manager can add a new plugin to the system given its url.
+        """
+        self.plugin_repr['name'] = 'testapp'
+        # mock manager's get_plugin_representation_from_store static method
+        self.pl_manager.get_plugin_representation_from_store_by_url = mock.Mock(
+            return_value=self.plugin_repr)
+        plugin = self.pl_manager.add_plugin_by_url('http://127.0.0.1:8010/api/v1/1/',
+                                                   'host')
+        self.assertEqual(Plugin.objects.count(), 2)
+        self.assertEqual(plugin.name, 'testapp')
+        self.assertTrue(PluginParameter.objects.count() > 1)
+        self.pl_manager.get_plugin_representation_from_store_by_url.assert_called_with(
+            'http://127.0.0.1:8010/api/v1/1/', 30)
 
     def test_mananger_can_modify_plugin(self):
         """

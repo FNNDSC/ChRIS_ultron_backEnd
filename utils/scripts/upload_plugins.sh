@@ -4,27 +4,27 @@ G_SYNOPSIS="
 
  NAME
 
-	upload_plugins.sh
+    upload_plugins.sh
 
  SYNOPSIS
 
-	upload_plugins.sh USER FILE
+    upload_plugins.sh USER FILE
 
  ARGS
 
     USER
 
-	    The user that will own the plugins in the ChRIS store.
+        The user that will own the plugins in the ChRIS store.
 
-	FILE
+    FILE
 
-	    A text file containing three strings per line (separated by white spaces) \
+        A text file containing three strings per line (separated by white spaces)
         indicating a plugin's name, docker image and public source code repo respectively.
 
  DESCRIPTION
 
-	upload_plugins.sh script will upload a list of plugins to the ChRIS store under the \
-    same ChRIS store user account. The script reads each plugin's name, docker image and\
+    upload_plugins.sh script will upload a list of plugins to the ChRIS store under the
+    same ChRIS store user account. The script reads each plugin's name, docker image and
     source code repo line by line from the FILE argument.
 
 "

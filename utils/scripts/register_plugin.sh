@@ -8,13 +8,17 @@ G_SYNOPSIS="
 
  SYNOPSIS
 
-	register_plugin.sh PLUGIN COMP_ENV
+	register_plugin.sh [--name NAME | --url URL] COMP_ENV
 
  ARGS
 
-    PLUGIN
+    --name NAME
 
 	    Plugin's name.
+
+    --url URL
+
+	    Plugin's url.
 
     COMP_ENV
 
@@ -22,20 +26,30 @@ G_SYNOPSIS="
 
  DESCRIPTION
 
-	register_plugin.sh script will register a plugin from the ChRIS store in ChRIS.
+    register_plugin.sh script will register a plugin from the ChRIS store in ChRIS.
     The plugin must already be previously uploaded to the ChRIS store.
 
 "
 
-if [[ "$#" -lt 2 ]] || [[ "$#" -gt 2 ]]; then
+if [[ "$#" -lt 3 ]] || [[ "$#" -gt 3 ]]; then
     echo "$G_SYNOPSIS"
     exit 1
 fi
 
-PLUGIN=$1
-COMP_ENV=$2
+set -e  # terminate as soon as any command fails
+COMP_ENV=$3
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-echo "Registering plugin=$PLUGIN  compute environment=$COMP_ENV..."
 echo " "
-docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add "${PLUGIN}" "$COMP_ENV"
+if [[ "$1" == '--url' ]]; then
+    PLUGIN_URL=$2
+    echo "Registering plugin=$PLUGIN_URL compute environment=$COMP_ENV..."
+    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add --url "${PLUGIN_URL}" "$COMP_ENV"
+elif [[ "$1" == '--name' ]]; then
+    PLUGIN_NAME=$2
+    echo "Registering plugin=$PLUGIN_NAME compute environment=$COMP_ENV..."
+    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add --name "${PLUGIN_NAME}" "$COMP_ENV"
+else
+    echo "--url URL or --name NAME must be provided as the first argument."
+    exit 1
+fi
 echo " "
