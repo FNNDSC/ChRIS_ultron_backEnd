@@ -330,13 +330,13 @@ else
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
-        title -d 1 "Running Django Unit tests..."
+        title -d 1 "Running CUBE Unit tests..."
         docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --exclude-tag integration
         windowBottom
     fi
 
     if (( ! b_skipIntegrationTests )) ; then
-        title -d 1 "Running Django Integration tests..."
+        title -d 1 "Running CUBE Integration tests..."
         docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --tag integration
         windowBottom
     fi
@@ -470,7 +470,7 @@ else
         fi
         printf "%8s" "${STEP}.$i: "
         printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$computeEnv${NC}..." "[ $dockerhubRepo ]"
-        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add "${dockerhubRepo}" $computeEnv
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add  --name "${dockerhubRepo}" $computeEnv
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done
