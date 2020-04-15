@@ -83,12 +83,15 @@ class PluginManager(object):
         """
         Private utility method to register/add a new plugin into the system.
         """
+        name = plg_repr['name']
+        version = plg_repr['version']
         try:
-            self.get_plugin(plg_repr['name'], plg_repr['version'])
+            self.get_plugin(name, version)
         except NameError:
             pass
         else:
-            raise NameError("Plugin already exists in the system!")
+            raise NameError("Plugin %s with version %s already exists in the system!" %
+                            (name, version))
 
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']

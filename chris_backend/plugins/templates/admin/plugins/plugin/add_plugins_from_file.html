@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% if not is_popup %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {% blocktrans with name=opts.verbose_name %}Add plugins{% endblocktrans %}
+</div>
+{% endblock %}
+{% endif %}
+
+{% block content %}
+
+    <h1>Add plugins from file</h1>
+
+    <form enctype="multipart/form-data" method="post" action="{% url 'admin:add_plugins' %}">
+        {% csrf_token %}
+        {{ file_form.file }}
+        <input type='submit' id='submitbutton' value='upload' onclick='return changeText();' />
+    </form>
+
+    <script type="text/javascript">
+        function changeText() {
+            var fileSelect = document.getElementById("id_file");
+            if (fileSelect.files.length > 0 ) {
+                var submit = document.getElementById("submitbutton");
+                submit.value = 'Registering plugins...';
+            }
+            return true;
+        };
+    </script>
+
+{% endblock %}
