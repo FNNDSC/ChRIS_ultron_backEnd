@@ -1,7 +1,11 @@
 
 from django.contrib import admin
 from django.utils import timezone
+from django.urls import path
+from django.shortcuts import render
 from django import forms
+from django.core.validators import URLValidator
+from django.core.exceptions import ValidationError
 
 from .models import Plugin, ComputeResource
 from .services.manager import PluginManager
@@ -9,6 +13,10 @@ from .services.manager import PluginManager
 
 readonly_fields = [fld.name for fld in Plugin._meta.fields if
                    fld.name != 'compute_resource']
+
+
+class UploadFileForm(forms.Form):
+    file = forms.FileField()
 
 
 class PluginAdminForm(forms.ModelForm):
@@ -50,7 +58,8 @@ class PluginAdmin(admin.ModelAdmin):
     search_fields = ['name', 'version']
     list_filter = ['compute_resource', 'type', 'creation_date', 'modification_date',
                    'category']
-    change_form_template = 'admin/plugins/change_form.html'
+    change_form_template = 'admin/plugins/plugin/change_form.html'
+    change_list_template = 'admin/plugins/plugin/change_list.html'
 
     def add_view(self, request, form_url='', extra_context=None):
         """
@@ -92,7 +101,91 @@ class PluginAdmin(admin.ModelAdmin):
     #     """
     #     return False
 
+    def get_urls(self):
+        urls = super(PluginAdmin, self).get_urls()
+        custom_urls = [
+            path('add_plugins/',
+                 self.admin_site.admin_view(self.add_plugins_from_file_view),
+                 name="add_plugins"),
+        ]
+        return custom_urls + urls
+
+    def add_plugins_from_file_view(self, request):
+        """
+        Custom view to handle the add plugins from file page.
+        """
+        # custom view should return an HttpResponse
+        context = dict(
+            # Include common variables for rendering the admin template.
+            self.admin_site.each_context(request),
+            # Anything else you want in the context...
+            opts=self.opts,
+        )
+        if request.method == 'POST':
+            file_form = UploadFileForm(request.POST, request.FILES)
+            if file_form.is_valid():
+                # handle uploaded file (request.FILES['file'])
+                summary = self.register_plugins_from_file(request.FILES['file'])
+                context['summary'] = summary
+                return render(request,
+                              'admin/plugins/plugin/add_plugins_from_file_result.html',
+                              context)
+        else:
+            file_form = UploadFileForm()
+        context['file_form'] = file_form
+        return render(request,
+                      'admin/plugins/plugin/add_plugins_from_file.html',
+                      context)
+
+    def register_plugins_from_file(self, f):
+        """
+        Custom method to register plugins from a text file f. The first string of each
+        line of the file is the plugin's name or url, the second string is the version
+        (can be empty) and the third string is the associated compute environment. Any
+        plugin in the file must already be previously uploaded to the ChRIS store.
+        """
+        summary = {'success': [], 'error': []}
+        val = URLValidator()
+        pl_manager = PluginManager()
+        for line in f:
+            try:  # check file must be a text file
+                strings = line.decode().strip().split()
+            except UnicodeDecodeError:
+                summary = {'success': [], 'error': []}
+                break
+            if len(strings) == 1:
+                summary['error'].append({'plugin_name': strings[0],
+                                         'code': 'Missing compute resource identifier.'})
+            elif len(strings) > 1:
+                try:
+                    val(strings[0])  # check whether the first string is a url
+                except ValidationError:
+                    # register by name
+                    plg_name = strings[0]
+                    if len(strings) == 2:
+                        plg_version = None
+                        compute_resource = strings[1]
+                    else:
+                        plg_version = strings[1]
+                        compute_resource = strings[2]
+                    try:
+                        pl_manager.add_plugin(plg_name, plg_version, compute_resource)
+                    except Exception as e:
+                        summary['error'].append({'plugin_name': plg_name, 'code': str(e)})
+                    else:
+                        summary['success'].append({'plugin_name': plg_name})
+                else:
+                    # register by url
+                    plg_url = strings[0]
+                    compute_resource = strings[1]
+                    try:
+                        pl_manager.add_plugin_by_url(plg_url, compute_resource)
+                    except Exception as e:
+                        summary['error'].append({'plugin_name': plg_url, 'code': str(e)})
+                    else:
+                        summary['success'].append({'plugin_name': plg_url})
+        return summary
+
 
 admin.site.register(Plugin, PluginAdmin)
 admin.site.register(ComputeResource)
-

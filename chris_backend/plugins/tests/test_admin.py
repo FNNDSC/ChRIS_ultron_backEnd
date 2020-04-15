@@ -1,6 +1,8 @@
 
 import logging
+import io
 from unittest import mock
+from unittest.mock import ANY
 
 from django.test import TestCase
 from django import forms
@@ -127,7 +129,7 @@ class PluginAdminTests(TestCase):
 
     def test_add_view(self):
         """
-        Test whether overriden add_view method only shows the required fields in the add
+        Test whether overriden add_view view only shows the required fields in the add
         plugin page and in editable mode.
         """
         plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
@@ -141,7 +143,7 @@ class PluginAdminTests(TestCase):
 
     def test_change_view(self):
         """
-        Test whether overriden change_view method shows all plugin fields in readonly
+        Test whether overriden change_view view shows all plugin fields in readonly
         mode except the 'compute_resource' field that is shown in editable mode.
         """
         plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
@@ -154,6 +156,48 @@ class PluginAdminTests(TestCase):
             self.assertEqual(len(plugin_admin.readonly_fields),
                              len(plugin_admin.fieldsets[1][1]['fields']))
             change_view_mock.assert_called_with(plugin_admin, request_mock, 1, '', None)
+
+    def test_add_plugins_from_file_view(self):
+        """
+        Test whether custom add_plugins_from_file_view view passes a summary dict in
+        the context for valid form POST or otherwise an empty form.
+        """
+        plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+        summary = {'success': [{'plugin_name': 'my_plugin'}], 'error': []}
+        plugin_admin.register_plugins_from_file = mock.Mock(return_value=summary)
+        request_mock = mock.Mock()
+        request_mock.META = {'SCRIPT_NAME': ''}
+
+        with mock.patch.object(pl_admin, 'render',
+                               return_value=mock.Mock()) as render_mock:
+            request_mock.method = 'GET'
+            plugin_admin.add_plugins_from_file_view(request_mock)
+            render_mock.assert_called_with(request_mock,
+                                           'admin/plugins/plugin/add_plugins_from_file.html',
+                                           {'site_title': 'ChRIS Admin',
+                                            'site_header': 'ChRIS Administration',
+                                            'site_url': ANY,
+                                            'has_permission': ANY,
+                                            'available_apps': ANY,
+                                            'opts': ANY,
+                                            'file_form': ANY})
+
+            request_mock.method = 'POST'
+            request_mock.FILES = {'file': 'f'}
+            with mock.patch.object(pl_admin.UploadFileForm, 'is_valid',
+                                   return_value=True) as is_valid_mock:
+                plugin_admin.add_plugins_from_file_view(request_mock)
+                plugin_admin.register_plugins_from_file.assert_called_with(
+                    request_mock.FILES['file'])
+                render_mock.assert_called_with(request_mock,
+                                'admin/plugins/plugin/add_plugins_from_file_result.html',
+                                               {'site_title': 'ChRIS Admin',
+                                                'site_header': 'ChRIS Administration',
+                                                'site_url': ANY,
+                                                'has_permission': ANY,
+                                                'available_apps': ANY,
+                                                'opts': ANY,
+                                                'summary': summary})
 
     def test_save_model(self):
         """
@@ -177,3 +221,37 @@ class PluginAdminTests(TestCase):
             plugin_admin.save_model(request_mock, obj_mock, form_mock, True)
             save_model_mock.assert_called_with(request_mock, obj_mock, form_mock, True)
             self.assertGreater(obj_mock.modification_date, obj_mock_creation_date)
+
+    def test_register_plugins_from_file(self):
+        """
+        Test whether custom register_plugins_from_file method registers plugins from the
+        ChRIS store that have been specified in a text file.
+        """
+        plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+        file_content = b'simplefsapp host\n simpledsapp 1.0.6 host\n http://127.0.0.1:8010/api/v1/1/ host\n'
+
+        with mock.patch.object(pl_admin.PluginManager, 'add_plugin',
+                               return_value=None) as add_plugin_mock:
+
+            with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
+                                   return_value=None) as add_plugin_by_url_mock:
+                summary = {'success': [{'plugin_name': 'simplefsapp'},
+                                       {'plugin_name': 'simpledsapp'},
+                                       {'plugin_name': 'http://127.0.0.1:8010/api/v1/1/'}
+                                       ],
+                           'error': []}
+                with io.BytesIO(file_content) as f:
+                    self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
+                    add_plugin_mock.assert_called_with('simpledsapp', '1.0.6', 'host')
+                    add_plugin_by_url_mock.assert_called_with('http://127.0.0.1:8010/api/v1/1/',
+                                                              'host')
+
+            with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
+                                   side_effect=Exception('Error')):
+                summary = {'success': [{'plugin_name': 'simplefsapp'},
+                                       {'plugin_name': 'simpledsapp'}
+                                       ],
+                           'error': [{'plugin_name': 'http://127.0.0.1:8010/api/v1/1/',
+                                      'code': 'Error'}]}
+                with io.BytesIO(file_content) as f:
+                    self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
