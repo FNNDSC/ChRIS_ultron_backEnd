@@ -133,6 +133,19 @@ class FeedSerializerTests(SerializerTests):
         feed = Feed.objects.get(name=self.feedname)
         self.feed_serializer = FeedSerializer(feed)
 
+    def test_validate_name(self):
+        """
+        Test whether overriden validate_name method raises a serializers.ValidationError
+        when the feed name contains forward slashes or it is the special 'uploads'
+        identifier.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            self.feed_serializer.validate_name('myfeed/')
+        with self.assertRaises(serializers.ValidationError):
+            self.feed_serializer.validate_name('uploads')
+        name = self.feed_serializer.validate_name('myfeed')
+        self.assertEqual(name, 'myfeed')
+
     def test_validate_new_owner(self):
         """
         Test whether custom validate_new_owner method returns a user instance

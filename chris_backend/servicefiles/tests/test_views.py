@@ -13,13 +13,13 @@ from django.urls import reverse
 
 from rest_framework import status
 
-from pacsfiles.models import PACS, PACSFile
-from pacsfiles import views
+from servicefiles.models import Service, ServiceFile
+from servicefiles import views
 
 
-class PACSFileViewTests(TestCase):
+class ServiceFileViewTests(TestCase):
     """
-    Generic pacsfile view tests' setup and tearDown.
+    Generic servicefile view tests' setup and tearDown.
     """
 
     def setUp(self):
@@ -33,47 +33,42 @@ class PACSFileViewTests(TestCase):
         User.objects.create_user(username=self.username, password=self.password)
 
         # create a pacs file in the DB "already registered" to the server)
-        pacs = PACS(identifier='MyPACS')
-        pacs.save()
-        pacs_file = PACSFile(mrn='123456', patient_name='crazy',
-                             study='brain_crazy_study', series='brain_crazy_mri',
-                             name='file1.dcm', pacs=pacs)
-        self.path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
-        pacs_file.fname.name = self.path
-        pacs_file.save()
+        service = Service(identifier='MyService')
+        service.save()
+
+        self.path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
+        service_file = ServiceFile(service=service)
+        service_file.fname.name = self.path
+        service_file.save()
 
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.DEBUG)
 
 
-class PACSFileListViewTests(PACSFileViewTests):
+class ServiceFileListViewTests(ServiceFileViewTests):
     """
-    Test the pacsfile-list view.
+    Test the servicefile-list view.
     """
 
     def setUp(self):
-        super(PACSFileListViewTests, self).setUp()
-        self.create_read_url = reverse("pacsfile-list")
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
+        super(ServiceFileListViewTests, self).setUp()
+        self.create_read_url = reverse("servicefile-list")
+        path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
         self.post = json.dumps(
             {"template": {"data": [{"name": "path", "value": path},
-                                   {"name": "mrn", "value": "123456"},
-                                   {"name": "patient_name", "value": "crazy"},
-                                   {"name": "study", "value": "brain_crazy_study"},
-                                   {"name": "series", "value": "brain_crazy_mri"},
-                                   {"name": "pacs_name", "value": "MyPACS"}]}})
+                                   {"name": "service_name", "value": "MyService"}]}})
 
     def tearDown(self):
-        super(PACSFileListViewTests, self).tearDown()
+        super(ServiceFileListViewTests, self).tearDown()
 
     @tag('integration')
-    def test_integration_pacsfile_create_success(self):
+    def test_integration_servicefile_create_success(self):
         chris_username = 'chris'
         chris_password = 'chris1234'
         User.objects.create_user(username=chris_username, password=chris_password)
 
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
+        path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
@@ -98,89 +93,90 @@ class PACSFileListViewTests(PACSFileViewTests):
         # delete file from Swift storage
         conn.delete_object(settings.SWIFT_CONTAINER_NAME, path)
 
-    def test_pacsfile_create_failure_unauthenticated(self):
+    def test_servicefile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_pacsfile_create_failure_already_exists(self):
+    def test_servicefile_create_failure_already_exists(self):
         chris_username = 'chris'
         chris_password = 'chris1234'
         User.objects.create_user(username=chris_username, password=chris_password)
         self.client.login(username=chris_username, password=chris_password)
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
-        pacs = PACS.objects.get(identifier='MyPACS')
-        pacs_file = PACSFile(mrn='123456', patient_name='crazy',
-                             study='brain_crazy_study', series='brain_crazy_mri',
-                             name='file1.dcm', pacs=pacs)
-        pacs_file.fname.name = path
-        pacs_file.save()
+        path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
+        service = Service.objects.get(identifier='MyService')
+        service_file = ServiceFile(service=service)
+        service_file.fname.name = path
+        service_file.save()
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_pacsfile_create_failure_permission_denied_not_chris_user(self):
+    def test_servicefile_create_failure_permission_denied_not_chris_user(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_pacsfile_list_success(self):
+    def test_servicefile_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, self.path)
 
-    def test_pacsfile_list_failure_unauthenticated(self):
+    def test_servicefile_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class PACSFileDetailViewTests(PACSFileViewTests):
+class ServiceFileDetailViewTests(ServiceFileViewTests):
     """
-    Test the pacsfile-detail view.
+    Test the servicefile-detail view.
     """
 
     def setUp(self):
-        super(PACSFileDetailViewTests, self).setUp()
-        pacs_file = PACSFile.objects.get(mrn=123456, name='file1.dcm')
-        self.read_url = reverse("pacsfile-detail",
-                                kwargs={"pk": pacs_file.id})
+        super(ServiceFileDetailViewTests, self).setUp()
+        service = Service.objects.get(identifier='MyService')
+        service_file = ServiceFile.objects.get(service=service)
+        self.read_url = reverse("servicefile-detail",
+                                kwargs={"pk": service_file.id})
 
-    def test_pacsfile_detail_success(self):
+    def test_servicefile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, self.path)
 
-    def test_pacsfile_detail_failure_unauthenticated(self):
+    def test_servicefile_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class PACSFileResourceViewTests(PACSFileViewTests):
+class ServiceFileResourceViewTests(ServiceFileViewTests):
     """
-    Test the pacsfile-resource view.
+    Test the servicefile-resource view.
     """
 
     def setUp(self):
-        super(PACSFileResourceViewTests, self).setUp()
-        pacs_file = PACSFile.objects.get(mrn=123456, name='file1.dcm')
-        self.download_url = reverse("pacsfile-resource",
-                                    kwargs={"pk": pacs_file.id}) + 'file1.dcm'
+        super(ServiceFileResourceViewTests, self).setUp()
+        service = Service.objects.get(identifier='MyService')
+        service_file = ServiceFile.objects.get(service=service)
+        self.download_url = reverse("servicefile-resource",
+                                    kwargs={"pk": service_file.id}) + 'file1.dcm'
 
     def tearDown(self):
-        super(PACSFileResourceViewTests, self).tearDown()
+        super(ServiceFileResourceViewTests, self).tearDown()
 
-    def test_pacsfileresource_get(self):
-        pacs_file = PACSFile.objects.get(mrn=123456, name='file1.dcm')
+    def test_servicefileresource_get(self):
+        service = Service.objects.get(identifier='MyService')
+        service_file = ServiceFile.objects.get(service=service)
         fileresource_view_inst = mock.Mock()
-        fileresource_view_inst.get_object = mock.Mock(return_value=pacs_file)
+        fileresource_view_inst.get_object = mock.Mock(return_value=service_file)
         request_mock = mock.Mock()
-        with mock.patch('pacsfiles.views.Response') as response_mock:
-            views.PACSFileResource.get(fileresource_view_inst, request_mock)
-            response_mock.assert_called_with(pacs_file.fname)
+        with mock.patch('servicefiles.views.Response') as response_mock:
+            views.ServiceFileResource.get(fileresource_view_inst, request_mock)
+            response_mock.assert_called_with(service_file.fname)
 
     @tag('integration')
-    def test_integration_pacsfileresource_download_success(self):
+    def test_integration_servicefileresource_download_success(self):
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,

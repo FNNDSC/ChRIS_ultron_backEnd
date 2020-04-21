@@ -11,6 +11,7 @@ from pipelines import views as pipeline_views
 from pipelineinstances import views as pipelineinstance_views
 from uploadedfiles import views as uploadedfile_views
 from pacsfiles import views as pacsfile_views
+from servicefiles import views as servicefile_views
 from users import views as user_views
 
 # API v1 endpoints
@@ -257,6 +258,23 @@ urlpatterns = format_suffix_patterns([
     url(r'^v1/pacsfiles/(?P<pk>[0-9]+)/.*$',
         pacsfile_views.PACSFileResource.as_view(),
         name='pacsfile-resource'),
+
+
+    url(r'^v1/servicefiles/$',
+        servicefile_views.ServiceFileList.as_view(),
+        name='servicefile-list'),
+
+    url(r'^v1/servicefiles/search/$',
+        servicefile_views.ServiceFileListQuerySearch.as_view(),
+        name='servicefile-list-query-search'),
+
+    url(r'^v1/servicefiles/(?P<pk>[0-9]+)/$',
+        servicefile_views.ServiceFileDetail.as_view(),
+        name='servicefile-detail'),
+
+    url(r'^v1/servicefiles/(?P<pk>[0-9]+)/.*$',
+        servicefile_views.ServiceFileResource.as_view(),
+        name='servicefile-resource'),
 
 ])
 

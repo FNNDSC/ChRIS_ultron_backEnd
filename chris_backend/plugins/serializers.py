@@ -12,7 +12,7 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ComputeResource
-        fields = ('url', 'compute_resource_identifier')
+        fields = ('url', 'id', 'compute_resource_identifier')
 
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
