@@ -7,18 +7,28 @@ import swiftclient
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
 
-from .models import PACSFile
+from .models import PACS, PACSFile
+
+
+class PACSSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = PACS
+        fields = ('url', 'id', 'identifier')
 
 
 class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
     file_resource = ItemLinkField('get_file_link')
     path = serializers.CharField(write_only=True)
     fname = serializers.FileField(use_url=False, required=False)
+    pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
+    pacs_name = serializers.CharField(write_only=True)
+    name = serializers.CharField(required=False)
 
     class Meta:
         model = PACSFile
         fields = ('url', 'id', 'fname', 'mrn', 'patient_name', 'study', 'series', 'name',
-                  'path', 'file_resource')
+                  'path', 'pacs_identifier', 'pacs_name', 'file_resource')
 
     def get_file_link(self, obj):
         """
@@ -28,62 +38,73 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to associate a path in Swift with the newly created pacs file.
+        Overriden to associate a Swift storage path with the newly created pacs file.
         """
+        # remove path as it is not part of the model and then compute fname
         path = validated_data.pop('path')
         pacs_file = super(PACSFileSerializer, self).create(validated_data)
         pacs_file.fname.name = path
         pacs_file.save()
         return pacs_file
 
+    def validate_pacs_name(self, pacs_name):
+        """
+        Overriden to check whether the provided PACS name is a valid PACS identifier.
+        """
+        try:
+            PACS.objects.get(identifier=pacs_name)
+        except PACS.DoesNotExist:
+            # validate new PACS identifier
+            pacs_serializer = PACSSerializer(data={'identifier': pacs_name})
+            try:
+                pacs_serializer.is_valid(raise_exception=True)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(e.detail['identifier'])
+        return pacs_name
+
     def validate_path(self, path):
         """
-        Overriden to check that the provided path is under /PACS path.
+        Overriden to check whether the provided path is under SERVICES/PACS/ path.
         """
         path = path.strip(' ').strip('/')
-        if not path.startswith('PACS'):
+        if not path.startswith('SERVICES/PACS/'):
             raise serializers.ValidationError(
-                ["You do not have permission to access this path."])
-        if len(path.split('/')) != 5:
-            raise serializers.ValidationError(
-                ["Missing components! Path must be of the form:"
-                 "PACS/<MRN>-<PATIENTNAME>/<STUDY>/<SERIES>/<actualDICOMfile>."])
+                ["File path must start with 'SERVICES/PACS/'."])
         # verify that the file is indeed already in Swift
         conn = swiftclient.Connection(user=settings.SWIFT_USERNAME,
                                       key=settings.SWIFT_KEY,
                                       authurl=settings.SWIFT_AUTH_URL)
         object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
         if not object_list:
-            raise serializers.ValidationError(["Could not find this path!"])
+            raise serializers.ValidationError(["Could not find this path."])
         return path
 
     def validate(self, data):
         """
-        Overriden to validate the calculated API descriptors from the provided path
-        and check whether the path is already registered.
+        Overriden to validate calculated API descriptors from the provided and check
+        whether the provided path is already registered.
         """
+        # compute file's name
         path = data.get('path')
         path_parts = path.split('/')
-        mrn = path_parts[1].split('-')[0]
-        patient_name = path_parts[1].split('-')[1]
-        study = path_parts[2]
-        series = path_parts[3]
-        name = path_parts[4]
-        expanded_data = {'mrn': mrn,
-                         'patient_name': patient_name,
-                         'study': study,
-                         'series': series,
-                         'name': name}
-        # update the request data and validate the expanded data
-        data.update(expanded_data)
-        serializer = PACSFileSerializer(data=data)
-        serializer.validate = lambda x: x  # do not rerun this validate
-        serializer.is_valid(raise_exception=True)
+        name = path_parts[-1]
+        # remove pacs_name as it is not part of the model and then compute pacs
+        pacs_name = data.pop('pacs_name')
+        (pacs, tf) = PACS.objects.get_or_create(identifier=pacs_name)
+        # verify that the file has not already been registered
+        search_data = {'mrn': data.get('mrn'),
+                       'patient_name': data.get('patient_name'),
+                       'study': data.get('study'),
+                       'series': data.get('series'),
+                       'name': name,
+                       'pacs': pacs}
         try:
-            PACSFile.objects.get(**expanded_data)
+            PACSFile.objects.get(**search_data)
         except PACSFile.DoesNotExist:
             pass
         else:
-            error_msg = "Path has already been registered!"
+            error_msg = "File has already been registered."
             raise serializers.ValidationError({'path': [error_msg]})
+        # update validated data
+        data.update({'name': name, 'pacs': pacs})
         return data

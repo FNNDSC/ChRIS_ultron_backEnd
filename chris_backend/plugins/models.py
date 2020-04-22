@@ -20,7 +20,7 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
 
 class ComputeResource(models.Model):
-    compute_resource_identifier = models.CharField(max_length=100)
+    compute_resource_identifier = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.compute_resource_identifier

@@ -6,17 +6,17 @@ from rest_framework.response import Response
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 
-from .models import PACSFile, PACSFileFilter
-from .serializers import PACSFileSerializer
+from .models import ServiceFile, ServiceFileFilter
+from .serializers import ServiceFileSerializer
 from .permissions import IsChrisOrReadOnly
 
 
-class PACSFileList(generics.ListCreateAPIView):
+class ServiceFileList(generics.ListCreateAPIView):
     """
     A view for the collection of PACS files.
     """
-    queryset = PACSFile.objects.all()
-    serializer_class = PACSFileSerializer
+    queryset = ServiceFile.objects.all()
+    serializer_class = ServiceFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
     def list(self, request, *args, **kwargs):
@@ -24,13 +24,12 @@ class PACSFileList(generics.ListCreateAPIView):
         Overriden to append document-level link relations and a collection+json
         template to the response.
         """
-        response = super(PACSFileList, self).list(request, *args, **kwargs)
+        response = super(ServiceFileList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('pacsfile-list-query-search', request=request)]
+        query_list = [reverse('servicefile-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
-        template_data = {'path': "", 'mrn': "", 'patient_name': "", 'study': "",
-                         'series': "", 'pacs_name': ""}
+        template_data = {'path': "", 'service_name': ""}
         return services.append_collection_template(response, template_data)
 
     def create(self, request, *args, **kwargs):
@@ -38,34 +37,33 @@ class PACSFileList(generics.ListCreateAPIView):
         Overriden to remove computed descriptors from the request if submitted.
         """
         self.request.data.pop('fname', None)
-        self.request.data.pop('name', None)
-        return super(PACSFileList, self).create(request, *args, **kwargs)
+        return super(ServiceFileList, self).create(request, *args, **kwargs)
 
 
-class PACSFileListQuerySearch(generics.ListAPIView):
+class ServiceFileListQuerySearch(generics.ListAPIView):
     """
-    A view for the collection of PACS files resulting from a query search.
+    A view for the collection of Service files resulting from a query search.
     """
-    serializer_class = PACSFileSerializer
-    queryset = PACSFile.objects.all()
+    serializer_class = ServiceFileSerializer
+    queryset = ServiceFile.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    filterset_class = PACSFileFilter
+    filterset_class = ServiceFileFilter
 
 
-class PACSFileDetail(generics.RetrieveAPIView):
+class ServiceFileDetail(generics.RetrieveAPIView):
     """
-    A PACS file view.
+    A Service file view.
     """
-    queryset = PACSFile.objects.all()
-    serializer_class = PACSFileSerializer
+    queryset = ServiceFile.objects.all()
+    serializer_class = ServiceFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
 
-class PACSFileResource(generics.GenericAPIView):
+class ServiceFileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
-    queryset = PACSFile.objects.all()
+    queryset = ServiceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -73,5 +71,5 @@ class PACSFileResource(generics.GenericAPIView):
         """
         Overriden to be able to make a GET request to an actual file resource.
         """
-        pacs_file = self.get_object()
-        return Response(pacs_file.fname)
+        service_file = self.get_object()
+        return Response(service_file.fname)

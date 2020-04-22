@@ -23,7 +23,7 @@ from chrisstoreclient.client import StoreClient
 from plugins.models import Plugin
 from plugins.models import ComputeResource
 from plugins.serializers import PluginSerializer, PluginParameterSerializer
-from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
+from plugins.serializers import ComputeResourceSerializer, DEFAULT_PARAMETER_SERIALIZERS
 
 
 class PluginManager(object):
@@ -92,7 +92,6 @@ class PluginManager(object):
         else:
             raise NameError("Plugin %s with version %s already exists in the system!" %
                             (name, version))
-
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
@@ -114,6 +113,14 @@ class PluginManager(object):
                 serializer_dict['default_serializer'] = default_param_serializer
             parameters_serializers.append(serializer_dict)
 
+        # validate compute resource identifier
+        try:
+            ComputeResource.objects.get(compute_resource_identifier=compute_identifier)
+        except ComputeResource.DoesNotExist:
+            compute_resource_serializer = ComputeResourceSerializer(
+                data={'compute_resource_identifier': compute_identifier})
+            compute_resource_serializer.is_valid(raise_exception=True)
+
         # if no validation errors at this point then save to the DB
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             compute_resource_identifier=compute_identifier)
@@ -133,6 +140,14 @@ class PluginManager(object):
         compute_resource = None
         plg_repr = None
         if compute_identifier:
+            # validate compute resource identifier
+            try:
+                ComputeResource.objects.get(
+                    compute_resource_identifier=compute_identifier)
+            except ComputeResource.DoesNotExist:
+                compute_resource_serializer = ComputeResourceSerializer(
+                    data={'compute_resource_identifier': compute_identifier})
+                compute_resource_serializer.is_valid(raise_exception=True)
             (compute_resource, tf) = ComputeResource.objects.get_or_create(
                 compute_resource_identifier=compute_identifier)
         if fetch:

@@ -113,6 +113,19 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                   'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
                   'files', 'plugin_instances')
 
+    def validate_name(self, name):
+        """
+        Overriden to check that the feed's name does not contain forward slashes and
+        is not the special 'uploads' identifier.
+        """
+        if '/' in name:
+            raise serializers.ValidationError(
+                ["This field may not contain forward slashes."])
+        if name == 'uploads':
+            raise serializers.ValidationError(
+                ["Forbidden feed name 'uploads'."])
+        return name
+
     def validate_new_owner(self, username):
         """
         Custom method to check whether a new feed owner is a system-registered user.
