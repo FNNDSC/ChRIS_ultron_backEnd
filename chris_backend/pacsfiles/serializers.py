@@ -27,8 +27,9 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PACSFile
-        fields = ('url', 'id', 'fname', 'mrn', 'patient_name', 'study', 'series', 'name',
-                  'path', 'pacs_identifier', 'pacs_name', 'file_resource')
+        fields = ('url', 'id', 'fname', 'path', 'name', 'PatientID', 'PatientName',
+                  'StudyInstanceUID', 'StudyDescription',  'SeriesInstanceUID',
+                  'SeriesDescription', 'pacs_identifier', 'pacs_name', 'file_resource')
 
     def get_file_link(self, obj):
         """
@@ -92,10 +93,9 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
         pacs_name = data.pop('pacs_name')
         (pacs, tf) = PACS.objects.get_or_create(identifier=pacs_name)
         # verify that the file has not already been registered
-        search_data = {'mrn': data.get('mrn'),
-                       'patient_name': data.get('patient_name'),
-                       'study': data.get('study'),
-                       'series': data.get('series'),
+        search_data = {'PatientID': data.get('PatientID'),
+                       'StudyInstanceUID': data.get('StudyInstanceUID'),
+                       'SeriesInstanceUID': data.get('SeriesInstanceUID'),
                        'name': name,
                        'pacs': pacs}
         try:

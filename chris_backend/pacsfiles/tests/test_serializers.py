@@ -62,7 +62,7 @@ class PACSFileSerializerTests(TestCase):
         in internal storage.
         """
         pacsfiles_serializer = PACSFileSerializer()
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
+        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         with self.assertRaises(serializers.ValidationError):
             pacsfiles_serializer.validate_path(path)
 
@@ -72,7 +72,7 @@ class PACSFileSerializerTests(TestCase):
         Test whether overriden validate_path method validates submitted path.
         """
         pacsfiles_serializer = PACSFileSerializer()
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
+        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,
@@ -101,9 +101,13 @@ class PACSFileSerializerTests(TestCase):
         Test whether overriden validate method updates validated data with the descriptors
         embedded in the path string.
         """
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
-        data = {'mrn': '123456', 'patient_name': 'crazy', 'study': 'brain_crazy_study',
-                'series': 'brain_crazy_mri', 'pacs_name': 'MyPACS', 'path': path}
+        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
+        data = {'PatientID': '123456', 'PatientName': 'crazy',
+                'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
+                'StudyDescription': 'brain_crazy_study',
+                'SeriesDescription': 'SAG T1 MPRAGE',
+                'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
+                'pacs_name': 'MyPACS', 'path': path}
         pacsfiles_serializer = PACSFileSerializer()
         new_data = pacsfiles_serializer.validate(data)
         self.assertIn('pacs', new_data)
@@ -114,13 +118,18 @@ class PACSFileSerializerTests(TestCase):
         Test whether overriden validate method validates that the submitted path
         has not been already registered.
         """
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
-        data = {'mrn': '123456', 'patient_name': 'crazy', 'study': 'brain_crazy_study',
-                'series': 'brain_crazy_mri', 'pacs_name': 'MyPACS', 'path': path}
+        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
+        data = {'PatientID': '123456', 'PatientName': 'crazy',
+                'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
+                'StudyDescription': 'brain_crazy_study',
+                'SeriesDescription': 'SAG T1 MPRAGE',
+                'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
+                'pacs_name': 'MyPACS', 'path': path}
         pacs = PACS(identifier='MyPACS')
         pacs.save()
-        pacs_file = PACSFile(mrn='123456', patient_name='crazy',
-                             study='brain_crazy_study', series='brain_crazy_mri',
+        pacs_file = PACSFile(PatientID='123456',
+                             StudyInstanceUID='1.1.3432.54.6545674765.765434',
+                             SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              name='file1.dcm', pacs=pacs)
         pacs_file.fname.name = path
         pacs_file.save()

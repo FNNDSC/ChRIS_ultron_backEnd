@@ -3,7 +3,7 @@
 ![License][license-badge]
 ![Last Commit][last-commit-badge]
 
-The core back end service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the  
+The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the  
 service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) 
 REST API.
 
@@ -49,7 +49,7 @@ The resulting instance uses the default Django development server and therefore 
 
 ### Single-machine production deployment
 
-#### To get the system up:
+#### To get the production system up:
 
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
