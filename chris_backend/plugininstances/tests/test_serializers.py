@@ -216,6 +216,19 @@ class PathParameterSerializerTests(SerializerTests):
         self.other_username = 'boo'
         self.other_password = 'far'
 
+    def test_validate_value_fail_acces_denied_to_root(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access an invalid root path.
+        """
+        path_parm_serializer = PathParameterSerializer(user=self.user)
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value("./")
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(".")
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value("/")
+
     def test_validate_value_fail_denied_acces_other_user_space(self):
         """
         Test whether overriden validate_value method raises a serializers.ValidationError
@@ -282,6 +295,19 @@ class UnextpathParameterSerializerTests(SerializerTests):
         self.user = User.objects.get(username=self.username)
         self.other_username = 'boo'
         self.other_password = 'far'
+
+    def test_validate_value_fail_acces_denied_to_root(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access an invalid root path.
+        """
+        path_parm_serializer = PathParameterSerializer(user=self.user)
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value("./")
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(".")
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value("/")
 
     def test_validate_value_fail_denied_acces_other_user_space(self):
         """

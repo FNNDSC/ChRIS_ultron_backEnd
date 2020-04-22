@@ -211,6 +211,9 @@ def validate_paths(user, string):
     path_list = [s.strip() for s in string.split(',')]
     for path in path_list:
         path_parts = pathlib.Path(path).parts
+        if len(path_parts) == 0:
+            raise serializers.ValidationError(
+                ["You do not have permission to access this path."])
         if path_parts[0] != user.username:
             if len(path_parts) == 1 or path_parts[1] == 'uploads':
                 raise serializers.ValidationError(
