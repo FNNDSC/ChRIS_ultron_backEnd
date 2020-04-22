@@ -13,11 +13,13 @@ class PACS(models.Model):
 
 class PACSFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=500)
-    mrn = models.CharField(max_length=10)
-    patient_name = models.CharField(max_length=15)
-    study = models.CharField(max_length=150)
-    series = models.CharField(max_length=150)
+    fname = models.FileField(max_length=600)
+    PatientID = models.CharField(max_length=15)
+    PatientName = models.CharField(max_length=30)
+    StudyInstanceUID = models.CharField(max_length=50)
+    StudyDescription = models.CharField(max_length=200, blank=True)
+    SeriesInstanceUID = models.CharField(max_length=50)
+    SeriesDescription = models.CharField(max_length=200, blank=True)
     name = models.CharField(max_length=175)
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
 
@@ -33,18 +35,24 @@ class PACSFileFilter(FilterSet):
                                                   lookup_expr='gte')
     max_creation_date = django_filters.DateFilter(field_name='creation_date',
                                                   lookup_expr='lte')
-    mrn = django_filters.CharFilter(field_name='mrn', lookup_expr='icontains')
-    mrn_exact = django_filters.CharFilter(field_name='mrn', lookup_expr='exact')
-    patient_name = django_filters.CharFilter(field_name='patient_name',
-                                             lookup_expr='icontains')
-    study = django_filters.CharFilter(field_name='study', lookup_expr='icontains')
-    series = django_filters.CharFilter(field_name='series', lookup_expr='icontains')
+    PatientID = django_filters.CharFilter(field_name='PatientID', lookup_expr='exact')
+    PatientName = django_filters.CharFilter(field_name='PatientName',
+                                            lookup_expr='icontains')
+    StudyInstanceUID = django_filters.CharFilter(field_name='StudyInstanceUID',
+                                                 lookup_expr='exact')
+    StudyDescription = django_filters.CharFilter(field_name='StudyDescription',
+                                                 lookup_expr='icontains')
+
+    SeriesInstanceUID = django_filters.CharFilter(field_name='SeriesInstanceUID',
+                                                 lookup_expr='exact')
+    SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
+                                                 lookup_expr='icontains')
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
                                                 lookup_expr='exact')
-    pacs_id = django_filters.CharFilter(field_name='pacs_id', lookup_expr='exact')
 
     class Meta:
         model = PACSFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'mrn', 'mrn_exact',
-                  'patient_name', 'study', 'series', 'name', 'pacs_identifier', 'pacs_id']
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'name', 'PatientID',
+                  'PatientName', 'StudyInstanceUID', 'StudyDescription',
+                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']

@@ -111,7 +111,7 @@ CELERY_RESULT_BACKEND = 'django-db'  # a result backend is needed for tests
 CELERY_RESULT_SERIALIZER = 'json'
 
 #CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
-CELERY_BROKER_URL = 'pyamqp://queue:5672'
+CELERY_BROKER_URL = 'amqp://queue:5672'
 
 #: Only add pickle to this list if your broker is secured
 #: from unwanted access (see userguide/security.html)
