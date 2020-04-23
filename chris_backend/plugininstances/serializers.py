@@ -137,8 +137,8 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginInstanceFile
-        fields = ('url', 'id', 'fname', 'feed_id', 'plugin_inst_id', 'file_resource',
-                  'plugin_inst')
+        fields = ('url', 'id', 'creation_date', 'fname', 'feed_id', 'plugin_inst_id',
+                  'file_resource', 'plugin_inst')
 
     def get_file_link(self, obj):
         """

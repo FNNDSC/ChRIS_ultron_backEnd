@@ -27,8 +27,8 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ServiceFile
-        fields = ('url', 'id', 'fname', 'path', 'service_identifier', 'service_name',
-                  'file_resource')
+        fields = ('url', 'id', 'creation_date', 'fname', 'path', 'service_identifier',
+                  'service_name', 'file_resource')
 
     def get_file_link(self, obj):
         """
