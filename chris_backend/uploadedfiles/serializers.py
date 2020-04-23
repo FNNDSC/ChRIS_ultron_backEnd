@@ -19,7 +19,8 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UploadedFile
-        fields = ('url', 'id', 'upload_path', 'fname', 'file_resource', 'owner')
+        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'file_resource',
+                  'owner')
 
     def get_file_link(self, obj):
         """
