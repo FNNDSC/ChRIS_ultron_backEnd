@@ -106,6 +106,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
 
+# silence warning "MySQL does not allow unique CharFields to have a max_length > 255"
+SILENCED_SYSTEM_CHECKS = ['mysql.E001']
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',

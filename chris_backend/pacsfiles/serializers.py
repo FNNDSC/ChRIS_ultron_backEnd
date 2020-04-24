@@ -23,11 +23,10 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False, required=False)
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
     pacs_name = serializers.CharField(write_only=True)
-    name = serializers.CharField(required=False)
 
     class Meta:
         model = PACSFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'path', 'name', 'PatientID',
+        fields = ('url', 'id', 'creation_date', 'fname', 'path', 'PatientID',
                   'PatientName', 'StudyInstanceUID', 'StudyDescription',
                   'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier',
                   'pacs_name', 'file_resource')
@@ -86,26 +85,22 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to validate calculated API descriptors from the provided and check
         whether the provided path is already registered.
         """
-        # compute file's name
-        path = data.get('path')
-        path_parts = path.split('/')
-        name = path_parts[-1]
-        # remove pacs_name as it is not part of the model and then compute pacs
+        # remove pacs_name as it is not part of the model
         pacs_name = data.pop('pacs_name')
-        (pacs, tf) = PACS.objects.get_or_create(identifier=pacs_name)
+        path = data.get('path')
+        prefix = 'SERVICES/PACS/%s/' % pacs_name
+        if not path.startswith(prefix):
+            error_msg = "File path must start with '%s'." % prefix
+            raise serializers.ValidationError([error_msg])
         # verify that the file has not already been registered
-        search_data = {'PatientID': data.get('PatientID'),
-                       'StudyInstanceUID': data.get('StudyInstanceUID'),
-                       'SeriesInstanceUID': data.get('SeriesInstanceUID'),
-                       'name': name,
-                       'pacs': pacs}
         try:
-            PACSFile.objects.get(**search_data)
+            PACSFile.objects.get(fname=path)
         except PACSFile.DoesNotExist:
             pass
         else:
             error_msg = "File has already been registered."
             raise serializers.ValidationError({'path': [error_msg]})
-        # update validated data
-        data.update({'name': name, 'pacs': pacs})
+        # update validated data with a pacs object
+        (pacs, tf) = PACS.objects.get_or_create(identifier=pacs_name)
+        data.update({'pacs': pacs})
         return data

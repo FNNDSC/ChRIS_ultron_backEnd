@@ -21,15 +21,12 @@ class UploadedFileModelTests(TestCase):
         uploadedfile_instance = mock.Mock()
         uploadedfile_instance.owner = mock.Mock(spec=User)
         uploadedfile_instance.owner.username = 'foo'
-        uploadedfile_instance.upload_path = '/myuploads'
+        uploadedfile_instance.owner.upload_path = 'foo/uploads/myuploads'
         filename = 'file1.txt'
         file_path = uploaded_file_path(uploadedfile_instance, filename)
-        expected_file_path = '{0}/{1}/{2}'.format(uploadedfile_instance.owner.username,
-                                                  'uploads',
-                                                  uploadedfile_instance.upload_path.strip('/'))
-        self.assertEqual(file_path, expected_file_path)
+        self.assertEqual(file_path, 'foo/uploads/myuploads')
 
     def test_str(self):
         uploadedfile_mock = mock.MagicMock(spec=UploadedFile)
-        uploadedfile_mock.upload_path = '/myuploads'
-        self.assertEqual(UploadedFile.__str__(uploadedfile_mock), '/myuploads')
+        uploadedfile_mock.fname.name = 'foo/uploads/myuploads'
+        self.assertEqual(UploadedFile.__str__(uploadedfile_mock), 'foo/uploads/myuploads')

@@ -40,7 +40,6 @@ class PACSFileList(generics.ListCreateAPIView):
         Overriden to remove computed descriptors from the request if submitted.
         """
         self.request.data.pop('fname', None)
-        self.request.data.pop('name', None)
         return super(PACSFileList, self).create(request, *args, **kwargs)
 
 
