@@ -16,8 +16,8 @@ class Service(models.Model):
 
 class ServiceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=500)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    fname = models.FileField(max_length=512, unique=True)
+    service = models.ForeignKey(Service, db_index=True, on_delete=models.CASCADE)
 
     class Meta:
         ordering = ('-fname',)
@@ -31,11 +31,13 @@ class ServiceFileFilter(FilterSet):
                                                   lookup_expr='gte')
     max_creation_date = django_filters.DateFilter(field_name='creation_date',
                                                   lookup_expr='lte')
+    fname = django_filters.CharFilter(field_name='fname', lookup_expr='icontains')
+    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     service_identifier = django_filters.CharFilter(field_name='service__identifier',
                                                    lookup_expr='exact')
     service_id = django_filters.CharFilter(field_name='service_id', lookup_expr='exact')
 
     class Meta:
         model = ServiceFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'service_identifier',
-                  'service_id']
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
+                  'service_identifier', 'service_id']

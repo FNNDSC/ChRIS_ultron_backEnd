@@ -41,9 +41,8 @@ class PACSFileViewTests(TestCase):
                              StudyDescription='brain_crazy_study',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              SeriesDescription='SAG T1 MPRAGE',
-                             name='file1.dcm',
                              pacs=pacs)
-        self.path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
+        self.path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         pacs_file.fname.name = self.path
         pacs_file.save()
 
@@ -60,7 +59,7 @@ class PACSFileListViewTests(PACSFileViewTests):
     def setUp(self):
         super(PACSFileListViewTests, self).setUp()
         self.create_read_url = reverse("pacsfile-list")
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
+        path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
         self.post = json.dumps(
             {"template": {"data": [{"name": "path", "value": path},
                                    {"name": "PatientID", "value": "123456"},
@@ -82,7 +81,7 @@ class PACSFileListViewTests(PACSFileViewTests):
         chris_password = 'chris1234'
         User.objects.create_user(username=chris_username, password=chris_password)
 
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
+        path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
@@ -117,12 +116,12 @@ class PACSFileListViewTests(PACSFileViewTests):
         chris_password = 'chris1234'
         User.objects.create_user(username=chris_username, password=chris_password)
         self.client.login(username=chris_username, password=chris_password)
-        path = 'SERVICES/PACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
+        path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
         pacs = PACS.objects.get(identifier='MyPACS')
         pacs_file = PACSFile(PatientID='123456',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
-                             name='file1.dcm', pacs=pacs)
+                             pacs=pacs)
         pacs_file.fname.name = path
         pacs_file.save()
         response = self.client.post(self.create_read_url, data=self.post,
@@ -152,7 +151,7 @@ class PACSFileDetailViewTests(PACSFileViewTests):
 
     def setUp(self):
         super(PACSFileDetailViewTests, self).setUp()
-        pacs_file = PACSFile.objects.get(PatientID=123456, name='file1.dcm')
+        pacs_file = PACSFile.objects.get(PatientID=123456)
         self.read_url = reverse("pacsfile-detail",
                                 kwargs={"pk": pacs_file.id})
 
@@ -173,7 +172,7 @@ class PACSFileResourceViewTests(PACSFileViewTests):
 
     def setUp(self):
         super(PACSFileResourceViewTests, self).setUp()
-        pacs_file = PACSFile.objects.get(PatientID=123456, name='file1.dcm')
+        pacs_file = PACSFile.objects.get(PatientID=123456)
         self.download_url = reverse("pacsfile-resource",
                                     kwargs={"pk": pacs_file.id}) + 'file1.dcm'
 
@@ -181,7 +180,7 @@ class PACSFileResourceViewTests(PACSFileViewTests):
         super(PACSFileResourceViewTests, self).tearDown()
 
     def test_pacsfileresource_get(self):
-        pacs_file = PACSFile.objects.get(PatientID=123456, name='file1.dcm')
+        pacs_file = PACSFile.objects.get(PatientID=123456)
         fileresource_view_inst = mock.Mock()
         fileresource_view_inst.get_object = mock.Mock(return_value=pacs_file)
         request_mock = mock.Mock()

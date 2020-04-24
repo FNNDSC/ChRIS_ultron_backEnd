@@ -72,15 +72,15 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to check whether the provided path is under SERVICES/<service_name>/
         path and already registered.
         """
-        # remove service_name as it is not part of the model and then compute service
+        # remove service_name as it is not part of the model
         service_name = data.pop('service_name')
-        (service, tf) = Service.objects.get_or_create(identifier=service_name)
         # verify that the file path is correct
         path = data.get('path')
         path = path.strip(' ').strip('/')
-        if not path.startswith('SERVICES/%s/' % service_name):
-            error_msg = "File path must start with 'SERVICES/%s/'." % service_name
-            raise serializers.ValidationError({'path': [error_msg]})
+        prefix = 'SERVICES/%s/' % service_name
+        if not path.startswith(prefix):
+            error_msg = "File path must start with '%s'." % prefix
+            raise serializers.ValidationError([error_msg])
         # verify that the file is indeed already in Swift
         conn = swiftclient.Connection(user=settings.SWIFT_USERNAME,
                                       key=settings.SWIFT_KEY,
@@ -89,14 +89,14 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
         if not object_list:
             raise serializers.ValidationError({'path': ["Could not find this path."]})
         # verify that the file has not already been registered
-        search_data = {'fname': path, 'service': service}
         try:
-            ServiceFile.objects.get(**search_data)
+            ServiceFile.objects.get(fname=path)
         except ServiceFile.DoesNotExist:
             pass
         else:
             error_msg = "File has already been registered."
             raise serializers.ValidationError({'path': [error_msg]})
         # update validated data
+        (service, tf) = Service.objects.get_or_create(identifier=service_name)
         data.update({'path': path, 'service': service})
         return data

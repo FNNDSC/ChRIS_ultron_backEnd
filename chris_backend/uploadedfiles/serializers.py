@@ -1,7 +1,4 @@
 
-import os
-
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
@@ -11,11 +8,10 @@ from .models import UploadedFile
 
 
 class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail',
-                                               read_only=True)
+    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
     file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
-    upload_path = serializers.CharField()
+    upload_path = serializers.CharField(write_only=True)
 
     class Meta:
         model = UploadedFile
@@ -28,20 +24,26 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         """
         return get_file_resource_link(self, obj)
 
-    def validate_file_upload_path(self, path):
+    def validate_upload_path(self, upload_path):
         """
-        Custom method to check that the provided path is unique for this user in the DB.
+        Overriden to check whether the provided path is under <username>/<uploads>/.
         """
         # remove leading and trailing slashes
-        path = path.strip('/')
-        if not path:
-            raise serializers.ValidationError({'upload_path': ["Invalid file path."]})
-        path = os.path.join('/', path)
-        try:
-            # check if path for this file already exists in the db
-            user = self.context['request'].user
-            UploadedFile.objects.get(owner=user.id, upload_path=path)
-        except ObjectDoesNotExist:
-            return path
-        else:
-            raise serializers.ValidationError({'upload_path': ["File already exists."]})
+        upload_path = upload_path.strip(' ').strip('/')
+        user = self.context['request'].user
+        prefix = '{}/{}/'.format(user.username, 'uploads')
+        if not upload_path.startswith(prefix):
+            error_msg = "File path must start with '%s'." % prefix
+            raise serializers.ValidationError([error_msg])
+        return upload_path
+
+    def validate(self, data):
+        """
+        Overriden to attach the upload path to the owner object.
+        """
+        # remove upload_path as it is not part of the model and attach it to the owner obj
+        upload_path = data.pop('upload_path')
+        owner = self.context['request'].user
+        owner.upload_path = upload_path
+        data['owner'] = owner
+        return data

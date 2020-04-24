@@ -43,8 +43,8 @@ class UploadedFileViewTests(TestCase):
                                  password=self.password)
 
         # create a file in the DB "already uploaded" to the server)
-        self.uploadedfile = UploadedFile(upload_path='/file1.txt', owner=user)
-        self.uploadedfile.fname.name = 'test/uploads/file1.txt'
+        self.uploadedfile = UploadedFile(owner=user)
+        self.uploadedfile.fname.name = '{}/uploads/file1.txt'.format(user)
         self.uploadedfile.save()
 
     def tearDown(self):
@@ -69,8 +69,9 @@ class UploadedFileListViewTests(UploadedFileViewTests):
 
         # POST request using multipart/form-data to be able to upload file
         self.client.login(username=self.username, password=self.password)
+        upload_path = "{}/uploads/file2.txt".format(self.username)
         with io.StringIO("test file") as f:
-            post = {"fname": f, "upload_path": "/file2.txt"}
+            post = {"fname": f, "upload_path": upload_path}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -81,11 +82,12 @@ class UploadedFileListViewTests(UploadedFileViewTests):
             authurl=settings.SWIFT_AUTH_URL,
         )
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, 'test/uploads/file2.txt')
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, upload_path)
 
     def test_uploadedfile_create_failure_unauthenticated(self):
+        upload_path = "{}/uploads/file2.txt".format(self.username)
         response = self.client.post(self.create_read_url,
-                                    data={"fname": {}, "upload_path": "/file2.txt"})
+                                    data={"fname": {}, "upload_path": upload_path})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_uploadedfile_list_success(self):
@@ -107,9 +109,9 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
         super(UploadedFileDetailViewTests, self).setUp()
         self.read_update_delete_url = reverse("uploadedfile-detail",
                                               kwargs={"pk": self.uploadedfile.id})
+        upload_path = "{}/uploads/myfolder/myfile1.txt".format(self.username)
         self.put = json.dumps({
-            "template": {"data": [{"name": "upload_path",
-                                   "value": "/myfolder/myfile1.txt"}]}})
+            "template": {"data": [{"name": "upload_path", "value": upload_path}]}})
 
     def test_uploadedfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -136,7 +138,7 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
 
     def test_uploadedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
-        swift_path = uploaded_file_path(self.uploadedfile, '')
+        swift_path = self.uploadedfile.fname.name
         mocked_method = 'uploadedfiles.views.swiftclient.Connection.delete_object'
         with mock.patch(mocked_method) as delete_object_mock:
             response = self.client.delete(self.read_update_delete_url)
@@ -178,17 +180,16 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
     @tag('integration')
     def test_integration_uploadedfileresource_download_success(self):
-
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,
             key=settings.SWIFT_KEY,
             authurl=settings.SWIFT_AUTH_URL,
         )
-
         # upload file to Swift storage
+        upload_path = "{}/uploads/file1.txt".format(self.username)
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, 'test/uploads/file1.txt',
+            conn.put_object(settings.SWIFT_CONTAINER_NAME, upload_path,
                             contents=file1.read(),
                             content_type='text/plain')
 
@@ -198,7 +199,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
         self.assertEqual(str(response.content, 'utf-8'), "test file")
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, 'test/uploads/file1.txt')
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, upload_path)
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

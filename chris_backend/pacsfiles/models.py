@@ -13,14 +13,13 @@ class PACS(models.Model):
 
 class PACSFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=600)
-    PatientID = models.CharField(max_length=15)
+    fname = models.FileField(max_length=512, unique=True)
+    PatientID = models.CharField(max_length=15, db_index=True)
     PatientName = models.CharField(max_length=30)
-    StudyInstanceUID = models.CharField(max_length=50)
+    StudyInstanceUID = models.CharField(max_length=50, db_index=True)
     StudyDescription = models.CharField(max_length=200, blank=True)
-    SeriesInstanceUID = models.CharField(max_length=50)
+    SeriesInstanceUID = models.CharField(max_length=50, db_index=True)
     SeriesDescription = models.CharField(max_length=200, blank=True)
-    name = models.CharField(max_length=175)
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
 
     class Meta:
@@ -35,6 +34,8 @@ class PACSFileFilter(FilterSet):
                                                   lookup_expr='gte')
     max_creation_date = django_filters.DateFilter(field_name='creation_date',
                                                   lookup_expr='lte')
+    fname = django_filters.CharFilter(field_name='fname', lookup_expr='icontains')
+    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     PatientID = django_filters.CharFilter(field_name='PatientID', lookup_expr='exact')
     PatientName = django_filters.CharFilter(field_name='PatientName',
                                             lookup_expr='icontains')
@@ -47,12 +48,11 @@ class PACSFileFilter(FilterSet):
                                                  lookup_expr='exact')
     SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
                                                  lookup_expr='icontains')
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
                                                 lookup_expr='exact')
 
     class Meta:
         model = PACSFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'name', 'PatientID',
-                  'PatientName', 'StudyInstanceUID', 'StudyDescription',
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
+                  'PatientID', 'PatientName', 'StudyInstanceUID', 'StudyDescription',
                   'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']

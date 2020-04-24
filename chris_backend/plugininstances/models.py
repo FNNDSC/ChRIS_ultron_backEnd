@@ -269,8 +269,8 @@ class PluginInstanceFilter(FilterSet):
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=4000)
-    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
-                                    related_name='files')
+    plugin_inst = models.ForeignKey(PluginInstance, db_index=True,
+                                    on_delete=models.CASCADE, related_name='files')
 
     class Meta:
         ordering = ('-fname',)

@@ -29,22 +29,9 @@ class UploadedFileList(generics.ListCreateAPIView):
         """
         user = self.request.user
         # if the user is chris then return all the files in the sandboxed filesystem
-        if (user.username == 'chris'):
+        if user.username == 'chris':
             return UploadedFile.objects.all()
         return UploadedFile.objects.filter(owner=user)
-
-    def perform_create(self, serializer):
-        """
-        Overriden to associate an owner with the uploaded file before first
-        saving to the DB.
-        """
-        request_data = serializer.context['request'].data
-        path = '/'
-        if 'upload_path' in request_data:
-            path = request_data['upload_path']
-        user = self.request.user
-        path = serializer.validate_file_upload_path(path)
-        serializer.save(owner=user, upload_path=path)
 
     def list(self, request, *args, **kwargs):
         """
@@ -91,34 +78,29 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to include the current fname in the request.
         """
         user_file = self.get_object()
-        request.data['fname'] = user_file.fname.file # fname is required in the serializer
+        request.data['fname'] = user_file.fname.file  # fname required in the serializer
         return super(UploadedFileDetail, self).update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         """
-        Overriden to validate and update the upload path in swift.
+        Overriden to delete the old path in swift.
         """
-        request_data = serializer.context['request'].data
-        path = request_data['upload_path']
         user_file = self.get_object()
-        if path != user_file.upload_path:
-            user = self.request.user
-            path = serializer.validate_file_upload_path(path)
-            serializer.save(owner=user, upload_path=path)
-            # initiate a Swift service connection to delete the old object from swift
-            conn = swiftclient.Connection(
-                user=settings.SWIFT_USERNAME,
-                key=settings.SWIFT_KEY,
-                authurl=settings.SWIFT_AUTH_URL,
-            )
-            old_swift_path = uploaded_file_path(user_file, '')
-            conn.delete_object(settings.SWIFT_CONTAINER_NAME, old_swift_path)
+        old_swift_path = user_file.fname.name
+        serializer.save()
+        # initiate a Swift service connection to delete the old object from swift
+        conn = swiftclient.Connection(
+            user=settings.SWIFT_USERNAME,
+            key=settings.SWIFT_KEY,
+            authurl=settings.SWIFT_AUTH_URL,
+        )
+        conn.delete_object(settings.SWIFT_CONTAINER_NAME, old_swift_path)
 
     def perform_destroy(self, instance):
         """
         Overriden to delete the file from swift storage.
         """
-        swift_path = uploaded_file_path(instance, '')
+        swift_path = instance.fname.name
         instance.delete()
         # initiate a Swift service connection to delete the object from swift
         conn = swiftclient.Connection(
