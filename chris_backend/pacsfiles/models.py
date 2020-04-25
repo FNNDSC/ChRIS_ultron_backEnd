@@ -34,7 +34,7 @@ class PACSFileFilter(FilterSet):
                                                   lookup_expr='gte')
     max_creation_date = django_filters.DateFilter(field_name='creation_date',
                                                   lookup_expr='lte')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='icontains')
+    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     PatientID = django_filters.CharFilter(field_name='PatientID', lookup_expr='exact')
     PatientName = django_filters.CharFilter(field_name='PatientName',

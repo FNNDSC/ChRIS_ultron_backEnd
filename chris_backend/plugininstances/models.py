@@ -288,11 +288,13 @@ class PluginInstanceFileFilter(FilterSet):
                                                lookup_expr='exact')
     feed_id = django_filters.CharFilter(field_name='plugin_inst__feed_id',
                                                lookup_expr='exact')
+    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
+    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
 
     class Meta:
         model = PluginInstanceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'plugin_inst_id',
-                  'feed_id']
+                  'feed_id', 'fname', 'fname_exact']
 
 
 class StrParameter(models.Model):
