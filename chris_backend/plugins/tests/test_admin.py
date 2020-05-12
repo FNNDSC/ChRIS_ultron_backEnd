@@ -179,6 +179,7 @@ class PluginAdminTests(TestCase):
                                             'site_url': ANY,
                                             'has_permission': ANY,
                                             'available_apps': ANY,
+                                            'is_popup': ANY,
                                             'opts': ANY,
                                             'file_form': ANY})
 
@@ -196,6 +197,7 @@ class PluginAdminTests(TestCase):
                                                 'site_url': ANY,
                                                 'has_permission': ANY,
                                                 'available_apps': ANY,
+                                                'is_popup': ANY,
                                                 'opts': ANY,
                                                 'summary': summary})
 
