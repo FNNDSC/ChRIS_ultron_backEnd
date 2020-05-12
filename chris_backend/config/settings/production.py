@@ -5,12 +5,12 @@ Production Configurations
 """
 
 from .common import *  # noqa
+from environs import Env, EnvValidationError
+import swiftclient
+
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
 from django.core.exceptions import ImproperlyConfigured
-
-from environs import Env, EnvValidationError
-import swiftclient
 
 
 # Environment variables-based secrets
@@ -29,21 +29,21 @@ def get_secret(setting, secret_type=env):
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
 # See: https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
-# Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not in os.environ
+# Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not set
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
 
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/1.6/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/2.2/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
 
 # DATABASE CONFIGURATION
 # ------------------------------------------------------------------------------
-# Raises ImproperlyConfigured exception if DATABASE_URL not in os.environ
+# Raises ImproperlyConfigured exception if DATABASE_URL not set
 DATABASES['default']['NAME'] = get_secret('MYSQL_DATABASE')
 DATABASES['default']['USER'] = get_secret('MYSQL_USER')
 DATABASES['default']['PASSWORD'] = get_secret('MYSQL_PASSWORD')
@@ -59,7 +59,7 @@ SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
 SWIFT_KEY = get_secret('SWIFT_KEY')
 SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
 SWIFT_AUTO_CREATE_CONTAINER = True
-# initiate a swift service connection and create 'users' container
+# Initiate a swift service connection and create 'users' container
 conn = swiftclient.Connection(
     user=SWIFT_USERNAME,
     key=SWIFT_KEY,
@@ -135,12 +135,13 @@ LOGGING = {
 
 
 # STATIC FILES (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_ROOT = get_secret('STATIC_ROOT')
 
 
 # Your production stuff: Below this line define 3rd party library settings
 
-# corsheaders
+# CORSHEADERS
 # ------------------------------------------------------------------------------
 CORS_ORIGIN_ALLOW_ALL = get_secret('DJANGO_CORS_ORIGIN_ALLOW_ALL', env.bool)
 CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)
