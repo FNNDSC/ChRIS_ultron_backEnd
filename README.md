@@ -27,7 +27,7 @@ Currently tested platforms:
 * ``Docker Compose 1.10.0+``
 * ``Ubuntu 16.04+ and MAC OS X 10.11+``
 
-#### On a Linux machine make sure to add your computer user to the ``docker group``
+#### On a Linux machine make sure to add your computer user to the ``docker`` group
 
 
 ### TL;DR
@@ -183,13 +183,17 @@ docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
 ```
 
 #### Using [HTTPie](https://httpie.org/) client to play with the REST API 
-A simple GET request:
+A simple GET request to retrieve the user-specific list of feeds:
 ```bash
 http -a cube:cube1234 http://localhost:8000/api/v1/
 ```
-A simple POST request:
+A simple POST request to run the plugin with id 1:
 ```bash
-http -a cube:cube1234 POST http://localhost:8000/api/v1/plugins/1/instances/ Content-Type:application/vnd.collection+json Accept:application/vnd.collection+json template:='{"data":[{"name":"dir","value":"cube"}]}'
+http -a cube:cube1234 POST http://localhost:8000/api/v1/plugins/1/instances/ Content-Type:application/vnd.collection+json Accept:application/vnd.collection+json template:='{"data":[{"name":"dir","value":"/cube"}]}'
+```
+Then keep making the following GET request until the ``"status"`` descriptor in the response becomes ``"finishedSuccessfully"``:
+```bash
+http -a cube:cube1234 http://localhost:8000/api/v1/plugins/instances/1/
 ```
 
 #### Using swift client to list files in the users bucket
