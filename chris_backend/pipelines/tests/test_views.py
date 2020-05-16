@@ -29,13 +29,15 @@ class ViewTests(TestCase):
                                                   'default': 111111}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugin
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                       type='ds',
-                                                       compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # add a parameter with a default
         (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
             plugin=plugin_ds,
@@ -94,10 +96,13 @@ class PipelineListViewTests(PipelineViewTests):
         self.create_read_url = reverse("pipeline-list")
 
     def test_pipeline_create_success(self):
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        plugin_ds1.compute_resources.set([self.compute_resource])
+        plugin_ds1.save()
+
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
 
         plugin_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
                          ', "previous_index": null}, {"plugin_id": ' + \
@@ -216,10 +221,14 @@ class PipelinePluginListViewTests(PipelineViewTests):
 
     def test_pipeline_plugin_list_success(self):
         # create plugins
-        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
-        Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                     compute_resource=self.compute_resource)
+        (plugin_ds1, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        plugin_ds1.compute_resources.set([self.compute_resource])
+        plugin_ds1.save()
+
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
+
         # pipe one plugin into pipeline
         PluginPiping.objects.get_or_create(pipeline=self.pipeline, plugin=plugin_ds1,
                                            previous=None)
@@ -246,8 +255,10 @@ class PipelinePluginPipingListViewTests(PipelineViewTests):
 
     def test_pipeline_plugin_piping_list_success(self):
         # create plugins
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # pipe one plugin into pipeline
         PluginPiping.objects.get_or_create(pipeline=self.pipeline, plugin=plugin_ds,
                                            previous=None)

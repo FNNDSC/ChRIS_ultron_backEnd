@@ -17,12 +17,15 @@ class ModelTests(TestCase):
         self.plugin_fs_name = "simplecopyapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,
                                              'default': "./"}}
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-                                                        compute_resource_identifier="host")
+            name="host", description="host description")
+
         # create a plugin
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                    type='fs',
-                                                    compute_resource=self.compute_resource)
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
         # add plugins' parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -38,9 +41,31 @@ class ModelTests(TestCase):
         logging.disable(logging.DEBUG)
 
 
+class ComputeResourceModelTests(ModelTests):
+    """
+    Test the ComputeResource model.
+    """
+
+    def test_delete(self):
+        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        # test the failure case bc plugin would be left without a compute resource
+        with self.assertRaises(Exception):
+            self.compute_resource.delete()
+        # test the success case
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            name="test", description="test description")
+        plugin_compute_resources = list(plugin.compute_resources.all())
+        plugin_compute_resources.append(compute_resource)
+        plugin.compute_resources.set(plugin_compute_resources)
+        plugin.save()
+        n_cr = len(plugin_compute_resources)
+        compute_resource.delete()
+        self.assertEqual(plugin.compute_resources.all().count(), n_cr - 1)
+
+
 class PluginModelTests(ModelTests):
     """
-    Test the PluginModel model.
+    Test the Plugin model.
     """
 
     def test_get_plugin_parameter_names(self):

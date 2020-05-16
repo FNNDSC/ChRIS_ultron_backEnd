@@ -25,12 +25,13 @@ class PipelineManagerTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugin
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds',
-                                                       version=self.plugin_ds_version,
-                                                       compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(
+            name=self.plugin_ds_name, type='ds', version=self.plugin_ds_version)
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
 
         # add a parameter with a default
         (plg_param_ds, tf)= PluginParameter.objects.get_or_create(

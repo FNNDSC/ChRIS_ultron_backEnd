@@ -470,7 +470,9 @@ else
         fi
         printf "%8s" "${STEP}.$i: "
         printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$computeEnv${NC}..." "[ $dockerhubRepo ]"
-        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add  --name "${dockerhubRepo}" $computeEnv
+        computeDescription="${computeEnv} description"
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add "$computeEnv" "$computeDescription"
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py register $computeEnv --pluginname "${dockerhubRepo}"
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done

@@ -46,7 +46,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         user = self.request.user
         # get previous plugin instance and create the new plugin instance
         request_data = serializer.context['request'].data
-        previous_id = request_data['previous_id'] if 'previous_id' in request_data else ""
+        previous_id = request_data.get('previous_id')
         previous = serializer.validate_previous(previous_id)
         plugin = self.get_object()
 
@@ -69,8 +69,13 @@ class PluginInstanceList(generics.ListCreateAPIView):
                 raise ValidationError({parameter.name: ["This field is required."]})
 
         # if no validation errors at this point then save to the DB
+        cr_data = serializer.validated_data.get('compute_resource')
+        if not cr_data:
+            compute_resource = plugin.compute_resources.all()[0]
+        else:
+            compute_resource = plugin.compute_resources.get(name=cr_data['name'])
         plg_inst = serializer.save(owner=user, plugin=plugin, previous=previous,
-                                   compute_resource=plugin.compute_resource)
+                                   compute_resource=compute_resource)
         parameters_dict = {}
         for param, param_serializer in parameter_serializers:
             param_inst = param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
@@ -89,12 +94,16 @@ class PluginInstanceList(generics.ListCreateAPIView):
         plugin = self.get_object()
         # append document-level link relations
         links = {'plugin': reverse('plugin-detail', request=request,
-                                   kwargs={"pk": plugin.id})}
+                                   kwargs={"pk": plugin.id}),
+                 'compute_resources': reverse('plugin-computeresource-list',
+                                              request=request, kwargs={"pk": plugin.id})
+                 }
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': "", 'previous_id': "", 'cpu_limit': "",
-                         'memory_limit': "", 'number_of_workers': "", 'gpu_limit': ""}
+        template_data = {'title': "", 'compute_resource_name': "", 'previous_id': "",
+                         'cpu_limit': "", 'memory_limit': "", 'number_of_workers': "",
+                         'gpu_limit': ""}
         for name in param_names:
             template_data[name] = ""
         return services.append_collection_template(response, template_data)

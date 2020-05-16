@@ -37,14 +37,15 @@ class SerializerTests(TestCase):
                             "selfexec": "simplefsapp.py", "execshell": "python3"}
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create a plugin
         data = self.plugin_repr.copy()
         parameters = self.plugin_repr['parameters']
         del data['parameters']
-        data['compute_resource'] = self.compute_resource
         (plugin, tf) = Plugin.objects.get_or_create(**data)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
 
         # add plugin's parameters
         PluginParameter.objects.get_or_create(
@@ -71,7 +72,7 @@ class PluginInstanceSerializerTests(SerializerTests):
         self.user = User.objects.get(username=self.username)
         self.data = {'plugin': self.plugin,
                      'owner': self.user,
-                     'compute_resource': self.plugin.compute_resource}
+                     'compute_resource': self.plugin.compute_resources.all()[0]}
 
     def test_validate_previous(self):
         """
@@ -80,18 +81,19 @@ class PluginInstanceSerializerTests(SerializerTests):
         """
         plugin = self.plugin
         # create an 'fs' plugin instance
-        pl_inst_fs = PluginInstance.objects.create(plugin=plugin, owner=self.user,
-                                                   compute_resource=plugin.compute_resource)
+        pl_inst_fs = PluginInstance.objects.create(
+            plugin=plugin, owner=self.user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin
         data = self.plugin_repr.copy()
         del data['parameters']
         data['name'] = 'testdsapp'
         data['type'] = 'ds'
-        data['compute_resource'] = self.compute_resource
         (plugin, tf) = Plugin.objects.get_or_create(**data)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
         data = {'plugin': plugin,
                 'owner': self.user,
-                'compute_resource': plugin.compute_resource}
+                'compute_resource': plugin.compute_resources.all()[0]}
 
         # create serializer for a 'ds' plugin instance
         plg_inst_serializer = PluginInstanceSerializer(data=data)
@@ -106,6 +108,26 @@ class PluginInstanceSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_previous('')
 
+    def test_validate_compute_resource_name(self):
+        """
+        Test whether overriden validate_compute_resource_name method checks that the
+        provided compute resource name is registered with the corresponding plugin.
+        """
+        plugin = self.plugin
+        data = {'plugin': plugin,
+                'owner': self.user,
+                'compute_resource': plugin.compute_resources.all()[0]}
+
+        # create serializer for a  plugin instance
+        plg_inst_serializer = PluginInstanceSerializer(data=data)
+        plg_inst_serializer.is_valid(raise_exception=True)
+        plg_inst_serializer.context['view'] = mock.Mock()
+        plg_inst_serializer.context['view'].get_object = mock.Mock(return_value=plugin)
+        compute_resource_name = plg_inst_serializer.validate_compute_resource_name("host")
+        self.assertEqual(compute_resource_name, "host")
+        with self.assertRaises(serializers.ValidationError):
+            plg_inst_serializer.validate_compute_resource_name('new')
+
     def test_validate_status(self):
         """
         Test whether overriden validate_status method raises a serializers.ValidationError
@@ -114,14 +136,14 @@ class PluginInstanceSerializerTests(SerializerTests):
         """
         plugin = self.plugin
         owner = self.user
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
-                                                compute_resource=plugin.compute_resource)
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         plg_inst_serializer = PluginInstanceSerializer(plg_inst)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_status('finishedSuccessfully')
 
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
-                                                compute_resource=plugin.compute_resource)
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         plg_inst.status = 'finishedSuccessfully'
         plg_inst_serializer = PluginInstanceSerializer(plg_inst)
         with self.assertRaises(serializers.ValidationError):
@@ -202,9 +224,9 @@ class PluginInstanceSerializerTests(SerializerTests):
         plugin = self.plugin
         plg_inst_serializer = PluginInstanceSerializer(plugin)
         with self.assertRaises(serializers.ValidationError):
-            plg_inst_serializer.validate_value_within_interval(1, 2, 4, 'error: below')
+            plg_inst_serializer.validate_value_within_interval(1, 2, 4)
         with self.assertRaises(serializers.ValidationError):
-            plg_inst_serializer.validate_value_within_interval(5, 2, 4, 'error: above')
+            plg_inst_serializer.validate_value_within_interval(5, 2, 4)
 
 
 class PathParameterSerializerTests(SerializerTests):
@@ -251,8 +273,8 @@ class PathParameterSerializerTests(SerializerTests):
         user1 = User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
         plugin = self.plugin
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         path_parm_serializer = PathParameterSerializer(user=user)
         # but feed id
         with self.assertRaises(serializers.ValidationError):
@@ -275,8 +297,8 @@ class PathParameterSerializerTests(SerializerTests):
         user1 = User.objects.create_user(username=self.other_username,
                                          password=self.other_password)
         plugin = self.plugin
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.owner.set([user1, user])
         path_parm_serializer = PathParameterSerializer(user=user)
         value = "{}, {}/feed_{} ".format(self.username, self.other_username,
@@ -331,8 +353,8 @@ class UnextpathParameterSerializerTests(SerializerTests):
         user1 = User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
         plugin = self.plugin
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         path_parm_serializer = UnextpathParameterSerializer(user=user)
         # but feed id
         with self.assertRaises(serializers.ValidationError):
@@ -355,8 +377,8 @@ class UnextpathParameterSerializerTests(SerializerTests):
         user1 = User.objects.create_user(username=self.other_username,
                                          password=self.other_password)
         plugin = self.plugin
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user1,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.owner.set([user1, user])
         path_parm_serializer = UnextpathParameterSerializer(user=user)
         value = "{}, {}/feed_{} ".format(self.username, self.other_username,

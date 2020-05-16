@@ -33,7 +33,7 @@ class PluginAdminFormTests(TestCase):
         logging.disable(logging.CRITICAL)
 
         (self.compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-                                                    compute_resource_identifier="host")
+            name="host", description="host description")
         # create a plugin
         self.plugin_name = "simplecopyapp"
         self.plugin_version = "0.1"
@@ -47,13 +47,14 @@ class PluginAdminFormTests(TestCase):
         Test whether overriden clean method validates the full set of plugin descriptors
         and save the newly created plugin to the DB.
         """
-        # mock manager's add_plugin method
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(name=self.plugin_name,
-                                                             version=self.plugin_version,
-                                                compute_resource=self.compute_resource)
+        # mock manager's register_plugin method
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(
+            name=self.plugin_name, version=self.plugin_version)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
 
-        with mock.patch.object(pl_admin.PluginManager, 'add_plugin',
-                               return_value=plugin) as add_plugin_mock:
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
+                               return_value=plugin) as register_plugin_mock:
             plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
             form = plugin_admin.form
             form.instance = self.plugin
@@ -63,7 +64,7 @@ class PluginAdminFormTests(TestCase):
             form.clean(form)
             self.assertEqual(form.instance, plugin)
             self.assertIsNotNone(form.instance.pk)
-            add_plugin_mock.assert_called_with(self.plugin_name, self.plugin_version,
+            register_plugin_mock.assert_called_with(self.plugin_name, self.plugin_version,
                                                'host')
 
     def test_clean_validate_url_and_save_plugin_descriptors(self):
@@ -71,13 +72,15 @@ class PluginAdminFormTests(TestCase):
         Test whether overriden clean method validates the full set of plugin descriptors
         and save the newly created plugin to the DB.
         """
-        # mock manager's add_plugin_by_url method
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(name=self.plugin_name,
-                                                             version=self.plugin_version,
-                                                compute_resource=self.compute_resource)
+        # mock manager's register_plugin_by_url method
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(
+            name=self.plugin_name, version=self.plugin_version)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+
         plugin_store_url = "http://127.0.0.1:8010/api/v1/1/"
-        with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
-                               return_value=plugin) as add_plugin_by_url_mock:
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
+                               return_value=plugin) as register_plugin_by_url_mock:
             plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
             form = plugin_admin.form
             form.instance = self.plugin
@@ -90,16 +93,16 @@ class PluginAdminFormTests(TestCase):
             self.assertNotIn('url', form.cleaned_data)
             self.assertEqual(form.instance, plugin)
             self.assertIsNotNone(form.instance.pk)
-            add_plugin_by_url_mock.assert_called_with(plugin_store_url, 'host')
+            register_plugin_by_url_mock.assert_called_with(plugin_store_url, 'host')
 
-    def test_clean_raises_validation_error_if_cannot_add_plugin(self):
+    def test_clean_raises_validation_error_if_cannot_register_plugin(self):
         """
         Test whether overriden clean method raises a ValidationError when there
         is a validation error or it cannot save a new plugin to the DB.
         """
-        # mock manager's add_plugin method
-        with mock.patch.object(pl_admin.PluginManager, 'add_plugin',
-                               side_effect=Exception) as add_plugin_mock:
+        # mock manager's register_plugin method
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
+                               side_effect=Exception) as register_plugin_mock:
             plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
             form = plugin_admin.form
             form.instance = self.plugin
@@ -232,11 +235,11 @@ class PluginAdminTests(TestCase):
         plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
         file_content = b'simplefsapp host\n simpledsapp 1.0.6 host\n http://127.0.0.1:8010/api/v1/1/ host\n'
 
-        with mock.patch.object(pl_admin.PluginManager, 'add_plugin',
-                               return_value=None) as add_plugin_mock:
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
+                               return_value=None) as register_plugin_mock:
 
-            with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
-                                   return_value=None) as add_plugin_by_url_mock:
+            with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
+                                   return_value=None) as register_plugin_by_url_mock:
                 summary = {'success': [{'plugin_name': 'simplefsapp'},
                                        {'plugin_name': 'simpledsapp'},
                                        {'plugin_name': 'http://127.0.0.1:8010/api/v1/1/'}
@@ -244,11 +247,11 @@ class PluginAdminTests(TestCase):
                            'error': []}
                 with io.BytesIO(file_content) as f:
                     self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
-                    add_plugin_mock.assert_called_with('simpledsapp', '1.0.6', 'host')
-                    add_plugin_by_url_mock.assert_called_with('http://127.0.0.1:8010/api/v1/1/',
+                    register_plugin_mock.assert_called_with('simpledsapp', '1.0.6', 'host')
+                    register_plugin_by_url_mock.assert_called_with('http://127.0.0.1:8010/api/v1/1/',
                                                               'host')
 
-            with mock.patch.object(pl_admin.PluginManager, 'add_plugin_by_url',
+            with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
                                    side_effect=Exception('Error')):
                 summary = {'success': [{'plugin_name': 'simplefsapp'},
                                        {'plugin_name': 'simpledsapp'}

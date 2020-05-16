@@ -20,10 +20,39 @@ PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
 
 
 class ComputeResource(models.Model):
-    compute_resource_identifier = models.CharField(max_length=100, unique=True)
+    creation_date = models.DateTimeField(auto_now_add=True)
+    modification_date = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=600)
 
     def __str__(self):
-        return self.compute_resource_identifier
+        return self.name
+
+    def delete(self):
+        """
+        Overriden to only allow the delete if no plugin would be left without a compute
+        resource after the operation.
+        """
+        plgs_with_no_compute_after_delete = [plg.id for plg in self.plugins.all()
+                                             if plg.compute_resources.count() == 1]
+        if plgs_with_no_compute_after_delete:
+            plgs_with_no_compute_after_delete.sort()
+            msg = "Can not delete compute resource '%s'. Please first register the " \
+                  "following plugins with another compute resource. Plugin IDs: %s"
+            raise Exception(msg % (self.name, plgs_with_no_compute_after_delete))
+        super().delete()
+
+
+class ComputeResourceFilter(FilterSet):
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
+    description = django_filters.CharFilter(lookup_expr='icontains')
+    plugin_id = django_filters.CharFilter(field_name='plugins__id',
+                                          lookup_expr='exact')
+
+    class Meta:
+        model = ComputeResource
+        fields = ['id', 'name', 'name_exact', 'description', 'plugin_id']
 
 
 class Plugin(models.Model):
@@ -35,12 +64,11 @@ class Plugin(models.Model):
                }
     name = models.CharField(max_length=100)
     version = models.CharField(max_length=10)
-    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE,
-                        related_name='plugins')
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     dock_image = models.CharField(max_length=500)
     type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
+    icon = models.URLField(max_length=300, blank=True)
     execshell = models.CharField(max_length=50)
     selfpath = models.CharField(max_length=512)
     selfexec = models.CharField(max_length=50)
@@ -64,6 +92,7 @@ class Plugin(models.Model):
                                    default=defaults['min_memory_limit'])  # In Mi
     max_memory_limit = MemoryField(null=True, blank=True,
                                    default=defaults['max_limit'])  # In Mi
+    compute_resources = models.ManyToManyField(ComputeResource, related_name='plugins')
 
     class Meta:
         unique_together = ('name', 'version',)
@@ -93,12 +122,14 @@ class PluginFilter(FilterSet):
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
     authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
+    compute_resource_id = django_filters.CharFilter(field_name='compute_resources__id',
+                                                    lookup_expr='exact')
 
     class Meta:
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'title', 'dock_image', 'type',
                   'category', 'authors', 'description', 'min_creation_date',
-                  'max_creation_date']
+                  'max_creation_date', 'compute_resource_id']
 
 
 class PluginParameter(models.Model):

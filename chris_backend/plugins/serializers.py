@@ -12,25 +12,25 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ComputeResource
-        fields = ('url', 'id', 'compute_resource_identifier')
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
+                  'description')
 
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
     instances = serializers.HyperlinkedIdentityField(view_name='plugininstance-list')
-    compute_resource_identifier = serializers.ReadOnlyField(
-        source='compute_resource.compute_resource_identifier')
+    compute_resources = serializers.HyperlinkedIdentityField(
+        view_name='plugin-computeresource-list')
 
     class Meta:
         model = Plugin
         fields = ('url', 'id', 'name', 'dock_image','creation_date', 'modification_date',
                   'type', 'authors', 'title', 'category', 'description', 'documentation',
                   'license', 'version', 'execshell', 'selfpath', 'selfexec',
-                  'compute_resource_identifier',
                   'parameters', 'instances', 'min_number_of_workers',
                   'max_number_of_workers', 'min_cpu_limit', 'max_cpu_limit',
                   'min_memory_limit', 'max_memory_limit', 'min_gpu_limit',
-                  'max_gpu_limit')
+                  'max_gpu_limit', 'compute_resources')
 
     def validate(self, data):
         """

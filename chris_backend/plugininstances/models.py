@@ -32,8 +32,9 @@ class PluginInstance(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
                              related_name='plugin_instances')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
-    compute_resource = models.ForeignKey(ComputeResource, on_delete=models.CASCADE, 
-                                    related_name='plugin_instances')
+    compute_resource = models.ForeignKey(ComputeResource, null=True,
+                                         on_delete=models.SET_NULL,
+                                         related_name='plugin_instances')
     pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
                                       on_delete=models.SET_NULL,
                                       related_name='plugin_instances')

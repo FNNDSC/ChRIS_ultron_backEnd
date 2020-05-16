@@ -112,7 +112,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         plugin_inst.owner = owner
         plugin_inst.plugin = piping.plugin
         plugin_inst.previous = previous_inst
-        plugin_inst.compute_resource = piping.plugin.compute_resource
+        plugin_inst.compute_resource = piping.plugin.compute_resources.all()[0]
         # collect and validate parameters from the request
         parsed_parameters = self.parsed_parameters
         parameter_serializers = []

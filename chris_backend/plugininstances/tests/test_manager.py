@@ -40,14 +40,15 @@ class PluginAppManagerTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create a plugin
         data = self.plugin_repr.copy()
         parameters = self.plugin_repr['parameters']
         del data['parameters']
-        data['compute_resource'] = self.compute_resource
         (plugin_fs, tf) = Plugin.objects.get_or_create(**data)
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
 
         # add plugin's parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
@@ -75,8 +76,9 @@ class PluginAppManagerTests(TestCase):
                                    return_value=None) as charm_app_manage_mock:
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
+                (pl_inst, tf) = PluginInstance.objects.get_or_create(
+                    plugin=plugin, owner=user,
+                    compute_resource=plugin.compute_resources.all()[0])
                 pl_param = plugin.parameters.all()[0]
                 PathParameter.objects.get_or_create(plugin_inst=pl_inst,
                                                     plugin_param=pl_param,
@@ -113,12 +115,11 @@ class PluginAppManagerTests(TestCase):
 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                             compute_resource=plugin.compute_resource)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
-        (path_param, tf) = PathParameter.objects.get_or_create(plugin_inst=pl_inst,
-                                                               plugin_param=pl_param,
-                                                               value=self.username)
+        PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
+                                            value=self.username)
         parameter_dict = {'dir': self.username}
         manager.PluginAppManager.run_plugin_app(pl_inst,
                                        parameter_dict,
@@ -143,8 +144,9 @@ class PluginAppManagerTests(TestCase):
 
                 user = User.objects.get(username=self.username)
                 plugin = Plugin.objects.get(name=self.plugin_fs_name)
-                (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
+                (pl_inst, tf) = PluginInstance.objects.get_or_create(
+                    plugin=plugin, owner=user,
+                    compute_resource=plugin.compute_resources.all()[0])
                 pl_param = plugin.parameters.all()[0]
                 PathParameter.objects.get_or_create(plugin_inst=pl_inst,
                                                     plugin_param=pl_param,
@@ -167,8 +169,8 @@ class PluginAppManagerTests(TestCase):
         """
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                             compute_resource=plugin.compute_resource)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=self.username)

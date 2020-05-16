@@ -16,6 +16,8 @@ from .models import PathParameter, UnextpathParameter, StrParameter
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
+    compute_resource_name = serializers.CharField(max_length=100, required=False,
+                                                  source='compute_resource.name')
     previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.name')
@@ -25,8 +27,6 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    compute_resource_identifier = serializers.ReadOnlyField(
-        source='compute_resource.compute_resource_identifier')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
     descendants = serializers.HyperlinkedIdentityField(
@@ -39,17 +39,19 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                                                  read_only=True)
     pipeline_inst = serializers.HyperlinkedRelatedField(
         view_name='pipelineinstance-detail', read_only=True)
-    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail',
-                                               read_only=True)
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    compute_resource = serializers.HyperlinkedRelatedField(
+        view_name='computeresource-detail', read_only=True)
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'title', 'previous_id', 'plugin_id', 'plugin_name',
-                  'plugin_version', 'pipeline_id', 'pipeline_name', 'pipeline_inst_id',
-                  'pipeline_inst', 'feed_id', 'start_date', 'end_date', 'status',
-                  'owner_username', 'previous', 'feed', 'plugin', 'descendants', 'files',
-                  'parameters', 'compute_resource_identifier', 'cpu_limit',
-                  'memory_limit', 'number_of_workers', 'gpu_limit')
+        fields = ('url', 'id', 'title',  'previous_id', 'compute_resource_name',
+                  'plugin_id', 'plugin_name', 'plugin_version', 'pipeline_id',
+                  'pipeline_name', 'pipeline_inst_id', 'pipeline_inst', 'feed_id',
+                  'start_date', 'end_date', 'status', 'owner_username', 'previous',
+                  'feed', 'plugin', 'descendants', 'files', 'parameters',
+                  'compute_resource', 'cpu_limit', 'memory_limit', 'number_of_workers',
+                  'gpu_limit')
 
     def validate_previous(self, previous_id):
         """
@@ -62,7 +64,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         # as plugin instances are always created through the API
         plugin = self.context['view'].get_object()
         previous = None
-        if plugin.type=='ds':
+        if plugin.type == 'ds':
             if not previous_id:
                 raise serializers.ValidationError(
                     {'previous_id': ["This field is required."]})
@@ -81,50 +83,72 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                     {'previous_id': [err_str % previous_id]})
         return previous
 
+    def validate_compute_resource_name(self, compute_resource_name):
+        """
+        Overriden to check the provided compute resource name is registered with the
+        corresponding plugin.
+        """
+        plg = self.context['view'].get_object()
+        if plg.compute_resources.filter(name=compute_resource_name).count() == 0:
+            msg = "Plugin '%s' with version '%s' has not been registered with compute " \
+                  "resource '%s'." % (plg.name, plg.version, compute_resource_name)
+            raise serializers.ValidationError([msg])
+        return compute_resource_name
+
     def validate_status(self, status):
+        """
+        Overriden to validate a change of status.
+        """
         if self.instance and (status != 'cancelled' or
                               self.instance.status not in ['started', 'cancelled']):
-            raise serializers.ValidationError(["Can not change status from %s to %s." %
-                                               (self.instance.status, status)])
+            msg = "Can not change status from '%s' to '%s'."
+            raise serializers.ValidationError([msg % (self.instance.status, status)])
         return status
 
     def validate_gpu_limit(self, gpu_limit):
+        """
+        Overriden to validate gpu_limit is within the proper limits.
+        """
         plugin = self.context['view'].get_object()
         self.validate_value_within_interval(gpu_limit,
                                             plugin.min_gpu_limit,
-                                            plugin.max_gpu_limit,
-                                            'gpu_limit')
+                                            plugin.max_gpu_limit)
         return gpu_limit
 
     def validate_number_of_workers(self, number_of_workers):
+        """
+        Overriden to validate number_of_workers is within the proper limits.
+        """
         plugin = self.context['view'].get_object()
         self.validate_value_within_interval(number_of_workers,
                                             plugin.min_number_of_workers,
-                                            plugin.max_number_of_workers,
-                                            'number_of_workers')
+                                            plugin.max_number_of_workers)
         return number_of_workers
 
     def validate_cpu_limit(self, cpu_limit):
+        """
+        Overriden to validate cpu_limit is within the proper limits.
+        """
         plugin = self.context['view'].get_object()
         self.validate_value_within_interval(cpu_limit,
                                             plugin.min_cpu_limit,
-                                            plugin.max_cpu_limit,
-                                            'cpu_limit')
+                                            plugin.max_cpu_limit)
         return cpu_limit
 
     def validate_memory_limit(self, memory_limit):
+        """
+        Overriden to validate memory_limit is within the proper limits.
+        """
         plugin = self.context['view'].get_object()
         self.validate_value_within_interval(memory_limit,
                                             plugin.min_memory_limit,
-                                            plugin.max_memory_limit,
-                                            'memory_limit')
+                                            plugin.max_memory_limit)
         return memory_limit
 
     @staticmethod
-    def validate_value_within_interval(val, min_val, max_val, val_str):
+    def validate_value_within_interval(val, min_val, max_val):
         if val < min_val or val > max_val:
-            raise serializers.ValidationError({val_str:
-                                                   ["This field value is out of range."]})
+            raise serializers.ValidationError(["This field value is out of range."])
 
 
 class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):

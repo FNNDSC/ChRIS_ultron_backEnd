@@ -12,7 +12,7 @@ from .services.manager import PluginManager
 
 
 readonly_fields = [fld.name for fld in Plugin._meta.fields if
-                   fld.name != 'compute_resource']
+                   fld.name != 'compute_resources']
 
 
 class UploadFileForm(forms.Form):
@@ -35,7 +35,7 @@ class PluginAdminForm(forms.ModelForm):
             url = self.cleaned_data.pop('url', None)
             if url:
                 try:
-                    self.instance = pl_manager.add_plugin_by_url(url, compute_resource)
+                    self.instance = pl_manager.register_plugin_by_url(url, compute_resource)
                     self.cleaned_data['name'] = self.instance.name  # set name form data
                 except Exception as e:
                     raise forms.ValidationError(e)
@@ -46,7 +46,8 @@ class PluginAdminForm(forms.ModelForm):
                 # get user-provided version (can be blank)
                 version = self.cleaned_data.get('version')
                 try:
-                    self.instance = pl_manager.add_plugin(name, version, compute_resource)
+                    self.instance = pl_manager.register_plugin(name, version,
+                                                               compute_resource)
                 except Exception as e:
                     raise forms.ValidationError(e)
             self.cleaned_data['version'] = self.instance.version  # set version form data
@@ -54,10 +55,9 @@ class PluginAdminForm(forms.ModelForm):
 
 class PluginAdmin(admin.ModelAdmin):
     form = PluginAdminForm
-    list_display = ('name', 'version', 'compute_resource', 'type', 'id')
+    list_display = ('name', 'version', 'type', 'id')
     search_fields = ['name', 'version']
-    list_filter = ['compute_resource', 'type', 'creation_date', 'modification_date',
-                   'category']
+    list_filter = ['type', 'creation_date', 'modification_date', 'category']
     change_form_template = 'admin/plugins/plugin/change_form.html'
     change_list_template = 'admin/plugins/plugin/change_list.html'
 
@@ -66,7 +66,7 @@ class PluginAdmin(admin.ModelAdmin):
         Overriden to only show the required fields in the add plugin page.
         """
         self.fieldsets = [
-            ('Choose associated compute resource', {'fields': ['compute_resource']}),
+            ('Choose associated compute resource', {'fields': ['compute_resources']}),
             ('Identify plugin by name and version', {'fields': [('name', 'version')]}),
             ('Or identify plugin by url', {'fields': ['url']}),
         ]
@@ -78,7 +78,7 @@ class PluginAdmin(admin.ModelAdmin):
         Overriden to show all plugin's fields in the view plugin page.
         """
         self.fieldsets = [
-            ('Associated compute resource', {'fields': ['compute_resource']}),
+            ('Associated compute resource', {'fields': ['compute_resources']}),
             ('Plugin properties', {'fields': readonly_fields}),
         ]
         self.readonly_fields = readonly_fields
@@ -169,7 +169,7 @@ class PluginAdmin(admin.ModelAdmin):
                         plg_version = strings[1]
                         compute_resource = strings[2]
                     try:
-                        pl_manager.add_plugin(plg_name, plg_version, compute_resource)
+                        pl_manager.register_plugin(plg_name, plg_version, compute_resource)
                     except Exception as e:
                         summary['error'].append({'plugin_name': plg_name, 'code': str(e)})
                     else:
@@ -179,7 +179,7 @@ class PluginAdmin(admin.ModelAdmin):
                     plg_url = strings[0]
                     compute_resource = strings[1]
                     try:
-                        pl_manager.add_plugin_by_url(plg_url, compute_resource)
+                        pl_manager.register_plugin_by_url(plg_url, compute_resource)
                     except Exception as e:
                         summary['error'].append({'plugin_name': plg_url, 'code': str(e)})
                     else:
