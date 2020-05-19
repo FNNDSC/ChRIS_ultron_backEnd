@@ -11,6 +11,124 @@ from django.utils import timezone
 from plugins import admin as pl_admin
 
 
+class ComputeResourceAdminTests(TestCase):
+    """
+    Test ComputeResourceAdmin.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.CRITICAL)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        # re-enable logging
+        logging.disable(logging.DEBUG)
+
+    def test_add_view(self):
+        """
+        Test whether overriden add_view view only shows the proper fields in
+        the add compute resource page and in editable mode.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        request_mock = mock.Mock()
+        with mock.patch.object(pl_admin.admin.ModelAdmin, 'add_view',
+                               return_value=None) as add_view_mock:
+            compute_resource_admin.add_view(request_mock)
+            self.assertIn('name', compute_resource_admin.fields)
+            self.assertIn('description', compute_resource_admin.fields)
+            self.assertNotIn('creation_date', compute_resource_admin.fields)
+            self.assertNotIn('modification_date', compute_resource_admin.fields)
+            add_view_mock.assert_called_with(compute_resource_admin, request_mock,
+                                             '', None)
+
+    def test_change_view(self):
+        """
+        Test whether overriden change_view view shows all compute resource fields and
+        the proper read-only and editable fields.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        request_mock = mock.Mock()
+        with mock.patch.object(pl_admin.admin.ModelAdmin, 'change_view',
+                               return_value=None) as change_view_mock:
+            compute_resource_admin.change_view(request_mock, 1)
+            self.assertIn('name', compute_resource_admin.fields)
+            self.assertIn('description', compute_resource_admin.fields)
+            self.assertIn('creation_date', compute_resource_admin.fields)
+            self.assertIn('modification_date', compute_resource_admin.fields)
+            self.assertIn('creation_date', compute_resource_admin.readonly_fields)
+            self.assertIn('modification_date', compute_resource_admin.readonly_fields)
+            change_view_mock.assert_called_with(compute_resource_admin, request_mock, 1,
+                                                '', None)
+
+    def test_save_model(self):
+        """
+        Test whether overriden save_model method creates a new compute resource from the
+        fields in the add compute resource page or properly change the modification date
+        for a modified existing compute resource.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        request_mock = mock.Mock()
+        obj_mock = mock.Mock()
+        obj_mock_creation_date = timezone.now()
+        obj_mock.modification_date = obj_mock_creation_date
+        form_mock = mock.Mock()
+        form_mock.instance = mock.Mock()
+        with mock.patch.object(pl_admin.admin.ModelAdmin, 'save_model',
+                               return_value=None) as save_model_mock:
+            compute_resource_admin.save_model(request_mock, obj_mock, form_mock, False)
+            save_model_mock.assert_called_with(request_mock, obj_mock,
+                                               form_mock, False)
+
+            compute_resource_admin.save_model(request_mock, obj_mock, form_mock, True)
+            save_model_mock.assert_called_with(request_mock, obj_mock, form_mock, True)
+            self.assertGreater(obj_mock.modification_date, obj_mock_creation_date)
+
+    def test_delete_model(self):
+        """
+        Test whether overriden delete_model method sets an error message when the user
+        attempts to delete a compute resource that would result in orphan plugins.
+        """
+        (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
+            name="host", description="host description")
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(name="pacspull", type="fs")
+        plg.compute_resources.set([compute_resource])
+        plg.save()
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        request_mock = mock.Mock()
+        pl_admin.messages.set_level = mock.Mock(return_value=None)
+        pl_admin.messages.error = mock.Mock(return_value=None)
+        compute_resource_admin.delete_model(request_mock, compute_resource)
+        pl_admin.messages.set_level.assert_called_with(request_mock, pl_admin.messages.ERROR)
+        pl_admin.messages.error.assert_called_with(request_mock, ANY)
+
+    def test_delete_queryset(self):
+        """
+        Test whether overriden delete_queryset method sets an error message when the user
+        attempts to delete compute resources that would result in orphan plugins.
+        """
+        (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
+            name="host", description="host description")
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(name="pacspull", type="fs")
+        plg.compute_resources.set([compute_resource])
+        plg.save()
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        request_mock = mock.Mock()
+        pl_admin.messages.set_level = mock.Mock(return_value=None)
+        pl_admin.messages.error = mock.Mock(return_value=None)
+        compute_resource_admin.delete_queryset(request_mock, plg.compute_resources.all())
+        pl_admin.messages.set_level.assert_called_with(request_mock, pl_admin.messages.ERROR)
+        pl_admin.messages.error.assert_called_with(request_mock, ANY)
+
+
 class PluginAdminFormTests(TestCase):
     """
     Test PluginAdminForm.
@@ -115,7 +233,7 @@ class PluginAdminFormTests(TestCase):
 
 class PluginAdminTests(TestCase):
     """
-    Test PluginAdminForm.
+    Test PluginAdmin.
     """
 
     @classmethod

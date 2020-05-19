@@ -92,16 +92,10 @@ class PluginAdminForm(forms.ModelForm):
             pl_manager = PluginManager()
             compute_resources = list(self.cleaned_data.get('compute_resources'))
             url = self.cleaned_data.pop('url', None)
+            cr = compute_resources[0]
             if url:
                 try:
-                    cr = compute_resources.pop()
                     self.instance = pl_manager.register_plugin_by_url(url, cr.name)
-                    name = self.instance.name
-                    version = self.instance.version
-                    for cr in compute_resources:
-                        # registering by (name, version) avoids contacting the ChRIS store
-                        # when the plugin already exists in ChRIS
-                        self.instance = pl_manager.register_plugin(name, version, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
             else:
@@ -111,16 +105,15 @@ class PluginAdminForm(forms.ModelForm):
                 # get user-provided version (can be blank)
                 version = self.cleaned_data.get('version')
                 try:
-                    cr = compute_resources.pop()
                     self.instance = pl_manager.register_plugin(name, version, cr.name)
-                    version = self.instance.version
-                    for cr in compute_resources:
-                        self.instance = pl_manager.register_plugin(name, version, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
             # reset form validated data
-            self.cleaned_data['name'] = name
-            self.cleaned_data['version'] = version
+            self.cleaned_data['name'] = self.instance.name
+            self.cleaned_data['version'] = self.instance.version
+            current_compute_resources = list(self.instance.compute_resources.all())
+            compute_resources = compute_resources + current_compute_resources
+            self.instance.compute_resources.set(compute_resources)
             self.cleaned_data['compute_resources'] = self.instance.compute_resources.all()
 
 
@@ -160,7 +153,7 @@ class PluginAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """
-        Overriden to properly create a plugin from the fields in the add plugin page.
+        Overriden to set the modification date..
         """
         if change:
             obj.modification_date = timezone.now()
