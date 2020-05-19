@@ -30,17 +30,24 @@ ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
 COPY ["./requirements", "${REQPATH}"]
 COPY ["./docker-entrypoint.sh", "/usr/src"]
 
-RUN apt-get update \
-  && apt-get install -y libmysqlclient-dev                            \
-  && apt-get install -y libssl-dev libcurl4-openssl-dev               \
-  && apt-get install -y apache2 apache2-dev                           \
-  && apt-get install -y bsdmainutils net-tools inetutils-ping          \
-  && pip install -r ${REQPATH}/production.txt                           \
+RUN apt-get update                                               \
+  && apt-get install -y locales                                  \
+  && export LANGUAGE=en_US.UTF-8                                 \
+  && export LANG=en_US.UTF-8                                     \
+  && export LC_ALL=en_US.UTF-8                                   \
+  && locale-gen en_US.UTF-8                                      \
+  && dpkg-reconfigure locales                                    \
+  && apt-get install -y libmysqlclient-dev                       \
+  && apt-get install -y libssl-dev libcurl4-openssl-dev          \
+  && apt-get install -y apache2 apache2-dev                      \
+  && apt-get install -y bsdmainutils net-tools inetutils-ping    \
+  && pip install -r ${REQPATH}/production.txt                    \
   && useradd -u $UID -ms /bin/bash localuser
 
 # Start as user localuser
 USER localuser
 
+# Copy source code and make localuser the owner
 COPY --chown=localuser ["./chris_backend", "${APPROOT}"]
 
 WORKDIR $APPROOT
