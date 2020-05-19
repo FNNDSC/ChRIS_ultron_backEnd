@@ -283,7 +283,7 @@ class FeedList(generics.ListAPIView):
         # append document-level link relations
         user = self.request.user
         links = {'files': reverse('allplugininstancefile-list', request=request),
-                 'computeresources': reverse('computeresource-list', request=request),
+                 'compute_resources': reverse('computeresource-list', request=request),
                  'plugins': reverse('plugin-list', request=request),
                  'plugin_instances': reverse('allplugininstance-list', request=request),
                  'pipelines': reverse('pipeline-list', request=request),

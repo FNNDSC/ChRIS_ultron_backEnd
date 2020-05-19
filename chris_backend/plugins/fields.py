@@ -42,7 +42,7 @@ class CPUInt(int):
             return super(CPUInt, cls).__new__(cls, cpu_str)
         try:
             cpu_int = int(cpu_str[:-1])
-            assert cpu_str[-1] is 'm'
+            assert cpu_str[-1] == 'm'
             assert cpu_int > 0
         except (IndexError, ValueError, AssertionError):
             raise ValueError("CPU format incorrect. Format is xm where x is an integer in millicores.")
