@@ -76,12 +76,25 @@ class PluginManagerTests(TestCase):
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
+
         plugin = self.pl_manager.register_plugin('testapp', '0.1', 'host')
         self.assertEqual(Plugin.objects.count(), 2)
         self.assertEqual(plugin.name, 'testapp')
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'testapp', '0.1', 30)
+
+        self.pl_manager.register_plugin('testapp', '', 'host')
+        self.pl_manager.get_plugin_representation_from_store.assert_called_with(
+            'testapp', None, 30)
+
+    def test_mananger_register_plugin_raises_name_error_if_compute_resource_does_not_exist(self):
+        """
+        Test whether the manager's register_plugin method raises NameError exception
+        when the compute respource argument doesn't exist in the DB.
+        """
+        with self.assertRaises(NameError):
+            self.pl_manager.register_plugin('testapp', '0.1', 'dummy')
 
     def test_mananger_can_register_plugin_by_url(self):
         """
@@ -98,6 +111,14 @@ class PluginManagerTests(TestCase):
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store_by_url.assert_called_with(
             'http://127.0.0.1:8010/api/v1/1/', 30)
+
+    def test_mananger_register_plugin_by_url_raises_name_error_if_compute_resource_does_not_exist(self):
+        """
+        Test whether the manager's register_plugin_by_url method raises NameError
+        exception when the compute respource argument doesn't exist in the DB.
+        """
+        with self.assertRaises(NameError):
+            self.pl_manager.register_plugin('testapp', '0.1', 'dummy')
 
     def test_mananger_can_remove_plugin(self):
         """

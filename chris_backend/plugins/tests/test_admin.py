@@ -40,7 +40,6 @@ class PluginAdminFormTests(TestCase):
         self.plugin = pl_admin.Plugin()
         self.plugin.name = self.plugin_name
         self.plugin.version = self.plugin_version
-        self.plugin.compute_resource = self.compute_resource
 
     def test_clean_validate_name_version_and_save_plugin_descriptors(self):
         """
@@ -59,13 +58,14 @@ class PluginAdminFormTests(TestCase):
             form = plugin_admin.form
             form.instance = self.plugin
             form.cleaned_data = {'name': self.plugin_name, 'version': self.plugin_version,
-                                 'compute_resource': 'host'}
+                                 'compute_resources': [self.compute_resource]}
             self.assertIsNone(form.instance.pk)
             form.clean(form)
             self.assertEqual(form.instance, plugin)
             self.assertIsNotNone(form.instance.pk)
-            register_plugin_mock.assert_called_with(self.plugin_name, self.plugin_version,
-                                               'host')
+            register_plugin_mock.assert_called_with(self.plugin_name,
+                                                    self.plugin_version,
+                                                    'host')
 
     def test_clean_validate_url_and_save_plugin_descriptors(self):
         """
@@ -85,7 +85,7 @@ class PluginAdminFormTests(TestCase):
             form = plugin_admin.form
             form.instance = self.plugin
             form.cleaned_data = {'url': plugin_store_url,
-                                 'compute_resource': 'host'}
+                                 'compute_resources': plugin.compute_resources.all()}
             self.assertIsNone(form.instance.pk)
             form.clean(form)
             self.assertEqual(form.cleaned_data.get('name'), self.plugin_name)
@@ -107,7 +107,7 @@ class PluginAdminFormTests(TestCase):
             form = plugin_admin.form
             form.instance = self.plugin
             form.cleaned_data = {'name': self.plugin_name, 'version': self.plugin_version,
-                                 'compute_resource': 'host'}
+                                 'compute_resources': [self.compute_resource]}
             self.assertIsNone(form.instance.pk)
             with self.assertRaises(forms.ValidationError):
                 form.clean(form)
@@ -147,17 +147,15 @@ class PluginAdminTests(TestCase):
     def test_change_view(self):
         """
         Test whether overriden change_view view shows all plugin fields in readonly
-        mode except the 'compute_resource' field that is shown in editable mode.
+        mode except the 'compute_resources' field that is shown in editable mode.
         """
         plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
         request_mock = mock.Mock()
         with mock.patch.object(pl_admin.admin.ModelAdmin, 'change_view',
                                return_value=None) as change_view_mock:
             plugin_admin.change_view(request_mock, 1)
-            self.assertNotIn('compute_resource', plugin_admin.readonly_fields)
+            self.assertNotIn('compute_resources', plugin_admin.readonly_fields)
             self.assertEqual(len(plugin_admin.fieldsets), 2)
-            self.assertEqual(len(plugin_admin.readonly_fields),
-                             len(plugin_admin.fieldsets[1][1]['fields']))
             change_view_mock.assert_called_with(plugin_admin, request_mock, 1, '', None)
 
     def test_add_plugins_from_file_view(self):
@@ -220,7 +218,7 @@ class PluginAdminTests(TestCase):
         with mock.patch.object(pl_admin.admin.ModelAdmin, 'save_model',
                                return_value=None) as save_model_mock:
             plugin_admin.save_model(request_mock, obj_mock, form_mock, False)
-            save_model_mock.assert_called_with(request_mock, form_mock.instance,
+            save_model_mock.assert_called_with(request_mock, obj_mock,
                                                form_mock, False)
 
             plugin_admin.save_model(request_mock, obj_mock, form_mock, True)

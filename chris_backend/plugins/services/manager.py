@@ -104,7 +104,7 @@ class PluginManager(object):
             compute_resource_serializer = ComputeResourceSerializer(cr, data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
-            cr.modification_date=timezone.now()
+            cr.modification_date = timezone.now()
             cr.save()
         return cr
 
@@ -119,25 +119,23 @@ class PluginManager(object):
             raise NameError("Compute resource '%s' does not exists" % compute_name)
         plg_repr = None
         if not version:
-            plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
+            plg_repr = self.get_plugin_representation_from_store(name, None, timeout)
             version = plg_repr['version']
         try:
             plugin = self.get_plugin(name, version)
         except NameError:
             # plugin doesn't exist in the system, let's create it
             if not plg_repr:
-                plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
+                plg_repr = self.get_plugin_representation_from_store(name, version,
+                                                                     timeout)
             return self._create_plugin(plg_repr, cr)
         # plugin already in the system, let's check if already registered with cr
         compute_resources = list(plugin.compute_resources.all())
-        if cr in compute_resources:
-            msg = "Plugin '%s' with version '%s' already registered with compute " \
-                  "resource '%s'"
-            raise NameError(msg % (name, version, compute_name))
-        compute_resources.append(cr)
-        plugin.compute_resources.set(compute_resources)
-        plugin.modification_date = timezone.now()
-        plugin.save()
+        if cr not in compute_resources:
+            compute_resources.append(cr)
+            plugin.compute_resources.set(compute_resources)
+            plugin.modification_date = timezone.now()
+            plugin.save()
         return plugin
 
     def register_plugin_by_url(self, url, compute_name, timeout=30):
@@ -155,16 +153,15 @@ class PluginManager(object):
         try:
             plugin = self.get_plugin(name, version)
         except NameError:
-            # plugin doesn't exist
+            # plugin doesn't exist in the system, let's create it
             return self._create_plugin(plg_repr, cr)
         # plugin already in the system, let's check if already registered with cr
         compute_resources = list(plugin.compute_resources.all())
-        if cr in compute_resources:
-            msg = "Plugin '%s' with version '%s' already registered with compute " \
-                  "resource '%s'"
-            raise NameError(msg % (name, version, compute_name))
-        compute_resources.append(cr)
-        plugin.compute_resources.set(compute_resources)
+        if cr not in compute_resources:
+            compute_resources.append(cr)
+            plugin.compute_resources.set(compute_resources)
+            plugin.modification_date = timezone.now()
+            plugin.save()
         return plugin
 
     def _create_plugin(self, plg_repr, compute_resource):

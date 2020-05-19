@@ -6,13 +6,72 @@ from django.shortcuts import render
 from django import forms
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
+from django.contrib import messages
 
 from .models import Plugin, ComputeResource
 from .services.manager import PluginManager
 
 
-readonly_fields = [fld.name for fld in Plugin._meta.fields if
-                   fld.name != 'compute_resources']
+plugin_readonly_fields = [fld.name for fld in Plugin._meta.fields if
+                          fld.name != 'compute_resources']
+
+
+class ComputeResourceAdmin(admin.ModelAdmin):
+    readonly_fields = ['creation_date', 'modification_date']
+    list_display = ('name', 'description', 'id')
+    list_filter = ['name', 'creation_date', 'modification_date']
+    search_fields = ['name', 'description']
+
+    def add_view(self, request, form_url='', extra_context=None):
+        """
+        Overriden to only show the required fields in the add compute resource page.
+        """
+        self.fields = ['name', 'description']
+        return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """
+        Overriden to show all compute resources's fields in the compute resource page.
+        """
+        self.fields = ['name', 'description', 'creation_date', 'modification_date']
+        return admin.ModelAdmin.change_view(self, request, object_id, form_url,
+                                            extra_context)
+
+    def save_model(self, request, obj, form, change):
+        """
+        Overriden to set the modification date.
+        """
+        if change:
+            obj.modification_date = timezone.now()
+        super().save_model(request, obj, form, change)
+
+    def delete_model(self, request, obj):
+        """
+        Overriden to prevent deleting compute resources that would leave orphan
+        plugins after the operation.
+        """
+        try:
+            super().delete_model(request, obj)
+        except ValidationError as e:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, e.message)
+
+    def delete_queryset(self, request, queryset):
+        """
+        Overriden to prevent deleting compute resources that would leave orphan
+        plugins after the operation. This customizes the deletion process for the
+        “delete selected objects” action.
+        """
+        for compute_resource in queryset:
+            plg_ids = compute_resource.get_plugins_with_self_as_single_compute_resource()
+            if plg_ids:
+                messages.set_level(request, messages.ERROR)
+                msg = "Can not delete compute resource '%s'. Please do not check it " \
+                      "for the delete or otherwise first register its associated " \
+                      "plugins with IDs %s with another compute resource."
+                messages.error(request, msg % (compute_resource, plg_ids))
+                return None
+        return super().delete_queryset(request, queryset)
 
 
 class UploadFileForm(forms.Form):
@@ -26,17 +85,23 @@ class PluginAdminForm(forms.ModelForm):
 
     def clean(self):
         """
-        Overriden to validate the full set of plugin descriptors and save the newly created
-        plugin to the DB.
+        Overriden to validate the full set of plugin descriptors and save the newly
+        created plugin to the DB.
         """
         if self.instance.pk is None:  # create plugin operation
             pl_manager = PluginManager()
-            compute_resource = self.cleaned_data.get('compute_resource')
+            compute_resources = list(self.cleaned_data.get('compute_resources'))
             url = self.cleaned_data.pop('url', None)
             if url:
                 try:
-                    self.instance = pl_manager.register_plugin_by_url(url, compute_resource)
-                    self.cleaned_data['name'] = self.instance.name  # set name form data
+                    cr = compute_resources.pop()
+                    self.instance = pl_manager.register_plugin_by_url(url, cr.name)
+                    name = self.instance.name
+                    version = self.instance.version
+                    for cr in compute_resources:
+                        # registering by (name, version) avoids contacting the ChRIS store
+                        # when the plugin already exists in ChRIS
+                        self.instance = pl_manager.register_plugin(name, version, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
             else:
@@ -46,11 +111,17 @@ class PluginAdminForm(forms.ModelForm):
                 # get user-provided version (can be blank)
                 version = self.cleaned_data.get('version')
                 try:
-                    self.instance = pl_manager.register_plugin(name, version,
-                                                               compute_resource)
+                    cr = compute_resources.pop()
+                    self.instance = pl_manager.register_plugin(name, version, cr.name)
+                    version = self.instance.version
+                    for cr in compute_resources:
+                        self.instance = pl_manager.register_plugin(name, version, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
-            self.cleaned_data['version'] = self.instance.version  # set version form data
+            # reset form validated data
+            self.cleaned_data['name'] = name
+            self.cleaned_data['version'] = version
+            self.cleaned_data['compute_resources'] = self.instance.compute_resources.all()
 
 
 class PluginAdmin(admin.ModelAdmin):
@@ -65,23 +136,25 @@ class PluginAdmin(admin.ModelAdmin):
         """
         Overriden to only show the required fields in the add plugin page.
         """
+        self.readonly_fields = []
         self.fieldsets = [
-            ('Choose associated compute resource', {'fields': ['compute_resources']}),
+            ('Compute resources', {'fields': ['compute_resources']}),
             ('Identify plugin by name and version', {'fields': [('name', 'version')]}),
             ('Or identify plugin by url', {'fields': ['url']}),
         ]
-        self.readonly_fields = []
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """
         Overriden to show all plugin's fields in the view plugin page.
         """
+        self.readonly_fields = [f for f in plugin_readonly_fields]
+        self.readonly_fields.append('get_registered_compute_resources')
         self.fieldsets = [
-            ('Associated compute resource', {'fields': ['compute_resources']}),
-            ('Plugin properties', {'fields': readonly_fields}),
+            ('Compute resources', {'fields': ['compute_resources',
+                                              'get_registered_compute_resources']}),
+            ('Plugin properties', {'fields': plugin_readonly_fields}),
         ]
-        self.readonly_fields = readonly_fields
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 
@@ -91,8 +164,6 @@ class PluginAdmin(admin.ModelAdmin):
         """
         if change:
             obj.modification_date = timezone.now()
-        else:
-            obj = form.instance
         super().save_model(request, obj, form, change)
 
     # def has_change_permission(self, request, obj=None):
@@ -169,7 +240,8 @@ class PluginAdmin(admin.ModelAdmin):
                         plg_version = strings[1]
                         compute_resource = strings[2]
                     try:
-                        pl_manager.register_plugin(plg_name, plg_version, compute_resource)
+                        pl_manager.register_plugin(plg_name, plg_version,
+                                                   compute_resource)
                     except Exception as e:
                         summary['error'].append({'plugin_name': plg_name, 'code': str(e)})
                     else:
@@ -188,4 +260,4 @@ class PluginAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Plugin, PluginAdmin)
-admin.site.register(ComputeResource)
+admin.site.register(ComputeResource, ComputeResourceAdmin)

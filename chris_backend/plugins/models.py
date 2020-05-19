@@ -3,6 +3,7 @@ from django.db import models
 
 import django_filters
 from django_filters.rest_framework import FilterSet
+from django.core.exceptions import ValidationError
 
 from .fields import CPUField, MemoryField
 
@@ -16,7 +17,7 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
 TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
          'path': 'path', 'unextpath': 'unextpath'}
 
-PLUGIN_TYPE_CHOICES = [("ds", "Data plugin"), ("fs", "Filesystem plugin")]
+PLUGIN_TYPE_CHOICES = [("ds", "Data synthesis"), ("fs", "Feed synthesis")]
 
 
 class ComputeResource(models.Model):
@@ -33,14 +34,20 @@ class ComputeResource(models.Model):
         Overriden to only allow the delete if no plugin would be left without a compute
         resource after the operation.
         """
-        plgs_with_no_compute_after_delete = [plg.id for plg in self.plugins.all()
-                                             if plg.compute_resources.count() == 1]
-        if plgs_with_no_compute_after_delete:
-            plgs_with_no_compute_after_delete.sort()
+        plg_ids = self.get_plugins_with_self_as_single_compute_resource()
+        if plg_ids:
+            plg_ids.sort()
             msg = "Can not delete compute resource '%s'. Please first register the " \
                   "following plugins with another compute resource. Plugin IDs: %s"
-            raise Exception(msg % (self.name, plgs_with_no_compute_after_delete))
+            raise ValidationError(msg % (self.name, plg_ids))
         super().delete()
+
+    def get_plugins_with_self_as_single_compute_resource(self):
+        """
+        Custom method to get the list of plugin ids for the plugins that are only
+        registered with this single compute resource.
+        """
+        return [pl.id for pl in self.plugins.all() if pl.compute_resources.count() == 1]
 
 
 class ComputeResourceFilter(FilterSet):
@@ -105,8 +112,12 @@ class Plugin(models.Model):
         """
         Custom method to get the list of plugin parameter names.
         """
-        params = self.parameters.all()
-        return [param.name for param in params]
+        return [param.name for param in self.parameters.all()]
+
+    def get_registered_compute_resources(self):
+        return [cr.name for cr in self.compute_resources.all()]
+    get_registered_compute_resources.admin_order_field = 'id'
+    get_registered_compute_resources.short_description = 'Associated compute resources'
 
 
 class PluginFilter(FilterSet):
