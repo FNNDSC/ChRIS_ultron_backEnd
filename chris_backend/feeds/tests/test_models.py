@@ -22,13 +22,16 @@ class FeedModelTests(TestCase):
                                   'img_type': {'type': 'string', 'optional': True}}
         self.username = 'foo'
         self.password = 'bar'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create a "fs" plugin
-        (plugin, tf) = Plugin.objects.get_or_create(name=self.plugin_name,
-                                                    type=self.plugin_type,
-                                                    compute_resource=self.compute_resource)
+        (plugin, tf) = Plugin.objects.get_or_create(
+            name=self.plugin_name, type=self.plugin_type)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+
         # add plugin parameter
         PluginParameter.objects.get_or_create(
             plugin=plugin,
@@ -41,8 +44,8 @@ class FeedModelTests(TestCase):
                                         password=self.password)
 
         # create a plugin instance that in turn creates a new feed
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                 compute_resource=plugin.compute_resource)
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         plg_inst.feed.name = self.feed_name
         plg_inst.feed.save()
 

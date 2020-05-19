@@ -22,13 +22,15 @@ class ModelTests(TestCase):
         self.plugin_ds_parameters = {'prefix': {'type': 'string', 'optional': False}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugin
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                       type='ds',
-                                                       compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # add plugin's parameters
         (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
             plugin=plugin_ds,

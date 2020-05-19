@@ -30,16 +30,19 @@ class SerializerTests(TestCase):
                                                   'default': 111111}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                       type='fs',
-                                                       compute_resource=self.compute_resource)
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                       type='ds',
-                                                       compute_resource=self.compute_resource)
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # add plugins' parameters
         (plg_param_fs, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -96,8 +99,8 @@ class PipelineInstanceSerializerTests(SerializerTests):
         """
         owner = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
-                                            compute_resource=plugin.compute_resource)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         data = {'title': 'PipelineInst1', 'previous_plugin_inst_id': pl_inst.id}
         pipeline_inst_serializer = PipelineInstanceSerializer(data=data)
@@ -116,8 +119,8 @@ class PipelineInstanceSerializerTests(SerializerTests):
         """
         owner = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        (pl_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=owner,
-                                            compute_resource=plugin.compute_resource)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         data = {'title': 'PipelineInst1', 'previous_plugin_inst_id': pl_inst.id}
         pipeline_inst_serializer = PipelineInstanceSerializer(data=data)
         pipeline_inst_serializer.context['request'] = mock.Mock()

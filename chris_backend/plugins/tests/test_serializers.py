@@ -32,14 +32,15 @@ class SerializerTests(TestCase):
                             "selfexec": "simplecopyapp.py", "execshell": "python3"}
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create a plugin
         data = self.plugin_repr.copy()
         parameters = self.plugin_repr['parameters']
         del data['parameters']
-        data['compute_resource'] = self.compute_resource
         (plugin, tf) = Plugin.objects.get_or_create(**data)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
 
         # add plugin's parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(

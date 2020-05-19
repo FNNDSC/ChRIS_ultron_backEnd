@@ -34,14 +34,15 @@ class PluginManagerTests(TestCase):
         self.pl_manager = manager.PluginManager()
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create a plugin
         data = self.plugin_repr.copy()
         parameters = self.plugin_repr['parameters']
         del data['parameters']
-        data['compute_resource'] = self.compute_resource
         (plugin_fs, tf) = Plugin.objects.get_or_create(**data)
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
 
         # add plugin's parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
@@ -66,7 +67,7 @@ class PluginManagerTests(TestCase):
         plugin = Plugin.objects.get(name=self.plugin_fs_name, version="0.1")
         self.assertEqual(plugin, self.pl_manager.get_plugin(self.plugin_fs_name, "0.1"))
 
-    def test_mananger_can_add_plugin(self):
+    def test_mananger_can_register_plugin(self):
         """
         Test whether the manager can add a new plugin to the system given its name
         and version.
@@ -75,14 +76,27 @@ class PluginManagerTests(TestCase):
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store = mock.Mock(
             return_value=self.plugin_repr)
-        plugin = self.pl_manager.add_plugin('testapp', '0.1', 'host')
+
+        plugin = self.pl_manager.register_plugin('testapp', '0.1', 'host')
         self.assertEqual(Plugin.objects.count(), 2)
         self.assertEqual(plugin.name, 'testapp')
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store.assert_called_with(
             'testapp', '0.1', 30)
 
-    def test_mananger_can_add_plugin_by_url(self):
+        self.pl_manager.register_plugin('testapp', '', 'host')
+        self.pl_manager.get_plugin_representation_from_store.assert_called_with(
+            'testapp', None, 30)
+
+    def test_mananger_register_plugin_raises_name_error_if_compute_resource_does_not_exist(self):
+        """
+        Test whether the manager's register_plugin method raises NameError exception
+        when the compute respource argument doesn't exist in the DB.
+        """
+        with self.assertRaises(NameError):
+            self.pl_manager.register_plugin('testapp', '0.1', 'dummy')
+
+    def test_mananger_can_register_plugin_by_url(self):
         """
         Test whether the manager can add a new plugin to the system given its url.
         """
@@ -90,36 +104,27 @@ class PluginManagerTests(TestCase):
         # mock manager's get_plugin_representation_from_store static method
         self.pl_manager.get_plugin_representation_from_store_by_url = mock.Mock(
             return_value=self.plugin_repr)
-        plugin = self.pl_manager.add_plugin_by_url('http://127.0.0.1:8010/api/v1/1/',
-                                                   'host')
+        plugin = self.pl_manager.register_plugin_by_url(
+            'http://127.0.0.1:8010/api/v1/1/', 'host')
         self.assertEqual(Plugin.objects.count(), 2)
         self.assertEqual(plugin.name, 'testapp')
         self.assertTrue(PluginParameter.objects.count() > 1)
         self.pl_manager.get_plugin_representation_from_store_by_url.assert_called_with(
             'http://127.0.0.1:8010/api/v1/1/', 30)
 
-    def test_mananger_can_modify_plugin(self):
+    def test_mananger_register_plugin_by_url_raises_name_error_if_compute_resource_does_not_exist(self):
         """
-        Test whether the manager can modify an existing plugin.
+        Test whether the manager's register_plugin_by_url method raises NameError
+        exception when the compute respource argument doesn't exist in the DB.
         """
-        self.plugin_repr['dock_image'] = 'fnndsc/pl-simplecopyapp1111'
-        plugin = Plugin.objects.get(name=self.plugin_fs_name, version='0.1')
-        initial_modification_date = plugin.modification_date
-        time.sleep(1)
-        # mock manager's get_plugin_representation_from_store static method
-        self.pl_manager.get_plugin_representation_from_store = mock.Mock(
-            return_value=self.plugin_repr)
-        plugin = self.pl_manager.modify_plugin(self.plugin_fs_name, '0.1', 'host1', True)
-        self.pl_manager.get_plugin_representation_from_store.assert_called_with(
-            'simplecopyapp', '0.1', 30)
-        self.assertTrue(plugin.modification_date > initial_modification_date)
-        self.assertEqual(plugin.dock_image,'fnndsc/pl-simplecopyapp1111')
-        self.assertEqual(plugin.compute_resource.compute_resource_identifier, 'host1')
+        with self.assertRaises(NameError):
+            self.pl_manager.register_plugin('testapp', '0.1', 'dummy')
 
     def test_mananger_can_remove_plugin(self):
         """
         Test whether the manager can remove an existing plugin from the system.
         """
-        self.pl_manager.remove_plugin(self.plugin_fs_name, '0.1')
+        plugin = Plugin.objects.get(name=self.plugin_fs_name, version="0.1")
+        self.pl_manager.remove_plugin(plugin.id)
         self.assertEqual(Plugin.objects.count(), 0)
         self.assertEqual(PluginParameter.objects.count(), 0)

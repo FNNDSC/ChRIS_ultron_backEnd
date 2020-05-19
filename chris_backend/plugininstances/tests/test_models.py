@@ -31,16 +31,18 @@ class ModelTests(TestCase):
         self.plugin_ds_parameters = {'prefix': {'type': 'string', 'optional': False}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                       type='fs',
-                                                       compute_resource=self.compute_resource)
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                       type='ds',
-                                                       compute_resource=self.compute_resource)
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # add plugins' parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -75,9 +77,8 @@ class PluginInstanceModelTests(ModelTests):
         # create an 'fs' plugin instance that in turn should create a new feed
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
-        
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         self.assertEqual(Feed.objects.count(), 1)
         self.assertEqual(pl_inst.feed.name,pl_inst.plugin.name)
 
@@ -89,12 +90,12 @@ class PluginInstanceModelTests(ModelTests):
         # create a 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
         PluginInstance.objects.create(plugin=plugin, owner=user, previous=plg_inst,
-                                      compute_resource=plugin.compute_resource)
+                                      compute_resource=plugin.compute_resources.all()[0])
         # the new 'ds' plugin instance shouldn't create a new feed
         self.assertEqual(Feed.objects.count(), 1)
 
@@ -106,13 +107,13 @@ class PluginInstanceModelTests(ModelTests):
         # create a 'fs' plugin instance 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst_root = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin instance whose root is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=plg_inst_root,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, previous=plg_inst_root,
+            compute_resource=plugin.compute_resources.all()[0])
         root_instance = plg_inst.get_root_instance()
         self.assertEqual(root_instance, plg_inst_root)
 
@@ -124,19 +125,19 @@ class PluginInstanceModelTests(ModelTests):
         # create a 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst_root = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        plg_inst1 = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=plg_inst_root,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst1 = PluginInstance.objects.create(
+            plugin=plugin, owner=user, previous=plg_inst_root,
+            compute_resource=plugin.compute_resources.all()[0])
         # create another 'ds' plugin instance whose previous is the previous 'ds' plugin
         # instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        plg_inst2 = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=plg_inst1,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst2 = PluginInstance.objects.create(
+            plugin=plugin, owner=user, previous=plg_inst1,
+            compute_resource=plugin.compute_resources.all()[0])
         decend_instances = plg_inst_root.get_descendant_instances()
         self.assertEqual(len(decend_instances), 3)
         self.assertEqual(decend_instances[0], plg_inst_root)
@@ -151,8 +152,8 @@ class PluginInstanceModelTests(ModelTests):
         # create an 'fs' plugin instance 
         user = User.objects.get(username=self.username)
         plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst_fs = PluginInstance.objects.create(plugin=plugin_fs, owner=user,
-                                                    compute_resource=plugin_fs.compute_resource)
+        pl_inst_fs = PluginInstance.objects.create(
+            plugin=plugin_fs, owner=user, compute_resource=plugin_fs.compute_resources.all()[0])
         # 'fs' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
         fs_output_path = '{0}/feed_{1}/{2}_{3}/data'.format( self.username,
@@ -165,8 +166,9 @@ class PluginInstanceModelTests(ModelTests):
         # create a 'ds' plugin instance 
         user = User.objects.get(username=self.username)
         plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
-        pl_inst_ds = PluginInstance.objects.create(plugin=plugin_ds,
-                    owner=user, previous=pl_inst_fs, compute_resource=plugin_ds.compute_resource)
+        pl_inst_ds = PluginInstance.objects.create(
+            plugin=plugin_ds, owner=user, previous=pl_inst_fs,
+            compute_resource=plugin_ds.compute_resources.all()[0])
         # 'ds' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
         #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
@@ -183,8 +185,8 @@ class PluginInstanceModelTests(ModelTests):
         # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, 
-                                    compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         output_path = pl_inst.get_output_path()
         object_list = [{'name': output_path + '/file1.txt'}]
         container_data = ['', object_list]
@@ -212,8 +214,8 @@ class PluginInstanceModelTests(ModelTests):
         # create an 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                            compute_resource=plugin.compute_resource)
+        plg_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
@@ -247,8 +249,8 @@ class PluginInstanceModelTests(ModelTests):
         # create a 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
         self.assertEqual(plg_inst.status, 'started')
         with mock.patch.object(PluginAppManager, 'cancel_plugin_app_exec',
@@ -267,8 +269,8 @@ class PluginInstanceModelTests(ModelTests):
                                return_value=None) as run_plugin_app_mock:
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                     compute_resource=plugin.compute_resource)
+            plg_inst = PluginInstance.objects.create(
+                plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
             self.assertEqual(plg_inst.status, 'started')
             parameters_dict = {'dir': './'}
             plg_inst.run(parameters_dict)
@@ -289,8 +291,8 @@ class PluginInstanceModelTests(ModelTests):
                                return_value=None) as check_plugin_app_exec_status_mock:
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(name=self.plugin_fs_name)
-            plg_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                     compute_resource=plugin.compute_resource)
+            plg_inst = PluginInstance.objects.create(
+                plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
             plg_inst.check_exec_status()
             # check that manager's check_plugin_app_exec_status method was called once
             check_plugin_app_exec_status_mock.assert_called_once()
@@ -306,19 +308,19 @@ class PluginInstanceFilterModelTests(ModelTests):
         # create a 'fs' plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name=self.plugin_fs_name)
-        plg_inst_root = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst_root = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin instance whose previous is the previous 'fs' plugin instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        plg_inst1 = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=plg_inst_root,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst1 = PluginInstance.objects.create(
+            plugin=plugin, owner=user, previous=plg_inst_root,
+            compute_resource=plugin.compute_resources.all()[0])
         # create another 'ds' plugin instance whose previous is the previous 'ds' plugin
         # instance
         plugin = Plugin.objects.get(name=self.plugin_ds_name)
-        plg_inst2 = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                previous=plg_inst1,
-                                                compute_resource=plugin.compute_resource)
+        plg_inst2 = PluginInstance.objects.create(
+            plugin=plugin, owner=user, previous=plg_inst1,
+            compute_resource=plugin.compute_resources.all()[0])
         queryset = PluginInstance.objects.all()
         value = plg_inst1.id
         filter = PluginInstanceFilter()

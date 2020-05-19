@@ -43,11 +43,11 @@ echo " "
 if [[ "$1" == '--url' ]]; then
     PLUGIN_URL=$2
     echo "Registering plugin=$PLUGIN_URL compute environment=$COMP_ENV..."
-    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add --url "${PLUGIN_URL}" "$COMP_ENV"
+    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py register "$COMP_ENV" --pluginurl "${PLUGIN_URL}"
 elif [[ "$1" == '--name' ]]; then
     PLUGIN_NAME=$2
     echo "Registering plugin=$PLUGIN_NAME compute environment=$COMP_ENV..."
-    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add --name "${PLUGIN_NAME}" "$COMP_ENV"
+    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py register "$COMP_ENV" --pluginname "${PLUGIN_NAME}"
 else
     echo "--url URL or --name NAME must be provided as the first argument."
     exit 1

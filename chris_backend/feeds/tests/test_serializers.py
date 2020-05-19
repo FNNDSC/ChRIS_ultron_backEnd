@@ -24,8 +24,9 @@ class SerializerTests(TestCase):
         self.feedname = "Feed1"
         self.other_username = 'boo'
         self.other_password = 'far'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create users
         User.objects.create_user(username=self.other_username,
@@ -34,12 +35,13 @@ class SerializerTests(TestCase):
                                         password=self.password)
 
         # create a "fs" plugin
-        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs",
-                                                    compute_resource=self.compute_resource)
+        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
 
         # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
 

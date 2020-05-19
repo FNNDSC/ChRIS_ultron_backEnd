@@ -80,6 +80,17 @@ urlpatterns = format_suffix_patterns([
         feed_views.TaggingDetail.as_view(), name='tagging-detail'),
 
 
+    path('v1/computeresources/',
+         plugin_views.ComputeResourceList.as_view(), name='computeresource-list'),
+
+    path('v1/computeresources/search/',
+         plugin_views.ComputeResourceListQuerySearch.as_view(),
+         name='computeresource-list-query-search'),
+
+    path('v1/computeresources/<int:pk>/',
+         plugin_views.ComputeResourceDetail.as_view(), name='computeresource-detail'),
+
+
     path('v1/plugins/',
         plugin_views.PluginList.as_view(), name='plugin-list'),
 
@@ -94,6 +105,10 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/plugins/parameters/<int:pk>/',
         plugin_views.PluginParameterDetail.as_view(), name='pluginparameter-detail'),
+
+    path('v1/plugins/<int:pk>/computeresources/',
+        plugin_views.PluginComputeResourceList.as_view(),
+         name='plugin-computeresource-list'),
 
 
     path('v1/pipelines/',

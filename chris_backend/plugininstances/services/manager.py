@@ -60,7 +60,7 @@ class PluginAppManager(object):
                     break
 
         # run the app via an external REST service...
-        str_IOPhost = plugin_inst.compute_resource.compute_resource_identifier
+        str_IOPhost = plugin_inst.compute_resource.name
         chris_service = Charm(app_args=app_args,
                               d_args=parameter_dict,
                               plugin_inst=plugin_inst,

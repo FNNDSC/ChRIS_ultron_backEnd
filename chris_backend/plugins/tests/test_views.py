@@ -22,15 +22,17 @@ class ViewTests(TestCase):
         self.password = 'bar'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create API user
         User.objects.create_user(username=self.username,
                                  password=self.password)
 
         # create two plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name="simplecopyapp", type="fs",
-                                     compute_resource=self.compute_resource)
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name="simplecopyapp", type="fs")
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
         # add plugin's parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -39,12 +41,72 @@ class ViewTests(TestCase):
             optional=True
         )
         DefaultStrParameter.objects.get_or_create(plugin_param=plg_param, value="./")
-        Plugin.objects.get_or_create(name="mri_convert", type="ds",
-                                     compute_resource=self.compute_resource)
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
 
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.DEBUG)
+
+
+class ComputeResourceListViewTests(ViewTests):
+    """
+    Test the computeresource-list view.
+    """
+
+    def setUp(self):
+        super(ComputeResourceListViewTests, self).setUp()
+        self.list_url = reverse("computeresource-list")
+
+    def test_compute_resource_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "host description")
+
+    def test_compute_resource_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ComputeResourceListQuerySearchViewTests(ViewTests):
+    """
+    Test the computeresource-list-query-search view.
+    """
+
+    def setUp(self):
+        super(ComputeResourceListQuerySearchViewTests, self).setUp()
+        self.list_url = reverse("computeresource-list-query-search") + '?name=host'
+
+    def test_compute_resource_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "host description")
+
+    def test_compute_resource_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ComputeResourceDetailViewTests(ViewTests):
+    """
+    Test the computeresource-detail view.
+    """
+
+    def setUp(self):
+        super(ComputeResourceDetailViewTests, self).setUp()
+        compute_resource = ComputeResource.objects.get(name="host")
+
+        self.read_url = reverse("computeresource-detail", kwargs={"pk": compute_resource.id})
+
+    def test_compute_resource_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, "host description")
+
+    def test_compute_resource_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginListViewTests(ViewTests):
@@ -83,6 +145,29 @@ class PluginListQuerySearchViewTests(ViewTests):
         self.assertNotContains(response, "mri_convert")
 
     def test_plugin_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginComputeResourceListViewTests(ViewTests):
+    """
+    Test the plugin-computeresource-list view.
+    """
+
+    def setUp(self):
+        super(PluginComputeResourceListViewTests, self).setUp()
+
+        plugin = Plugin.objects.get(name="simplecopyapp")
+        self.list_url = reverse("plugin-computeresource-list", kwargs={"pk": plugin.id})
+
+    def test_plugin_compute_resource_list_success(self):
+        ComputeResource.objects.get_or_create(name="new", description="new description")
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "host description")
+        self.assertNotContains(response, "new")  # compute resource list is plugin-specific
+
+    def test_plugin_compute_resource_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 

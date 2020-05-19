@@ -13,8 +13,8 @@ if __name__ == '__main__':
     import django
     django.setup()
 
-from django.utils import timezone
 from django.conf import settings
+from django.utils import timezone
 
 from argparse import ArgumentParser
 from argparse import ArgumentError
@@ -35,63 +35,139 @@ class PluginManager(object):
                                            help='sub-command help')
 
         # create the parser for the "add" command
-        parser_add = subparsers.add_parser('add', help='Add a new plugin')
+        parser_add = subparsers.add_parser('add', help='add a new compute resource')
         parser_add.add_argument('computeresource',
-                                help="Compute resource where the plugin's instances run")
-        group = parser_add.add_mutually_exclusive_group()
-        group.add_argument('--name', help="Plugin's name")
-        group.add_argument('--url', help="Plugin's url")
-        parser_add.add_argument('-v', '--version', help="Plugin's version. If not "
-                                                        "provided then the latest "
-                                                        "version is fetched.")
-        parser_add.add_argument('--storetimeout', help="ChRIS store request timeout")
+                                help="compute resource where plugins' instances run")
+        parser_add.add_argument('description',
+                                help="compute resource description")
 
         # create the parser for the "modify" command
-        parser_modify = subparsers.add_parser('modify', help='Modify existing plugin')
-        parser_modify.add_argument('name', help="Plugin's name")
-        parser_modify.add_argument('version', help="Plugin's version")
-        parser_modify.add_argument('--computeresource',
-                                help="Compute resource where the plugin's instances run")
-        parser_modify.add_argument('--updatefromstore', action='store_true',
-                                   help="Update plugin representation from ChRIS store")
-        parser_modify.add_argument('--storetimeout', help="ChRIS store request timeout")
+        parser_modify = subparsers.add_parser('modify',
+                                              help='modify existing compute resource')
+        parser_modify.add_argument('computeresource', help="compute resource")
+        parser_modify.add_argument('--name',
+                                help="compute resource new name")
+        parser_modify.add_argument('--description',
+                                help="compute resource new description")
+
+        # create parser for the "register" command
+        parser_register = subparsers.add_parser(
+            'register', help='register a plugin with a compute resource')
+        parser_register.add_argument(
+            'computeresource', help="compute resource where the plugin's instances run")
+        group = parser_register.add_mutually_exclusive_group()
+        group.add_argument('--pluginname', help="plugin's name")
+        group.add_argument('--pluginurl', help="plugin's url")
+        parser_register.add_argument('--pluginversion', help="plugin's version. If not "
+                                                        "provided then the latest "
+                                                        "version is fetched.")
+        parser_register.add_argument('--storetimeout', help="ChRIS store request timeout")
 
         # create the parser for the "remove" command
-        parser_remove = subparsers.add_parser('remove', help='Remove an existing plugin')
-        parser_remove.add_argument('name', help="Plugin's name")
-        parser_remove.add_argument('version', help="Plugin's version")
+        parser_remove = subparsers.add_parser(
+            'remove', help='remove an existing plugin or compute')
+        parser_remove.add_argument('resourcename', choices=['plugin', 'compute'],
+                                help="resource name")
+        parser_remove.add_argument('id', help="resource id")
 
         self.parser = parser
 
-    def add_plugin(self, name, version, compute_identifier, timeout=30):
+    def add_compute_resource(self, name, description):
+        """
+        Add a new compute resource to the system.
+        """
+        # validate compute resource name
+        try:
+            cr = ComputeResource.objects.get(name=name)
+        except ComputeResource.DoesNotExist:
+            data = {'name': name, 'description': description}
+            compute_resource_serializer = ComputeResourceSerializer(data=data)
+            compute_resource_serializer.is_valid(raise_exception=True)
+            cr = compute_resource_serializer.save()
+        return cr
+
+    def modify_compute_resource(self, name, new_name, description):
+        """
+        Modify an existing compute resource and add the current date as a new
+        modification date.
+        """
+        try:
+            cr = ComputeResource.objects.get(name=name)
+        except ComputeResource.DoesNotExist:
+            raise NameError("Compute resource '%s' does not exists" % name)
+        if new_name or description:
+            data = {'name': cr.name, 'description': cr.description}
+            if new_name:
+                data['name'] = new_name
+            if description:
+                data['description'] = description
+            compute_resource_serializer = ComputeResourceSerializer(cr, data=data)
+            compute_resource_serializer.is_valid(raise_exception=True)
+            cr = compute_resource_serializer.save()
+            cr.modification_date = timezone.now()
+            cr.save()
+        return cr
+
+    def register_plugin(self, name, version, compute_name, timeout=30):
         """
         Register/add a new plugin identified by its name and version from the ChRIS store
         into the system.
         """
-        plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
-        return self._add_plugin(plg_repr, compute_identifier)
+        try:
+            cr = ComputeResource.objects.get(name=compute_name)
+        except ComputeResource.DoesNotExist:
+            raise NameError("Compute resource '%s' does not exists" % compute_name)
+        plg_repr = None
+        if not version:
+            plg_repr = self.get_plugin_representation_from_store(name, None, timeout)
+            version = plg_repr['version']
+        try:
+            plugin = self.get_plugin(name, version)
+        except NameError:
+            # plugin doesn't exist in the system, let's create it
+            if not plg_repr:
+                plg_repr = self.get_plugin_representation_from_store(name, version,
+                                                                     timeout)
+            return self._create_plugin(plg_repr, cr)
+        # plugin already in the system, let's check if already registered with cr
+        compute_resources = list(plugin.compute_resources.all())
+        if cr not in compute_resources:
+            compute_resources.append(cr)
+            plugin.compute_resources.set(compute_resources)
+            plugin.modification_date = timezone.now()
+            plugin.save()
+        return plugin
 
-    def add_plugin_by_url(self, url, compute_identifier, timeout=30):
+    def register_plugin_by_url(self, url, compute_name, timeout=30):
         """
         Register/add a new plugin identified by its ChRIS store url from the store into
         the system.
         """
+        try:
+            cr = ComputeResource.objects.get(name=compute_name)
+        except ComputeResource.DoesNotExist:
+            raise NameError("Compute resource '%s' does not exists" % compute_name)
         plg_repr = self.get_plugin_representation_from_store_by_url(url, timeout)
-        return self._add_plugin(plg_repr, compute_identifier)
-
-    def _add_plugin(self, plg_repr, compute_identifier):
-        """
-        Private utility method to register/add a new plugin into the system.
-        """
         name = plg_repr['name']
         version = plg_repr['version']
         try:
-            self.get_plugin(name, version)
+            plugin = self.get_plugin(name, version)
         except NameError:
-            pass
-        else:
-            raise NameError("Plugin %s with version %s already exists in the system!" %
-                            (name, version))
+            # plugin doesn't exist in the system, let's create it
+            return self._create_plugin(plg_repr, cr)
+        # plugin already in the system, let's check if already registered with cr
+        compute_resources = list(plugin.compute_resources.all())
+        if cr not in compute_resources:
+            compute_resources.append(cr)
+            plugin.compute_resources.set(compute_resources)
+            plugin.modification_date = timezone.now()
+            plugin.save()
+        return plugin
+
+    def _create_plugin(self, plg_repr, compute_resource):
+        """
+        Private utility method to register/add a new plugin into the system.
+        """
         parameters_data = plg_repr['parameters']
         del plg_repr['parameters']
         plg_serializer = PluginSerializer(data=plg_repr)
@@ -113,71 +189,36 @@ class PluginManager(object):
                 serializer_dict['default_serializer'] = default_param_serializer
             parameters_serializers.append(serializer_dict)
 
-        # validate compute resource identifier
-        try:
-            ComputeResource.objects.get(compute_resource_identifier=compute_identifier)
-        except ComputeResource.DoesNotExist:
-            compute_resource_serializer = ComputeResourceSerializer(
-                data={'compute_resource_identifier': compute_identifier})
-            compute_resource_serializer.is_valid(raise_exception=True)
-
         # if no validation errors at this point then save to the DB
-        (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier=compute_identifier)
-        plugin = plg_serializer.save(compute_resource=compute_resource)
+        plugin = plg_serializer.save(compute_resources=[compute_resource])
         for param_serializer_dict in parameters_serializers:
             param = param_serializer_dict['serializer'].save(plugin=plugin)
             if param_serializer_dict['default_serializer'] is not None:
                 param_serializer_dict['default_serializer'].save(plugin_param=param)
         return plugin
 
-    def modify_plugin(self, name, version, compute_identifier, fetch, timeout=30):
-        """
-        Modify an existing/registered plugin and add the current date as a new plugin
-        modification date.
-        """
-        plugin = self.get_plugin(name, version)
-        compute_resource = None
-        plg_repr = None
-        if compute_identifier:
-            # validate compute resource identifier
-            try:
-                ComputeResource.objects.get(
-                    compute_resource_identifier=compute_identifier)
-            except ComputeResource.DoesNotExist:
-                compute_resource_serializer = ComputeResourceSerializer(
-                    data={'compute_resource_identifier': compute_identifier})
-                compute_resource_serializer.is_valid(raise_exception=True)
-            (compute_resource, tf) = ComputeResource.objects.get_or_create(
-                compute_resource_identifier=compute_identifier)
-        if fetch:
-            plg_repr = self.get_plugin_representation_from_store(name, version, timeout)
-        if plg_repr:
-            del plg_repr['parameters']
-            plg_serializer = PluginSerializer(plugin, data=plg_repr)
-            plg_serializer.is_valid(raise_exception=True)
-            if compute_resource:
-                plugin = plg_serializer.save(compute_resource=compute_resource)
-            else:
-                plugin = plg_serializer.save()
-        elif compute_resource:
-            plg_serializer = PluginSerializer(plugin)
-            plugin = plg_serializer.save(compute_resource=compute_resource)
-
-        if plg_repr or compute_resource:
-            plugin.modification_date = timezone.now()
-            plugin.save()
-        return plugin
-
-    def remove_plugin(self, name, version):
+    def remove_plugin(self, id):
         """
         Remove an existing/registered plugin from the system. All the associated plugin
         instances are cancelled before they are deleted by the DB CASCADE.
         """
-        plugin = self.get_plugin(name, version)
+        try:
+            plugin = Plugin.objects.get(id=id)
+        except Plugin.DoesNotExist:
+            raise NameError("Couldn't find plugin with id '%s'" % id)
         for plg_inst in plugin.instances.all():
             plg_inst.cancel()
         plugin.delete()
+
+    def remove_compute_resource(self, id):
+        """
+        Remove an existing compute resource from the system.
+        """
+        try:
+            cr = ComputeResource.objects.get(id=id)
+        except ComputeResource.DoesNotExist:
+            raise NameError("Couldn't find compute resource with id '%s'" % id)
+        cr.delete()
 
     def run(self, args=None):
         """
@@ -185,19 +226,24 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
-            if options.url:
-                self.add_plugin_by_url(options.url, options.computeresource,
-                                       options.storetimeout)
-            elif options.name:
-                self.add_plugin(options.name, options.version, options.computeresource,
-                            options.storetimeout)
-            else:
-                raise ArgumentError('Either a name or a url must be provided.')
+            self.add_compute_resource(options.computeresource, options.description)
         elif options.subparser_name == 'modify':
-            self.modify_plugin(options.name, options.version, options.computeresource,
-                               options.updatefromstore, options.storetimeout)
+            self.modify_compute_resource(options.computeresource, options.name,
+                                         options.description)
+        elif options.subparser_name == 'register':
+            if options.pluginurl:
+                self.register_plugin_by_url(options.pluginurl, options.computeresource,
+                                       options.storetimeout)
+            elif options.pluginname:
+                self.register_plugin(options.pluginname, options.pluginversion,
+                                     options.computeresource, options.storetimeout)
+            else:
+                raise ArgumentError('Either a name or a url must be provided')
         elif options.subparser_name == 'remove':
-            self.remove_plugin(options.name, options.version)
+            if options.resourcename == 'plugin':
+                self.remove_plugin(options.id)
+            if options.resourcename == 'compute':
+                self.remove_compute_resource(options.id)
 
     @staticmethod
     def get_plugin_representation_from_store(name, version=None, timeout=30):
@@ -222,7 +268,7 @@ class PluginManager(object):
         if result['data']:
             plg = result['data'][0]
         else:
-            raise NameError('Could not find plugin with url %s.' % url)
+            raise NameError("Could not find plugin with url '%s'" % url)
         plg['parameters'] = PluginManager.get_plugin_parameters_from_store(plg['id'],
                                                                            timeout)
         return plg
@@ -235,7 +281,7 @@ class PluginManager(object):
         try:
             plugin = Plugin.objects.get(name=name, version=version)
         except Plugin.DoesNotExist:
-            raise NameError("Couldn't find '%s' plugin with version %s in the system." %
+            raise NameError("Couldn't find plugin '%s' with version '%s' in the system" %
                             (name, version))
         return plugin
 

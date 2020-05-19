@@ -362,20 +362,14 @@ else
     windowBottom
 
     #
-    # Plugin array list for list of plugin names to be registered in the dev
-    # syste
+    # Array of plugin names to be uploaded to the ChRIS store service for the dev env
     #
     # If the main module name within a plugin is different than the plugin name,
-    # separate the plugin and module strings with a '/' characater (see below).
+    # separate the plugin and module strings with a '/' character (see below).
     #
-    # Indicate a specific remote compute environment with a [:<env>] 
-    # specification.
-    #
-    declare -a plugins=( 
+    declare -a chris_store_plugins=(
                          "simplefsapp"
-                         "simplefsapp_moc:moc"
                          "simpledsapp"
-                         "simpledsapp_moc:moc"
                          "s3retrieve"
                          "s3push"
                          "dircopy"
@@ -386,16 +380,12 @@ else
                          "freesurfer_pp"
                          "z2labelmap"
                          "mri10yr06mo01da_normal"
-                         "mpcs_moc:moc"
-                         "freesurfer_pp_moc:moc"
-                         "z2labelmap_moc:moc"
-                         "mri10yr06mo01da_normal_moc:moc"
     )
 
     title -d 1 "Checking on container plugins..."
         if [[ $CREPO == "fnndsc" ]] ; then
             echo "Pulling latest version of all fnndsc plugin containers..."
-            for plugin in "${plugins[@]}" ; do
+            for plugin in "${chris_store_plugins[@]}" ; do
                 printf "${Cyan}%-25s${NC} <--- ${LightBlue}[ dockerhub ]${NC}: " "[ $plugin ]"                
                 dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
                 dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
@@ -415,7 +405,7 @@ else
 
     title -d 1 "Automatically uploading some plugins to the ChRIS store..."
     declare -i i=1
-    for plugin in "${plugins[@]}"; do
+    for plugin in "${chris_store_plugins[@]}"; do
         dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
         dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
         moduleName=$(echo $plugin           | awk -F\/ '{print $2}')
@@ -457,9 +447,35 @@ else
     docker-compose -f docker-compose_dev.yml exec chrisstore python pipelines/services/manager.py add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
     windowBottom
 
+    #
+    # Array of plugin names from the ChRIS store to be registered in the dev CUBE service
+    #
+    # Indicate a specific remote compute environment with a [:<env>] specification.
+    #
+    declare -a chris_plugins=(
+                         "simplefsapp"
+                         "simplefsapp:moc"
+                         "simpledsapp"
+                         "simpledsapp:moc"
+                         "s3retrieve"
+                         "s3push"
+                         "dircopy"
+                         "pfdicom_tagextract"
+                         "pfdicom_tagsub"
+                         "pacscopy"
+                         "mpcs"
+                         "mpcs:moc"
+                         "freesurfer_pp"
+                         "freesurfer_pp:moc"
+                         "z2labelmap"
+                         "z2labelmap:moc"
+                         "mri10yr06mo01da_normal"
+                         "mri10yr06mo01da_normal:moc"
+    )
+
     title -d 1 "Automatically registering some plugins from the ChRIS store into CUBE..."
     declare -i i=1
-    for plugin in "${plugins[@]}"; do
+    for plugin in "${chris_plugins[@]}"; do
         dockerhubRepo=$(echo $plugin        | awk -F\/ '{print $1}')
         remoteCompute=$(echo $dockerhubRepo | awk -F\: '{print $2}')
         dockerhubRepo=$(echo $dockerhubRepo | awk -F\: '{print $1}')
@@ -470,7 +486,9 @@ else
         fi
         printf "%8s" "${STEP}.$i: "
         printf "${LightBlue}[ ChRIS store ]${NC}::${Cyan}%-28s${NC} --> ${Yellow}[ CUBE ]${NC}::${Cyan}$computeEnv${NC}..." "[ $dockerhubRepo ]"
-        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add  --name "${dockerhubRepo}" $computeEnv
+        computeDescription="${computeEnv} description"
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py add "$computeEnv" "$computeDescription"
+        docker-compose -f docker-compose_dev.yml exec chris_dev python plugins/services/manager.py register $computeEnv --pluginname "${dockerhubRepo}"
         printf "\t${LightGreen}[ success ]${NC}\n"
         ((i++))
     done

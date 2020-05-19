@@ -29,16 +29,19 @@ class SerializerTests(TestCase):
                                                   'default': 111111}}
         self.username = 'foo'
         self.password = 'foo-pass'
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name,
-                                                       type='fs',
-                                                       compute_resource=self.compute_resource)
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name,
-                                                       type='ds',
-                                                       compute_resource=self.compute_resource)
+        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
+        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
+
         # add plugins' parameters
         (plg_param_fs, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -83,8 +86,10 @@ class PipelineSerializerTests(SerializerTests):
         with a tree of associated plugins.
         """
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
+
         owner = User.objects.get(username=self.username)
         plugin_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
                          ', "previous_index": null}, {"plugin_id": ' + \
@@ -277,8 +282,10 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
+
         tree_list = [{"plugin_id": plugin_ds1.id,
                       "plugin_parameter_defaults": [],
                       "previous_index": None},
@@ -311,8 +318,10 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
+
         tree_list = [{"plugin_id": plugin_ds1.id, "previous_index": 0},
                 {"plugin_id": plugin_ds2.id, "previous_index": 0},
                 {"plugin_id": plugin_ds1.id, "previous_index": 1}]
@@ -327,8 +336,9 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
 
         tree_list = [{"plugin_id": plugin_ds1.id,
                       "plugin_parameter_defaults": [],
@@ -362,8 +372,10 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
+
         tree = [{"plugin_id": plugin_ds1.id, "child_indices": []},
                 {"plugin_id": plugin_ds2.id, "child_indices": [2]},
                 {"plugin_id": plugin_ds1.id, "child_indices": [1]}]
@@ -379,8 +391,9 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds1 = Plugin.objects.get(name=self.plugin_ds_name)
-        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds",
-                                                compute_resource=self.compute_resource)
+        (plugin_ds2, tf) = Plugin.objects.get_or_create(name="mri_analyze", type="ds")
+        plugin_ds2.compute_resources.set([self.compute_resource])
+        plugin_ds2.save()
 
         tree = [{"plugin_id": plugin_ds1.id,
                  "plugin_parameter_defaults": [],

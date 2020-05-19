@@ -34,14 +34,20 @@ ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
 COPY ["./requirements", "${REQPATH}"]
 COPY ["./docker-entrypoint_dev.sh", "/usr/src"]
 
-RUN apt-get update \
-  && apt-get install sudo                                             \
-  && apt-get install -y libmysqlclient-dev                            \
-  && apt-get install -y libssl-dev libcurl4-openssl-dev               \
-  && apt-get install -y apache2 apache2-dev                           \
-  && apt-get install -y bsdmainutils vim net-tools inetutils-ping    \
-  && pip install -r ${REQPATH}/local.txt                           \
-  && useradd -u $UID -ms /bin/bash localuser                        \
+RUN apt-get update                                                \
+  && apt-get install -y locales                                   \
+  && export LANGUAGE=en_US.UTF-8                                  \
+  && export LANG=en_US.UTF-8                                      \
+  && export LC_ALL=en_US.UTF-8                                    \
+  && locale-gen en_US.UTF-8                                       \
+  && dpkg-reconfigure locales                                     \
+  && apt-get install sudo                                         \
+  && apt-get install -y libmysqlclient-dev                        \
+  && apt-get install -y libssl-dev libcurl4-openssl-dev           \
+  && apt-get install -y apache2 apache2-dev                       \
+  && apt-get install -y bsdmainutils vim net-tools inetutils-ping \
+  && pip install -r ${REQPATH}/local.txt                          \
+  && useradd -u $UID -ms /bin/bash localuser                      \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Start as user localuser

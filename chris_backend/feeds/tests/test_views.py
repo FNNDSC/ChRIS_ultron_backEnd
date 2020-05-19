@@ -31,10 +31,10 @@ class ViewTests(TestCase):
         self.plugin_type = "fs"
         self.plugin_parameters = {'mrn': {'type': 'string', 'optional': False},
                                   'img_type': {'type': 'string', 'optional': True}}
-
         self.feedname = "Feed1"
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            compute_resource_identifier="host")
+            name="host", description="host description")
 
         # create basic models
         
@@ -47,14 +47,17 @@ class ViewTests(TestCase):
                                         password=self.password)
         
         # create two plugins of different types
-        Plugin.objects.get_or_create(name="mri_convert", type="ds", 
-                                        compute_resource=self.compute_resource)
-        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs",
-                                            compute_resource=self.compute_resource)
+        (plugin, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+
+        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
         
         # create a feed by creating a "fs" plugin instance
         pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, title='test',
-                                            compute_resource=plugin.compute_resource)
+            compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = self.feedname
         pl_inst.feed.save()
 
@@ -128,8 +131,8 @@ class FeedListViewTests(ViewTests):
         # create an additional feed using a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "Feed2"
         pl_inst.feed.save()
     
@@ -177,8 +180,8 @@ class FeedListQuerySearchViewTests(ViewTests):
         # create an additional feed using a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull")
         user = User.objects.get(username=self.username)
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                            compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "Feed2"
         pl_inst.feed.save()
 
@@ -526,8 +529,8 @@ class FeedTagListViewTests(ViewTests):
 
         # create a new feed by creating a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull", type="fs")
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                    compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
         pl_inst.feed.save()
 
@@ -585,8 +588,8 @@ class TagFeedListViewTests(ViewTests):
 
         # create a new feed by creating a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull", type="fs")
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
         pl_inst.feed.save()
 
@@ -702,8 +705,8 @@ class TagTaggingListViewTests(ViewTests):
 
         # create a new feed by creating a "fs" plugin instance
         plugin = Plugin.objects.get(name="pacspull", type="fs")
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user,
-                                                compute_resource=plugin.compute_resource)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
         pl_inst.feed.save()
 
@@ -832,9 +835,9 @@ class FeedFileListViewTests(ViewTests):
         # create a second 'ds' plugin instance in the same feed tree
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name="mri_convert")
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                              previous_id= plg_inst.id,
-                                                compute_resource=plugin.compute_resource)
+        (plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, previous_id=plg_inst.id,
+            compute_resource=plugin.compute_resources.all()[0])
         (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
         plg_inst_file.fname.name = 'file2.txt'
         plg_inst_file.save()
@@ -874,11 +877,9 @@ class FeedPluginInstanceListViewTests(ViewTests):
         # create a second 'ds' plugin instance in the same feed tree
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(name="mri_convert")
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(plugin=plugin, owner=user,
-                                                              previous_id= plg_inst.id,
-                                                              title='test1',
-                                                compute_resource=plugin.compute_resource)
-
+        PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, previous_id=plg_inst.id, title='test1',
+            compute_resource=plugin.compute_resources.all()[0])
 
     def test_feed_plugin_instance_list_success(self):
         self.client.login(username=self.username, password=self.password)
