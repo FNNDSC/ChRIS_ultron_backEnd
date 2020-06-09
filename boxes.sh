@@ -9,7 +9,7 @@
 #   Draws left and right "box" outlines for a string of text
 #	line by line.
 #
-. decorate.sh
+. ./decorate.sh
 let width=80
 let b_clear=0
 
