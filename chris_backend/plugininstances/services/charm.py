@@ -56,7 +56,7 @@ class Charm():
 
     def col2_print(self, str_left, str_right, level = 1):
         self.dp.qprint(Colors.WHITE +
-              ('%*s' % (self.LC, str_left)), 
+              ('%*s' % (self.LC, str_left)),
               end       = '',
               level     = level,
               syslog    = False)
@@ -91,9 +91,9 @@ class Charm():
         self.d_msg                  = {}
         self.str_protocol           = "http"
 
-        self.dp                     = pfmisc.debug(    
+        self.dp                     = pfmisc.debug(
                                             verbosity   = 1,
-                                            within      = self.__name__ 
+                                            within      = self.__name__
                                             )
 
         self.pp                     = pprint.PrettyPrinter(indent=4)
@@ -157,10 +157,10 @@ class Charm():
                                 +---------------------+
             """ + Colors.LIGHT_GREEN + """
 
-            'charm' is the interface class/code between ChRIS and a remote 
+            'charm' is the interface class/code between ChRIS and a remote
             REST-type server, typically 'pfcon'.
 
-            This module is the only contact boundary between ChRIS and 
+            This module is the only contact boundary between ChRIS and
             external/remote services.
 
             Debugging output is currently sent to """ + Colors.YELLOW
@@ -303,7 +303,7 @@ class Charm():
         # pudb.set_trace()
 
         str_setting     = 'settings.%s' % str_service.upper()
-        str_http        = '%s:%s' % (eval(str_setting)['host'], 
+        str_http        = '%s:%s' % (eval(str_setting)['host'],
                                      eval(str_setting)['port'])
         if str_service == 'pman': b_httpResponseBodyParse = False
 
@@ -347,7 +347,7 @@ class Charm():
     def swiftstorage_connect(self, *args, **kwargs):
         """
         Connect to swift storage and return the connection object,
-        as well an optional "prepend" string to fully qualify 
+        as well an optional "prepend" string to fully qualify
         object location in swift storage.
         """
 
@@ -377,7 +377,7 @@ class Charm():
         if b_prependBucketPath:
             # d_ret['prependBucketPath']  = self.c_pluginInst.owner.username + '/uploads'
 	    # The following line should "root" requests to swift storage to the user
-	    # space and allow for access/dircopy to the feed space and not only 
+	    # space and allow for access/dircopy to the feed space and not only
 	    # the 'uploads' space.
             # d_ret['prependBucketPath']  = self.c_pluginInst.owner.username
             d_ret['prependBucketPath']  = ''
@@ -405,7 +405,7 @@ class Charm():
         while str_path[:1] == '.':  str_path    = str_path[1:]
 
         d_conn          = self.swiftstorage_connect(**kwargs)
-        if d_conn['status']:
+        if d_conn['status'] and len(str_path):
             conn        = d_conn['conn']
             if b_prependBucketPath:
                 str_fullPath    = '%s%s' % (d_conn['prependBucketPath'], str_path)
@@ -413,14 +413,14 @@ class Charm():
                 str_fullPath    = str_path
 
             # get the full list of objects in Swift storage with given prefix
-            ld_obj = conn.get_container( settings.SWIFT_CONTAINER_NAME, 
+            ld_obj = conn.get_container( settings.SWIFT_CONTAINER_NAME,
                                         prefix          = str_fullPath,
-                                        full_listing    = True)[1]        
+                                        full_listing    = True)[1]
 
             for d_obj in ld_obj:
                 l_ls.append(d_obj['name'])
                 b_status    = True
-        
+
         return {
             'status':       b_status,
             'objectDict':   ld_obj,
@@ -431,7 +431,7 @@ class Charm():
     def swiftstorage_objExists(self, *args, **kwargs):
         """
         Return True/False if passed object exists in swift storage
-        """        
+        """
         b_exists    = False
         str_obj     = ''
 
@@ -465,7 +465,7 @@ class Charm():
 
                 /home/user/project/data/ ...
 
-        and we want to pack everything in the 'data' dir to 
+        and we want to pack everything in the 'data' dir to
         object storage, at location '/storage'. In this case, the
         pattern of kwargs specifying this would be:
 
@@ -478,7 +478,7 @@ class Charm():
         will replace, for each file in <fileList>, the <mapLocationOver> with
         <toLocation>, resulting in a new list
 
-                    '/storage/file1', 
+                    '/storage/file1',
                     '/storage/dir1/file_d1',
                     '/storage/dir2/file_d2'
 
@@ -520,7 +520,7 @@ class Charm():
             l_objectfile    = [str_swiftLocation + '{0}'.format(i) for i in l_localfile]
 
         if d_conn['status']:
-            for str_localfilename, str_storagefilename in zip(l_localfile, l_objectfile): 
+            for str_localfilename, str_storagefilename in zip(l_localfile, l_objectfile):
                 try:
                     d_ret['status'] = True and d_ret['status']
                     with open(str_localfilename, 'r') as fp:
@@ -539,7 +539,7 @@ class Charm():
         """
         This method is used under certain conditions:
 
-            * An FS plugin has specified an "illegal" directory in 
+            * An FS plugin has specified an "illegal" directory in
               the object store:
                     * /     root of store
                     * ./    relative "current" dir
@@ -549,14 +549,14 @@ class Charm():
 
         In each case, this method creates an appropriately named "dummy"
         file in the object store and specifies its parent directory as
-        the directory to pull from the store. 
+        the directory to pull from the store.
 
         The effect is that if an FS plugin specifies one of these "illegal"
         conditions, a file is created in the FS plugin output that contains
         this somewhat descriptive filename.
 
         This method appends the correct username for swift purposes to
-        the 'inputdir'. 
+        the 'inputdir'.
 
         **kwargs:
             squashFilePath
@@ -627,7 +627,7 @@ class Charm():
         system (pfcon/pfurl) does require some non-zero inputdir spec in order
         to operate correctly.
 
-        However, this operational requirement allows us a convenient 
+        However, this operational requirement allows us a convenient
         mechanism to inject data into an FS processing stream by storing
         data in swift and accessing this as a "pseudo" inputdir for FS
         plugins.
@@ -639,13 +639,13 @@ class Charm():
 
         Importantly, one major exception to the normal FS processing scheme
         exists: an FS plugin that collects data from object storage. This
-        storage location is not an 'inputdir' in the traditional sense, and is 
-        thus specified in the FS plugin argument list as argument of type 
+        storage location is not an 'inputdir' in the traditional sense, and is
+        thus specified in the FS plugin argument list as argument of type
         'path' (i.e. there is no positional argument for inputdir as in DS
         plugins. Thus, if a type 'path' argument is specified, this 'path'
         is assumed to denote a location in object storage.
 
-        In the case then that a 'path' type argument is specified, there 
+        In the case then that a 'path' type argument is specified, there
         are certain important caveats:
 
             1. Only one 'path' type argument is assumed / fully supported.
@@ -713,7 +713,7 @@ class Charm():
     def app_service_fsplugin_setup(self, *args, **kwargs):
         """
         Some fsplugins, esp those that might interact with the local file
-        filesystem can be "massaged" to conform to the existing fileIO 
+        filesystem can be "massaged" to conform to the existing fileIO
         transmission pattern.
 
         This method edits the cmdLine for fsplugin input to /share/incoming
@@ -731,7 +731,7 @@ class Charm():
             if d_param.type == 'path':
                 l_pathArgs.append(d_param.name)
 
-        # The 'path' type parameter refers to some location (ideally in the 
+        # The 'path' type parameter refers to some location (ideally in the
         # swift storage). We need to replace this location referring to some
         # 'local' path with a hard code '/share/incoming' since that is where
         # the data will be located in the remote compute env.
@@ -748,7 +748,7 @@ class Charm():
                     i+=1
                 str_allCmdLineArgs      = ' '.join(self.l_appArgs)
                 str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
-                self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)                 
+                self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
                 self.dp.qprint('cmd = %s' % self.str_cmd)
 
         # Manage args with type 'path' for FS type plugins
@@ -777,8 +777,8 @@ class Charm():
             if k == 'IOPhost':  str_IOPhost = v
 
         # pudb.set_trace()
-        
-        # First, check if the remote service is available... 
+
+        # First, check if the remote service is available...
         self.app_service_checkIfAvailable(**kwargs)
 
         self.dp.qprint('d_args = %s' % self.d_args)
@@ -796,58 +796,72 @@ class Charm():
         self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
         self.dp.qprint('cmd = %s' % self.str_cmd)
         if str_service == 'pfcon':
-            # Handle the case for 'fs'-type plugins that don't specify an 
+            # Handle the case for 'fs'-type plugins that don't specify an
             # inputdir, in which case the self.str_inputdir is empty.
             #
-            # Passing an empty string through to pfurl will cause it to fail 
+            # Passing an empty string through to pfurl will cause it to fail
             # on its local directory check.
             #
-            # The "hack" here is to set the 'inputdir' to the fs plugin to the
-            # 'dir' argument of its input CLI, if such an argument exists; 
-            # otherwise, set to '/etc'. 
+            # The "hack" here is to check on the inputdir strings. In the case
+            # of FS-type plugins this is '' or an empty string. Note this is 
+            # NOT Null!
             #
-            # Also, for 'fs' plugins, we need to set the "incoming" directory 
-            # to /share/incoming.
+            # In such a case, charm will "transparently" set the input dir to
+            # a location in swift
+            #
+            #       /home/localuser/data/squashInvalidDir
+            #
+            # which in turn contains a "file"
+            #
+            #       /home/localuser/data/squashInvalidDir/squashInvalidDir.txt
+            #
+            # This "inputdir" is then sent along with `pfcon/pfurl` and is of
+            # course ignored by the actual plugin when it is run. This does have
+            # the anti-pattern side effect of possibly using this to send 
+            # completely OOB (out of band) data to an FS plugin in this "fake"
+            # "inputdir" and could have implications. Right now though I don't 
+            # see how an FS plugin could even access this fake "inputdir".
+            #
             # pudb.set_trace()
             if self.str_inputdir == '':
                 d_fs    = self.app_service_fsplugin_setup()
                 self.str_inputdir   = d_fs['d_manage']['d_handle']['inputdir']
             str_serviceName = self.str_jidPrefix + str(self.d_pluginInst['id'])
             d_msg = \
-            {   
+            {
                 "action": "coordinate",
                 "threadAction":   True,
-                "meta-store": 
+                "meta-store":
                 {
                         "meta":         "meta-compute",
                         "key":          "jid"
                 },
 
-                "meta-data": 
+                "meta-data":
                 {
-                    "remote": 
+                    "remote":
                     {
                         "key":          "%meta-store"
                     },
-                    "localSource": 
+                    "localSource":
                     {
                         "path":         self.str_inputdir,
                         "storageType":  "swift"
                     },
-                    "localTarget": 
+                    "localTarget":
                     {
                         "path":         self.str_outputdir,
                         "createDir":    True
                     },
-                    "specialHandling": 
+                    "specialHandling":
                     {
                         "op":           "plugin",
                         "cleanup":      True
                     },
-                    "transport": 
+                    "transport":
                     {
                         "mechanism":    "compress",
-                        "compress": 
+                        "compress":
                         {
                             "archive":  "zip",
                             "unpack":   True,
@@ -869,7 +883,7 @@ class Charm():
                     'gpu_limit':         self.d_pluginInst['gpu_limit'],
                     "container":
                     {
-                        "target": 
+                        "target":
                         {
                             "image":            self.c_pluginInst.plugin.dock_image,
                             "cmdParse":         False,
@@ -900,10 +914,10 @@ class Charm():
                                 "key":       str_serviceName
                             }
                     }
-                }            
+                }
             str_dmsgExec = json.dumps(d_msg,    indent = 4, sort_keys = True)
             str_dmsgStat = json.dumps(d_status, indent = 4, sort_keys = True)
-            
+
             str_pfurlCmdHeader = """\npfurl \\
                     --verb POST --raw --http ${HOST_IP}:5005/api/v1/cmd \\
                     --httpResponseBodyParse                             \\
@@ -915,10 +929,10 @@ class Charm():
             str_pfurlCmdStatus = str_pfurlCmdHeader + """
             %s
             '
-            """ % str_dmsgStat 
+            """ % str_dmsgStat
 
             ###
-            # NB: This is a good break point in charm to pause 
+            # NB: This is a good break point in charm to pause
             #     execution and not keep interrupting downstream
             #     service for status data that might break debugging
             #     context in services like 'pfcon'
@@ -931,18 +945,18 @@ class Charm():
             if os.path.exists(datadir):
                 if not os.path.exists(os.path.join(datadir, 'tmp')):
                     os.makedirs(os.path.join(datadir, 'tmp'))
-                self.dp.qprint( str_pfurlCmdExec, 
+                self.dp.qprint( str_pfurlCmdExec,
                                 teeFile = os.path.join(datadir, 'tmp/dmsg-exec-%s.json' % str_serviceName),
                                 teeMode = 'w+')
-                self.dp.qprint( str_pfurlCmdStatus, 
+                self.dp.qprint( str_pfurlCmdStatus,
                                 teeFile = os.path.join(datadir, 'tmp/dmsg-stat-%s.json' % str_serviceName),
                                 teeMode = 'w+')
             else:
-                self.dp.qprint( str_pfurlCmdExec, 
-                                teeFile = '/tmp/dmsg-exec-%s.json' % str_serviceName, 
+                self.dp.qprint( str_pfurlCmdExec,
+                                teeFile = '/tmp/dmsg-exec-%s.json' % str_serviceName,
                                 teeMode = 'w+')
-                self.dp.qprint( str_pfurlCmdStatus, 
-                                teeFile = '/tmp/dmsg-stat-%s.json' % str_serviceName, 
+                self.dp.qprint( str_pfurlCmdStatus,
+                                teeFile = '/tmp/dmsg-stat-%s.json' % str_serviceName,
                                 teeMode = 'w+')
 
         d_response  = self.app_service_call(msg = d_msg, **kwargs)
@@ -1000,7 +1014,7 @@ class Charm():
                 b_swiftFound    = True
             maxPolls        = 10
             currentPoll     = 1
-            while not b_swiftFound and currentPoll <= maxPolls: 
+            while not b_swiftFound and currentPoll <= maxPolls:
                 if 'swiftPut' in d_response['jobOperation']['info']:
                     d_swiftState    = d_response['jobOperation']['info']['swiftPut']
                     b_swiftFound    = True
