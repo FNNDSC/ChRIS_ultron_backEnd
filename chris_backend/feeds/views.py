@@ -237,7 +237,7 @@ class TagTaggingList(generics.ListCreateAPIView):
         template_data = {"feed_id": ""}
         return services.append_collection_template(response, template_data)
 
-    def get_taggings_queryset(self,):
+    def get_taggings_queryset(self):
         """
         Custom method to get the actual taggings queryset for the tag.
         """
@@ -463,7 +463,7 @@ class FeedFileList(generics.ListAPIView):
 
 class FeedPluginInstanceList(generics.ListAPIView):
     """
-    A view for the collection of comments.
+    A view for the collection of feed-specific plugin instances.
     """
     queryset = Feed.objects.all()
     serializer_class = PluginInstanceSerializer

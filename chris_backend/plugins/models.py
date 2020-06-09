@@ -86,8 +86,7 @@ class Plugin(models.Model):
     documentation = models.CharField(max_length=800, blank=True)
     license = models.CharField(max_length=50)
     min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
-    max_gpu_limit = models.IntegerField(null=True, blank=True,
-                                        default=defaults['max_limit'])
+    max_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
     max_number_of_workers = models.IntegerField(null=True, blank=True,
                                                 default=defaults['max_limit'])
