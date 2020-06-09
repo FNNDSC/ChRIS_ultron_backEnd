@@ -13,7 +13,7 @@ version: '3'
 services:
 
   chris_dev:
-    image: ${CREPO}/chris:dev
+    image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend
     environment:
@@ -31,7 +31,7 @@ services:
       role: "Backend development server"
 
   worker:
-    image: ${CREPO}/chris:dev
+    image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend
     entrypoint: ''
@@ -69,7 +69,7 @@ services:
       role: "Backend development async task queue"
 
   chrisstore:
-    image: ${CREPO}/chris_store
+    image: ${STOREREPO}/chris_store
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - DJANGO_ALLOWED_HOSTS=*
@@ -109,7 +109,7 @@ services:
       role: "Chris store database"
 
   swift_service:
-    image: fnndsc/docker-swift-onlyone
+    image: ${SWIFTREPO}/docker-swift-onlyone
     volumes:
       - swift_storage_dev:/srv
     environment:
@@ -123,7 +123,7 @@ services:
       role: "Swift object storage service"
 
   pfcon_service:
-    image: ${CREPO}/pfcon${TAG}
+    image: ${PFCONREPO}/pfcon${TAG}
     volumes:
       - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
@@ -141,7 +141,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image: ${CREPO}/pfioh${TAG}
+    image: ${PFIOHREPO}/pfioh${TAG}
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -164,7 +164,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image: ${CREPO}/pman${TAG}
+    image: ${PMANREPO}/pman${TAG}
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
