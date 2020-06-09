@@ -14,7 +14,7 @@
 #
 #               [<repo>/]<container>[::<mainModuleName>[^<env>]]
 #
-#       and returns 
+#       and returns
 #
 #               <repo> <container> <mainModuleName><extension> <env>
 #
@@ -29,7 +29,7 @@
 #       An extension to append to the <mainModuleName>. Since most
 #       ChRIS plugins are python modules, this usually is just ".py".
 #
-# RETURN 
+# RETURN
 #
 # REPO
 #       if not passed in <repo>, defaults to env variable, $CREPO.
@@ -39,15 +39,15 @@
 #       the <container> part of the string.
 #
 # MMN
-#       if not passed, defaults to the <container> string, with 
+#       if not passed, defaults to the <container> string, with
 #       ".py" appended and sans a possibly leading "pl-".
 #
 # ENV
 #       if not passed, defaults to "host", else <env>.
 #
 # EXAMPLE
-#       
-#       cparse.sh "local/pl-dircopy::directoryCopy^moc" "py"
+#
+#       cparse.sh "local/pl-dircopy::directoryCopy^moc" ".py"
 #
 
 
@@ -56,15 +56,15 @@ CREPO=fnndsc
 function cparse {
         pluginSpec=$1
         pluginExt=$2
-        
+
         local __repo=$3
         local __container=$4
         local __mainModuleName=$5
         local __env=$6
-        
+
         export pluginSpec=$pluginSpec
         export CREPO=$CREPO
-        
+
 l_parse=$(python3 - << EOF
 import os
 
@@ -83,7 +83,7 @@ else:
         # There is a leading [<repo>/]
         str_repo        = l_spec[0]
         str_remain      = l_spec[1]
-        
+
 # [^<env>]
 l_spec          = str_remain.split('^')
 if len(l_spec) == 1:
@@ -111,7 +111,7 @@ else:
         str_remain      = l_spec[0]
 
 str_container           = str_remain
- 
+
 print("%s %s %s %s" % (str_repo, str_container, str_mmn, str_env))
 
 EOF
@@ -124,17 +124,18 @@ EOF
         eval $__container="'$str_container'"
         eval $__mainModuleName="'$str_mmn'"
         eval $__env="'$str_env'"
-      
+
 }
 
-TESTNAME="local/pl-dircopy:directoryCopy^moc"
+function cparse_do {
+        TESTNAME="local/pl-dircopy:directoryCopy^moc"
 
-cparse "$1" "$2" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse "$1" "$2" "REPO" "CONTAINER" "MMN" "ENV"
 
-echo $REPO
-echo $CONTAINER
-echo $MMN
-echo $ENV
-
+        echo $REPO
+        echo $CONTAINER
+        echo $MMN
+        echo $ENV
+}
 
 
