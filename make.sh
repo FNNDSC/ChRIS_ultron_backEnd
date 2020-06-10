@@ -369,9 +369,9 @@ else
     title -d 1 "Waiting until CUBE is ready to accept connections..."
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
-        docker-compose -f docker-compose_dev.yml        \
+        docker-compose --no-ansi -f docker-compose_dev.yml        \
             exec chris_dev sh -c                        \
-            'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
+            'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
         echo -en "\033[2A\033[2K"
         cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
@@ -429,7 +429,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore sh -c                   \
-            'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
+            'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
         echo -en "\033[2A\033[2K"
         cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
