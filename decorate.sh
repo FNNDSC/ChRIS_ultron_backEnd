@@ -84,56 +84,48 @@ function title {
     if ! (( LEN % 2 )) ; then
         TITLE="$TITLE "
     fi
-    MSG=$(echo -e "$TITLE" | awk -F\| {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
+    MSG=$(echo -e "$TITLE" | awk -F\|\
+             {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
     if (( ${#MSG2} )) ; then
         TITLE2=$(echo " $MSG2 ")
         LEN2=$(echo "$TITLE2" | awk -F\| {'printf("%s", length($1));'})
         if ! (( LEN2 % 2 )) ; then
             TITLE2="$TITLE2 "
         fi
-        MSG2=$(echo -e "$TITLE2" | awk -F\| {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
+        MSG2=$(echo -e "$TITLE2" | awk -F\|\
+             {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
     fi
     printf "\n"
     DATE=" $(date) [$(hostname)] "
     lDATE=${#DATE}
-    DRAW
     if (( b_date )) ; then
         printf "${NC}${White}"
-        printf "${White}l" ;  for c in $(seq 1 $lDATE); do printf "q" ; done ;
-        printf "k\nx"
-        WRITE
+        printf "${White}┌" ;  for c in $(seq 1 $lDATE); do printf "─" ; done ;
+        printf "┐\n│"
         printf "${NC}${LightBlue}"
         printf "%-30s" "$DATE"
-        DRAW
-        printf "${White}x${NC}\n"
-        printf "${Yellow}t" ; for c in $(seq 1 $lDATE); do printf "q";  done ; printf "v"
+        printf "${White}│${NC}\n"
+        printf "${Yellow}├" ; for c in $(seq 1 $lDATE); do printf "─";  done ; printf "┴"
         REM=$(expr 79 - $lDATE)
-        for c in $(seq 1 $REM); do printf "q" ; done ; printf "k\n"
+        for c in $(seq 1 $REM); do printf "─" ; done ; printf "┐\n"
     else
-        printf "${Yellow}l"
-        for c in $(seq 1 80); do printf "q" ; done
-        printf "k\n"
+        printf "${Yellow}┌"
+        for c in $(seq 1 80); do printf "─" ; done
+        printf "┐\n"
     fi
-    printf "x"
-    WRITE
+    printf "│"
     printf "${LightPurple}$MSG${Yellow}"
     if (( ${#MSG2} )) ; then
-        DRAW
-        printf "x${Brown}a\n${Yellow}x"
-        WRITE
+        printf "│${Brown}▒\n${Yellow}│"
         printf "${LightPurple}$MSG2${Yellow}"
     fi
-    DRAW
-    printf "x${Brown}a\n"
-    printf "${Yellow}t" ;  for c in $(seq 1 80); do printf "q" ; done ; printf "u${Brown}a\n"
-    WRITE
+    printf "│${Brown}▒\n"
+    printf "${Yellow}├" ;  for c in $(seq 1 80); do printf "─" ; done ; printf "┤${Brown}▒\n"
     printf "${NC}"
 }
 
 function windowBottom {
-    DRAW
-    printf "${Yellow}mq" ;  for c in $(seq 1 79); do printf "q" ; done ; printf "j${Brown}a\n"
-    printf "${Brown} a" ; for c in $(seq 1 81); do printf "a" ; done ; printf "\n"
-    WRITE
+    printf "${Yellow}└─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┘${Brown}▒\n"
+    printf "${Brown} ▒" ; for c in $(seq 1 81); do printf "▒" ; done ; printf "\n"
     printf "${NC}"
 }
