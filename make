@@ -171,7 +171,7 @@ declare -a A_CONTAINER=(
     "fnndsc/pfcon${TAG}^PFCONREPO"
     "fnndsc/pfurl${TAG}^PFURLREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
-    "local/pman${TAG}^PMANREPO"
+    "fnndsc/pman${TAG}^PMANREPO"
     "fnndsc/swarm^SWARMREPO"
     "fnndsc/pfdcm${TAG}^PFDCMREPO"
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
@@ -197,11 +197,11 @@ windowBottom
 if (( b_restart )) ; then
     docker-compose -f docker-compose_dev.yml stop                       \
         ${RESTART}_service && docker-compose -f docker-compose_dev.yml  \
-        rm -f ${RESTART}_service                                        |& tee dc.out >/dev/null
+        rm -f ${RESTART}_service                                        >& dc.out >/dev/null
         cat dc.out | ./boxes.sh
 
     docker-compose -f docker-compose_dev.yml run --service-ports        \
-        ${RESTART}_service                                              |& tee dc.out >/dev/null
+        ${RESTART}_service                                              >& dc.out >/dev/null
         cat dc.out | ./boxes.sh
 else
     title -d 1 "Pulling non-'local/' core containers where needed..."   \
@@ -267,10 +267,10 @@ else
         cat dc.out | ./boxes.sh
         if (( b_swarmAdvertiseAdr )) ; then
             docker swarm init --advertise-addr=$SWARMADVERTISEADDR      |\
-                sed 's/[[:alnum:]]+:/\n&/g' | sed -r 's/(.{80})/\1\n/g' | ./boxes.sh
+                sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g' | ./boxes.sh
         else
             docker swarm init --advertise-addr 127.0.0.1                |\
-                sed 's/[[:alnum:]]+:/\n&/g' | sed -r 's/(.{80})/\1\n/g' | ./boxes.sh
+                sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g' | ./boxes.sh
         fi
         echo "Swarm started"                                            | ./boxes.sh
     windowBottom
@@ -278,12 +278,13 @@ else
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
         echo "This might take a few minutes... please be patient."              | ./boxes.sh ${LightRed}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml stop |& tee dc.out > /dev/null
+        docker-compose --no-ansi -f docker-compose_dev.yml stop >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
-        cat dc.out | sed -r 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightBlue}
-        docker-compose --no-ansi -f docker-compose_dev.yml rm -vf |& tee dc.out > /dev/null
-        cat dc.out | sed -r 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightCyan}
-        for CONTAINER in ${A_CONTAINER[@]} ; do
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightBlue}
+        docker-compose --no-ansi -f docker-compose_dev.yml rm -vf >& dc.out > /dev/null
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightCyan}
+        for CORE in ${A_CONTAINER[@]} ; do
+            cparse $CORE " " "REPO" "CONTAINER" "MMN" "ENV"
             docker ps -a                                                        |\
                 grep $CONTAINER                                                 |\
                 awk '{printf("docker stop %s && docker rm -vf %s\n", $1, $1);}' |\
@@ -333,9 +334,9 @@ else
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
         echo "docker-compose -f docker-compose_dev.yml up -d"           | ./boxes.sh ${LightCyan}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml up -d        |& tee dc.out > /dev/null
+        docker-compose --no-ansi -f docker-compose_dev.yml up -d        >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
-        cat dc.out | sed -r 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
     windowBottom
 
     title -d 1 "Pause for manual restart of services?"
@@ -354,14 +355,14 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml        \
             exec chris_dev_db sh -c                     \
-            'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;' |& tee dc.out > /dev/null
+            'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
-        sed -r 's/[[:alnum:]]+:/\n&/g' dc.out | ./boxes.sh
+        sed -E 's/[[:alnum:]]+:/\n&/g' dc.out | ./boxes.sh
         echo "Granting <chris> user all DB permissions...."             | ./boxes.sh ${LightCyan}
         echo "This is required for the Django tests."                   | ./boxes.sh ${LightCyan}
         docker-compose -f docker-compose_dev.yml        \
             exec chris_dev_db mysql -uroot -prootp -e   \
-            'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"' |& tee dc.out > /dev/null
+            'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"' >& dc.out > /dev/null
         cat dc.out                                                      | ./boxes.sh
     windowBottom
 
@@ -370,9 +371,12 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml        \
             exec chris_dev sh -c                        \
-            'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' |& tee dc.out > /dev/null
+            'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
-        cat dc.out | python -m json.tool | ./boxes.sh ${LightGreen}
+        cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
+        echo ""                                                         | ./boxes.sh
+        echo "Ready to accept connections"                              | ./boxes.sh ${LightGreen}
+        echo ""                                                         | ./boxes.sh
     windowBottom
 
     if (( ! b_skipUnitTests )) ; then
@@ -383,7 +387,7 @@ else
             exec chris_dev python manage.py         \
             test --exclude-tag integration
         status=$?
-        title -d "CUBE Unit results"
+        title -d 1 "CUBE Unit results"
         if (( $status == 0 )) ; then
             printf "%40s${LightGreen}%40s${NC}\n"                       \
                 "CUBE Unit tests" "[ success ]"                         | ./boxes.sh
@@ -410,9 +414,9 @@ else
             echo "Clearing internal pman database..."                   | ./boxes.sh
             windowBottom
             docker-compose --no-ansi -f docker-compose_dev.yml          \
-                exec pman_service db_clean.py |& tee dc.out > /dev/null
+                exec pman_service db_clean.py >& dc.out > /dev/null
             echo -en "\033[2A\033[2K"
-            cat dc.out | sed -r 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
+            cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
         else
             printf "%40s${LightRed}%40s${NC}\n"                         \
                 "CUBE Integration tests" "[ failure ]"                  | ./boxes.sh
@@ -425,9 +429,9 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore sh -c                   \
-            'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' |& tee dc.out > /dev/null
+            'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
-        cat dc.out | python -m json.tool | ./boxes.sh ${LightGreen}
+        cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
@@ -437,13 +441,13 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore /bin/bash -c            \
-            'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;' |& tee dc.out > /dev/null
+            'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore /bin/bash -c            \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' |& tee dc.out > /dev/null
+            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
@@ -451,19 +455,19 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore /bin/bash -c            \
-            'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;' |& tee dc.out > /dev/null
+            'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         windowBottom
 
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore /bin/bash -c            \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"' |& tee dc.out > /dev/null
+            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
         windowBottom
-        docker-compose -f docker-compose_dev.yml restart chrisstore     |& tee dc.out > /dev/null
+        docker-compose -f docker-compose_dev.yml restart chrisstore     >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
@@ -521,7 +525,7 @@ else
             docker-compose -f docker-compose_dev.yml                                \
                 exec chrisstore python plugins/services/manager.py add "$CONTAINER" \
                 cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"              \
-                --descriptorstring "$PLUGIN_REP" |& tee dc.out >/dev/null
+                --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 
@@ -634,7 +638,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c                                 \
-            'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;' |& tee dc.out >/dev/null
+            'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
 
@@ -642,7 +646,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' |& tee dc.out >/dev/null
+            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
 
@@ -651,7 +655,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c                                 \
-            'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;' |& tee dc.out >/dev/null
+            'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
 
@@ -659,7 +663,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c                                 \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"' |& tee dc.out >/dev/null
+            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
     windowBottom
@@ -673,7 +677,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev                                              \
-            python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" |& tee dc.out >/dev/null
+            python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
     windowBottom
@@ -686,7 +690,7 @@ else
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev                                              \
-            python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock |& tee dc.out >/dev/null
+            python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
    windowBottom
@@ -697,7 +701,7 @@ else
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "Stopping" "chris_dev"                          | ./boxes.sh
             windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml stop chris_dev |& tee dc.out >/dev/null
+            docker-compose --no-ansi -f docker-compose_dev.yml stop chris_dev >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 
@@ -705,7 +709,7 @@ else
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "rm -f" "chris_dev"                             | ./boxes.sh
             windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml rm -f chris_dev |& tee dc.out >/dev/null
+            docker-compose --no-ansi -f docker-compose_dev.yml rm -f chris_dev >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 
