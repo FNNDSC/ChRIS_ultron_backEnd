@@ -26,11 +26,11 @@
 #
 #   Run full CUBE instantiation with tests:
 #
-#       unmake ; sudo rm -fr FS; rm -fr FS; make
+#       unmake.sh ; sudo rm -fr FS; rm -fr FS; make.sh
 #
 #   Skip unit and integration tests and the intro:
 #
-#       unmake ; sudo rm -fr FS; rm -fr FS; make -U -I -s
+#       unmake.sh ; sudo rm -fr FS; rm -fr FS; make.sh -U -I -s
 #
 # ARGS
 #

@@ -9,3 +9,6 @@ htmlcov
 .docker
 .idea
 FS/
+dc.out
+.vscode
+
