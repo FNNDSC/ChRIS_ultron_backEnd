@@ -432,6 +432,9 @@ else
             'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
+        echo ""                                                         | ./boxes.sh
+        echo "Ready to accept connections"                              | ./boxes.sh ${LightGreen}
+        echo ""                                                         | ./boxes.sh
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
