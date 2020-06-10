@@ -276,7 +276,7 @@ else
     windowBottom
 
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
-        echo "This might take a few minutes... please be patient."              | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."              | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose --no-ansi -f docker-compose_dev.yml stop >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
@@ -331,7 +331,7 @@ else
     windowBottom
 
     title -d 1 "Starting CUBE containerized development environment using " "./docker-compose_dev.yml"
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         echo "docker-compose -f docker-compose_dev.yml up -d"           | ./boxes.sh ${LightCyan}
         windowBottom
         docker-compose --no-ansi -f docker-compose_dev.yml up -d        >& dc.out > /dev/null
@@ -351,7 +351,7 @@ else
     windowBottom
 
     title -d 1 "Waiting until ChRIS database server is ready to accept connections..."
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml        \
             exec chris_dev_db sh -c                     \
@@ -367,7 +367,7 @@ else
     windowBottom
 
     title -d 1 "Waiting until CUBE is ready to accept connections..."
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml        \
             exec chris_dev sh -c                        \
@@ -381,7 +381,7 @@ else
 
     if (( ! b_skipUnitTests )) ; then
         title -d 1 "Running CUBE Unit tests..."
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chris_dev python manage.py         \
@@ -392,7 +392,7 @@ else
             printf "%40s${LightGreen}%40s${NC}\n"                       \
                 "CUBE Unit tests" "[ success ]"                         | ./boxes.sh
         else
-            printf "%40s${LightRed}%40s${NC}\n"                         \
+            printf "%40s${Red}%40s${NC}\n"                              \
                 "CUBE Unit tests" "[ failure ]"                         | ./boxes.sh
         fi
         windowBottom
@@ -400,7 +400,7 @@ else
 
     if (( ! b_skipIntegrationTests )) ; then
         title -d 1 "Running CUBE Integration tests..."
-        echo "This might take more than a few minutes... please be patient."    | ./boxes.sh ${LightRed}
+        echo "This might take more than a few minutes... please be patient."    | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chris_dev python manage.py         \
@@ -418,14 +418,14 @@ else
             echo -en "\033[2A\033[2K"
             cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
         else
-            printf "%40s${LightRed}%40s${NC}\n"                         \
+            printf "%40s${Red}%40s${NC}\n"                              \
                 "CUBE Integration tests" "[ failure ]"                  | ./boxes.sh
         fi
         windowBottom
     fi
 
     title -d 1 "Waiting until ChRIS store is ready to accept connections..."
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore sh -c                   \
@@ -440,7 +440,7 @@ else
     title -d 1 "Creating two ChRIS STORE API users"
         echo ""                                                         | ./boxes.sh
         echo "Creating superuser chris:chris1234..."                    | ./boxes.sh
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${LightRed}
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chrisstore /bin/bash -c            \
@@ -536,7 +536,7 @@ else
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                         "ChRIS store upload" "[ success ]"              | ./boxes.sh
             else
-                printf "%40s${LightRed}%40s${NC}\n"                     \
+                printf "%40s${Yellow}%40s${NC}\n"                     \
                         "ChRIS store upload" "[ failure ]"              | ./boxes.sh
             fi
             ((i++))
@@ -629,7 +629,7 @@ else
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                     "CUBE registation" "[ success ]"                    | ./boxes.sh
             else
-                printf "%40s${LightRed}%40s${NC}\n"                     \
+                printf "%40s${Yellow}%40s${NC}\n"                     \
                     "CUBE registration" "[ failure ]"                   | ./boxes.sh
             fi
             ((i++))

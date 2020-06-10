@@ -12,8 +12,8 @@ title -d 1 "Destroying containerized development environment" "from  ./docker-co
     echo -en "\033[2A\033[2K"
     # read -p  " " -n 1 -r REPLY
     if [[ $REPLY =~ ^[Yy]$ ]] ; then
-        printf "Removing persisent volumes...\n" | ./boxes.sh ${LightRed}
-        echo "This might take a few minutes... please be patient."          | ./boxes.sh ${LightRed}
+        printf "Removing persisent volumes...\n"                            | ./boxes.sh ${Yellow}
+        echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose --no-ansi -f docker-compose_dev.yml down -v >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
