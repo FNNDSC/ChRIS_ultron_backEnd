@@ -16,7 +16,7 @@
 #
 # DESC
 #
-#   'docker-make.sh' is the main entry point for instantiating a
+#   'make.sh' is the main entry point for instantiating a
 #   complete backend dev environment.
 #
 #   It creates a pattern of directories and symbolic links that reflect the
