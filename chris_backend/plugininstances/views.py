@@ -30,10 +30,12 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """
-        Overriden to remove 'status' from the request as it must take the default
+        Overriden to remove descriptors from the request that must take their default
         value on creation.
         """
         self.request.data.pop('status', None)
+        self.request.data.pop('summary', None)
+        self.request.data.pop('raw', None)
         return super(PluginInstanceList, self).create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
@@ -171,6 +173,8 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         serializer validation.
         """
         data = self.request.data
+        data.pop('summary', None)
+        data.pop('raw', None)
         data.pop('gpu_limit', None)
         data.pop('number_of_workers', None)
         data.pop('cpu_limit', None)
