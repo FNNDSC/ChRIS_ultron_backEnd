@@ -26,6 +26,8 @@ class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=30, default=STATUS_TYPES[0])
+    summary = models.CharField(max_length=4000, blank=True, default='')
+    raw = models.TextField(blank=True, default='')
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
