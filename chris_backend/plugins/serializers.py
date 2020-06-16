@@ -1,10 +1,11 @@
 
+from django.utils import timezone
+
 from rest_framework import serializers
 
-from .models import Plugin, PluginParameter
-from .models import ComputeResource
-from .models import DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter
-from .models import DefaultStrParameter
+from .models import ComputeResource, PluginMeta, Plugin, PluginParameter
+from .models import (DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter,
+                     DefaultStrParameter)
 from .fields import MemoryInt, CPUInt
 
 
@@ -16,7 +17,35 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                   'description')
 
 
+class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
+    plugins = serializers.HyperlinkedIdentityField(view_name='pluginmeta-plugin-list')
+
+    class Meta:
+        model = PluginMeta
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'stars',
+                  'public_repo', 'license', 'type', 'icon', 'category', 'authors',
+                  'plugins')
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to add modification date.
+        """
+        instance.modification_date = timezone.now()
+        instance.save()
+        return super(PluginMetaSerializer, self).update(instance, validated_data)
+
+
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
+    name = serializers.ReadOnlyField(source='meta.name')
+    public_repo = serializers.ReadOnlyField(source='meta.public_repo')
+    license = serializers.ReadOnlyField(source='meta.license')
+    type = serializers.ReadOnlyField(source='meta.type')
+    icon = serializers.ReadOnlyField(source='meta.icon')
+    category = serializers.ReadOnlyField(source='meta.category')
+    authors = serializers.ReadOnlyField(source='meta.authors')
+    stars = serializers.ReadOnlyField(source='meta.stars')
+    meta = serializers.HyperlinkedRelatedField(view_name='pluginmeta-detail',
+                                               read_only=True)
     parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
     instances = serializers.HyperlinkedIdentityField(view_name='plugininstance-list')
     compute_resources = serializers.HyperlinkedIdentityField(
@@ -24,13 +53,13 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'name', 'dock_image','creation_date', 'modification_date',
-                  'type', 'authors', 'title', 'category', 'description', 'documentation',
-                  'license', 'version', 'execshell', 'selfpath', 'selfexec',
-                  'parameters', 'instances', 'min_number_of_workers',
-                  'max_number_of_workers', 'min_cpu_limit', 'max_cpu_limit',
-                  'min_memory_limit', 'max_memory_limit', 'min_gpu_limit',
-                  'max_gpu_limit', 'compute_resources')
+        fields = ('url', 'id', 'creation_date', 'name', 'version', 'dock_image',
+                  'public_repo', 'icon', 'type', 'stars', 'authors', 'title', 'category',
+                  'description', 'documentation', 'license',  'execshell', 'selfpath',
+                  'selfexec', 'min_number_of_workers', 'max_number_of_workers',
+                  'min_cpu_limit', 'max_cpu_limit', 'min_memory_limit',
+                  'max_memory_limit', 'min_gpu_limit', 'max_gpu_limit', 'meta',
+                  'parameters', 'instances', 'compute_resources')
 
     def validate(self, data):
         """

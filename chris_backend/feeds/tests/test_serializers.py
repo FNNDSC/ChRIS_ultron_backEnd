@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from plugins.models import Plugin, ComputeResource
+from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance
 from feeds.models import Feed, Tag, Tagging
 from feeds.serializers import TaggingSerializer, FeedSerializer
@@ -35,7 +35,8 @@ class SerializerTests(TestCase):
                                         password=self.password)
 
         # create a "fs" plugin
-        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 

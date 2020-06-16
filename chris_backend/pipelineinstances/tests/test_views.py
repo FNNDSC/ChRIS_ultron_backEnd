@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin
+from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from plugininstances.models import PluginInstance
@@ -38,11 +38,13 @@ class ViewTests(TestCase):
             name="host", description="host description")
 
         # create plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
 
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 
@@ -104,13 +106,13 @@ class PipelineInstanceListViewTests(ViewTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         self.create_read_url = reverse("pipelineinstance-list", kwargs={"pk": pipeline.id})
         owner = User.objects.get(username=self.username)
-        plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (self.pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin_fs, owner=owner, compute_resource=plugin_fs.compute_resources.all()[0])
 
     def test_pipeline_instance_create_success(self):
 
-        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         param_name = "%s_%s_%s_%s" % (plugin_ds.id, self.pips[1].id, self.pips[0].id, 'dummyInt')
         post = json.dumps(
             {"template": {"data": [{"name": "title", "value": "PipelineInst1"},
@@ -246,7 +248,7 @@ class PipelineInstancePluginInstanceListViewTests(ViewTests):
                                 kwargs={"pk": self.pipeline_inst.id})
 
     def test_pipeline_instance_plugin_instance_list_success(self):
-        plugin_fs = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
         owner = User.objects.get(username=self.username)
         (previous_plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin_fs, owner=owner, compute_resource=plugin_fs.compute_resources.all()[0])

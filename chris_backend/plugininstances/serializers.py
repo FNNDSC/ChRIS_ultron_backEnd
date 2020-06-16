@@ -20,7 +20,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                                                   source='compute_resource.name')
     previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
-    plugin_name = serializers.ReadOnlyField(source='plugin.name')
+    plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
     pipeline_id = serializers.ReadOnlyField(source='pipeline_inst.pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
@@ -64,7 +64,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         # as plugin instances are always created through the API
         plugin = self.context['view'].get_object()
         previous = None
-        if plugin.type == 'ds':
+        if plugin.meta.type == 'ds':
             if not previous_id:
                 raise serializers.ValidationError(
                     {'previous_id': ["This field is required."]})
@@ -91,7 +91,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         plg = self.context['view'].get_object()
         if plg.compute_resources.filter(name=compute_resource_name).count() == 0:
             msg = "Plugin '%s' with version '%s' has not been registered with compute " \
-                  "resource '%s'." % (plg.name, plg.version, compute_resource_name)
+                  "resource '%s'." % (plg.meta.name, plg.version, compute_resource_name)
             raise serializers.ValidationError([msg])
         return compute_resource_name
 

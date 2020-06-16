@@ -5,9 +5,9 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 
 from .models import ComputeResource, ComputeResourceFilter
-from .models import Plugin, PluginFilter, PluginParameter
+from .models import PluginMeta, PluginMetaFilter, Plugin, PluginFilter, PluginParameter
 from .serializers import ComputeResourceSerializer
-from .serializers import PluginSerializer, PluginParameterSerializer
+from .serializers import PluginMetaSerializer, PluginSerializer, PluginParameterSerializer
 
 
 class ComputeResourceList(generics.ListAPIView):
@@ -51,6 +51,75 @@ class ComputeResourceDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
 
+class PluginMetaList(generics.ListAPIView):
+    """
+    A view for the collection of plugin metas.
+    """
+    queryset = PluginMeta.objects.all()
+    serializer_class = PluginMetaSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append document-level link relations and a query list to the
+        response.
+        """
+        response = super(PluginMetaList, self).list(request, *args, **kwargs)
+        # append document-level link relations
+        links = {'feeds': reverse('feed-list', request=request),
+                 'plugins': reverse('plugin-list', request=request)}
+        response = services.append_collection_links(response, links)
+        # append query list
+        query_list = [reverse('pluginmeta-list-query-search', request=request)]
+        return services.append_collection_querylist(response, query_list)
+
+
+class PluginMetaListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of plugin metas resulting from a query search.
+    """
+    serializer_class = PluginMetaSerializer
+    queryset = PluginMeta.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = PluginMetaFilter
+
+
+class PluginMetaDetail(generics.RetrieveAPIView):
+    """
+    A plugin meta view.
+    """
+    serializer_class = PluginMetaSerializer
+    queryset = PluginMeta.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class PluginMetaPluginList(generics.ListAPIView):
+    """
+    A view for the collection of meta-specific plugins.
+    """
+    queryset = PluginMeta.objects.all()
+    serializer_class = PluginSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list of the plugins for the queried  meta.
+        """
+        queryset = self.get_plugins_queryset()
+        response = services.get_list_response(self, queryset)
+        meta = self.get_object()
+        links = {'meta': reverse('pluginmeta-detail', request=request,
+                                 kwargs={"pk": meta.id})}
+        return services.append_collection_links(response, links)
+
+    def get_plugins_queryset(self):
+        """
+        Custom method to get the actual plugins queryset.
+        """
+        meta = self.get_object()
+        return self.filter_queryset(meta.plugins.all())
+
+
 class PluginList(generics.ListAPIView):
     """
     A view for the collection of plugins.
@@ -69,7 +138,8 @@ class PluginList(generics.ListAPIView):
         query_list = [reverse('plugin-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
-        links = {'feeds': reverse('feed-list', request=request)}
+        links = {'feeds': reverse('feed-list', request=request),
+                 'plugin_metas': reverse('pluginmeta-list', request=request)}
         return services.append_collection_links(response, links)
 
 

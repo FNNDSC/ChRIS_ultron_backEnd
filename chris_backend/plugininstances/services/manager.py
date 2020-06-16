@@ -40,7 +40,7 @@ class PluginAppManager(object):
             outputdir = str_outputDirOverride
         app_args = []
         # append input dir to app's argument list (only for ds plugins)
-        if plugin_inst.plugin.type == 'ds' and inputdir:
+        if plugin_inst.plugin.meta.type == 'ds' and inputdir:
             app_args.append(inputdir)
         # append output dir to app's argument list
         app_args.append(outputdir)

@@ -5,7 +5,7 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase, tag
 
-from plugins.models import Plugin, PluginParameter, DefaultIntParameter
+from plugins.models import PluginMeta, Plugin, PluginParameter, DefaultIntParameter
 from plugins.models import ComputeResource
 from pipelines.models import Pipeline, PluginPiping
 from pipelines.services import manager
@@ -28,8 +28,8 @@ class PipelineManagerTests(TestCase):
             name="host", description="host description")
 
         # create plugin
-        (plugin_ds, tf) = Plugin.objects.get_or_create(
-            name=self.plugin_ds_name, type='ds', version=self.plugin_ds_version)
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version=self.plugin_ds_version)
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 

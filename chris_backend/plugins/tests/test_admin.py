@@ -97,7 +97,8 @@ class ComputeResourceAdminTests(TestCase):
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
             name="host", description="host description")
-        (plg, tf) = pl_admin.Plugin.objects.get_or_create(name="pacspull", type="fs")
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])
         plg.save()
         compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
@@ -116,7 +117,8 @@ class ComputeResourceAdminTests(TestCase):
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
             name="host", description="host description")
-        (plg, tf) = pl_admin.Plugin.objects.get_or_create(name="pacspull", type="fs")
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])
         plg.save()
         compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
@@ -155,8 +157,10 @@ class PluginAdminFormTests(TestCase):
         # create a plugin
         self.plugin_name = "simplecopyapp"
         self.plugin_version = "0.1"
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
         self.plugin = pl_admin.Plugin()
-        self.plugin.name = self.plugin_name
+        self.plugin.meta = pl_meta
         self.plugin.version = self.plugin_version
 
     def test_clean_validate_name_version_and_save_plugin_descriptors(self):
@@ -165,11 +169,12 @@ class PluginAdminFormTests(TestCase):
         and save the newly created plugin to the DB.
         """
         # mock manager's register_plugin method
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(
-            name=self.plugin_name, version=self.plugin_version)
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
+                                                             version=self.plugin_version)
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
-
         with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
                                return_value=plugin) as register_plugin_mock:
             plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
@@ -191,8 +196,10 @@ class PluginAdminFormTests(TestCase):
         and save the newly created plugin to the DB.
         """
         # mock manager's register_plugin_by_url method
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(
-            name=self.plugin_name, version=self.plugin_version)
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
+                                                             version=self.plugin_version)
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
@@ -227,6 +234,27 @@ class PluginAdminFormTests(TestCase):
             form.cleaned_data = {'name': self.plugin_name, 'version': self.plugin_version,
                                  'compute_resources': [self.compute_resource]}
             self.assertIsNone(form.instance.pk)
+            with self.assertRaises(forms.ValidationError):
+                form.clean(form)
+
+    def test_clean_raises_validation_error_if_compute_resources_is_NONE(self):
+        """
+        Test whether overriden clean method raises a ValidationError when compute
+        resources is None (the user didn't picked up any in the UI) .
+        """
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='test_plg',
+                                                                  type='fs')
+        plugin = pl_admin.Plugin()
+        plugin.meta = pl_meta
+        plugin.version = self.plugin_version
+        # mock manager's register_plugin method
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
+                               return_value=plugin) as register_plugin_mock:
+            plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+            form = plugin_admin.form
+            form.instance = plugin
+            form.cleaned_data = {'name': 'test_plg', 'version': self.plugin_version,
+                                 'compute_resources': None}
             with self.assertRaises(forms.ValidationError):
                 form.clean(form)
 
@@ -276,6 +304,40 @@ class PluginAdminTests(TestCase):
             self.assertEqual(len(plugin_admin.fieldsets), 2)
             change_view_mock.assert_called_with(plugin_admin, request_mock, 1, '', None)
 
+    def test_delete_model(self):
+        """
+        Test whether overriden delete_model method deletes the associated meta if this
+        is the last associated plugin.
+        """
+        (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
+            name="host", description="host description")
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plg.compute_resources.set([compute_resource])
+        plg.save()
+        plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+        request_mock = mock.Mock()
+        plugin_admin.delete_model(request_mock, plg)
+        with self.assertRaises(pl_admin.PluginMeta.DoesNotExist):
+            pl_admin.PluginMeta.objects.get(name='pacspull')
+
+    def test_delete_queryset(self):
+        """
+        Test whether overriden delete_queryset method deletes plugin metas if their last
+        associated plugin is deleted.
+        """
+        (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
+            name="host", description="host description")
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plg.compute_resources.set([compute_resource])
+        plg.save()
+        plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
+        request_mock = mock.Mock()
+        plugin_admin.delete_queryset(request_mock, pl_meta.plugins.all())
+        with self.assertRaises(pl_admin.PluginMeta.DoesNotExist):
+            pl_admin.PluginMeta.objects.get(name='pacspull')
+
     def test_add_plugins_from_file_view(self):
         """
         Test whether custom add_plugins_from_file_view view passes a summary dict in
@@ -319,29 +381,6 @@ class PluginAdminTests(TestCase):
                                                 'is_popup': ANY,
                                                 'opts': ANY,
                                                 'summary': summary})
-
-    def test_save_model(self):
-        """
-        Test whether overriden save_model method creates a plugin from the fields in
-        the add plugin page or properly change the modification date for a modified
-        existing plugin.
-        """
-        plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
-        request_mock = mock.Mock()
-        obj_mock = mock.Mock()
-        obj_mock_creation_date = timezone.now()
-        obj_mock.modification_date = obj_mock_creation_date
-        form_mock = mock.Mock()
-        form_mock.instance = mock.Mock()
-        with mock.patch.object(pl_admin.admin.ModelAdmin, 'save_model',
-                               return_value=None) as save_model_mock:
-            plugin_admin.save_model(request_mock, obj_mock, form_mock, False)
-            save_model_mock.assert_called_with(request_mock, obj_mock,
-                                               form_mock, False)
-
-            plugin_admin.save_model(request_mock, obj_mock, form_mock, True)
-            save_model_mock.assert_called_with(request_mock, obj_mock, form_mock, True)
-            self.assertGreater(obj_mock.modification_date, obj_mock_creation_date)
 
     def test_register_plugins_from_file(self):
         """

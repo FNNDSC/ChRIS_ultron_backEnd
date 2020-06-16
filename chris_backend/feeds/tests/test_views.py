@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin, ComputeResource
+from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from feeds.models import Note, Tag, Tagging, Feed, Comment
 
@@ -47,11 +47,14 @@ class ViewTests(TestCase):
                                         password=self.password)
         
         # create two plugins of different types
-        (plugin, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_convert', type='ds')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
-        (plugin, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
         
@@ -129,7 +132,7 @@ class FeedListViewTests(ViewTests):
         self.list_url = reverse("feed-list")
 
         # create an additional feed using a "fs" plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         user = User.objects.get(username=self.username)
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
@@ -178,7 +181,7 @@ class FeedListQuerySearchViewTests(ViewTests):
         self.list_url = reverse("feed-list-query-search") + '?name=' + self.feedname
 
         # create an additional feed using a "fs" plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         user = User.objects.get(username=self.username)
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
@@ -528,7 +531,8 @@ class FeedTagListViewTests(ViewTests):
         Tagging.objects.get_or_create(tag=tag, feed=feed)
 
         # create a new feed by creating a "fs" plugin instance
-        plugin = Plugin.objects.get(name="pacspull", type="fs")
+
+        plugin = Plugin.objects.get(meta__name="pacspull")
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
@@ -587,7 +591,7 @@ class TagFeedListViewTests(ViewTests):
         Tagging.objects.get_or_create(tag=tag, feed=feed)
 
         # create a new feed by creating a "fs" plugin instance
-        plugin = Plugin.objects.get(name="pacspull", type="fs")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
@@ -704,7 +708,7 @@ class TagTaggingListViewTests(ViewTests):
             {"template": {"data": [{"name": "feed_id", "value": feed.id}]}})
 
         # create a new feed by creating a "fs" plugin instance
-        plugin = Plugin.objects.get(name="pacspull", type="fs")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = "new"
@@ -834,7 +838,7 @@ class FeedFileListViewTests(ViewTests):
 
         # create a second 'ds' plugin instance in the same feed tree
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name="mri_convert")
+        plugin = Plugin.objects.get(meta__name="mri_convert")
         (plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous_id=plg_inst.id,
             compute_resource=plugin.compute_resources.all()[0])
@@ -876,7 +880,7 @@ class FeedPluginInstanceListViewTests(ViewTests):
 
         # create a second 'ds' plugin instance in the same feed tree
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name="mri_convert")
+        plugin = Plugin.objects.get(meta__name="mri_convert")
         PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous_id=plg_inst.id, title='test1',
             compute_resource=plugin.compute_resources.all()[0])

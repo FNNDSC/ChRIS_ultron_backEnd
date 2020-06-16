@@ -10,7 +10,7 @@ from django.conf import settings
 
 import swiftclient
 
-from plugins.models import Plugin
+from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
 from plugininstances.services import manager
@@ -22,36 +22,48 @@ class PluginAppManagerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.CRITICAL)
 
-        self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
-                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                            "description": "A simple chris fs app demo", "version": "0.1",
-                            "title": "Simple chris fs app", "license": "Opensource (MIT)",
-
-                            "parameters": [{"optional": False, "action": "store",
-                                            "help": "look up directory", "type": "path",
-                                            "name": "dir", "flag": "--dir",
-                                            "short_flag": "-d"}],
-
-                            "selfpath": "/usr/src/simplefsapp",
-                            "selfexec": "simplefsapp.py", "execshell": "python3"}
-
         self.plugin_fs_name = "simplefsapp"
         self.username = 'foo'
         self.password = 'foo-pass'
+
+        plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
+                              'optional': False, 'flag': '--dir', 'short_flag': '-d',
+                              'help': 'test plugin', 'ui_exposed': True}]
+
+        self.plg_data = {'title': 'Dir plugin',
+                         'description': 'A simple chris fs app demo',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
+
+        self.plg_meta_data = {'name': self.plugin_fs_name,
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", description="host description")
 
         # create a plugin
-        data = self.plugin_repr.copy()
-        parameters = self.plugin_repr['parameters']
-        del data['parameters']
-        (plugin_fs, tf) = Plugin.objects.get_or_create(**data)
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
 
         # add plugin's parameters
-        (plg_param, tf) = PluginParameter.objects.get_or_create(
+        parameters = plugin_parameters
+        PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
             name=parameters[0]['name'],
             type=parameters[0]['type'],
@@ -75,7 +87,7 @@ class PluginAppManagerTests(TestCase):
             with mock.patch.object(manager.Charm, 'app_manage',
                                    return_value=None) as charm_app_manage_mock:
                 user = User.objects.get(username=self.username)
-                plugin = Plugin.objects.get(name=self.plugin_fs_name)
+                plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
                 (pl_inst, tf) = PluginInstance.objects.get_or_create(
                     plugin=plugin, owner=user,
                     compute_resource=plugin.compute_resources.all()[0])
@@ -114,7 +126,7 @@ class PluginAppManagerTests(TestCase):
         #         os.makedirs(test_dir)
 
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
@@ -143,7 +155,7 @@ class PluginAppManagerTests(TestCase):
                                    return_value=None) as app_statusCheckAndRegister_mock:
 
                 user = User.objects.get(username=self.username)
-                plugin = Plugin.objects.get(name=self.plugin_fs_name)
+                plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
                 (pl_inst, tf) = PluginInstance.objects.get_or_create(
                     plugin=plugin, owner=user,
                     compute_resource=plugin.compute_resources.all()[0])
@@ -168,7 +180,7 @@ class PluginAppManagerTests(TestCase):
             This must be fixed in later versions!
         """
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]

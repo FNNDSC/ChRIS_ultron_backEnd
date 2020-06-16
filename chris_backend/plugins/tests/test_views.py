@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import status
 
-from plugins.models import Plugin
+from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
 
@@ -28,11 +28,11 @@ class ViewTests(TestCase):
         User.objects.create_user(username=self.username,
                                  password=self.password)
 
-        # create two plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name="simplecopyapp", type="fs")
+        # create an fs plugins
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='simplecopyapp', type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
-
         # add plugin's parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -41,7 +41,10 @@ class ViewTests(TestCase):
             optional=True
         )
         DefaultStrParameter.objects.get_or_create(plugin_param=plg_param, value="./")
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
+
+        # create a ds plugin
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_convert', type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 
@@ -109,6 +112,88 @@ class ComputeResourceDetailViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class PluginMetaListViewTests(ViewTests):
+    """
+    Test the pluginmeta-list view.
+    """
+
+    def setUp(self):
+        super(PluginMetaListViewTests, self).setUp()
+        self.list_url = reverse("pluginmeta-list")
+
+    def test_plugin_meta_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, 'simplecopyapp')
+        self.assertContains(response, 'mri_convert')
+
+    def test_plugin_meta_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginMetaListQuerySearchViewTests(ViewTests):
+    """
+    Test the pluginmeta-list-query-search view.
+    """
+
+    def setUp(self):
+        super(PluginMetaListQuerySearchViewTests, self).setUp()
+        self.list_url = reverse("pluginmeta-list-query-search") + '?name=simplecopyapp'
+
+    def test_plugin_meta_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, 'simplecopyapp')
+
+    def test_plugin_meta_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginMetaPluginListViewTests(ViewTests):
+    """
+    Test the pluginmeta-plugin-list view.
+    """
+
+    def setUp(self):
+        super(PluginMetaPluginListViewTests, self).setUp()
+
+        pl_meta = PluginMeta.objects.get(name="simplecopyapp")
+        self.list_url = reverse("pluginmeta-plugin-list", kwargs={"pk": pl_meta.id})
+
+    def test_plugin_meta_plugin_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "simplecopyapp")
+        self.assertNotContains(response, "mri_convert")  # plugin list is plugin meta-specific
+
+    def test_plugin_compute_resource_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginMetaDetailViewTests(ViewTests):
+    """
+    Test the pluginmeta-detail view.
+    """
+
+    def setUp(self):
+        super(PluginMetaDetailViewTests, self).setUp()
+
+        meta = PluginMeta.objects.get(name='simplecopyapp')
+        self.read_url = reverse("pluginmeta-detail", kwargs={"pk": meta.id})
+
+    def test_plugin_meta_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, 'simplecopyapp')
+
+    def test_plugin_meta_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class PluginListViewTests(ViewTests):
     """
     Test the plugin-list view.
@@ -157,7 +242,7 @@ class PluginComputeResourceListViewTests(ViewTests):
     def setUp(self):
         super(PluginComputeResourceListViewTests, self).setUp()
 
-        plugin = Plugin.objects.get(name="simplecopyapp")
+        plugin = Plugin.objects.get(meta__name="simplecopyapp")
         self.list_url = reverse("plugin-computeresource-list", kwargs={"pk": plugin.id})
 
     def test_plugin_compute_resource_list_success(self):
@@ -179,7 +264,8 @@ class PluginDetailViewTests(ViewTests):
 
     def setUp(self):
         super(PluginDetailViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="simplecopyapp")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='simplecopyapp', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
 
         self.read_url = reverse("plugin-detail", kwargs={"pk": plugin.id})
 
@@ -200,7 +286,9 @@ class PluginParameterListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginParameterListViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="simplecopyapp")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='simplecopyapp', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+
         # self.corresponding_plugin_url = reverse("plugin-detail", kwargs={"pk": plugin.id})
         self.list_url = reverse("pluginparameter-list", kwargs={"pk": plugin.id})
 

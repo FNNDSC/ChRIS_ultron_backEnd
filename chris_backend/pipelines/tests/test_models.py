@@ -4,7 +4,7 @@ import logging
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from plugins.models import Plugin
+from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultIntParameter
 from pipelines.models import Pipeline
@@ -27,7 +27,8 @@ class ModelTests(TestCase):
             name="host", description="host description")
 
         # create plugin
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 
@@ -36,7 +37,7 @@ class ModelTests(TestCase):
             plugin=plugin_ds,
             name='prefix',
             type=self.plugin_ds_parameters['prefix']['type'],
-            optional=self.plugin_ds_parameters['prefix']['optional']) # this plugin parameter has no default
+            optional=self.plugin_ds_parameters['prefix']['optional'])  # this plugin parameter has no default
 
         # create user
         user = User.objects.create_user(username=self.username, password=self.password)
@@ -78,7 +79,7 @@ class PipelineModelTests(ModelTests):
         parameters should be transformed to have the plugin id, piping id and previous
         piping id as a prefix.
         """
-        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         param = plugin_ds.parameters.get(name='prefix')
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         param_names = pipeline.get_pipings_parameters_names()
@@ -109,7 +110,7 @@ class PipelineModelTests(ModelTests):
         doesn't have a default value.
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
-        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         # add a new plugin piping to pipeline but do not set a default value for
         # the plugin parameter
         PluginPiping.objects.get_or_create(plugin=plugin_ds, pipeline=pipeline,
@@ -139,7 +140,7 @@ class PluginPipingModelTests(ModelTests):
         Test whether overriden save method saves the default plugin parameters' values
         associated with this piping.
         """
-        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         # add a parameter with a default
         (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
             plugin=plugin_ds,
@@ -163,7 +164,7 @@ class PluginPipingModelTests(ModelTests):
         any of the plugin parameters associated to the piping doesn't have a default value.
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
-        plugin_ds = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         # add a new plugin piping to pipeline but do not set a default value for
         # the plugin parameter
         (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, pipeline=pipeline,
