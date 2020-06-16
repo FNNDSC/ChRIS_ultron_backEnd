@@ -5,10 +5,10 @@ from unittest import mock
 from django.test import TestCase
 from rest_framework import serializers
 
-from plugins.models import Plugin
+from plugins.models import ComputeResource, PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
-from plugins.models import ComputeResource
-from plugins.serializers import PluginSerializer, PluginParameterSerializer
+from plugins.serializers import (PluginMetaSerializer, PluginSerializer,
+                                 PluginParameterSerializer)
 
 
 class SerializerTests(TestCase):
@@ -18,31 +18,43 @@ class SerializerTests(TestCase):
         logging.disable(logging.CRITICAL)
 
         self.plugin_name = "simplecopyapp"
-        self.plugin_repr = {"name": "simplecopyapp", "dock_image": "fnndsc/pl-simplecopyapp",
-                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                            "description": "A simple chris fs app demo", "version": "0.1",
-                            "title": "Simple chris fs app", "license": "Opensource (MIT)",
+        plugin_parameters = [{'name': 'dir', 'type': 'string', 'action': 'store',
+                              'optional': True, 'flag': '--dir', 'short_flag': '-d',
+                              'default': '/', 'help': 'test plugin', 'ui_exposed': True}]
 
-                            "parameters": [{"optional": True, "action": "store",
-                                            "help": "look up directory", "type": "string",
-                                            "name": "dir", "flag": "--dir",
-                                            "short_flag": "-d", "default": "./"}],
+        self.plg_data = {'title': 'Dir plugin',
+                         'description': 'A simple chris fs app demo',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
 
-                            "selfpath": "/usr/src/simplecopyapp",
-                            "selfexec": "simplecopyapp.py", "execshell": "python3"}
+        self.plg_meta_data = {'name': self.plugin_name,
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", description="host description")
 
         # create a plugin
-        data = self.plugin_repr.copy()
-        parameters = self.plugin_repr['parameters']
-        del data['parameters']
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
         # add plugin's parameters
+        parameters = plugin_parameters
         (plg_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
@@ -56,6 +68,21 @@ class SerializerTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.DEBUG)
+
+
+class PluginMetaSerializerTests(SerializerTests):
+
+    def test_update(self):
+        """
+        Test whether overriden update method changes modification date.
+        """
+        meta = PluginMeta.objects.get(name=self.plugin_name)
+        initial_mod_date = meta.modification_date
+        data = {'name': self.plugin_name, 'public_repo': 'http://github.com/plugin'}
+        plg_meta_serializer = PluginMetaSerializer(meta, data)
+        plg_meta_serializer.is_valid(raise_exception=True)
+        meta = plg_meta_serializer.update(meta, plg_meta_serializer.validated_data)
+        self.assertGreater(meta.modification_date, initial_mod_date)
 
 
 class PluginSerializerTests(SerializerTests):
@@ -138,7 +165,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method raises a ValidationError when the
         'max_number_of_workers' is smaller than the 'min_number_of_workers'.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         self.plugin_repr['min_number_of_workers'] = 2
         self.plugin_repr['max_number_of_workers'] = 1
@@ -152,7 +179,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method raises a ValidationError when the
         'max_cpu_limit' is smaller than the 'min_cpu_limit'.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         self.plugin_repr['min_cpu_limit'] = 200
         self.plugin_repr['max_cpu_limit'] = 100
@@ -166,7 +193,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method raises a ValidationError when the
         'max_memory_limit' is smaller than the 'min_memory_limit'.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         self.plugin_repr['min_memory_limit'] = 100000
         self.plugin_repr['max_memory_limit'] = 10000
@@ -180,7 +207,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method raises a ValidationError when the
         'max_gpu_limit' is smaller than the 'max_gpu_limit'.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         self.plugin_repr['min_gpu_limit'] = 2
         self.plugin_repr['max_gpu_limit'] = 1
@@ -194,7 +221,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'min_number_of_workers'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -209,7 +236,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'max_number_of_workers'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -224,7 +251,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'min_gpu_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -239,7 +266,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'max_gpu_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -254,7 +281,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'min_cpu_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -269,7 +296,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'max_cpu_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -284,7 +311,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'min_memory_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']
@@ -299,7 +326,7 @@ class PluginSerializerTests(SerializerTests):
         Test whether custom validate method validates the 'max_memory_limit'
         descriptor.
         """
-        plugin = Plugin.objects.get(name=self.plugin_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
         plg_serializer = PluginSerializer(plugin)
         data = self.plugin_repr.copy()
         del data['parameters']

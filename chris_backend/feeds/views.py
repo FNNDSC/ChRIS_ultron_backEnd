@@ -284,6 +284,7 @@ class FeedList(generics.ListAPIView):
         user = self.request.user
         links = {'files': reverse('allplugininstancefile-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
+                 'plugin_metas': reverse('pluginmeta-list', request=request),
                  'plugins': reverse('plugin-list', request=request),
                  'plugin_instances': reverse('allplugininstance-list', request=request),
                  'pipelines': reverse('pipeline-list', request=request),
@@ -449,8 +450,7 @@ class FeedFileList(generics.ListAPIView):
         queryset = self.get_feedfiles_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
-        links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+        links = {'feed': reverse('feed-detail', request=request, kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
 
     def get_feedfiles_queryset(self):
@@ -476,8 +476,7 @@ class FeedPluginInstanceList(generics.ListAPIView):
         queryset = self.get_plugin_instances_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
-        links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+        links = {'feed': reverse('feed-detail', request=request, kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
 
     def get_plugin_instances_queryset(self):

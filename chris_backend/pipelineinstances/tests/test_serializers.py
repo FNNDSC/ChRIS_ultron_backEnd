@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from plugininstances.models import PluginInstance
-from plugins.models import Plugin
+from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping
@@ -35,11 +35,13 @@ class SerializerTests(TestCase):
             name="host", description="host description")
 
         # create plugins
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
 
-        (plugin_ds, tf) = Plugin.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 
@@ -54,7 +56,7 @@ class SerializerTests(TestCase):
                                                    value=default)  # set plugin parameter default
 
         # add a parameter with a default
-        (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
+        (plg_param_ds, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_ds,
             name='dummyInt',
             type=self.plugin_ds_parameters['dummyInt']['type'],
@@ -98,7 +100,7 @@ class PipelineInstanceSerializerTests(SerializerTests):
         not a model field.
         """
         owner = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
@@ -118,7 +120,7 @@ class PipelineInstanceSerializerTests(SerializerTests):
         that the user can run plugins within the corresponding feed.
         """
         owner = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         data = {'title': 'PipelineInst1', 'previous_plugin_inst_id': pl_inst.id}
@@ -140,7 +142,7 @@ class PipelineInstanceSerializerTests(SerializerTests):
         Test whether custom parse_parameters method properly parses the pipeline instance
         parameters in the request data dictionary.
         """
-        plugin = Plugin.objects.get(name=self.plugin_ds_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_ds_name)
         pipeline_inst_serializer = PipelineInstanceSerializer()
         pipeline_inst_serializer.context['request'] = mock.Mock()
         # parameters name in the request have the form

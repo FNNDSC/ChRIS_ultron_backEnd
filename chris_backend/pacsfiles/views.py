@@ -30,6 +30,7 @@ class PACSFileList(generics.ListCreateAPIView):
         response = services.append_collection_querylist(response, query_list)
         # append write template
         template_data = {'path': "", 'PatientID': "", 'PatientName': "",
+                         'PatientBirthDate': "", 'PatientAge': "", 'PatientSex': "",
                          'StudyInstanceUID': "", 'StudyDescription': "",
                          'SeriesInstanceUID': "", 'SeriesDescription': "",
                          'pacs_name': ""}

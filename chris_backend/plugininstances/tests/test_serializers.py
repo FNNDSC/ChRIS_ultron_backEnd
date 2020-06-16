@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import (PathParameterSerializer,
@@ -23,31 +23,43 @@ class SerializerTests(TestCase):
         self.username = 'foo'
         self.password = 'foopassword'
         self.plugin_name = "simplefsapp"
-        self.plugin_repr = {"name": "simplefsapp", "dock_image": "fnndsc/pl-simplefsapp",
-                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                            "description": "A simple chris fs app demo", "version": "0.1",
-                            "title": "Simple chris fs app", "license": "Opensource (MIT)",
+        plugin_parameters = [{'name': 'dir', 'type': 'string', 'action': 'store',
+                              'optional': True, 'flag': '--dir', 'short_flag': '-d',
+                              'default': '/', 'help': 'test plugin', 'ui_exposed': True}]
 
-                            "parameters": [{"optional": True, "action": "store",
-                                            "help": "look up directory", "type": "path",
-                                            "name": "dir", "flag": "--dir",
-                                            "short_flag": "-d", "default": "./"}],
+        self.plg_data = {'title': 'Dir plugin',
+                         'description': 'A simple chris fs app demo',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-simplecopyapp',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
 
-                            "selfpath": "/usr/src/simplefsapp",
-                            "selfexec": "simplefsapp.py", "execshell": "python3"}
+        self.plg_meta_data = {'name': self.plugin_name,
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", description="host description")
 
         # create a plugin
-        data = self.plugin_repr.copy()
-        parameters = self.plugin_repr['parameters']
-        del data['parameters']
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
         # add plugin's parameters
+        parameters = plugin_parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
@@ -68,7 +80,7 @@ class PluginInstanceSerializerTests(SerializerTests):
 
     def setUp(self):
         super(PluginInstanceSerializerTests, self).setUp()
-        self.plugin = Plugin.objects.get(name=self.plugin_name)
+        self.plugin = Plugin.objects.get(meta__name=self.plugin_name)
         self.user = User.objects.get(username=self.username)
         self.data = {'plugin': self.plugin,
                      'owner': self.user,
@@ -84,11 +96,12 @@ class PluginInstanceSerializerTests(SerializerTests):
         pl_inst_fs = PluginInstance.objects.create(
             plugin=plugin, owner=self.user, compute_resource=plugin.compute_resources.all()[0])
         # create a 'ds' plugin
-        data = self.plugin_repr.copy()
-        del data['parameters']
+        data = self.plg_meta_data.copy()
         data['name'] = 'testdsapp'
         data['type'] = 'ds'
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
         data = {'plugin': plugin,
@@ -233,7 +246,7 @@ class PathParameterSerializerTests(SerializerTests):
 
     def setUp(self):
         super(PathParameterSerializerTests, self).setUp()
-        self.plugin = Plugin.objects.get(name=self.plugin_name)
+        self.plugin = Plugin.objects.get(meta__name=self.plugin_name)
         self.user = User.objects.get(username=self.username)
         self.other_username = 'boo'
         self.other_password = 'far'
@@ -313,7 +326,7 @@ class UnextpathParameterSerializerTests(SerializerTests):
 
     def setUp(self):
         super(UnextpathParameterSerializerTests, self).setUp()
-        self.plugin = Plugin.objects.get(name=self.plugin_name)
+        self.plugin = Plugin.objects.get(meta__name=self.plugin_name)
         self.user = User.objects.get(username=self.username)
         self.other_username = 'boo'
         self.other_password = 'far'

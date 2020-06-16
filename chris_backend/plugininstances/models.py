@@ -57,9 +57,9 @@ class PluginInstance(models.Model):
         For 'ds' instances the feed of the previous instance is assigned.
         """
         if not hasattr(self, 'feed'):
-            if self.plugin.type == 'fs':
+            if self.plugin.meta.type == 'fs':
                 self.feed = self._save_feed()
-            if self.plugin.type == 'ds':
+            if self.plugin.meta.type == 'ds':
                 self.feed = self.previous.feed
         self._set_compute_defaults()
         super(PluginInstance, self).save(*args, **kwargs)
@@ -69,7 +69,7 @@ class PluginInstance(models.Model):
         Custom internal method to create and save a new feed to the DB.
         """
         feed = Feed()
-        feed.name = self.plugin.name
+        feed.name = self.plugin.meta.name
         feed.save()
         feed.owner.set([self.owner])
         feed.save()
@@ -93,7 +93,7 @@ class PluginInstance(models.Model):
         Custom method to return the root plugin instance for this plugin instance.
         """
         current = self
-        while not current.plugin.type == 'fs':
+        while not current.plugin.meta.type == 'fs':
             current = current.previous
         return current
 
@@ -121,10 +121,10 @@ class PluginInstance(models.Model):
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
         #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
         current = self
-        path = '/{0}_{1}/data'.format(current.plugin.name, current.id)
-        while not current.plugin.type == 'fs':
+        path = '/{0}_{1}/data'.format(current.plugin.meta.name, current.id)
+        while not current.plugin.meta.type == 'fs':
             current = current.previous
-            path = '/{0}_{1}'.format(current.plugin.name, current.id) + path
+            path = '/{0}_{1}'.format(current.plugin.meta.name, current.id) + path
         username = self.owner.username
         output_path = '{0}/feed_{1}'.format(username, current.feed.id) + path
         return output_path
@@ -237,9 +237,9 @@ class PluginInstanceFilter(FilterSet):
     plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
     pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
                                                  lookup_expr='exact')
-    plugin_name = django_filters.CharFilter(field_name='plugin__name',
+    plugin_name = django_filters.CharFilter(field_name='plugin__meta__name',
                                             lookup_expr='icontains')
-    plugin_name_exact = django_filters.CharFilter(field_name='plugin__name',
+    plugin_name_exact = django_filters.CharFilter(field_name='plugin__meta__name',
                                                   lookup_expr='exact')
     plugin_version = django_filters.CharFilter(field_name='plugin__version',
                                                lookup_expr='exact')

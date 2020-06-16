@@ -8,7 +8,7 @@ from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 
-from .models import Plugin, ComputeResource
+from .models import PluginMeta, Plugin, ComputeResource
 from .services.manager import PluginManager
 
 
@@ -71,7 +71,27 @@ class ComputeResourceAdmin(admin.ModelAdmin):
                       "plugins with IDs %s with another compute resource."
                 messages.error(request, msg % (compute_resource, plg_ids))
                 return None
-        return super().delete_queryset(request, queryset)
+        super().delete_queryset(request, queryset)
+
+
+class PluginMetaAdmin(admin.ModelAdmin):
+    readonly_fields = ['name', 'stars', 'public_repo', 'license', 'type', 'icon',
+                       'category', 'authors', 'creation_date', 'modification_date']
+    list_display = ('name', 'type', 'id')
+    list_filter = ['type', 'creation_date', 'modification_date', 'category']
+    search_fields = ['name']
+
+    def has_change_permission(self, request, obj=None):
+        """
+        Overriden to disable the editing of fields in the view plugin meta page.
+        """
+        return False
+
+    def has_add_permission(self, request):
+        """
+        Overriden to remove the add plugin meta button.
+        """
+        return False
 
 
 class UploadFileForm(forms.Form):
@@ -90,7 +110,9 @@ class PluginAdminForm(forms.ModelForm):
         """
         if self.instance.pk is None:  # create plugin operation
             pl_manager = PluginManager()
-            compute_resources = list(self.cleaned_data.get('compute_resources'))
+            compute_resources = self.cleaned_data.get('compute_resources')
+            if compute_resources is None:
+                raise forms.ValidationError('Please choose a compute resource')
             url = self.cleaned_data.pop('url', None)
             cr = compute_resources[0]
             if url:
@@ -109,19 +131,19 @@ class PluginAdminForm(forms.ModelForm):
                 except Exception as e:
                     raise forms.ValidationError(e)
             # reset form validated data
-            self.cleaned_data['name'] = self.instance.name
+            self.cleaned_data['name'] = self.instance.meta.name
             self.cleaned_data['version'] = self.instance.version
             current_compute_resources = list(self.instance.compute_resources.all())
-            compute_resources = compute_resources + current_compute_resources
+            compute_resources = list(compute_resources) + current_compute_resources
             self.instance.compute_resources.set(compute_resources)
             self.cleaned_data['compute_resources'] = self.instance.compute_resources.all()
 
 
 class PluginAdmin(admin.ModelAdmin):
     form = PluginAdminForm
-    list_display = ('name', 'version', 'type', 'id')
-    search_fields = ['name', 'version']
-    list_filter = ['type', 'creation_date', 'modification_date', 'category']
+    list_display = ('meta', 'version', 'id')
+    search_fields = ['meta', 'version']
+    list_filter = ['meta', 'creation_date']
     change_form_template = 'admin/plugins/plugin/change_form.html'
     change_list_template = 'admin/plugins/plugin/change_list.html'
 
@@ -141,7 +163,7 @@ class PluginAdmin(admin.ModelAdmin):
         """
         Overriden to show all plugin's fields in the view plugin page.
         """
-        self.readonly_fields = [f for f in plugin_readonly_fields]
+        self.readonly_fields = [fl for fl in plugin_readonly_fields]
         self.readonly_fields.append('get_registered_compute_resources')
         self.fieldsets = [
             ('Compute resources', {'fields': ['compute_resources',
@@ -151,19 +173,13 @@ class PluginAdmin(admin.ModelAdmin):
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 
-    def save_model(self, request, obj, form, change):
-        """
-        Overriden to set the modification date..
-        """
-        if change:
-            obj.modification_date = timezone.now()
-        super().save_model(request, obj, form, change)
-
-    # def has_change_permission(self, request, obj=None):
+    # def save_model(self, request, obj, form, change):
     #     """
-    #     Overriden to disable the editing of fields in the view plugin page.
+    #     Overriden to set the modification date..
     #     """
-    #     return False
+    #     if change:
+    #         obj.modification_date = timezone.now()
+    #     super().save_model(request, obj, form, change)
 
     def get_urls(self):
         urls = super(PluginAdmin, self).get_urls()
@@ -173,6 +189,28 @@ class PluginAdmin(admin.ModelAdmin):
                  name="add_plugins"),
         ]
         return custom_urls + urls
+
+    def delete_model(self, request, obj):
+        """
+        Overriden to delete the associated meta if this is the last associated plugin.
+        """
+        meta = obj.meta
+        super().delete_model(request, obj)
+        if meta.plugins.count() == 0:
+            meta.delete()  # delete the meta if this is the last associated plugin
+
+    def delete_queryset(self, request, queryset):
+        """
+        Overriden to delete plugin metas if their last associated plugin is deleted.
+        This customizes the deletion process for the “delete selected objects” action.
+        """
+        pl_metas = []
+        for plugin in queryset:
+            if plugin.meta.plugins.count() == 1:
+                pl_metas.append(plugin.meta)
+        super().delete_queryset(request, queryset)
+        for meta in pl_metas:
+            meta.delete()
 
     def add_plugins_from_file_view(self, request):
         """
@@ -252,5 +290,6 @@ class PluginAdmin(admin.ModelAdmin):
         return summary
 
 
-admin.site.register(Plugin, PluginAdmin)
 admin.site.register(ComputeResource, ComputeResourceAdmin)
+admin.site.register(PluginMeta, PluginMetaAdmin)
+admin.site.register(Plugin, PluginAdmin)

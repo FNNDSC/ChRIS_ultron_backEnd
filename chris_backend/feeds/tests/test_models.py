@@ -4,7 +4,7 @@ import logging
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from feeds.models import Note, Feed
 
@@ -27,8 +27,9 @@ class FeedModelTests(TestCase):
             name="host", description="host description")
 
         # create a "fs" plugin
-        (plugin, tf) = Plugin.objects.get_or_create(
-            name=self.plugin_name, type=self.plugin_type)
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                         type=self.plugin_type)
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 

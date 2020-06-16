@@ -3,7 +3,7 @@ import logging
 
 from django.test import TestCase
 
-from plugins.models import Plugin
+from plugins.models import PluginMeta, PluginMetaFilter, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
 
@@ -22,7 +22,8 @@ class ModelTests(TestCase):
             name="host", description="host description")
 
         # create a plugin
-        (plugin_fs, tf) = Plugin.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
 
@@ -47,7 +48,7 @@ class ComputeResourceModelTests(ModelTests):
     """
 
     def test_delete(self):
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         # test the failure case bc plugin would be left without a compute resource
         with self.assertRaises(Exception):
             self.compute_resource.delete()
@@ -63,13 +64,43 @@ class ComputeResourceModelTests(ModelTests):
         self.assertEqual(plugin.compute_resources.all().count(), n_cr - 1)
 
 
+class PluginMetaFilterTests(ModelTests):
+
+    def setUp(self):
+        super(PluginMetaFilterTests, self).setUp()
+        self.other_plugin_name = "simplefsapp1"
+
+        # create other plugin
+        (meta, tf) = PluginMeta.objects.get_or_create(name=self.other_plugin_name)
+        Plugin.objects.get_or_create(meta=meta)
+
+    def test_search_name_authors_category(self):
+        """
+        Test whether custom method search_name_authors_category returns a filtered
+        queryset with all plugins for which name or title or category matches the
+        search value.
+        """
+        meta1 = PluginMeta.objects.get(name=self.plugin_fs_name)
+        meta1.category = 'dir'
+        meta1.authors = 'author1'
+        meta1.save()
+        meta2 = PluginMeta.objects.get(name=self.other_plugin_name)
+        meta2.category = 'dir'
+        meta2.authors = 'author2'
+        meta2.save()
+        meta_filter = PluginMetaFilter()
+        queryset = PluginMeta.objects.all()
+        qs = meta_filter.search_name_authors_category(queryset, 'name_authors_category', 'Dir')
+        self.assertCountEqual(qs, queryset)
+
+
 class PluginModelTests(ModelTests):
     """
     Test the Plugin model.
     """
 
     def test_get_plugin_parameter_names(self):
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         param_names = plugin.get_plugin_parameter_names()
         self.assertEqual(param_names, ['dir'])
 
@@ -80,7 +111,7 @@ class PluginParameterModelTests(ModelTests):
     """
 
     def test_get_default(self):
-        plugin = Plugin.objects.get(name=self.plugin_fs_name)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         parameter = plugin.parameters.get(name='dir')
         default = parameter.get_default()
         self.assertEqual(default.value, "./")

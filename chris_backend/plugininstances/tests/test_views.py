@@ -16,7 +16,7 @@ from celery.contrib.testing.worker import start_worker
 
 from core.celery import app as celery_app
 from core.celery import task_routes
-from plugins.models import Plugin, PluginParameter, ComputeResource
+from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PathParameter, FloatParameter, STATUS_TYPES
 from plugininstances.services.manager import PluginAppManager
@@ -50,12 +50,15 @@ class ViewTests(TestCase):
                                  password=self.password)
         
         # create two plugins
-        (plg, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
-        plg.compute_resources.set([self.compute_resource])
-        plg.save()
-        (plg, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
-        plg.compute_resources.set([self.compute_resource])
-        plg.save()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_convert', type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
 
     def tearDown(self):
         # re-enable logging
@@ -109,12 +112,15 @@ class TasksViewTests(TransactionTestCase):
                                  password=self.password)
 
         # create two plugins
-        (plg, tf) = Plugin.objects.get_or_create(name="pacspull", type="fs")
-        plg.compute_resources.set([self.compute_resource])
-        plg.save()
-        (plg, tf) = Plugin.objects.get_or_create(name="mri_convert", type="ds")
-        plg.compute_resources.set([self.compute_resource])
-        plg.save()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_convert', type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
 
     def tearDown(self):
         super().tearDown()
@@ -129,7 +135,7 @@ class PluginInstanceListViewTests(ViewTests):
 
     def setUp(self):
         super(PluginInstanceListViewTests, self).setUp()
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.post = json.dumps(
             {"template": {"data": [{"name": "dir", "value": self.username}]}})
@@ -138,7 +144,7 @@ class PluginInstanceListViewTests(ViewTests):
         with mock.patch.object(views.PluginInstance, 'run',
                                return_value=None) as run_mock:
             # add parameters to the plugin before the POST request
-            plugin = Plugin.objects.get(name="pacspull")
+            plugin = Plugin.objects.get(meta__name="pacspull")
             PluginParameter.objects.get_or_create(plugin=plugin, name='dir', type='string',
                                                   optional=False)
             # make API request
@@ -154,33 +160,42 @@ class PluginInstanceListViewTests(ViewTests):
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
         # add an FS plugin to the system
-        plugin_repr =      {"name": "simplefsapp",
-                            "dock_image": "fnndsc/pl-simplefsapp",
-                            "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                            "description": "A simple chris fs app demo",
-                            "version": "0.1",
-                            "title": "Simple chris fs app",
-                            "license": "Opensource (MIT)",
+        plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
+                              'optional': False, 'flag': '--dir', 'short_flag': '-d',
+                              'help': 'test plugin', 'ui_exposed': True}]
 
-                            "parameters": [{"optional": False, "action": "store",
-                                            "help": "look up directory",
-                                            "type": "path",
-                                            "name": "dir", "flag": "--dir"}],
+        self.plg_data = {'title': 'Dir plugin',
+                         'description': 'A simple chris fs app demo',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
 
-                            "selfpath": "/usr/src/simplefsapp",
-                            "selfexec": "simplefsapp.py", "execshell": "python3"}
+        self.plg_meta_data = {'name': 'simplefsapp',
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
 
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", description="host description")
 
-        parameters = plugin_repr['parameters']
-        data = plugin_repr
-        del data['parameters']
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin.compute_resources.set([compute_resource])
         plugin.save()
 
         # add plugin's parameters
+        parameters = plugin_parameters
         PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
@@ -201,7 +216,7 @@ class PluginInstanceListViewTests(ViewTests):
 
     def test_plugin_instance_list_success(self):
         # create a pacspull plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         user = User.objects.get(username=self.username)
         PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
@@ -222,11 +237,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
         # create a pacspull plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         user = User.objects.get(username=self.username)
         (self.pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
-        plugin = Plugin.objects.get(name="mri_convert")
+        plugin = Plugin.objects.get(meta__name="mri_convert")
         PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=self.pl_inst,
             compute_resource=plugin.compute_resources.all()[0])
@@ -247,33 +262,42 @@ class PluginInstanceDetailViewTests(TasksViewTests):
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):
         # add an FS plugin to the system
-        plugin_repr = {"name": "simplefsapp",
-                       "dock_image": "fnndsc/pl-simplefsapp",
-                       "authors": "FNNDSC (dev@babyMRI.org)", "type": "fs",
-                       "description": "A simple chris fs app demo",
-                       "version": "0.1",
-                       "title": "Simple chris fs app",
-                       "license": "Opensource (MIT)",
+        plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
+                              'optional': False, 'flag': '--dir', 'short_flag': '-d',
+                              'help': 'test plugin', 'ui_exposed': True}]
 
-                       "parameters": [{"optional": False, "action": "store",
-                                       "help": "look up directory",
-                                       "type": "path",
-                                       "name": "dir", "flag": "--dir"}],
+        self.plg_data = {'title': 'Dir plugin',
+                         'description': 'A simple chris fs app demo',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
 
-                       "selfpath": "/usr/src/simplefsapp",
-                       "selfexec": "simplefsapp.py", "execshell": "python3"}
+        self.plg_meta_data = {'name': 'simplefsapp',
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
 
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", description="host description")
 
-        parameters = plugin_repr['parameters']
-        data = plugin_repr
-        del data['parameters']
-        (plugin, tf) = Plugin.objects.get_or_create(**data)
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
         plugin.compute_resources.set([compute_resource])
         plugin.save()
 
         # add plugin's parameters
+        parameters = plugin_parameters
         (pl_param, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin,
             name=parameters[0]['name'],
@@ -395,12 +419,12 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         user = User.objects.get(username=self.username)
         
         # create two plugin instances
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # set first instance's status
         inst.status = STATUS_TYPES[0]
-        plugin = Plugin.objects.get(name="mri_convert")
+        plugin = Plugin.objects.get(meta__name="mri_convert")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=inst,
             compute_resource=plugin.compute_resources.all()[0])
@@ -433,24 +457,26 @@ class PluginInstanceDescendantListViewTests(ViewTests):
         user = User.objects.get(username=self.username)
 
         # create an 'fs' plugin instance
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         (fs_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
         # create a tree of 'ds' plugin instances
-        plugin = Plugin.objects.get(name="mri_convert")
+        plugin = Plugin.objects.get(meta__name="mri_convert")
         PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=fs_inst,
             compute_resource=plugin.compute_resources.all()[0])
 
-        (plugin, tf) = Plugin.objects.get_or_create(name="mri_info", type="ds")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_info', type='ds')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
         (ds_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=fs_inst,
             compute_resource=plugin.compute_resources.all()[0])
 
-        (plugin, tf) = Plugin.objects.get_or_create(name="mri_surf", type="ds")
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='mri_surf', type='ds')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
         PluginInstance.objects.get_or_create(
@@ -484,7 +510,7 @@ class PluginInstanceParameterListViewTests(ViewTests):
         user = User.objects.get(username=self.username)
 
         # create a plugin
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         parameters = [{"type": "path", "name": "param1", "flag": "--param1"},
                       {"type": "float", "name": "param2", "flag": "--param2"}]
 
@@ -534,7 +560,7 @@ class PluginInstanceFileViewTests(ViewTests):
         super(PluginInstanceFileViewTests, self).setUp()
         # create a plugin instance
         user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(name="pacspull")
+        plugin = Plugin.objects.get(meta__name="pacspull")
         (self.plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         # create test directory where files are created

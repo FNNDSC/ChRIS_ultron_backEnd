@@ -37,7 +37,7 @@ class Feed(models.Model):
         """
         Custom method to get the user that created the feed.
         """
-        plg_inst = self.plugin_instances.filter(plugin__type='fs')[0]
+        plg_inst = self.plugin_instances.filter(plugin__meta__type='fs')[0]
         return plg_inst.owner
 
     def get_plugin_instances_status_count(self, status):

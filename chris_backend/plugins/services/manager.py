@@ -20,10 +20,11 @@ from argparse import ArgumentParser
 from argparse import ArgumentError
 from chrisstoreclient.client import StoreClient
 
-from plugins.models import Plugin
 from plugins.models import ComputeResource
-from plugins.serializers import PluginSerializer, PluginParameterSerializer
-from plugins.serializers import ComputeResourceSerializer, DEFAULT_PARAMETER_SERIALIZERS
+from plugins.models import PluginMeta, Plugin
+from plugins.serializers import ComputeResourceSerializer
+from plugins.serializers import (PluginMetaSerializer, PluginSerializer,
+                                 PluginParameterSerializer, DEFAULT_PARAMETER_SERIALIZERS)
 
 
 class PluginManager(object):
@@ -129,13 +130,8 @@ class PluginManager(object):
                 plg_repr = self.get_plugin_representation_from_store(name, version,
                                                                      timeout)
             return self._create_plugin(plg_repr, cr)
-        # plugin already in the system, let's check if already registered with cr
-        compute_resources = list(plugin.compute_resources.all())
-        if cr not in compute_resources:
-            compute_resources.append(cr)
-            plugin.compute_resources.set(compute_resources)
-            plugin.modification_date = timezone.now()
-            plugin.save()
+        # plugin already in the system, register it with cr if not already registered
+        plugin.compute_resources.add(cr)
         return plugin
 
     def register_plugin_by_url(self, url, compute_name, timeout=30):
@@ -148,28 +144,40 @@ class PluginManager(object):
         except ComputeResource.DoesNotExist:
             raise NameError("Compute resource '%s' does not exists" % compute_name)
         plg_repr = self.get_plugin_representation_from_store_by_url(url, timeout)
-        name = plg_repr['name']
-        version = plg_repr['version']
+        name = plg_repr.get('name')
+        version = plg_repr.get('version')
         try:
             plugin = self.get_plugin(name, version)
         except NameError:
             # plugin doesn't exist in the system, let's create it
             return self._create_plugin(plg_repr, cr)
-        # plugin already in the system, let's check if already registered with cr
-        compute_resources = list(plugin.compute_resources.all())
-        if cr not in compute_resources:
-            compute_resources.append(cr)
-            plugin.compute_resources.set(compute_resources)
-            plugin.modification_date = timezone.now()
-            plugin.save()
+        # plugin already in the system, register it with cr if not already registered
+        plugin.compute_resources.add(cr)
         return plugin
 
     def _create_plugin(self, plg_repr, compute_resource):
         """
         Private utility method to register/add a new plugin into the system.
         """
-        parameters_data = plg_repr['parameters']
-        del plg_repr['parameters']
+        meta_data = {'name': plg_repr.pop('name'),
+                     'stars': plg_repr.pop('stars', 0),
+                     'public_repo': plg_repr.pop('public_repo', ''),
+                     'license': plg_repr.pop('license', ''),
+                     'type': plg_repr.pop('type'),
+                     'icon': plg_repr.pop('icon', ''),
+                     'category': plg_repr.pop('category', ''),
+                     'authors': plg_repr.pop('authors', '')}
+        parameters_data = plg_repr.pop('parameters')
+
+        # check whether plugin_name does not exist and validate the plugin meta data
+        try:
+            meta = PluginMeta.objects.get(name=meta_data['name'])
+            meta_serializer = PluginMetaSerializer(meta, data=meta_data)
+        except PluginMeta.DoesNotExist:
+            meta_serializer = PluginMetaSerializer(data=meta_data)
+        meta_serializer.is_valid(raise_exception=True)
+
+        # validate the plugin's versioned data
         plg_serializer = PluginSerializer(data=plg_repr)
         plg_serializer.is_valid(raise_exception=True)
 
@@ -190,7 +198,9 @@ class PluginManager(object):
             parameters_serializers.append(serializer_dict)
 
         # if no validation errors at this point then save to the DB
-        plugin = plg_serializer.save(compute_resources=[compute_resource])
+
+        pl_meta = meta_serializer.save()
+        plugin = plg_serializer.save(meta=pl_meta, compute_resources=[compute_resource])
         for param_serializer_dict in parameters_serializers:
             param = param_serializer_dict['serializer'].save(plugin=plugin)
             if param_serializer_dict['default_serializer'] is not None:
@@ -208,7 +218,10 @@ class PluginManager(object):
             raise NameError("Couldn't find plugin with id '%s'" % id)
         for plg_inst in plugin.instances.all():
             plg_inst.cancel()
-        plugin.delete()
+        if plugin.meta.plugins.count() == 1:
+            plugin.meta.delete()  # the cascade deletes the plugin too
+        else:
+            plugin.delete()  # the cascade deletes the plugin instances too
 
     def remove_compute_resource(self, id):
         """
@@ -279,7 +292,11 @@ class PluginManager(object):
         Get an existing plugin.
         """
         try:
-            plugin = Plugin.objects.get(name=name, version=version)
+            plg_meta = PluginMeta.objects.get(name=name)
+        except PluginMeta.DoesNotExist:
+            raise NameError("Couldn't find any plugin named '%s' in the system" % name)
+        try:
+            plugin = Plugin.objects.get(meta=plg_meta, version=version)
         except Plugin.DoesNotExist:
             raise NameError("Couldn't find plugin '%s' with version '%s' in the system" %
                             (name, version))

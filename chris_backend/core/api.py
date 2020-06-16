@@ -91,6 +91,23 @@ urlpatterns = format_suffix_patterns([
          plugin_views.ComputeResourceDetail.as_view(), name='computeresource-detail'),
 
 
+    path('v1/plugins/metas/',
+         plugin_views.PluginMetaList.as_view(),
+         name='pluginmeta-list'),
+
+    path('v1/plugins/metas/search/',
+         plugin_views.PluginMetaListQuerySearch.as_view(),
+         name='pluginmeta-list-query-search'),
+
+    path('v1/plugins/metas/<int:pk>/',
+         plugin_views.PluginMetaDetail.as_view(),
+         name='pluginmeta-detail'),
+
+    path('v1/plugins/metas/<int:pk>/plugins/',
+         plugin_views.PluginMetaPluginList.as_view(),
+         name='pluginmeta-plugin-list'),
+
+
     path('v1/plugins/',
         plugin_views.PluginList.as_view(), name='plugin-list'),
 
