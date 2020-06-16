@@ -2,11 +2,11 @@
 #
 # NAME
 #
-#   docker-make.sh
+#   make.sh
 #
 # SYNPOSIS
 #
-#   docker-make.sh    [-r <service>]                  \
+#   make.sh                     [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
@@ -411,10 +411,10 @@ else
             printf "%40s${LightGreen}%40s${NC}\n"                       \
                 "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
             echo ""                                                     | ./boxes.sh
-            echo "Clearing internal pman database..."                   | ./boxes.sh
+            printf "%80s\n" "Clearing internal pman database..."        | ./boxes.sh
             windowBottom
             docker-compose --no-ansi -f docker-compose_dev.yml          \
-                exec pman_service db_clean.py >& dc.out > /dev/null
+                exec pman_service pman_do --op DBclean                  >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
         else
@@ -701,6 +701,20 @@ else
     if (( !  b_norestartinteractive_chris_dev )) ; then
         title -d 1 "Restarting CUBE's Django development server"        \
                             "in interactive mode..."
+            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
+                        "Stopping" "pman_service"                       | ./boxes.sh
+            windowBottom
+            docker-compose --no-ansi -f docker-compose_dev.yml stop pman_service >& dc.out > /dev/null
+            echo -en "\033[2A\033[2K"
+            cat dc.out | ./boxes.sh
+
+            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
+                        "rm -f" "pman_service"                          | ./boxes.sh
+            windowBottom
+            docker-compose --no-ansi -f docker-compose_dev.yml rm -f pman_service >& dc.out > /dev/null
+            echo -en "\033[2A\033[2K"
+            cat dc.out | ./boxes.sh
+
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "Stopping" "chris_dev"                          | ./boxes.sh
             windowBottom
