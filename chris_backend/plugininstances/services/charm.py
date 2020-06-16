@@ -22,6 +22,8 @@ from    pfmisc.message  import  Message
 import  swiftclient
 import  time
 
+from celery.contrib import rdb 
+
 class Charm():
 
     def log(self, *args):
@@ -974,97 +976,234 @@ class Charm():
         """
         Check on the status of the job, and if just finished without error,
         register output files.
+
+        NOTE:
+
+            This is now part of an asynchronous celery worker. To debug
+            synchronously with pudb.set_trace() you need to:
+
+            1. Once CUBE is running, and assuming some plugininstance
+               has been POSTed, start a python shell on the manage.py
+               code (note <IMAGE> below is the chris:dev container):
+
+                    docker exec -ti <IMAGE> python manage.py shell
+
+                You should now be in a python shell.
+
+            3. To simulate operations on a given plugin with id <id>,
+               instantiate the relevant objects (for ex, for id=1):
+
+from plugininstances.models import PluginInstance
+from plugininstances.services import charm
+
+plg_inst        = PluginInstance.objects.get(id=1)
+chris_service   = charm.Charm(plugin_inst=plg_inst)
+
+            4. And finally, call this method:
+
+chris_service.app_statusCheckAndRegister()
+
+            Any pudb.set_trace() calls in this method will now be
+            handled by the pudb debugger.
+
+            5. Finally, after each change to this method, reload this module:
+
+import importlib
+
+importlib.reload(charm)
+
+                and also re-instantiate the service
+
+chris_service   = charm.Charm(plugin_inst=plg_inst)
         """
 
-        # pudb.set_trace()
-
-        # Now ask the remote service for the job status
-        d_msg   = {
-            "action": "status",
-            "meta": {
-                    "remote": {
-                        "key":       self.str_jidPrefix + str(self.d_pluginInst['id'])
-                    }
+        def rawAndSummaryInfo_serialize(d_response):
+            """
+            Serialize and save the 'jobOperation' and 'jobOperationSummary'
+            """
+            str_summary     = json.dumps(d_response['jobOperationSummary'],
+                                        indent     = 4,
+                                        sort_keys  = True)
+            str_raw         = json.dumps(d_response['jobOperation'],
+                                        indent     = 4,
+                                        sort_keys  = True)
+            # Still WIP about what is best summary...
+            # a couple of options / ideas linger
+            try:
+                str_containerLogs = d_response['jobOperation']\
+                                              ['info']\
+                                              ['compute']\
+                                              ['return']\
+                                              ['d_ret']\
+                                              ['l_logs'][0]
+            except:
+                str_containerLogs = "Container logs not currently available."
+            # self.c_pluginInst.summary   = 'logs: %s' % str_containerLogs
+            self.c_pluginInst.summary   = str_summary
+            self.c_pluginInst.raw       = str_raw
+            return {
+                'status':       True,
+                'raw':          str_raw,
+                'summary':      str_summary,
+                'd_response':   d_response
             }
-        }
 
-        d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
-        self.dp.qprint('d_response = %s' % json.dumps(d_response, indent = 4, sort_keys = True))
-        str_responseStatus  = ""
-        for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
-            if str_action == 'compute':
-                for str_part in ['submit', 'return']:
-                    str_actionStatus = str(d_response['jobOperationSummary'][str_action][str_part]['status'])
-                    str_actionStatus = ''.join(str_actionStatus.split())
-                    str_responseStatus += str_action + '.' + str_part + ':' + str_actionStatus + ';'
-            else:
-                str_actionStatus = str(d_response['jobOperationSummary'][str_action]['status'])
-                str_actionStatus = ''.join(str_actionStatus.split())
-                str_responseStatus += str_action + ':' + str_actionStatus + ';'
+        def responseStatus_decode(d_serialize):
+            """
+            Based on the information in d_resonse['jobOperationSummary']
+            determine and return a single string decoding.
+            """
+            str_responseStatus  = ""
+            b_status            = False
+            if d_serialize['status']:
+                b_status        = True
+                for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
+                    if str_action == 'compute':
+                        for str_part in ['submit', 'return']:
+                            str_actionStatus    = str(d_serialize['d_response']\
+                                                                ['jobOperationSummary']\
+                                                                [str_action]\
+                                                                [str_part]\
+                                                                ['status'])
+                            str_actionStatus    = ''.join(str_actionStatus.split())
+                            str_responseStatus += str_action + '.' + str_part + ':' +\
+                                                    str_actionStatus + ';'
+                    else:
+                        str_actionStatus        = str(d_serialize['d_response']\
+                                                                ['jobOperationSummary']\
+                                                                [str_action]\
+                                                                ['status'])
+                        str_actionStatus        = ''.join(str_actionStatus.split())
+                        str_responseStatus     += str_action + ':' + str_actionStatus + ';'
+            return {
+                'status':       b_status,
+                'response':     str_responseStatus,
+                'd_serialize':  d_serialize
+            }
 
-        str_DBstatus    = self.c_pluginInst.status
-        self.dp.qprint('Current job DB     status = %s' % str_DBstatus,          comms = 'status')
-        self.dp.qprint('Current job remote status = %s' % str_responseStatus,    comms = 'status')
-        if 'swiftPut:True' in str_responseStatus and str_DBstatus != 'finishedSuccessfully':
-            # pudb.set_trace()
-            b_swiftFound    = False
-            d_swiftState    = {}
-            if 'swiftPut' in d_response['jobOperation']['info']:
-                d_swiftState    = d_response['jobOperation']['info']['swiftPut']
-                b_swiftFound    = True
-            maxPolls        = 10
-            currentPoll     = 1
-            while not b_swiftFound and currentPoll <= maxPolls:
+        def status_evaluateAndRegister(d_responseStatus):
+            """
+            If the status of the response (str_responseStatus) has become
+            'swiftPut:True' and if the current DBstatus is not
+            "finishedSuccessfully", then perform some logic that ultimately
+            results in the received files from the remote process being
+            registered to CUBE.
+            """
+
+            def register_perform():
+                """
+                The actual method to perform the registration logic.
+                """
+                b_filesRegistered   = True
+                b_swiftFound        = False
+                d_response          = d_responseStatus['d_serialize']['d_response']
+                d_swiftState        = {}
                 if 'swiftPut' in d_response['jobOperation']['info']:
                     d_swiftState    = d_response['jobOperation']['info']['swiftPut']
                     b_swiftFound    = True
-                    self.dp.qprint('Found swift return data on poll %d' % currentPoll)
-                    break
-                self.dp.qprint('swift return data not found on poll %d; will sleep a bit...' % currentPoll)
-                time.sleep(0.2)
-                d_response  = self.app_service_call(msg = d_msg, service = 'pfcon', **kwargs)
-                currentPoll += 1
+                maxPolls            = 10
+                currentPoll         = 1
+                while not b_swiftFound and currentPoll <= maxPolls:
+                    if 'swiftPut' in d_response['jobOperation']['info']:
+                        d_swiftState    = d_response['jobOperation']['info']['swiftPut']
+                        b_swiftFound    = True
+                        self.dp.qprint('Found swift return data on poll %d' % currentPoll)
+                        break
+                    self.dp.qprint('swift return data not found on poll %d; sleeping...'\
+                                    % currentPoll)
+                    time.sleep(0.2)
+                    d_response  = self.app_service_call(
+                                        msg         = d_msg,
+                                        service     = 'pfcon',
+                                        **kwargs
+                                    )
+                    currentPoll += 1
 
-            d_register      = self.c_pluginInst.register_output_files(
-                                                swiftState = d_swiftState
+                d_register      = self.c_pluginInst.register_output_files(
+                                        swiftState = d_swiftState
+                )
+
+                str_responseStatus          = 'finishedSuccessfully'
+                self.c_pluginInst.status    = str_responseStatus
+                self.c_pluginInst.end_date  = timezone.now()
+                self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
+                                                                comms = 'status')
+                self.dp.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
+                                                                comms = 'status')
+                return {
+                    'status':       b_filesRegistered,
+                    'd_register':   d_register
+                }
+
+            b_filesRegistered   = False
+            d_register          = {}
+            str_responseStatus  = ""
+
+            if d_responseStatus['status']:
+                str_DBstatus        = self.c_pluginInst.status
+                d_register          = {}
+                str_responseStatus  = d_responseStatus['response']
+                self.dp.qprint('Current job DB     status = %s' % str_DBstatus,
+                                comms = 'status')
+                self.dp.qprint('Current job remote status = %s' % str_responseStatus,
+                                comms = 'status')
+
+                if 'swiftPut:True' in str_responseStatus and \
+                    str_DBstatus != 'finishedSuccessfully':
+                    d_perform   = register_perform()
+                    b_filesRegistered   = d_perform['status']
+                    d_register          = d_perform['d_register']
+
+            return {
+                    'status':               b_filesRegistered,
+                    'd_registerReponse':    d_register,
+                    'responseStatus':       str_responseStatus,
+                    'd_responseStatus':     d_responseStatus
+            }
+
+        #
+        # Main processing starts here!
+        #
+
+        # pudb.set_trace()
+        d_msg = {
+            "action": "status",
+            "meta": {
+                    "remote": {
+                        "key": self.str_jidPrefix + str(self.d_pluginInst['id'])
+                    }
+            }
+        }
+        d_status_evaluateAndRegister = \
+            status_evaluateAndRegister(
+                responseStatus_decode(
+                    rawAndSummaryInfo_serialize(
+                        self.app_service_call(
+                                msg         = d_msg,
+                                service     = 'pfcon',
+                                **kwargs
+                        )
+                    )
+                )
             )
 
-            # This doesn't work when CUBE container is not started as root
-            # str_registrationMsg = """
-            # Registering output files...
-            #
-            # pfcon swift poll loops      = %d
-            # charm swift poll loops      = %d
-            # swift prefix path           = %s
-            #
-            # In total, registered %d objects.
-            #
-            # Object list:\n""" % (
-            #         d_register['pollLoop'],
-            #         currentPoll,
-            #         d_register['outputPath'],
-            #         d_register['total']
-            # )
-            # #pudb.set_trace()
-            # for obj in d_register['l_object']:
-            #     str_registrationMsg += obj['name'] + '\n'
-            # self.dp.qprint('%s' % str_registrationMsg, status = 'comms',
-            #                 teeFile = 'os.path.join(expanduser("~"), 'data/tmp/registrationMsg-%s.txt' %  str(self.d_pluginInst['id'])),
-            #                 teeMode = 'w+')
+        self.dp.qprint(
+            'd_response = %s' % json.dumps(
+                    d_status_evaluateAndRegister['d_responseStatus']\
+                                                ['d_serialize']\
+                                                ['d_response'],
+                    indent      = 4,
+                    sort_keys   = True
+                    )
+        )
 
+        self.c_pluginInst.save()
 
-            str_responseStatus          = 'finishedSuccessfully'
-            self.c_pluginInst.status    = str_responseStatus
-            self.c_pluginInst.end_date  = timezone.now()
-            self.c_pluginInst.save()
-            self.dp.qprint("Saving job DB status   as '%s'" %  str_responseStatus,
-                                                            comms = 'status')
-            self.dp.qprint("Saving job DB end_date as '%s'" %  self.c_pluginInst.end_date,
-                                                            comms = 'status')
+        # Some possible error handling...
+        if d_status_evaluateAndRegister['responseStatus'] == 'finishedWithError': 
+            self.app_handleRemoteError(**kwargs)
 
-        # NB: Improve error handling!!
-        if str_responseStatus == 'finishedWithError': self.app_handleRemoteError(**kwargs)
-        return str_responseStatus
+        return d_status_evaluateAndRegister['responseStatus']
 
     def app_handleRemoteError(self, *args, **kwargs):
         """
