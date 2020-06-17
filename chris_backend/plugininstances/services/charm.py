@@ -22,6 +22,9 @@ from    pfmisc.message  import  Message
 import  swiftclient
 import  time
 
+import  zlib, base64
+
+
 from celery.contrib import rdb 
 
 class Charm():
@@ -1017,6 +1020,22 @@ importlib.reload(charm)
 chris_service   = charm.Charm(plugin_inst=plg_inst)
         """
 
+
+
+        def json_zipToStr(json_data):
+            """
+            Return a string of compressed JSON data, suitable for transmission
+            back to a client.
+            """
+
+            str_compressed = base64.b64encode(
+                    zlib.compress(
+                        json.dumps(json_data).encode('utf-8')
+                    )
+                ).decode('ascii')
+
+            return str_compressed
+
         def rawAndSummaryInfo_serialize(d_response):
             """
             Serialize and save the 'jobOperation' and 'jobOperationSummary'
@@ -1024,9 +1043,10 @@ chris_service   = charm.Charm(plugin_inst=plg_inst)
             str_summary     = json.dumps(d_response['jobOperationSummary'],
                                         indent     = 4,
                                         sort_keys  = True)
-            str_raw         = json.dumps(d_response['jobOperation'],
-                                        indent     = 4,
-                                        sort_keys  = True)
+            # str_raw         = json.dumps(d_response['jobOperation'],
+            #                             indent     = 4,
+            #                             sort_keys  = True)
+            str_raw         = json_zipToStr(d_response['jobOperation'])
             # Still WIP about what is best summary...
             # a couple of options / ideas linger
             try:
