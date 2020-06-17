@@ -1040,9 +1040,7 @@ chris_service   = charm.Charm(plugin_inst=plg_inst)
             """
             Serialize and save the 'jobOperation' and 'jobOperationSummary'
             """
-            str_summary     = json.dumps(d_response['jobOperationSummary'],
-                                        indent     = 4,
-                                        sort_keys  = True)
+            str_summary     = json.dumps(d_response['jobOperationSummary'])
             # str_raw         = json.dumps(d_response['jobOperation'],
             #                             indent     = 4,
             #                             sort_keys  = True)
