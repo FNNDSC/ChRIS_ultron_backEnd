@@ -238,7 +238,7 @@ def validate_paths(user, string):
         if len(path_parts) == 0:
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
-        if path_parts[0] != user.username:
+        if path_parts[0] != user.username and path_parts[0] != 'SERVICES':
             if len(path_parts) == 1 or path_parts[1] == 'uploads':
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
