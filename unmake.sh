@@ -12,7 +12,7 @@ title -d 1 "Destroying containerized development environment" "from  ./docker-co
     echo -en "\033[2A\033[2K"
     # read -p  " " -n 1 -r REPLY
     if [[ $REPLY =~ ^[Yy]$ ]] ; then
-        printf "Removing persisent volumes...\n"                            | ./boxes.sh ${Yellow}
+        printf "Removing persistent volumes...\n"                           | ./boxes.sh ${Yellow}
         echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose --no-ansi -f docker-compose_dev.yml down -v >& dc.out >/dev/null
@@ -21,9 +21,12 @@ title -d 1 "Destroying containerized development environment" "from  ./docker-co
         echo "Removing ./FS tree"                                           | ./boxes.sh
         rm -fr ./FS
     else
-        printf "Keeping persistent volumes...\n"                            | ./boxes.sh ${LightGreen}
+        printf "Keeping persistent volumes...\n"                            | ./boxes.sh ${Yellow}
+        echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
         windowBottom
+        docker-compose --no-ansi -f docker-compose_dev.yml down >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
+        cat dc.out | ./boxes.sh
     fi
 windowBottom
 
