@@ -42,7 +42,7 @@ cd ChRIS_ultron_backend
 *destroy* ; sudo rm -fr FS; rm -fr FS; *make*
 
 # Skip unit and integration tests and the intro:
-*destroy* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
+*unmake* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
 ```
 The resulting instance uses the default Django development server and therefore is not suitable for production.
 
