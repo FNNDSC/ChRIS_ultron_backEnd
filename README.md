@@ -39,7 +39,7 @@ running with no mess, no fuss:
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
 # Run full CUBE instantiation with tests:
-*destroy* ; sudo rm -fr FS; rm -fr FS; *make*
+*unmake* ; sudo rm -fr FS; rm -fr FS; *make*
 
 # Skip unit and integration tests and the intro:
 *unmake* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
@@ -132,7 +132,7 @@ Start CUBE from the repository source directory by running the make bash script
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 cd ChRIS_ultron_backEnd
-./docker-make.sh
+./make.sh
 ```
 All the steps performed by the above script are properly documented in the script itself. 
 
@@ -201,12 +201,12 @@ http -a cube:cube1234 http://localhost:8000/api/v1/plugins/instances/1/
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
 ```
 
-#### Destroy CUBE
+#### Tear down CUBE
 
-Stop and remove CUBE services and storage space by running the destroy bash script from the repository source directory
+Stop and remove CUBE services and storage space by running the following bash script from the repository source directory
 
 ```bash
-./docker-destroy.sh
+./unmake.sh
 ```
 
 
