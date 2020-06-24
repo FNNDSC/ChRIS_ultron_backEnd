@@ -39,7 +39,7 @@ class ModelTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
 
 class ComputeResourceModelTests(ModelTests):

@@ -15,7 +15,7 @@ class UploadedFileModelTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_uploaded_file_path(self):
         uploadedfile_instance = mock.Mock()

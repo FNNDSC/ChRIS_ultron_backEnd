@@ -21,7 +21,7 @@ class PACSFileSerializerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_validate_path_failure_does_not_start_with_SERVICES_PACS(self):
         """

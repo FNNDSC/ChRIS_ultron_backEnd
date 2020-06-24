@@ -67,7 +67,7 @@ class SerializerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
 
 class PluginMetaSerializerTests(SerializerTests):

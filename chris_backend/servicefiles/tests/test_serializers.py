@@ -21,7 +21,7 @@ class ServiceFileSerializerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_validate_service_name_failure_registered_service(self):
         """

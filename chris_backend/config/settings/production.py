@@ -28,7 +28,7 @@ def get_secret(setting, secret_type=env):
 
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#secret-key
+# See: https://docs.djangoproject.com/en/2.2/ref/settings/#secret-key
 # Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not set
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
@@ -87,12 +87,13 @@ CHRIS_DEBUG['quiet'] = get_secret('CHRIS_DEBUG_QUIET', env.bool)
 
 # LOGGING CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/dev/ref/settings/#logging
+# See: https://docs.djangoproject.com/en/2.2/ref/settings/#logging
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
 # the site admins on every HTTP 500 error when DEBUG=False.
-# See http://docs.djangoproject.com/en/dev/topics/logging for
+# See http://docs.djangoproject.com/en/2.2/topics/logging for
 # more details on how to customize your logging configuration.
+ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
