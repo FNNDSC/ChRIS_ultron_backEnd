@@ -59,7 +59,7 @@ class PipelineManagerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_mananger_can_add_pipeline(self):
         """

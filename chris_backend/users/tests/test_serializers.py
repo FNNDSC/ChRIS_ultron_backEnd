@@ -23,7 +23,7 @@ class UserSerializerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_create(self):
         """

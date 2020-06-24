@@ -26,7 +26,7 @@ class ComputeResourceAdminTests(TestCase):
     def tearDownClass(cls):
         super().tearDownClass()
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_add_view(self):
         """
@@ -146,7 +146,7 @@ class PluginAdminFormTests(TestCase):
     def tearDownClass(cls):
         super().tearDownClass()
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
@@ -274,7 +274,7 @@ class PluginAdminTests(TestCase):
     def tearDownClass(cls):
         super().tearDownClass()
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_add_view(self):
         """

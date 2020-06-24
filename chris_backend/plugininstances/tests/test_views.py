@@ -62,7 +62,7 @@ class ViewTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
 
 class TasksViewTests(TransactionTestCase):
@@ -125,7 +125,7 @@ class TasksViewTests(TransactionTestCase):
     def tearDown(self):
         super().tearDown()
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
 
 class PluginInstanceListViewTests(ViewTests):

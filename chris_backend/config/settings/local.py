@@ -11,13 +11,9 @@ Local settings
 from .common import *  # noqa
 import os
 import swiftclient
-import logging
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
-
-# Avoid cluttered console output (for instance logging all the http requests)
-logging.disable(logging.DEBUG)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'

@@ -52,7 +52,7 @@ class FeedModelTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_save_creates_new_note_just_after_feed_is_created(self):
         """

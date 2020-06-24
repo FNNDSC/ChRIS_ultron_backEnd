@@ -76,7 +76,7 @@ class PluginAppManagerTests(TestCase):
 
     def tearDown(self):
         # re-enable logging
-        logging.disable(logging.DEBUG)
+        logging.disable(logging.NOTSET)
 
     def test_mananger_can_run_registered_plugin_app(self):
         """
