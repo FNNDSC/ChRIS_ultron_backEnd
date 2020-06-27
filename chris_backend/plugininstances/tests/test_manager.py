@@ -20,7 +20,7 @@ class PluginAppManagerTests(TestCase):
     
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         self.plugin_fs_name = "simplefsapp"
         self.username = 'foo'
@@ -118,6 +118,8 @@ class PluginAppManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
+        logging.disable(logging.WARNING)
+
         # try:
         #     # create test directory where files are created
         #     test_dir = settings.MEDIA_ROOT + '/test'
@@ -179,6 +181,8 @@ class PluginAppManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
+        logging.disable(logging.WARNING)
+
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
