@@ -14,7 +14,7 @@ class UploadedFileSerializerTests(TestCase):
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
     def tearDown(self):
         # re-enable logging

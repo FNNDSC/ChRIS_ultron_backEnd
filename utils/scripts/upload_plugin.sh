@@ -47,6 +47,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 echo "Uploading user=$USER  plugin=$PLUGIN  image=$DOCK  repo=$REPO..."
 echo " "
 docker pull $DOCK
-PLUGIN_REP=$(docker run --rm "${DOCK}" "${PLUGIN}.py" --json 2> /dev/null;)
+PLUGIN_MODULE="${PLUGIN:3}"
+PLUGIN_REP=$(docker run --rm "${DOCK}" "${PLUGIN_MODULE}.py" --json 2> /dev/null;)
 docker-compose -f "${DIR}/../../docker-compose.yml" exec chrisstore python plugins/services/manager.py add "$PLUGIN" "$USER" "$REPO" "$DOCK" --descriptorstring "$PLUGIN_REP"
 echo " "

@@ -27,7 +27,7 @@ class ViewTests(TestCase):
     
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
@@ -69,6 +69,7 @@ class TasksViewTests(TransactionTestCase):
 
     @classmethod
     def setUpClass(cls):
+        logging.disable(logging.WARNING)
         super().setUpClass()
         # route tasks to this worker by using the default 'celery' queue
         # that is exclusively used for the automated tests
@@ -84,12 +85,13 @@ class TasksViewTests(TransactionTestCase):
         cls.celery_worker.__exit__(None, None, None)
         # reset routes to the original queues
         celery_app.conf.update(task_routes=task_routes)
+        logging.disable(logging.NOTSET)
 
     def setUp(self):
         super().setUp()
 
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
@@ -159,6 +161,8 @@ class PluginInstanceListViewTests(ViewTests):
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
+        logging.disable(logging.WARNING)
+
         # add an FS plugin to the system
         plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
                               'optional': False, 'flag': '--dir', 'short_flag': '-d',
@@ -261,6 +265,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):
+        logging.disable(logging.WARNING)
+
         # add an FS plugin to the system
         plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
                               'optional': False, 'flag': '--dir', 'short_flag': '-d',
@@ -763,6 +769,8 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
 
     @tag('integration')
     def test_integration_fileresource_download_success(self):
+        logging.disable(logging.WARNING)
+
         # initiate a Swift service connection
         conn = swiftclient.Connection(
             user=settings.SWIFT_USERNAME,

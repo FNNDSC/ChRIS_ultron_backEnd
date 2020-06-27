@@ -15,7 +15,7 @@ class PipelineManagerTests(TestCase):
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_version = "0.1"

@@ -25,6 +25,39 @@ ALLOWED_HOSTS = ['*']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# LOGGING CONFIGURATION
+# See http://docs.djangoproject.com/en/2.2/topics/logging for
+# more details on how to customize your logging configuration.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'console': {
+            'format': '[%(asctime)s] [%(levelname)s][%(name)s][%(filename)s:%(lineno)d %(funcName)s] %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'console',
+        },
+    },
+    'loggers': {
+        '': {  # root logger
+            'level': 'INFO',
+            'handlers': ['console'],
+        }
+    }
+}
+for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
+            'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users']:
+    LOGGING['loggers'][app] = {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+            'propagate': False  # required to avoid double logging with root logger
+        }
+
 # Swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'

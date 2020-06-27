@@ -20,7 +20,7 @@ class ComputeResourceAdminTests(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
     @classmethod
     def tearDownClass(cls):
@@ -140,7 +140,7 @@ class PluginAdminFormTests(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
     @classmethod
     def tearDownClass(cls):
@@ -150,7 +150,7 @@ class PluginAdminFormTests(TestCase):
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         (self.compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
             name="host", description="host description")
@@ -268,7 +268,7 @@ class PluginAdminTests(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
     @classmethod
     def tearDownClass(cls):

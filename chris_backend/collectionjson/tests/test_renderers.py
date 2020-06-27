@@ -27,7 +27,7 @@ class SimpleGetTest(TestCase):
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
         self.response = self.client.get(self.endpoint)
         content = json.loads(self.response.content.decode('utf8'))
         self.total = content['collection'].pop('total', None)  # remove the non-standard 'total' property

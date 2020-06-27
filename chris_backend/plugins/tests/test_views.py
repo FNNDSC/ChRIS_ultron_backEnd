@@ -16,7 +16,7 @@ class ViewTests(TestCase):
 
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING)
 
         self.username = 'foo'
         self.password = 'bar'

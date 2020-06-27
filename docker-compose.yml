@@ -13,7 +13,7 @@ version: '3'
 services:
 
   chris:
-    image: ${CREPO}/chris
+    image: ${CHRISREPO}/chris
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -33,7 +33,7 @@ services:
       role: "Production server using Apache's mod_wsgi"
 
   worker:
-    image: ${CREPO}/chris
+    image: ${CHRISREPO}/chris
     entrypoint: ''
     command: celery -A core worker -c 1 -l info -Q main
     env_file:
@@ -70,7 +70,7 @@ services:
       role: "Production async task queue"
 
   chrisstore:
-    image: ${CREPO}/chris_store
+    image: ${CHRISREPO}/chris_store
     env_file:
       - ./secrets/.chris_store.env
       - ./secrets/.chris_store_db.env
@@ -110,7 +110,7 @@ services:
       role: "swift object storage service"
 
   pfcon_service:
-    image: ${CREPO}/pfcon
+    image: ${CHRISREPO}/pfcon
     volumes:
       - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
@@ -132,7 +132,7 @@ services:
     # The following is a bit complicated... Basically we need to map a physical dir
     # in the HOST to the key store in pfioh. The keystore is specified by the
     # --storeBase flag.
-    image: ${CREPO}/pfioh
+    image: ${CHRISREPO}/pfioh
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ./FS/remote:/hostFS/storeBase
@@ -156,7 +156,7 @@ services:
     # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
     environment:
       - STOREBASE
-    image: ${CREPO}/pman
+    image: ${CHRISREPO}/pman
     command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
