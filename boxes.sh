@@ -7,8 +7,15 @@
 # DESC
 #
 #   Draws left and right "box" outlines for a string of text
-#	line by line.
+#   in line by line fashion -- useful to create the "body" of
+#   a box of text, for example:
 #
+#       │      Here is some text that          │▒ 
+#       │      is created in a box of          │▒ 
+#       │      some fixed width, with          │▒ 
+#       │      a shadow effect also!           │▒ 
+#
+
 . ./decorate.sh
 let width=80
 let b_clear=0
