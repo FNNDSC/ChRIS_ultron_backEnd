@@ -3,9 +3,7 @@
 ![License][license-badge]
 ![Last Commit][last-commit-badge]
 
-The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the  
-service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) 
-REST API.
+The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon``, ``pman``, and ``pfioh`` collection of coordinating, managing, and file transfer services.
 
 
 ## ChRIS development, testing and deployment
@@ -13,9 +11,7 @@ REST API.
 
 ### Abstract
 
-This page describes how to quickly get the set of services comprising the ChRIS backend up and running for 
-CUBE development and how to run the automated tests. A single-machine production deployment of the ChRIS 
-backend services is also explained.
+This page describes how to quickly get the set of services comprising the ChRIS backend up and running for  CUBE development and how to run the automated tests. A single-machine production deployment of the ChRIS backend services is also explained.
 
 
 ### Preconditions
