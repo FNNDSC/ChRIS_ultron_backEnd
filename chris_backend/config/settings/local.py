@@ -77,10 +77,7 @@ conn.put_container(SWIFT_CONTAINER_NAME)
 CHRIS_STORE_URL = 'http://chrisstore:8010/api/v1/'
 
 # pfcon service settings
-PFCON = {
-    'host': 'pfcon_service',
-    'port': '5005'
-}
+PFCON_URL = 'http://pfcon_service:5005'
 
 # Debug control output
 CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
