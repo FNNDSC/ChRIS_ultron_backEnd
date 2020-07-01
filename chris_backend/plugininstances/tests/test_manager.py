@@ -97,12 +97,7 @@ class PluginAppManagerTests(TestCase):
                                                     value=self.username)
                 parameter_dict = {'dir': self.username}
 
-                manager.PluginAppManager.run_plugin_app(pl_inst,
-                                               parameter_dict,
-                                               service='pfcon',
-                                               inputDirOverride='/share/incoming',
-                                               outputDirOverride='/share/outgoing',
-                                               )
+                manager.PluginAppManager.run_plugin_app(pl_inst, parameter_dict)
                 self.assertEqual(pl_inst.status, 'started')
                 assert charm_init_mock.called
                 charm_app_manage_mock.assert_called_with(method='pfcon', IOPhost='host')
@@ -135,11 +130,7 @@ class PluginAppManagerTests(TestCase):
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=self.username)
         parameter_dict = {'dir': self.username}
-        manager.PluginAppManager.run_plugin_app(pl_inst,
-                                       parameter_dict,
-                                       service             = 'pfcon',
-                                       inputDirOverride    = '/share/incoming',
-                                       outputDirOverride   = '/share/outgoing')
+        manager.PluginAppManager.run_plugin_app(pl_inst, parameter_dict)
         self.assertEqual(pl_inst.status, 'started')
 
         # finally:
@@ -192,11 +183,7 @@ class PluginAppManagerTests(TestCase):
                                             value=self.username)
         parameter_dict = {'dir': self.username}
 
-        manager.PluginAppManager.run_plugin_app(pl_inst,
-                                       parameter_dict,
-                                       service             = 'pfcon',
-                                       inputDirOverride    = '/share/incoming',
-                                       outputDirOverride   = '/share/outgoing')
+        manager.PluginAppManager.run_plugin_app(pl_inst, parameter_dict)
 
         manager.PluginAppManager.check_plugin_app_exec_status(pl_inst)
         self.assertEqual(pl_inst.status, 'started')

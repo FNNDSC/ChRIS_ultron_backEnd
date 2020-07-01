@@ -209,11 +209,7 @@ class PluginInstance(models.Model):
         """
         Custom method to run the app corresponding to this plugin instance.
         """
-        PluginAppManager.run_plugin_app(self,
-                                        parameters_dict,
-                                        service             = 'pfcon',
-                                        inputDirOverride    = '/share/incoming',
-                                        outputDirOverride   = '/share/outgoing')
+        PluginAppManager.run_plugin_app(self, parameters_dict)
 
     def check_exec_status(self):
         """

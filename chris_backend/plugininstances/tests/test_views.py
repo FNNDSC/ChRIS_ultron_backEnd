@@ -320,10 +320,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                                               kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
-        PluginAppManager.run_plugin_app(pl_inst, {'dir': self.username},
-                                        service='pfcon',
-                                        inputDirOverride='/share/incoming',
-                                        outputDirOverride='/share/outgoing')
+        PluginAppManager.run_plugin_app(pl_inst, {'dir': self.username})
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)

@@ -4,8 +4,10 @@ charm - ChRIS / pfcon interface.
 
 """
 
-import  os
+import logging
+import os
 from os.path import expanduser
+import  time
 import  pprint
 import  json
 import  pudb
@@ -13,26 +15,27 @@ import  pfurl
 import  pfmisc
 
 from    urllib.parse    import  parse_qs
+import  zlib, base64
+
 from    django.utils    import  timezone
 from    django.conf     import  settings
 
 from    pfmisc._colors  import  Colors
 from    pfmisc.message  import  Message
 
-import  swiftclient
-import  time
+from celery.contrib import rdb
 
-import  zlib, base64
+from .swiftmanager import SwiftManager
 
 
-from celery.contrib import rdb 
+logger = logging.getLogger(__name__)
+
 
 class Charm():
 
     def log(self, *args):
         """
         get/set the log object.
-
         Caller can further manipulate the log object with object-specific
         calls.
         """
@@ -78,39 +81,22 @@ class Charm():
         self._log._b_syslog         = True
         self.__name__               = "Charm"
         self.b_useDebug             = settings.CHRIS_DEBUG['useDebug']
-
         str_debugDir                = '%s/tmp' % os.environ['HOME']
         if not os.path.exists(str_debugDir):
             os.makedirs(str_debugDir)
         self.str_debugFile          = '%s/debug-charm.log' % str_debugDir
-
         if len(settings.CHRIS_DEBUG['debugFile']):
             self.str_debugFile      = settings.CHRIS_DEBUG['debugFile']
-
         self.str_http               = ""
-        self.str_ip                 = ""
-        self.str_port               = ""
-        self.str_URL                = ""
-        self.str_verb               = ""
-        self.str_msg                = ""
         self.d_msg                  = {}
-        self.str_protocol           = "http"
-
         self.dp                     = pfmisc.debug(
                                             verbosity   = 1,
                                             within      = self.__name__
                                             )
-
         self.pp                     = pprint.PrettyPrinter(indent=4)
-        self.b_man                  = False
-        self.str_man                = ''
         self.b_quiet                = settings.CHRIS_DEBUG['quiet']
         self.b_raw                  = False
-        self.auth                   = ''
-        self.str_jsonwrapper        = ''
-
         self.str_IOPhost            = ''
-
         self.str_cmd                = ''
         self.str_inputdir           = ''
         self.str_outputdir          = ''
@@ -174,15 +160,14 @@ class Charm():
             else:
                 str_desc += "*this* console"
             str_desc += Colors.NO_COLOUR
-
             self.dp.qprint(str_desc)
 
-        self.dp.qprint('d_args         = %s'   % self.pp.pformat(self.d_args).strip())
-        self.dp.qprint('app_args       = %s'   % self.l_appArgs)
-        self.dp.qprint('d_pluginInst   = %s'   % self.pp.pformat(self.d_pluginInst).strip())
-        self.dp.qprint('app            = %s'   % self.app)
-        self.dp.qprint('inputdir       = %s'   % self.str_inputdir)
-        self.dp.qprint('outputdir      = %s'   % self.str_outputdir)
+        self.dp.qprint('d_args         = %s' % self.pp.pformat(self.d_args).strip())
+        self.dp.qprint('app_args       = %s' % self.l_appArgs)
+        self.dp.qprint('d_pluginInst   = %s' % self.pp.pformat(self.d_pluginInst).strip())
+        self.dp.qprint('app            = %s' % self.app)
+        self.dp.qprint('inputdir       = %s' % self.str_inputdir)
+        self.dp.qprint('outputdir      = %s' % self.str_outputdir)
 
     def app_manage(self, **kwargs):
         """
@@ -205,65 +190,11 @@ class Charm():
         if str_method == 'pfcon':
             self.app_service(   service = str_method,
                                 IOPhost = str_IOPhost)
-
         if b_launched: self.c_pluginInst.register_output_files()
 
     def app_launchInternal(self):
         self.app.launch(self.l_appArgs)
         self.c_pluginInst.register_output_files()
-
-    # def app_crunnerWrap(self):
-    #     """
-    #     Run the "app" in a crunner instance.
-
-    #     :param self:
-    #     :return:
-    #     """
-
-    #     str_cmdLineArgs = ''.join('{} {}'.format(key, val) for key,val in sorted(self.d_args.items()))
-    #     self.dp.qprint('cmdLindArgs = %s' % str_cmdLineArgs)
-
-    #     str_allCmdLineArgs      = ' '.join(self.l_appArgs)
-    #     str_exec                = os.path.join(self.c_pluginInst.plugin.selfpath, self.c_pluginInst.plugin.selfexec)
-
-    #     if len(self.c_pluginInst.plugin.execshell):
-    #         str_exec            = '%s %s' % (self.c_pluginInst.plugin.execshell, str_exec)
-
-    #     self.str_cmd            = '%s %s' % (str_exec, str_allCmdLineArgs)
-    #     self.dp.qprint('cmd = %s' % self.str_cmd)
-
-    #     self.app_crunner(self.str_cmd, loopctl = True)
-    #     self.c_pluginInst.register_output_files()
-
-    # def app_crunner(self, str_cmd, **kwargs):
-    #     """
-    #     Run the "app" in a crunner instance.
-
-    #     :param self:
-    #     :return:
-    #     """
-
-    #     # The loopctl controls whether or not to block on the
-    #     # crunner shell job
-    #     b_loopctl               = False
-
-    #     for k,v in kwargs.items():
-    #         if k == 'loopctl':  b_loopctl = v
-
-    #     verbosity               = 1
-    #     shell                   = pfurl.crunner(
-    #                                         verbosity   = verbosity,
-    #                                         debug       = True,
-    #                                         debugTo     = '%s/tmp/debug-crunner.log' % os.environ['HOME'])
-
-    #     shell.b_splitCompound   = True
-    #     shell.b_showStdOut      = True
-    #     shell.b_showStdErr      = True
-    #     shell.b_echoCmd         = False
-
-    #     shell(str_cmd)
-    #     if b_loopctl:
-    #         shell.jobs_loopctl()
 
     def app_service_shutdown(self, **kwargs):
         """
@@ -271,9 +202,7 @@ class Charm():
 
         :return:
         """
-
         # pudb.set_trace()
-
         str_service     = 'pfcon'
 
         for k,v in kwargs.items():
@@ -296,9 +225,7 @@ class Charm():
         :param kwargs:
         :return: True | False
         """
-
         d_msg                   = {}
-        str_service             = 'pfcon'
         b_httpResponseBodyParse = True
 
         for k,v in kwargs.items():
@@ -306,11 +233,7 @@ class Charm():
             if k == 'service':  str_service = v
 
         # pudb.set_trace()
-
-        str_setting     = 'settings.%s' % str_service.upper()
-        str_http        = '%s:%s' % (eval(str_setting)['host'],
-                                     eval(str_setting)['port'])
-        if str_service == 'pman': b_httpResponseBodyParse = False
+        str_http        = settings.PFCON_URL
 
         str_debugFile       = '%s/tmp/debug-pfurl.log' % os.environ['HOME']
         if self.str_debugFile == '/dev/null':
@@ -328,217 +251,11 @@ class Charm():
             debugFile               = str_debugFile,
             useDebug                = self.b_useDebug
         )
-
         # speak to the service...
         d_response      = json.loads(serviceCall())
         if not b_httpResponseBodyParse:
             d_response  = parse_qs(d_response)
         return d_response
-
-    def app_service_checkIfAvailable(self, *args, **kwargs):
-        """
-        This method checks if the remote service is available by asking
-        it for system status.
-
-        It is currently deprecated.
-
-        :param args:
-        :param kwargs:
-        :return: True | False
-        """
-        return True
-
-
-    def swiftstorage_connect(self, *args, **kwargs):
-        """
-        Connect to swift storage and return the connection object,
-        as well an optional "prepend" string to fully qualify
-        object location in swift storage.
-        """
-
-        b_status                = True
-        b_prependBucketPath     = False
-
-        for k,v in kwargs.items():
-            if k == 'prependBucketPath':    b_prependBucketPath = v
-
-        d_ret       = {
-            'status':               b_status,
-            'conn':                 None,
-            'prependBucketPath':    ""
-        }
-
-        # initiate a swift service connection, based on internal
-        # settings already available in the django variable space.
-        try:
-            d_ret['conn'] = swiftclient.Connection(
-                user    = settings.SWIFT_USERNAME,
-                key     = settings.SWIFT_KEY,
-                authurl = settings.SWIFT_AUTH_URL,
-            )
-        except:
-            d_ret['status'] = False
-
-        if b_prependBucketPath:
-            # d_ret['prependBucketPath']  = self.c_pluginInst.owner.username + '/uploads'
-	    # The following line should "root" requests to swift storage to the user
-	    # space and allow for access/dircopy to the feed space and not only
-	    # the 'uploads' space.
-            # d_ret['prependBucketPath']  = self.c_pluginInst.owner.username
-            d_ret['prependBucketPath']  = ''
-
-        return d_ret
-
-    def swiftstorage_ls(self, *args, **kwargs):
-        """
-        Return a list of objects in the swiftstorage
-        """
-        l_ls                    = []    # The listing of names to return
-        ld_obj                  = {}    # List of dictionary objects in swift
-        str_path                = '/'
-        str_fullPath            = ''
-        b_prependBucketPath     = False
-        b_status                = False
-
-        for k,v in kwargs.items():
-            if k == 'path':                 str_path            = v
-            if k == 'prependBucketPath':    b_prependBucketPath = v
-
-        # Remove any leading noise on the str_path, specifically
-        # any leading '.' characters.
-        # This is probably not very robust!
-        while str_path[:1] == '.':  str_path    = str_path[1:]
-
-        d_conn          = self.swiftstorage_connect(**kwargs)
-        if d_conn['status'] and len(str_path):
-            conn        = d_conn['conn']
-            if b_prependBucketPath:
-                str_fullPath    = '%s%s' % (d_conn['prependBucketPath'], str_path)
-            else:
-                str_fullPath    = str_path
-
-            # get the full list of objects in Swift storage with given prefix
-            ld_obj = conn.get_container( settings.SWIFT_CONTAINER_NAME,
-                                        prefix          = str_fullPath,
-                                        full_listing    = True)[1]
-
-            for d_obj in ld_obj:
-                l_ls.append(d_obj['name'])
-                b_status    = True
-
-        return {
-            'status':       b_status,
-            'objectDict':   ld_obj,
-            'lsList':       l_ls,
-            'fullPath':     str_fullPath
-        }
-
-    def swiftstorage_objExists(self, *args, **kwargs):
-        """
-        Return True/False if passed object exists in swift storage
-        """
-        b_exists    = False
-        str_obj     = ''
-
-        for k,v in kwargs.items():
-            if k == 'obj':                  str_obj             = v
-            if k == 'prependBucketPath':    b_prependBucketPath = v
-
-        kwargs['path']  = str_obj
-        d_swift_ls  = self.swiftstorage_ls(*args, **kwargs)
-        str_obj     = d_swift_ls['fullPath']
-
-        if d_swift_ls['status']:
-            for obj in d_swift_ls['lsList']:
-                if str_obj in obj:
-                    b_exists = True
-
-        return {
-            'status':   b_exists,
-            'objPath':  str_obj
-        }
-
-    def swiftstorage_objPut(self, *args, **kwargs):
-        """
-        Put an object (or list of objects) into swift storage.
-
-        By default, to location in storage will map 1:1 to the
-        location name string in the local filesytem. This storage
-        location can be remapped by using the '<toLocation>' and
-        '<mapLocationOver>' kwargs. For example, assume
-        a list of local locations starting with:
-
-                /home/user/project/data/ ...
-
-        and we want to pack everything in the 'data' dir to
-        object storage, at location '/storage'. In this case, the
-        pattern of kwargs specifying this would be:
-
-                    fileList = ['/home/user/project/data/file1',
-                                '/home/user/project/data/dir1/file_d1',
-                                '/home/user/project/data/dir2/file_d2'],
-                    toLocation      = '/storage',
-                    mapLocationOver = '/home/user/project/data'
-
-        will replace, for each file in <fileList>, the <mapLocationOver> with
-        <toLocation>, resulting in a new list
-
-                    '/storage/file1',
-                    '/storage/dir1/file_d1',
-                    '/storage/dir2/file_d2'
-
-        Note that the <toLocation> is subject to <b_prependBucketPath>!
-
-        """
-        b_status                = True
-        l_localfile             = []    # Name on the local file system
-        l_objectfile            = []    # Name in the object storage
-        str_swiftLocation       = ''
-        str_mapLocationOver     = ''
-        str_localfilename       = ''
-        str_storagefilename     = ''
-        str_prependBucketPath   = ''
-        d_ret                   = {
-            'status':           b_status,
-            'localFileList':    [],
-            'objectFileList':   []
-        }
-
-        d_conn  = self.swiftstorage_connect(*args, **kwargs)
-        if d_conn['status']:
-            str_prependBucketPath       = d_conn['prependBucketPath']
-
-        str_swiftLocation               = str_prependBucketPath
-
-        for k,v in kwargs.items():
-            if k == 'file':             l_localfile.append(v)
-            if k == 'fileList':         l_localfile         = v
-            if k == 'toLocation':       str_swiftLocation   = '%s%s' % (str_prependBucketPath, v)
-            if k == 'mapLocationOver':  str_mapLocationOver = v
-
-        if len(str_mapLocationOver):
-            # replace the local file path with object store path
-            l_objectfile    = [w.replace(str_mapLocationOver, str_swiftLocation) \
-                                for w in l_localfile]
-        else:
-            # Prepend the swiftlocation to each element in the localfile list:
-            l_objectfile    = [str_swiftLocation + '{0}'.format(i) for i in l_localfile]
-
-        if d_conn['status']:
-            for str_localfilename, str_storagefilename in zip(l_localfile, l_objectfile):
-                try:
-                    d_ret['status'] = True and d_ret['status']
-                    with open(str_localfilename, 'r') as fp:
-                        d_conn['conn'].put_object(
-                            settings.SWIFT_CONTAINER_NAME,
-                            str_storagefilename,
-                            contents=fp.read()
-                        )
-                except:
-                    d_ret['status'] = False
-                d_ret['localFileList'].append(str_localfilename)
-                d_ret['objectFileList'].append(str_storagefilename)
-        return d_ret
 
     def app_service_fsplugin_squashFileHandle(self, *args, **kwargs):
         """
@@ -587,7 +304,7 @@ class Charm():
         str_squashParentPath, str_squashFile = os.path.split(str_squashFilePath)
 
         # Check if squash file exists in object storage
-        d_ret['d_objExists'] = self.swiftstorage_objExists(
+        d_ret['d_objExists'] = SwiftManager.objExists(
                                         obj                 = str_squashFilePath,
                                         prependBucketPath   = True
                                 )
@@ -604,7 +321,7 @@ class Charm():
                 with open(str_squashFile, 'w') as f:
                     print(str_squashFileMessage, file=f)
                 # and push to swift...
-                d_ret['d_objPut']       = self.swiftstorage_objPut(
+                d_ret['d_objPut']       = SwiftManager.objPut(
                                             file                = str_squashFilePath,
                                             prependBucketPath   = True
                                         )
@@ -696,7 +413,7 @@ class Charm():
             return d_ret
 
         # Check if dir spec exists in swift
-        d_objExists     = self.swiftstorage_objExists(
+        d_objExists     = SwiftManager.objExists(
                             obj                 = str_inputdir,
                             prependBucketPath   = True
                         )
@@ -782,9 +499,6 @@ class Charm():
             if k == 'IOPhost':  str_IOPhost = v
 
         # pudb.set_trace()
-
-        # First, check if the remote service is available...
-        self.app_service_checkIfAvailable(**kwargs)
 
         self.dp.qprint('d_args = %s' % self.d_args)
         str_cmdLineArgs = ''.join('{} {} '.format(key, val) for key,val in sorted(self.d_args.items()))
