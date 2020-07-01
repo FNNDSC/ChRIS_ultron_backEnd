@@ -278,11 +278,7 @@ class PluginInstanceModelTests(ModelTests):
             plg_inst.run(parameters_dict)
             self.assertEqual(plg_inst.status, 'started')
             # check that manager's run_plugin_app method was called with appropriate args
-            run_plugin_app_mock.assert_called_with(plg_inst,
-                                                   parameters_dict,
-                                                   service             = 'pfcon',
-                                                   inputDirOverride    = '/share/incoming',
-                                                   outputDirOverride   = '/share/outgoing')
+            run_plugin_app_mock.assert_called_with(plg_inst, parameters_dict)
 
     def test_check_exec_status(self):
         """

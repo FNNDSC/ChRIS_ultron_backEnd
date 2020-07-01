@@ -73,11 +73,7 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # PFCON SERVICE CONFIGURATION
-# ------------------------------------------------------------------------------
-PFCON = {
-    'host': get_secret('PFCON_HOST'),
-    'port': get_secret('PFCON_PORT')
-}
+PFCON_URL = get_secret('PFCON_URL')
 
 
 # CHARM DEBUG CONTROL OUTPUT
