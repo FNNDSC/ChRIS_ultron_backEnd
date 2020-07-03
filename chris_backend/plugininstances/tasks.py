@@ -5,8 +5,20 @@ from .models import PluginInstance
 
 
 @shared_task
-def check_plugin_instance_exec_status(plg_inst_id):
+def run_plugin_instance(plg_inst_id, parameters_dict):
+    """
+    Run the app corresponding to this plugin instance.
+    """
     #from celery.contrib import rdb;rdb.set_trace()
+    plugin_inst = PluginInstance.objects.get(pk=plg_inst_id)
+    plugin_inst.run(parameters_dict)
+
+
+@shared_task
+def check_plugin_instance_exec_status(plg_inst_id):
+    """
+    Check the execution status of the app corresponding to this plugin instance.
+    """
     plugin_inst = PluginInstance.objects.get(pk=plg_inst_id)
     plugin_inst.check_exec_status()
 

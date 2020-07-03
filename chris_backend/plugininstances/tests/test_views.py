@@ -88,10 +88,6 @@ class TasksViewTests(TransactionTestCase):
         logging.disable(logging.NOTSET)
 
     def setUp(self):
-        super().setUp()
-
-        # avoid cluttered console output (for instance logging all the http requests)
-        logging.disable(logging.WARNING)
 
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
@@ -124,13 +120,8 @@ class TasksViewTests(TransactionTestCase):
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
 
-    def tearDown(self):
-        super().tearDown()
-        # re-enable logging
-        logging.disable(logging.NOTSET)
 
-
-class PluginInstanceListViewTests(ViewTests):
+class PluginInstanceListViewTests(TasksViewTests):
     """
     Test the plugininstance-list view.
     """
@@ -143,8 +134,8 @@ class PluginInstanceListViewTests(ViewTests):
             {"template": {"data": [{"name": "dir", "value": self.username}]}})
 
     def test_plugin_instance_create_success(self):
-        with mock.patch.object(views.PluginInstance, 'run',
-                               return_value=None) as run_mock:
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
             # add parameters to the plugin before the POST request
             plugin = Plugin.objects.get(meta__name="pacspull")
             PluginParameter.objects.get_or_create(plugin=plugin, name='dir', type='string',
@@ -155,13 +146,12 @@ class PluginInstanceListViewTests(ViewTests):
                                         content_type=self.content_type)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-            # check that the run method was called with appropriate args
+            # check that the run_plugin_instance task was called with appropriate args
             parameters_dict = {'dir': self.username}
-            run_mock.assert_called_with(parameters_dict)
+            delay_mock.assert_called_with(response.data['id'], parameters_dict)
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
-        logging.disable(logging.WARNING)
 
         # add an FS plugin to the system
         plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
@@ -260,12 +250,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             response = self.client.get(self.read_update_delete_url)
             self.assertContains(response, "pacspull")
 
-            # check that the check_exec_status method was called once
+            # check that the check_plugin_instance_exec_status task was called once
             delay_mock.assert_called_with(self.pl_inst.id)
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):
-        logging.disable(logging.WARNING)
 
         # add an FS plugin to the system
         plugin_parameters = [{'name': 'dir', 'type': 'path', 'action': 'store',
@@ -766,7 +755,6 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
 
     @tag('integration')
     def test_integration_fileresource_download_success(self):
-        logging.disable(logging.WARNING)
 
         # initiate a Swift service connection
         conn = swiftclient.Connection(
