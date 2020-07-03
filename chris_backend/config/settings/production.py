@@ -76,13 +76,6 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 PFCON_URL = get_secret('PFCON_URL')
 
 
-# CHARM DEBUG CONTROL OUTPUT
-CHRIS_DEBUG = {'quiet': get_secret('CHRIS_DEBUG_QUIET', env.bool),
-               'debugFile': '/dev/null',
-               'useDebug': False
-               }
-
-
 # LOGGING CONFIGURATION
 # See http://docs.djangoproject.com/en/2.2/topics/logging for
 # more details on how to customize your logging configuration.
@@ -92,7 +85,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'console': {
-            'format': '[%(levelname)s][%(name)s][%(filename)s:%(lineno)d %(funcName)s] %(message)s'
+            'format': '[%(levelname)s][%(module)s %(process)d %(thread)d] %(message)s'
         },
     },
     'handlers': {
@@ -115,8 +108,6 @@ LOGGING = {
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_ROOT = get_secret('STATIC_ROOT')
 
-
-# Your production stuff: Below this line define 3rd party library settings
 
 # CORSHEADERS
 # ------------------------------------------------------------------------------

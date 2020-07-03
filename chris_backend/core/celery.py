@@ -1,7 +1,10 @@
 
 import os
+from logging.config import dictConfig
+from django.conf import settings
 
 from celery import Celery
+from celery.signals import setup_logging
 
 # set the default Django settings module for the 'celery' program
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
@@ -22,8 +25,14 @@ app.autodiscover_tasks()
 task_routes = {
     'plugininstances.tasks.sum': {'queue': 'main'},
     'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main'},
+    'plugininstances.tasks.run_plugin_instance': {'queue': 'main'},
 }
 app.conf.update(task_routes=task_routes)
+
+# use logging settings in Django settings
+@setup_logging.connect
+def config_loggers(*args, **kwags):
+    dictConfig(settings.LOGGING)
 
 # example task that is passed info about itself
 @app.task(bind=True)
