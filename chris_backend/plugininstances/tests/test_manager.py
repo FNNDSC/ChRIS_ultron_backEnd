@@ -113,7 +113,6 @@ class PluginAppManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
-        logging.disable(logging.WARNING)
 
         # try:
         #     # create test directory where files are created
@@ -172,7 +171,6 @@ class PluginAppManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
-        logging.disable(logging.WARNING)
 
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)

@@ -32,29 +32,39 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'console': {
-            'format': '[%(asctime)s] [%(levelname)s][%(name)s][%(filename)s:%(lineno)d %(funcName)s] %(message)s'
+        'verbose': {
+            'format': '[%(asctime)s] [%(levelname)s]'
+                      '[%(name)s][%(filename)s:%(lineno)d %(funcName)s] %(message)s'
+        },
+        'simple': {
+            'format': '[%(asctime)s] [%(levelname)s]'
+                      '[%(module)s %(process)d %(thread)d] %(message)s'
         },
     },
     'handlers': {
-        'console': {
+        'console_verbose': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'console',
+            'formatter': 'verbose',
         },
+        'console_simple': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        }
     },
     'loggers': {
         '': {  # root logger
             'level': 'INFO',
-            'handlers': ['console'],
-        }
+            'handlers': ['console_simple'],
+        },
     }
 }
 for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
             'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users']:
     LOGGING['loggers'][app] = {
             'level': 'DEBUG',
-            'handlers': ['console'],
+            'handlers': ['console_verbose'],
             'propagate': False  # required to avoid double logging with root logger
         }
 
@@ -78,12 +88,6 @@ CHRIS_STORE_URL = 'http://chrisstore:8010/api/v1/'
 
 # pfcon service settings
 PFCON_URL = 'http://pfcon_service:5005'
-
-# Debug control output
-CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
-
-if 'CHRIS_DEBUG_QUIET' in os.environ:
-    CHRIS_DEBUG['quiet'] = bool(int(os.environ['CHRIS_DEBUG_QUIET']))
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
