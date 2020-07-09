@@ -15,7 +15,7 @@ from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
-from .services.manager import PluginAppManager
+from .services.manager import PluginInstanceManager
 
 
 STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError', 'cancelled']
@@ -201,7 +201,8 @@ class PluginInstance(models.Model):
         instance.
         """
         if self.status == 'started':
-            PluginAppManager.cancel_plugin_app_exec(self)
+            plg_inst_manager = PluginInstanceManager(self)
+            plg_inst_manager.cancel_plugin_instance_app_exec()
             self.status = 'cancelled'
             self.save()
 
@@ -209,11 +210,8 @@ class PluginInstance(models.Model):
         """
         Custom method to run the app corresponding to this plugin instance.
         """
-        PluginAppManager.run_plugin_app(self,
-                                        parameters_dict,
-                                        service             = 'pfcon',
-                                        inputDirOverride    = '/share/incoming',
-                                        outputDirOverride   = '/share/outgoing')
+        plg_inst_manager = PluginInstanceManager(self)
+        plg_inst_manager.run_plugin_instance_app(parameters_dict)
 
     def check_exec_status(self):
         """
@@ -221,7 +219,8 @@ class PluginInstance(models.Model):
         plugin instance.
         """
         if self.status == 'started':
-            PluginAppManager.check_plugin_app_exec_status(self)
+            plg_inst_manager = PluginInstanceManager(self)
+            plg_inst_manager.check_plugin_instance_app_exec_status()
 
 
 class PluginInstanceFilter(FilterSet):

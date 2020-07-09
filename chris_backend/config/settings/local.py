@@ -25,6 +25,49 @@ ALLOWED_HOSTS = ['*']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# LOGGING CONFIGURATION
+# See http://docs.djangoproject.com/en/2.2/topics/logging for
+# more details on how to customize your logging configuration.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] [%(levelname)s]'
+                      '[%(name)s][%(filename)s:%(lineno)d %(funcName)s] %(message)s'
+        },
+        'simple': {
+            'format': '[%(asctime)s] [%(levelname)s]'
+                      '[%(module)s %(process)d %(thread)d] %(message)s'
+        },
+    },
+    'handlers': {
+        'console_verbose': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'console_simple': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        }
+    },
+    'loggers': {
+        '': {  # root logger
+            'level': 'INFO',
+            'handlers': ['console_simple'],
+        },
+    }
+}
+for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
+            'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users']:
+    LOGGING['loggers'][app] = {
+            'level': 'DEBUG',
+            'handlers': ['console_verbose'],
+            'propagate': False  # required to avoid double logging with root logger
+        }
+
 # Swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
@@ -44,16 +87,7 @@ conn.put_container(SWIFT_CONTAINER_NAME)
 CHRIS_STORE_URL = 'http://chrisstore:8010/api/v1/'
 
 # pfcon service settings
-PFCON = {
-    'host': 'pfcon_service',
-    'port': '5005'
-}
-
-# Debug control output
-CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
-
-if 'CHRIS_DEBUG_QUIET' in os.environ:
-    CHRIS_DEBUG['quiet'] = bool(int(os.environ['CHRIS_DEBUG_QUIET']))
+PFCON_URL = 'http://pfcon_service:5005'
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases

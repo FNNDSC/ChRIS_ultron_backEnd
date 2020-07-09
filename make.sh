@@ -529,10 +529,11 @@ else
                 exec chrisstore python plugins/services/manager.py add "$CONTAINER" \
                 cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"              \
                 --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
+            status=$?
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 
-            if (( $? == 0 )) ; then
+            if (( $status == 0 )) ; then
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                         "ChRIS store upload" "[ success ]"              | ./boxes.sh
             else
@@ -624,8 +625,10 @@ else
             docker-compose -f docker-compose_dev.yml                    \
                 exec chris_dev python plugins/services/manager.py       \
                 register $ENV --pluginname "$CONTAINER"
+            status=$?
             echo -en "\033[2A\033[2K"
-            if (( $? == 0 )) ; then
+
+            if (( $status == 0 )) ; then
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                     "CUBE registation" "[ success ]"                    | ./boxes.sh
             else

@@ -73,63 +73,32 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # PFCON SERVICE CONFIGURATION
-# ------------------------------------------------------------------------------
-PFCON = {
-    'host': get_secret('PFCON_HOST'),
-    'port': get_secret('PFCON_PORT')
-}
-
-
-# CHARM DEBUG CONTROL OUTPUT
-CHRIS_DEBUG = {'quiet': True, 'debugFile': '/dev/null', 'useDebug': False}
-CHRIS_DEBUG['quiet'] = get_secret('CHRIS_DEBUG_QUIET', env.bool)
+PFCON_URL = get_secret('PFCON_URL')
 
 
 # LOGGING CONFIGURATION
-# ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/2.2/ref/settings/#logging
-# A sample logging configuration. The only tangible logging
-# performed by this configuration is to send an email to
-# the site admins on every HTTP 500 error when DEBUG=False.
 # See http://docs.djangoproject.com/en/2.2/topics/logging for
 # more details on how to customize your logging configuration.
 ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse'
-        }
-    },
     'formatters': {
-        'verbose': {
-            'format': '%(levelname)s %(asctime)s %(module)s '
-                      '%(process)d %(thread)d %(message)s'
+        'console': {
+            'format': '[%(levelname)s][%(module)s %(process)d %(thread)d] %(message)s'
         },
     },
     'handlers': {
-        'mail_admins': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false'],
-            'class': 'django.utils.log.AdminEmailHandler'
-        },
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'console',
         },
     },
     'loggers': {
-        'django.request': {
-            'handlers': ['mail_admins'],
-            'level': 'ERROR',
-            'propagate': True
-        },
-        'django.security.DisallowedHost': {
-            'level': 'ERROR',
-            'handlers': ['console', 'mail_admins'],
-            'propagate': True
+        '': {  # root logger
+            'level': 'INFO',
+            'handlers': ['console'],
         }
     }
 }
@@ -139,8 +108,6 @@ LOGGING = {
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 STATIC_ROOT = get_secret('STATIC_ROOT')
 
-
-# Your production stuff: Below this line define 3rd party library settings
 
 # CORSHEADERS
 # ------------------------------------------------------------------------------

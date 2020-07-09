@@ -8,7 +8,5 @@ django-storage-swift==1.2.19
 celery==4.4.2
 mod-wsgi==4.7.1
 pfurl>=2.2.2.2
-pfmisc>=1.3.32
-pytz==2020.1
 python-chrisstoreclient==1.0.0
 environs==7.4.0

@@ -20,6 +20,7 @@ class PACSFile(models.Model):
     PatientAge = models.IntegerField(blank=True, null=True)
     PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')],
                                   blank=True)
+    Modality = models.CharField(max_length=15, blank=True)
     StudyInstanceUID = models.CharField(max_length=150, db_index=True)
     StudyDescription = models.CharField(max_length=500, blank=True)
     SeriesInstanceUID = models.CharField(max_length=150, db_index=True)

@@ -17,7 +17,7 @@ from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly
-from .tasks import check_plugin_instance_exec_status
+from .tasks import run_plugin_instance, check_plugin_instance_exec_status
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -84,7 +84,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
             parameters_dict[param.name] = param_inst.value
 
         # run the plugin's app
-        plg_inst.run(parameters_dict)
+        run_plugin_instance.delay(plg_inst.id, parameters_dict)  # call async task
 
     def list(self, request, *args, **kwargs):
         """
@@ -162,6 +162,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to check a plugin's instance status.
         """
         instance = self.get_object()
+        # check execution status of plugin's app
         check_plugin_instance_exec_status.delay(instance.id)  # call async task
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}

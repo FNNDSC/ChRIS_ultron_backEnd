@@ -39,7 +39,6 @@ fi
 set -e  # terminate as soon as any command fails
 COMP_ENV=$3
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-echo " "
 if [[ "$1" == '--url' ]]; then
     PLUGIN_URL=$2
     echo "Registering plugin=$PLUGIN_URL compute environment=$COMP_ENV..."
