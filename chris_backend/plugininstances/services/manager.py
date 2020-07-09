@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class PluginInstanceManager(object):
 
-    def __init__(self):
+    def __init__(self, plugin_instance):
 
         # hardcode mounting points for the input and outputdir in the app's container!
         self.str_app_container_inputdir = '/share/incoming'
@@ -35,17 +35,16 @@ class PluginInstanceManager(object):
 
         # A job ID prefix string. Necessary since some schedulers require
         # a minimum job ID string length
-        self.str_jidPrefix = 'chris-jid-'
+        self.str_jid_prefix = 'chris-jid-'
 
         self.str_http = settings.PFCON_URL
-        self.c_pluginInst = None
+        self.c_plugin_inst = plugin_instance
 
-    def run_plugin_instance_app(self, plugin_inst, parameter_dict):
+    def run_plugin_instance_app(self, parameter_dict):
         """
         Run a plugin instance's app via a call to a remote service provider.
         """
-        self.c_pluginInst = plugin_inst
-        plugin = plugin_inst.plugin
+        plugin = self.c_plugin_inst.plugin
         app_args = []
         # append app's container input dir to app's argument list (only for ds plugins)
         if plugin.meta.type == 'ds':
@@ -83,8 +82,8 @@ class PluginInstanceManager(object):
         # Passing an empty string through to pfurl will cause it to fail
         # on its local directory check.
         #
-        # The "hack" here is that charm will "transparently" set the input dir to a
-        # location in swift in the case of FS-type plugins
+        # The "hack" here is that the manager will "transparently" set the input dir
+        # to a location in swift in the case of FS-type plugins
         #
         #       /home/localuser/data/squashInvalidDir
         #
@@ -99,8 +98,8 @@ class PluginInstanceManager(object):
         # "inputdir" and could have implications. Right now though I don't
         # see how an FS plugin could even access this fake "inputdir".
         #
-        if plugin_inst.previous:
-            str_inputdir = plugin_inst.previous.get_output_path()
+        if self.c_plugin_inst.previous:
+            str_inputdir = self.c_plugin_inst.previous.get_output_path()
         else:
             d_fs = self.app_service_fsplugin_setup(parameter_dict, l_appArgs)
             str_inputdir = d_fs['d_manage']['d_handle']['inputdir']
@@ -109,14 +108,14 @@ class PluginInstanceManager(object):
         logger.info('cmd = %s', str_cmd)
         # logger.debug('inputdir = %s', str_inputdir)
 
-        str_outputdir = plugin_inst.get_output_path()
+        str_outputdir = self.c_plugin_inst.get_output_path()
         # logger.debug('outputdir = %s', str_outputdir)
 
-        d_pluginInst = vars(self.c_pluginInst)
+        d_pluginInst = vars(self.c_plugin_inst)
         # logger.debug('d_pluginInst = %s', d_pluginInst)
 
-        str_serviceName = self.str_jidPrefix + str(d_pluginInst['id'])
-        str_IOPhost = self.c_pluginInst.compute_resource.name
+        str_serviceName = self.str_jid_prefix + str(d_pluginInst['id'])
+        str_IOPhost = self.c_plugin_inst.compute_resource.name
         d_msg = {
             "action": "coordinate",
             "threadAction": True,
@@ -162,9 +161,9 @@ class PluginInstanceManager(object):
 
             "meta-compute":
                 {
-                    'cmd': "%s %s" % (self.c_pluginInst.plugin.execshell, str_cmd),
+                    'cmd': "%s %s" % (self.c_plugin_inst.plugin.execshell, str_cmd),
                     'threaded': True,
-                    'auid': self.c_pluginInst.owner.username,
+                    'auid': self.c_plugin_inst.owner.username,
                     'jid': str_serviceName,
                     'number_of_workers': str(d_pluginInst['number_of_workers']),
                     'cpu_limit': str(d_pluginInst['cpu_limit']),
@@ -174,11 +173,11 @@ class PluginInstanceManager(object):
                         {
                             "target":
                                 {
-                                    "image": self.c_pluginInst.plugin.dock_image,
+                                    "image": self.c_plugin_inst.plugin.dock_image,
                                     "cmdParse": False,
-                                    "selfexec": self.c_pluginInst.plugin.selfexec,
-                                    "selfpath": self.c_pluginInst.plugin.selfpath,
-                                    "execshell": self.c_pluginInst.plugin.execshell
+                                    "selfexec": self.c_plugin_inst.plugin.selfexec,
+                                    "selfpath": self.c_plugin_inst.plugin.selfpath,
+                                    "execshell": self.c_plugin_inst.plugin.execshell
                                 },
                             "manager":
                                 {
@@ -235,7 +234,7 @@ class PluginInstanceManager(object):
         if "Connection refused" in d_response:
             logging.error('fatal error in talking to %s', str_service)
 
-    def check_plugin_instance_app_exec_status(self, plugin_inst):
+    def check_plugin_instance_app_exec_status(self):
         """
         Check a plugin instance's app execution status. It connects to the remote
         service to determine job status and if just finished without error,
@@ -261,11 +260,11 @@ class PluginInstanceManager(object):
         #         from plugininstances.services import manager
         #
         #         plg_inst        = PluginInstance.objects.get(id=1)
-        #         chris_service   = manager.PluginInstanceManager()
+        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
         #
         # 4. And finally, call this method:
         #
-        #         chris_service.check_plugin_instance_app_exec_status(plg_inst)
+        #         plg_inst_manager.check_plugin_instance_app_exec_status()
         #
         #     Any pudb.set_trace() calls in this method will now be
         #     handled by the pudb debugger.
@@ -278,16 +277,15 @@ class PluginInstanceManager(object):
         #
         #     and also re-instantiate the service
         #
-        #         chris_service   = manager.PluginInstanceManager()
+        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
 
         # pudb.set_trace()
 
-        self.c_pluginInst = plugin_inst
         d_msg = {
             "action": "status",
             "meta": {
                     "remote": {
-                        "key": self.str_jidPrefix + str(self.c_pluginInst.id)
+                        "key": self.str_jid_prefix + str(self.c_plugin_inst.id)
                     }
             }
         }
@@ -301,7 +299,7 @@ class PluginInstanceManager(object):
         logger.info('d_response = %s', json.dumps(d_response, indent=4, sort_keys=True))
 
         if d_responseStatus['status']:
-            str_DBstatus = self.c_pluginInst.status
+            str_DBstatus = self.c_plugin_inst.status
             logger.info('Current job DB status = %s', str_DBstatus)
 
             if 'swiftPut:True' in str_responseStatus and \
@@ -312,7 +310,7 @@ class PluginInstanceManager(object):
         if str_responseStatus == 'finishedWithError':
             self.app_handleRemoteError()
 
-    def cancel_plugin_instance_app_exec(self, plugin_inst):
+    def cancel_plugin_instance_app_exec(self):
         """
         Cancel a plugin instance's app execution. It connects to the remote service
         to cancel job.
@@ -356,7 +354,7 @@ class PluginInstanceManager(object):
         # 'path'. Ideally speaking there should be only one, however for now
         # we won't assume that -- we'll lay the groundwork for more than 'path'
         # type parameter, but will process things as if there was only one...
-        for d_param in self.c_pluginInst.plugin.parameters.all():
+        for d_param in self.c_plugin_inst.plugin.parameters.all():
             if d_param.type == 'path':
                 l_pathArgs.append(d_param.name)
 
@@ -376,8 +374,8 @@ class PluginInstanceManager(object):
                     l_appArgs[i] = self.str_app_container_inputdir
                 i+=1
             str_allCmdLineArgs = ' '.join(l_appArgs)
-            str_exec = os.path.join(self.c_pluginInst.plugin.selfpath,
-                                    self.c_pluginInst.plugin.selfexec)
+            str_exec = os.path.join(self.c_plugin_inst.plugin.selfpath,
+                                    self.c_plugin_inst.plugin.selfexec)
             str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
             logger.info('cmd = %s', str_cmd)
 
@@ -585,15 +583,15 @@ class PluginInstanceManager(object):
             d_response = self.app_service_call(d_msg)
             currentPoll += 1
 
-        d_register = self.c_pluginInst.register_output_files(swiftState=d_swiftState)
+        d_register = self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
 
         str_responseStatus = 'finishedSuccessfully'
-        self.c_pluginInst.status = str_responseStatus
-        self.c_pluginInst.end_date = timezone.now()
-        self.c_pluginInst.save()
+        self.c_plugin_inst.status = str_responseStatus
+        self.c_plugin_inst.end_date = timezone.now()
+        self.c_plugin_inst.save()
 
         logger.info("Saving job DB status   as '%s'", str_responseStatus)
-        logger.info("Saving job DB end_date as '%s'", self.c_pluginInst.end_date)
+        logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
 
         return d_register
 
@@ -614,10 +612,10 @@ class PluginInstanceManager(object):
                 ['l_logs'][0]
         except:
             str_containerLogs = "Container logs not currently available."
-        # self.c_pluginInst.summary   = 'logs: %s' % str_containerLogs
-        self.c_pluginInst.summary = str_summary
-        self.c_pluginInst.raw = str_raw
-        self.c_pluginInst.save()
+        # self.c_plugin_inst.summary   = 'logs: %s' % str_containerLogs
+        self.c_plugin_inst.summary = str_summary
+        self.c_plugin_inst.raw = str_raw
+        self.c_plugin_inst.save()
 
         return {
             'status': True,
@@ -645,7 +643,7 @@ class PluginInstanceManager(object):
             "action": "search",
             "meta": {
                 "key": "jid",
-                "value": self.str_jidPrefix + str(self.c_pluginInst.id),
+                "value": self.str_jid_prefix + str(self.c_plugin_inst.id),
                 "job": "0",
                 "when": "end",
                 "field": "stderr"

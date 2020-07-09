@@ -201,8 +201,8 @@ class PluginInstance(models.Model):
         instance.
         """
         if self.status == 'started':
-            plg_inst_manager = PluginInstanceManager()
-            plg_inst_manager.cancel_plugin_instance_app_exec(self)
+            plg_inst_manager = PluginInstanceManager(self)
+            plg_inst_manager.cancel_plugin_instance_app_exec()
             self.status = 'cancelled'
             self.save()
 
@@ -210,8 +210,8 @@ class PluginInstance(models.Model):
         """
         Custom method to run the app corresponding to this plugin instance.
         """
-        plg_inst_manager = PluginInstanceManager()
-        plg_inst_manager.run_plugin_instance_app(self, parameters_dict)
+        plg_inst_manager = PluginInstanceManager(self)
+        plg_inst_manager.run_plugin_instance_app(parameters_dict)
 
     def check_exec_status(self):
         """
@@ -219,8 +219,8 @@ class PluginInstance(models.Model):
         plugin instance.
         """
         if self.status == 'started':
-            plg_inst_manager = PluginInstanceManager()
-            plg_inst_manager.check_plugin_instance_app_exec_status(self)
+            plg_inst_manager = PluginInstanceManager(self)
+            plg_inst_manager.check_plugin_instance_app_exec_status()
 
 
 class PluginInstanceFilter(FilterSet):

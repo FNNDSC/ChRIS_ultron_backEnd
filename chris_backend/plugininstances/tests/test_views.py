@@ -309,8 +309,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                                               kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
-        plg_inst_manager = PluginInstanceManager()
-        plg_inst_manager.run_plugin_instance_app(pl_inst, {'dir': self.username})
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        plg_inst_manager.run_plugin_instance_app({'dir': self.username})
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)

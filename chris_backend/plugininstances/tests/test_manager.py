@@ -94,8 +94,8 @@ class PluginInstanceManagerTests(TestCase):
                                                 plugin_param=pl_param,
                                                 value=self.username)
             parameter_dict = {'dir': self.username}
-            plg_inst_manager = PluginInstanceManager()
-            plg_inst_manager.run_plugin_instance_app(pl_inst, parameter_dict)
+            plg_inst_manager = PluginInstanceManager(pl_inst)
+            plg_inst_manager.run_plugin_instance_app(parameter_dict)
             self.assertEqual(pl_inst.status, 'started')
             app_service_call_mock.assert_called_once()
 
@@ -126,8 +126,8 @@ class PluginInstanceManagerTests(TestCase):
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=self.username)
         parameter_dict = {'dir': self.username}
-        plg_inst_manager = PluginInstanceManager()
-        plg_inst_manager.run_plugin_instance_app(pl_inst, parameter_dict)
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        plg_inst_manager.run_plugin_instance_app(parameter_dict)
         self.assertEqual(pl_inst.status, 'started')
 
         # finally:
@@ -152,14 +152,14 @@ class PluginInstanceManagerTests(TestCase):
         #     PathParameter.objects.get_or_create(plugin_inst=pl_inst,
         #                                         plugin_param=pl_param,
         #                                         value=self.username)
-        #     plg_inst_manager = PluginInstanceManager()
-        #     plg_inst_manager.check_plugin_instance_app_exec_status(pl_inst)
+        #     plg_inst_manager = PluginInstanceManager(pl_inst)
+        #     plg_inst_manager.check_plugin_instance_app_exec_status()
         #     self.assertEqual(pl_inst.status, 'started')
         #     msg = {
         #         "action": "status",
         #         "meta": {
         #             "remote": {
-        #                 "key": plg_inst_manager.str_jidPrefix + str(pl_inst.id)
+        #                 "key": plg_inst_manager.str_jid_prefix + str(pl_inst.id)
         #             }
         #         }
         #     }
@@ -186,10 +186,10 @@ class PluginInstanceManagerTests(TestCase):
                                             value=self.username)
         parameter_dict = {'dir': self.username}
 
-        plg_inst_manager = PluginInstanceManager()
-        plg_inst_manager.run_plugin_instance_app(pl_inst, parameter_dict)
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        plg_inst_manager.run_plugin_instance_app(parameter_dict)
 
-        plg_inst_manager.check_plugin_instance_app_exec_status(pl_inst)
+        plg_inst_manager.check_plugin_instance_app_exec_status()
         self.assertEqual(pl_inst.status, 'started')
 
         # In the following we keep checking the status until the job ends with
@@ -199,7 +199,7 @@ class PluginInstanceManagerTests(TestCase):
         currentLoop = 1
         b_checkAgain = True
         while b_checkAgain:
-            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status(pl_inst)
+            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             elif currentLoop < maxLoopTries:
