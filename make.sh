@@ -168,7 +168,7 @@ fi
 declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
-    "fnndsc/pfcon${TAG}^PFCONREPO"
+    "local/pfcon${TAG}^PFCONREPO"
     "fnndsc/pfurl${TAG}^PFURLREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
@@ -248,17 +248,17 @@ else
         done
         # Determine the versions of pfurl *inside* pfcon and chris:dev
         windowBottom
-        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/pfcon${TAG} --version"
+        CMD="docker run --entrypoint /usr/local/bin/pfurl ${PFCONREPO}/pfcon${TAG} --version"
         Ver=$(echo $CMD | sh | grep Version)
         echo -en "\033[2A\033[2K"
         printf "${White}%40s${Green}%40s${Yellow}\n"                    \
-                    "pfurl inside ${CREPO}/pfcon${TAG}" "$Ver"          | ./boxes.sh
+                    "pfurl inside ${PFCONREPO}/pfcon${TAG}" "$Ver"      | ./boxes.sh
         windowBottom
-        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CREPO}/chris:dev --version"
+        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CHRISREPO}/chris:dev --version"
         Ver=$(echo $CMD | sh | grep Version)
         echo -en "\033[2A\033[2K"
         printf "${White}%40s${Green}%40s${Yellow}\n"                    \
-                    "pfurl inside ${CREPO}/CUBE" "$Ver"                 | ./boxes.sh
+                    "pfurl inside ${CHRISREPO}/CUBE" "$Ver"             | ./boxes.sh
         windowBottom
     fi
 
