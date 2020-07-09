@@ -1,6 +1,6 @@
 """
-Plugin app manager module that provides functionality to run and check the execution
-status of a plugin app.
+Pipeline instance manager module that provides functionality to run and check the
+execution status of a pipeline instance.
 """
 
 import time
@@ -8,7 +8,7 @@ import time
 from django.conf import settings
 
 
-class PluginAppManager(object):
+class PipelineInstanceManager(object):
 
     @staticmethod
     def run_pipeline_instance(pipeline_inst, parameter_dict):
@@ -18,17 +18,17 @@ class PluginAppManager(object):
         pass
 
     @staticmethod
-    def check_pipeline_inst_exec_status(plugin_inst):
+    def check_pipeline_instance_exec_status(plugin_inst):
         """
         Check a pipeline instance execution status. It connects to the remote
-        service to determine job status.
+        service to determine pipeline's jobs status.
         """
         pass
 
     @staticmethod
-    def cancel_plugin_app_exec(plugin_inst):
+    def cancel_pipeline_instance_exec(plugin_inst):
         """
-        Cancel a pipeline instance app execution. It connects to the remote
-        service to cancel job.
+        Cancel a pipeline instance execution. It connects to the remote service to
+        cancel pipeline's jobs.
         """
         pass

@@ -68,7 +68,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
             self.save_plugin_inst(plg_inst_dict)
 
         # run the plugin's app
-        # PluginAppManager.run_pipeline_instance(pipeline_inst,
+        # PipelineInstanceManager.run_pipeline_instance(pipeline_inst,
         #                                 parameters_dict,
         #                                 service='pfcon',
         #                                 inputDirOverride='/share/incoming',
