@@ -19,7 +19,7 @@ from core.celery import task_routes
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PathParameter, FloatParameter, STATUS_TYPES
-from plugininstances.services.manager import PluginAppManager
+from plugininstances.services.manager import PluginInstanceManager
 from plugininstances import views
 
 
@@ -309,7 +309,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                                               kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
-        PluginAppManager.run_plugin_app(pl_inst, {'dir': self.username})
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        plg_inst_manager.run_plugin_instance_app({'dir': self.username})
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)
