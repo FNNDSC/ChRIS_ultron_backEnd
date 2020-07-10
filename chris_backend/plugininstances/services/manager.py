@@ -411,7 +411,7 @@ class PluginInstanceManager(object):
                     print(str_squashMsg, file=f)
                 # and push to swift...
                 d_objPut = SwiftManager.objPut(
-                    file=str_squashFilePath,
+                    file=str_squashFile,
                     prependBucketPath=True
                 )
                 str_swiftLocation = d_objPut['objectFileList'][0]
