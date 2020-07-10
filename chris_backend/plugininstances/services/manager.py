@@ -227,10 +227,12 @@ class PluginInstanceManager(object):
         str_service = 'pfcon'
         if isinstance(d_response, dict):
             logger.info('looks like we got a successful response from %s', str_service)
+            logger.info('comms were sent to -->%s<--', self.str_http)
             logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
         else:
             logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
-            logger.info('response from pfurl(): %s', d_response)
+            logger.info('comms were sent to -->%s<--', self.str_http)
+            logger.info('response from pfurl(): -->%s<--', d_response)
         if "Connection refused" in d_response:
             logging.error('fatal error in talking to %s', str_service)
 
@@ -259,7 +261,7 @@ class PluginInstanceManager(object):
         #         from plugininstances.models import PluginInstance
         #         from plugininstances.services import manager
         #
-        #         plg_inst        = PluginInstance.objects.get(id=1)
+        #         plg_inst           = PluginInstance.objects.get(id=1)
         #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
         #
         # 4. And finally, call this method:
