@@ -55,7 +55,9 @@ class PluginInstanceManager(object):
         app_args.append("--saveinputmeta")
         # append flag to save output meta data (output description)
         app_args.append("--saveoutputmeta")
-        # append the parameters to app's argument list
+        # append the parameters to app's argument list and identify 'path' type parameters
+        path_param_names = []
+        unextpath_param_names = []
         db_parameters = plugin.parameters.all()
         for param_name in parameter_dict:
             param_value = parameter_dict[param_name]
@@ -63,33 +65,31 @@ class PluginInstanceManager(object):
                 if db_param.name == param_name:
                     if db_param.action == 'store':
                         app_args.append(db_param.flag)
-                        app_args.append(param_value)
+                        value = param_value
+                        if db_param.type == 'unextpath':
+                            unextpath_param_names.append(param_name)
+                            value = self.str_app_container_inputdir
+                        if db_param.type == 'path':
+                            path_param_names.append(param_name)
+                            value = self.str_app_container_inputdir
+                        app_args.append(value)
                     if db_param.action == 'store_true' and param_value:
                         app_args.append(db_param.flag)
                     if db_param.action == 'store_false' and not param_value:
                         app_args.append(db_param.flag)
                     break
 
-        l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
-        # logger.debug('app_args = %s', l_appArgs)
-
-        str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
-        str_allCmdLineArgs = ' '.join(l_appArgs)
-        str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
-
         # Handle the case for 'fs'-type plugins that don't specify an inputdir
-        #
         # Passing an empty string through to pfurl will cause it to fail
-        # on its local directory check.
+        # on its local directory check. The "hack" here is that the manager will
+        # "transparently" set the input dir to a location in swift in the case of
+        # FS-type plugins
         #
-        # The "hack" here is that the manager will "transparently" set the input dir
-        # to a location in swift in the case of FS-type plugins
-        #
-        #       /home/localuser/data/squashInvalidDir
+        #       /home/localuser/data/squashEmptyDir
         #
         # which in turn contains a "file"
         #
-        #       /home/localuser/data/squashInvalidDir/squashInvalidDir.txt
+        #       /home/localuser/data/squashEmptyDir/squashEmptyDir.txt
         #
         # This "inputdir" is then sent along with `pfcon/pfurl` and is of
         # course ignored by the actual plugin when it is run. This does have
@@ -99,14 +99,19 @@ class PluginInstanceManager(object):
         # see how an FS plugin could even access this fake "inputdir".
         #
         if self.c_plugin_inst.previous:
+            # WARNING: 'ds' plugins can also have 'path' parameters!
             str_inputdir = self.c_plugin_inst.previous.get_output_path()
         else:
-            d_fs = self.app_service_fsplugin_setup(parameter_dict, l_appArgs)
-            str_inputdir = d_fs['d_manage']['d_handle']['inputdir']
-            str_cmd = d_fs['cmd']
+            # WARNING: Inputdir assumed to only be the last 'path' parameter!
+            str_inputdir = parameter_dict[path_param_names[-1]] if path_param_names else ''
+            str_inputdir = self.app_service_fsplugin_inputdirManage(str_inputdir)
 
+        str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
+        l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
+        str_allCmdLineArgs = ' '.join(l_appArgs)
+        str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
         logger.info('cmd = %s', str_cmd)
-        # logger.debug('inputdir = %s', str_inputdir)
+        #logger.debug('inputdir = %s', str_inputdir)
 
         str_outputdir = self.c_plugin_inst.get_output_path()
         # logger.debug('outputdir = %s', str_outputdir)
@@ -339,77 +344,20 @@ class PluginInstanceManager(object):
         d_response = json.loads(serviceCall())
         return d_response
 
-    def app_service_fsplugin_setup(self, d_args, l_appArgs):
-        """
-        Some fsplugins, esp those that might interact with the local file
-        filesystem can be "massaged" to conform to the existing fileIO
-        transmission pattern.
-
-        This method edits the cmdLine for fsplugin input to
-        self.str_app_container_inputdir and sets any --dir to data location
-        in local object storage.
-        """
-        # pudb.set_trace()
-        l_pathArgs = []
-
-        # Loop over the plugin parameters and search for any that have type
-        # 'path'. Ideally speaking there should be only one, however for now
-        # we won't assume that -- we'll lay the groundwork for more than 'path'
-        # type parameter, but will process things as if there was only one...
-        for d_param in self.c_plugin_inst.plugin.parameters.all():
-            if d_param.type == 'path':
-                l_pathArgs.append(d_param.name)
-
-        # The 'path' type parameter refers to some location (ideally in the
-        # swift storage). We need to replace this location referring to some
-        # 'local' path with a hard code self.str_app_container_inputdir since that is
-        # where the data will be located in the remote compute env.
-        #
-        # We then need to pass this local input parameter as the inputdir to
-        # pfcon, with appropriate pre-massaging for bucket prepending.
-        str_inputdir = ''
-        for argName in l_pathArgs:
-            str_inputdir = d_args[argName]
-            i = 0
-            for v in l_appArgs:
-                if v == str_inputdir:
-                    l_appArgs[i] = self.str_app_container_inputdir
-                i+=1
-            str_allCmdLineArgs = ' '.join(l_appArgs)
-            str_exec = os.path.join(self.c_plugin_inst.plugin.selfpath,
-                                    self.c_plugin_inst.plugin.selfexec)
-            str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
-            logger.info('cmd = %s', str_cmd)
-
-        # Manage args with type 'path' for FS type plugins
-        # At the point the 'str_inputdir' now points to the location
-        # of the 'path' type variable in the arg list of the FS app.
-        d_manage = self.app_service_fsplugin_inputdirManage(str_inputdir)
-
-        return {
-            'status':   True,
-            'cmd':      str_cmd,
-            'd_manage': d_manage
-        }
-
     def app_service_fsplugin_inputdirManage(self, inputdir):
         """
         This method is responsible for managing the 'inputdir' in the
         case of FS plugins.
 
         Typically, an FS plugin does not have an inputdir spec, since this
-        is a requirement for DS plugins. Nonetheless, the underlying management
+        is only a requirement for DS plugins. Nonetheless, the underlying management
         system (pfcon/pfurl) does require some non-zero inputdir spec in order
         to operate correctly.
 
-        However, this operational requirement allows us a convenient
-        mechanism to inject data into an FS processing stream by storing
-        data in swift and accessing this as a "pseudo" inputdir for FS
-        plugins.
-
-        For example, if an FS plugin has no arguments of type 'path', then
-        we create a "dummy" inputdir with a small dummy text file in swift
-        storage. This is then transmitted as an 'inputdir' to the compute
+        The hack here is to store data somewhere in swift and accessing it as a
+        "pseudo" inputdir for FS plugins. For example, if an FS plugin has no arguments
+        of type 'path', then we create a "dummy" inputdir with a small dummy text file
+        in swift storage. This is then transmitted as an 'inputdir' to the compute
         environment, and can be completely ignored by the plugin.
 
         Importantly, one major exception to the normal FS processing scheme
@@ -424,144 +372,56 @@ class PluginInstanceManager(object):
         are certain important caveats:
 
             1. Only one 'path' type argument is assumed / fully supported.
-            2. Open ended (or relative) path arguments are not supported
-               (otherwise an entire object storage tree could be exposed):
-                * directory specifcations of '/' are not supported and
-                  are squashed;
-                * directory specification of './' are not supported and
-                  are squashed;
-            3. If an invalid object location is specified, this is squashed.
+            2. If an invalid object location is specified, this is squashed.
 
         (squashed means that the system will still execute, but the returned
         output directory from the FS plugin will contain only a single file
         with the text 'squash' in its filename and the file will contain
         some descriptive message)
         """
-        b_status = False
         str_inputdir = inputdir
-        d_ret = {
-            'status': b_status,
-            'd_handle': {}
-        }
-
-        # First, check and return on illegal dir specs
         homedir = os.path.expanduser("~")
-        if str_inputdir == '/' or str_inputdir == './':
-            if str_inputdir == '/':
-                str_squashFile = os.path.join(homedir, 'data/squashRoot/squashRoot.txt')
-                str_squashMsg = 'Illegal dir spec, "/", passed to plugin.'
-            if str_inputdir == './':
-                str_squashFile = os.path.join(homedir,
-                                              'data/squashHereDir/squashHereDir.txt')
-                str_squashMsg = 'Illegal dir spec, "./", passed to plugin.'
-            d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
-                squashFilePath=str_squashFile,
-                squashFileMessage=str_squashMsg
-            )
-            d_ret['status'] = True
-            return d_ret
-
-        # Check if dir spec exists in swift
-        d_objExists = SwiftManager.objExists(
-            obj=str_inputdir,
-            prependBucketPath=True
-        )
-        b_pathValid = d_objExists['status']
-        if not b_pathValid:
+        if not str_inputdir:
+            # No parameter of type 'path' was submitted, so input dir is empty
+            str_squashFile = os.path.join(homedir,
+                                          'data/squashEmptyDir/squashEmptyDir.txt')
+            str_squashMsg = 'Empty input dir.'
+        else:
+            # Check if dir spec exists in swift
+            d_objExists = SwiftManager.objExists(obj=str_inputdir, prependBucketPath=True)
+            if d_objExists['status']:
+                str_inputdir = d_objExists['objPath']
+                return str_inputdir
             str_squashFile = os.path.join(homedir,
                                           'data/squashInvalidDir/squashInvalidDir.txt')
             str_squashMsg = 'Path specified in object storage does not exist!'
-            d_ret['d_handle'] = self.app_service_fsplugin_squashFileHandle(
-                squashFilePath=str_squashFile,
-                squashFileMessage=str_squashMsg
-            )
-            d_ret['status'] = True
-            return d_ret
-        else:
-            d_ret['status'] = True
-            d_ret['d_handle']['inputdir'] = d_objExists['objPath']
-        return d_ret
 
-    def app_service_fsplugin_squashFileHandle(self, *args, **kwargs):
-        """
-        This method is used under certain conditions:
-
-            * An FS plugin has specified an "illegal" directory in
-              the object store:
-                    * /     root of store
-                    * ./    relative "current" dir
-
-            * An FS plugin has specified a non-existent directory/file
-              in the object store.
-
-        In each case, this method creates an appropriately named "dummy"
-        file in the object store and specifies its parent directory as
-        the directory to pull from the store.
-
-        The effect is that if an FS plugin specifies one of these "illegal"
-        conditions, a file is created in the FS plugin output that contains
-        this somewhat descriptive filename.
-
-        This method appends the correct username for swift purposes to
-        the 'inputdir'.
-
-        **kwargs:
-            squashFilePath
-            squashFileMessage
-        """
-        b_status                = False
-        squashdir = os.path.join(os.path.expanduser("~"), 'data/squash')
-        str_squashFilePath      = os.path.join(squashdir, 'unspecifiedSquashFile.txt')
-        str_squashFileMessage   = 'Unspecified message.'
-        d_ret                   = {
-            'status':               b_status,
-            'b_squashFileFound':    False,
-            'inputdir':             '',
-            'd_objPut':             {},
-            'd_objExists':          {}
-        }
-
-        for k,v in kwargs.items():
-            if k == 'squashFilePath':       str_squashFilePath      = v
-            if k == 'squashFileMessage':    str_squashFileMessage   = v
-
-        str_squashParentPath, str_squashFile = os.path.split(str_squashFilePath)
-
-        # Check if squash file exists in object storage
-        d_ret['d_objExists'] = SwiftManager.objExists(
-                                        obj                 = str_squashFilePath,
-                                        prependBucketPath   = True
-                                )
-        d_ret['b_squashFileFound']  = d_ret['d_objExists']['status']
-
-        # If not, create and push...
-        if not d_ret['b_squashFileFound']:
-            # Create a squash file...
-            try:
-                if not os.path.exists(str_squashParentPath):
-                    os.makedirs(str_squashParentPath)
-                os.chdir(str_squashParentPath)
-                # Create a squashfile with possibly descriptive message
-                with open(str_squashFile, 'w') as f:
-                    print(str_squashFileMessage, file=f)
-                # and push to swift...
-                d_ret['d_objPut']       = SwiftManager.objPut(
-                                            file                = str_squashFilePath,
-                                            prependBucketPath   = True
-                                        )
-                str_swiftLocation       = d_ret['d_objPut']['objectFileList'][0]
-                d_ret['inputdir']       = os.path.dirname(str_swiftLocation)
-                d_ret['status']         = True
-            except:
-                d_ret['status']         = False
-        else:
+        # Check if squash file already exists in object storage
+        d_objExists = SwiftManager.objExists(obj=str_squashFile, prependBucketPath=True)
+        if d_objExists['status']:
             # Here the file was found, so 'objPath' is a file spec.
             # We need to prune this into a path spec...
-            d_ret['status']     = True
-            d_ret['inputdir']   = os.path.dirname(
-                                        d_ret['d_objExists']['objPath']
-                                    )
-        return d_ret
+            str_inputdir = os.path.dirname(d_objExists['objPath'])
+        else:
+            try:
+                # Create a squash file with possibly descriptive message...
+                str_squashFilePath = os.path.split(str_squashFile)[0]
+                if not os.path.exists(str_squashFilePath):
+                    os.makedirs(str_squashFilePath)
+                os.chdir(str_squashFilePath)
+                with open(str_squashFile, 'w') as f:
+                    print(str_squashMsg, file=f)
+                # and push to swift...
+                d_objPut = SwiftManager.objPut(
+                    file=str_squashFile,
+                    prependBucketPath=True
+                )
+                str_swiftLocation = d_objPut['objectFileList'][0]
+                str_inputdir = os.path.dirname(str_swiftLocation)
+            except Exception as e:
+                logger.exception(e)
+                #logger.debug('Could not create squash file', exc_info=True)
+        return str_inputdir
 
     def app_register_files(self, d_response, d_msg):
         """
@@ -584,17 +444,16 @@ class PluginInstanceManager(object):
             time.sleep(0.2)
             d_response = self.app_service_call(d_msg)
             currentPoll += 1
-
         d_register = self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
 
         str_responseStatus = 'finishedSuccessfully'
         self.c_plugin_inst.status = str_responseStatus
-        self.c_plugin_inst.end_date = timezone.now()
-        self.c_plugin_inst.save()
+        logger.info("Saving job DB status   as '%s'", self.c_plugin_inst.status)
 
-        logger.info("Saving job DB status   as '%s'", str_responseStatus)
+        self.c_plugin_inst.end_date = timezone.now()
         logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
 
+        self.c_plugin_inst.save()
         return d_register
 
     def app_rawAndSummaryInfo_serialize(self, d_response):
@@ -614,7 +473,7 @@ class PluginInstanceManager(object):
                 ['l_logs'][0]
         except:
             str_containerLogs = "Container logs not currently available."
-        # self.c_plugin_inst.summary   = 'logs: %s' % str_containerLogs
+        #logger.debug("str_summary = '%s'", str_summary)
         self.c_plugin_inst.summary = str_summary
         self.c_plugin_inst.raw = str_raw
         self.c_plugin_inst.save()
@@ -631,7 +490,6 @@ class PluginInstanceManager(object):
         Collect the 'stderr' from the remote app
         """
         str_deepVal = ''
-
         def str_deepnest(d):
             nonlocal str_deepVal
             for k, v in d.items():
