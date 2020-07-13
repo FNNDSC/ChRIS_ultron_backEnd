@@ -163,7 +163,7 @@ fi
 declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
-    "local/pfcon${TAG}^PFCONREPO"
+    "fnndsc/pfcon${TAG}^PFCONREPO"
     "fnndsc/pfurl${TAG}^PFURLREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
