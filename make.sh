@@ -8,7 +8,7 @@
 #
 #   make.sh                     [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
-#                               [-p] [-s] [-i] [-d]             \
+#                               [-p] [-s] [-i]                  \
 #                               [-U] [-I]                       \
 #                               [-S <storeBaseOverride>]        \
 #                               [-e <computeEnv>]               \
@@ -87,11 +87,6 @@
 #       services explicitly with
 #
 #               docker stop <ID> && docker rm -vf <ID> && *make* -r <service>
-#
-#   -d
-#
-#       Optional debug ON. If specified, trigger verbose output during
-#       run, especially during testing. Useful for debugging.
 #
 #   [local|fnndsc[:dev]] (optional, default = 'fnndsc')
 #
@@ -195,14 +190,27 @@ title -d 1 "Setting global exports..."
 windowBottom
 
 if (( b_restart )) ; then
-    docker-compose -f docker-compose_dev.yml stop                       \
-        ${RESTART}_service && docker-compose -f docker-compose_dev.yml  \
-        rm -f ${RESTART}_service                                        >& dc.out >/dev/null
-        cat dc.out | ./boxes.sh
+    title -d 1 "Restarting ${RESTART} service"                          \
+                    "in interactive mode..."
+    printf "${LightCyan}%40s${LightGreen}%40s\n"                        \
+                "Stopping" "${RESTART}_service"                         | ./boxes.sh
+    windowBottom
+
+    docker-compose --no-ansi -f docker-compose_dev.yml stop ${RESTART}_service >& dc.out > /dev/null
+    echo -en "\033[2A\033[2K"
+    cat dc.out | ./boxes.sh
+
+    printf "${LightCyan}%40s${LightGreen}%40s\n"                        \
+                "rm -f" "${RESTART}_service"                            | ./boxes.sh
+    windowBottom
+
+    docker-compose --no-ansi -f docker-compose_dev.yml rm -f ${RESTART}_service >& dc.out > /dev/null
+    echo -en "\033[2A\033[2K"
+    cat dc.out | ./boxes.sh
+    windowBottom
 
     docker-compose -f docker-compose_dev.yml run --service-ports        \
-        ${RESTART}_service                                              >& dc.out >/dev/null
-        cat dc.out | ./boxes.sh
+        ${RESTART}_service
 else
     title -d 1 "Pulling non-'local/' core containers where needed..."   \
                 "and creating appropriate .env for docker-compose"
