@@ -8,7 +8,7 @@
 # specify them again in docker-compose.yml.
 #
 
-version: '3'
+version: '3.7'
 
 services:
 
@@ -98,6 +98,7 @@ services:
 
   swift_service:
     image: fnndsc/docker-swift-onlyone
+    init: true
     volumes:
       - swift_storage:/srv
     env_file:
