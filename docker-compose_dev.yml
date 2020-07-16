@@ -8,7 +8,7 @@
 # specify them again in docker-compose.yml.
 #
 
-version: '3'
+version: '3.7'
 
 services:
 
@@ -110,12 +110,12 @@ services:
 
   swift_service:
     image: ${SWIFTREPO}/docker-swift-onlyone
+    init: true
     volumes:
       - swift_storage_dev:/srv
     environment:
       - SWIFT_USERNAME=chris:chris1234
       - SWIFT_KEY=testing
-      - SWIFT_CONTAINER_NAME=store_users
     ports:
       - "8080:8080"
     labels:
