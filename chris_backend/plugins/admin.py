@@ -75,8 +75,9 @@ class ComputeResourceAdmin(admin.ModelAdmin):
 
 
 class PluginMetaAdmin(admin.ModelAdmin):
-    readonly_fields = ['name', 'stars', 'public_repo', 'license', 'type', 'icon',
-                       'category', 'authors', 'creation_date', 'modification_date']
+    readonly_fields = ['name', 'title', 'stars', 'public_repo', 'license', 'type', 'icon',
+                       'category', 'authors', 'documentation', 'creation_date',
+                       'modification_date']
     list_display = ('name', 'type', 'id')
     list_filter = ['type', 'creation_date', 'modification_date', 'category']
     search_fields = ['name']

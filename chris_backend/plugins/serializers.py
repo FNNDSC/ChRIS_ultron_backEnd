@@ -22,9 +22,9 @@ class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginMeta
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'stars',
-                  'public_repo', 'license', 'type', 'icon', 'category', 'authors',
-                  'plugins')
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'title',
+                  'stars', 'public_repo', 'license', 'type', 'icon', 'category',
+                  'authors', 'documentation', 'plugins')
 
     def update(self, instance, validated_data):
         """
@@ -37,12 +37,14 @@ class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
     name = serializers.ReadOnlyField(source='meta.name')
+    title = serializers.ReadOnlyField(source='meta.title')
     public_repo = serializers.ReadOnlyField(source='meta.public_repo')
     license = serializers.ReadOnlyField(source='meta.license')
     type = serializers.ReadOnlyField(source='meta.type')
     icon = serializers.ReadOnlyField(source='meta.icon')
     category = serializers.ReadOnlyField(source='meta.category')
     authors = serializers.ReadOnlyField(source='meta.authors')
+    documentation = serializers.ReadOnlyField(source='meta.documentation')
     stars = serializers.ReadOnlyField(source='meta.stars')
     meta = serializers.HyperlinkedRelatedField(view_name='pluginmeta-detail',
                                                read_only=True)
