@@ -194,17 +194,17 @@ class PluginInstanceManagerTests(TestCase):
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
-        # max number of attempts at 5 second intervals.
-        maxLoopTries = 30
+        # max number of attempts at 10 second intervals.
+        maxLoopTries = 20
         currentLoop = 1
         b_checkAgain = True
-        time.sleep(5)
+        time.sleep(10)
         while b_checkAgain:
             str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             elif currentLoop < maxLoopTries:
-                time.sleep(5)
+                time.sleep(10)
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
             currentLoop += 1
