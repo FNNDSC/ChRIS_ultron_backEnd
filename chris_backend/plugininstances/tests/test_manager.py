@@ -30,8 +30,7 @@ class PluginInstanceManagerTests(TestCase):
                               'optional': False, 'flag': '--dir', 'short_flag': '-d',
                               'help': 'test plugin', 'ui_exposed': True}]
 
-        self.plg_data = {'title': 'Dir plugin',
-                         'description': 'A simple chris fs app demo',
+        self.plg_data = {'description': 'A simple chris fs app demo',
                          'version': '0.1',
                          'dock_image': 'fnndsc/pl-simplefsapp',
                          'execshell': 'python3',
@@ -39,6 +38,7 @@ class PluginInstanceManagerTests(TestCase):
                          'selfexec': 'simplefsapp.py'}
 
         self.plg_meta_data = {'name': self.plugin_fs_name,
+                              'title': 'Dir plugin',
                               'license': 'MIT',
                               'type': 'fs',
                               'icon': 'http://github.com/plugin',
@@ -195,9 +195,10 @@ class PluginInstanceManagerTests(TestCase):
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
-        maxLoopTries = 15
+        maxLoopTries = 20
         currentLoop = 1
         b_checkAgain = True
+        time.sleep(10)
         while b_checkAgain:
             str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
             if str_responseStatus == 'finishedSuccessfully':

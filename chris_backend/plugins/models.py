@@ -77,6 +77,7 @@ class PluginMeta(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
+    title = models.CharField(max_length=400, blank=True)
     stars = models.IntegerField(default=0)
     public_repo = models.URLField(max_length=300, blank=True)
     license = models.CharField(max_length=50, blank=True)
@@ -84,6 +85,7 @@ class PluginMeta(models.Model):
     icon = models.URLField(max_length=300, blank=True)
     category = models.CharField(max_length=100, blank=True)
     authors = models.CharField(max_length=200, blank=True)
+    documentation = models.CharField(max_length=800, blank=True)
 
     class Meta:
         ordering = ('type', '-creation_date',)
@@ -102,10 +104,24 @@ class PluginMetaFilter(FilterSet):
                                                   lookup_expr='lte')
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='type', lookup_expr='exact')
     authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
-    name_authors_category = django_filters.CharFilter(method='search_name_authors_category')
+    name_title_category = django_filters.CharFilter(method='search_name_title_category')
+    name_authors_category = django_filters.CharFilter(
+        method='search_name_authors_category')
+
+    def search_name_title_category(self, queryset, name, value):
+        """
+        Custom method to get a filtered queryset with all plugins for which name or title
+        or category matches the search value.
+        """
+        # construct the full lookup expression.
+        lookup = models.Q(name__icontains=value)
+        lookup = lookup | models.Q(title__icontains=value)
+        lookup = lookup | models.Q(category__icontains=value)
+        return queryset.filter(lookup)
 
     def search_name_authors_category(self, queryset, name, value):
         """
@@ -120,8 +136,9 @@ class PluginMetaFilter(FilterSet):
 
     class Meta:
         model = PluginMeta
-        fields = ['id', 'name', 'name_exact', 'category', 'type', 'authors',
-                  'min_creation_date', 'max_creation_date', 'name_authors_category']
+        fields = ['id', 'name', 'name_exact', 'title', 'category', 'type', 'authors',
+                  'min_creation_date', 'max_creation_date', 'name_title_category',
+                  'name_authors_category']
 
 
 class Plugin(models.Model):
@@ -141,9 +158,7 @@ class Plugin(models.Model):
     execshell = models.CharField(max_length=50)
     selfpath = models.CharField(max_length=512)
     selfexec = models.CharField(max_length=50)
-    title = models.CharField(max_length=400, blank=True)
     description = models.CharField(max_length=800, blank=True)
-    documentation = models.CharField(max_length=800, blank=True)
     min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     max_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
@@ -188,7 +203,7 @@ class PluginFilter(FilterSet):
                                                   lookup_expr='lte')
     name = django_filters.CharFilter(field_name='meta__name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='meta__name', lookup_expr='exact')
-    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    title = django_filters.CharFilter(field_name='meta__title', lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='meta__category',
                                          lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='meta__type', lookup_expr='exact')
@@ -205,7 +220,7 @@ class PluginFilter(FilterSet):
         """
         # construct the full lookup expression.
         lookup = models.Q(meta__name__icontains=value)
-        lookup = lookup | models.Q(title__icontains=value)
+        lookup = lookup | models.Q(meta__title__icontains=value)
         lookup = lookup | models.Q(meta__category__icontains=value)
         return queryset.filter(lookup)
 

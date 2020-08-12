@@ -22,8 +22,7 @@ class PluginManagerTests(TestCase):
                               'optional': True, 'flag': '--dir', 'short_flag': '-d',
                               'default': '/', 'help': 'test plugin', 'ui_exposed': True}]
 
-        self.plg_data = {'title': 'Dir plugin',
-                         'description': 'A simple chris fs app demo',
+        self.plg_data = {'description': 'A simple chris fs app demo',
                          'version': '0.1',
                          'dock_image': 'fnndsc/pl-simplecopyapp',
                          'execshell': 'python3',
@@ -31,6 +30,7 @@ class PluginManagerTests(TestCase):
                          'selfexec': 'simplefsapp.py'}
 
         self.plg_meta_data = {'name':  self.plugin_fs_name,
+                              'title': 'Dir plugin',
                               'license': 'MIT',
                               'type': 'fs',
                               'icon': 'http://github.com/plugin',

@@ -160,13 +160,15 @@ class PluginManager(object):
         Private utility method to register/add a new plugin into the system.
         """
         meta_data = {'name': plg_repr.pop('name'),
+                     'title': plg_repr.pop('title', ''),
                      'stars': plg_repr.pop('stars', 0),
                      'public_repo': plg_repr.pop('public_repo', ''),
                      'license': plg_repr.pop('license', ''),
                      'type': plg_repr.pop('type'),
                      'icon': plg_repr.pop('icon', ''),
                      'category': plg_repr.pop('category', ''),
-                     'authors': plg_repr.pop('authors', '')}
+                     'authors': plg_repr.pop('authors', ''),
+                     'documentation': plg_repr.pop('documentation', '')}
         parameters_data = plg_repr.pop('parameters')
 
         # check whether plugin_name does not exist and validate the plugin meta data
