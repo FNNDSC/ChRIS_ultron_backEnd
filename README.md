@@ -35,10 +35,10 @@ running with no mess, no fuss:
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
 # Run full CUBE instantiation with tests:
-*unmake* ; sudo rm -fr FS; rm -fr FS; *make*
+./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
 
 # Skip unit and integration tests and the intro:
-*unmake* ; sudo rm -fr FS; rm -fr FS; *make* -U -I -s
+./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
 ```
 The resulting instance uses the default Django development server and therefore is not suitable for production.
 
