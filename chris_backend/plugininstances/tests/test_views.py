@@ -316,11 +316,12 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "simplefsapp")
+        self.assertContains(response, 'started')
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
-        maxLoopTries = 20
+        maxLoopTries = 15
         currentLoop = 1
         b_checkAgain = True
         time.sleep(10)
