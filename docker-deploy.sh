@@ -40,9 +40,7 @@ if [[ "$1" == 'up' ]]; then
     windowBottom
 
     title -d 1 "Checking required FS directory tree for remote services in host filesystem..."
-    mkdir -p FS/local
     mkdir -p FS/remote
-    mkdir -p FS/data
     chmod -R 777 FS
     export STOREBASE=$(pwd)/FS/remote
     windowBottom

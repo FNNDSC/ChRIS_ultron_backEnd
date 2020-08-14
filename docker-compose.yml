@@ -112,8 +112,6 @@ services:
 
   pfcon_service:
     image: ${CHRISREPO}/pfcon
-    volumes:
-      - ./FS/data:/data
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
     env_file:
       - ./secrets/.pfcon_service.env
