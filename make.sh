@@ -309,27 +309,25 @@ else
     windowBottom
 
     title -d 1 "Checking that FS directory tree is empty..."
-        mkdir -p FS/local
         mkdir -p FS/remote
-        mkdir -p FS/data
         chmod -R 777 FS
         b_FSOK=1
         type -all tree >/dev/null 2>/dev/null
         if (( ! $? )) ; then
             tree FS                                                     | ./boxes.sh
             report=$(tree FS | tail -n 1)
-            if [[ "$report" != "3 directories, 0 files" ]] ; then
+            if [[ "$report" != "1 directories, 0 files" ]] ; then
                 b_FSOK=0
             fi
         else
             report=$(find FS 2>/dev/null)
             lines=$(echo "$report" | wc -l)
-            if (( lines != 4 )) ; then
+            if (( lines != 2 )) ; then
                 b_FSOK=0
             fi
         fi
         if (( ! b_FSOK )) ; then
-            printf "There should only be 3 directories and no files in the FS tree!\n"  | ./boxes.sh ${Red}
+            printf "There should only be 1 directory and no files in the FS tree!\n"  | ./boxes.sh ${Red}
             printf "Please manually clean/delete the entire FS tree and re-run.\n"      | ./boxes.sh ${Yellow}
             printf "\nThis script will now exit with code '1'.\n\n"                     | ./boxes.sh ${Yellow}
             exit 1

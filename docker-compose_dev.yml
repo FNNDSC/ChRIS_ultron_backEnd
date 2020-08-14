@@ -127,8 +127,6 @@ services:
 
   pfcon_service:
     image: ${PFCONREPO}/pfcon${TAG}
-    volumes:
-      - ./FS/data:/data:z
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
     ports:
       - "5005:5005"

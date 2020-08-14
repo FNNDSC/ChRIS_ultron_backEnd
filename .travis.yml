@@ -31,9 +31,7 @@ install:
 before_script:
   - docker swarm init --advertise-addr 127.0.0.1
   - chmod -R 755 $(pwd)
-  - mkdir -p FS/local
   - mkdir -p FS/remote
-  - mkdir -p FS/data
   - chmod -R 777 FS
   - export STOREBASE=$(pwd)/FS/remote
   - docker-compose -f docker-compose_dev.yml up -d
