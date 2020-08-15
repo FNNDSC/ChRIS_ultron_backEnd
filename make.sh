@@ -316,7 +316,7 @@ else
         if (( ! $? )) ; then
             tree FS                                                     | ./boxes.sh
             report=$(tree FS | tail -n 1)
-            if [[ "$report" != "1 directories, 0 files" ]] ; then
+            if [[ "$report" != "1 directory, 0 files" ]] ; then
                 b_FSOK=0
             fi
         else
@@ -325,6 +325,7 @@ else
             if (( lines != 2 )) ; then
                 b_FSOK=0
             fi
+            echo "lines is $lines"
         fi
         if (( ! b_FSOK )) ; then
             printf "There should only be 1 directory and no files in the FS tree!\n"  | ./boxes.sh ${Red}
