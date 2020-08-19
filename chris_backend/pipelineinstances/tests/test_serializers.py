@@ -4,7 +4,7 @@ from unittest import mock
 
 from django.test import TestCase
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import serializers
 
 from plugininstances.models import PluginInstance
@@ -14,6 +14,9 @@ from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParam
 from pipelines.models import Pipeline, PluginPiping
 from pipelineinstances.models import PipelineInstance
 from pipelineinstances.serializers import PipelineInstanceSerializer
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class SerializerTests(TestCase):
@@ -32,7 +35,7 @@ class SerializerTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')

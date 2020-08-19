@@ -4,7 +4,7 @@ from unittest import mock
 
 from django.test import TestCase
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import serializers
 
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
@@ -12,6 +12,9 @@ from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import (PathParameterSerializer,
                                          UnextpathParameterSerializer)
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class SerializerTests(TestCase):
@@ -48,7 +51,7 @@ class SerializerTests(TestCase):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a plugin
         data = self.plg_meta_data.copy()

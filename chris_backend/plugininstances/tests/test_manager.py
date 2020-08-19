@@ -16,6 +16,9 @@ from plugininstances.models import PluginInstance, PathParameter, ComputeResourc
 from plugininstances.services.manager import PluginInstanceManager
 
 
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+
+
 class PluginInstanceManagerTests(TestCase):
     
     def setUp(self):
@@ -51,7 +54,7 @@ class PluginInstanceManagerTests(TestCase):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a plugin
         data = self.plg_meta_data.copy()

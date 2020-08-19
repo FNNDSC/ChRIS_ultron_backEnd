@@ -18,6 +18,9 @@ from plugininstances.models import swiftclient
 from plugininstances.models import PluginInstanceManager
 
 
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+
+
 class ModelTests(TestCase):
 
     def setUp(self):
@@ -33,7 +36,7 @@ class ModelTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name,

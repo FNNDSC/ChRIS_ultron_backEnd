@@ -72,10 +72,6 @@ conn.put_container(SWIFT_CONTAINER_NAME)
 CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
-# PFCON SERVICE CONFIGURATION
-PFCON_URL = get_secret('PFCON_URL')
-
-
 # LOGGING CONFIGURATION
 # See http://docs.djangoproject.com/en/2.2/topics/logging for
 # more details on how to customize your logging configuration.

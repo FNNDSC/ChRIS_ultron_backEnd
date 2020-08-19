@@ -39,17 +39,21 @@ class PluginManager(object):
         parser_add = subparsers.add_parser('add', help='add a new compute resource')
         parser_add.add_argument('computeresource',
                                 help="compute resource where plugins' instances run")
-        parser_add.add_argument('description',
-                                help="compute resource description")
+        parser_add.add_argument('url',
+                                help="compute resource's url")
+        parser_add.add_argument('--description', default='',
+                                help="compute resource's description")
 
         # create the parser for the "modify" command
         parser_modify = subparsers.add_parser('modify',
                                               help='modify existing compute resource')
         parser_modify.add_argument('computeresource', help="compute resource")
         parser_modify.add_argument('--name',
-                                help="compute resource new name")
-        parser_modify.add_argument('--description',
-                                help="compute resource new description")
+                                help="compute resource's new name")
+        parser_modify.add_argument('--url',
+                                help="compute resource's new url")
+        parser_modify.add_argument('--description', default='',
+                                help="compute resource's new description")
 
         # create parser for the "register" command
         parser_register = subparsers.add_parser(
@@ -73,7 +77,7 @@ class PluginManager(object):
 
         self.parser = parser
 
-    def add_compute_resource(self, name, description):
+    def add_compute_resource(self, name, url, description):
         """
         Add a new compute resource to the system.
         """
@@ -81,13 +85,13 @@ class PluginManager(object):
         try:
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
-            data = {'name': name, 'description': description}
+            data = {'name': name, 'compute_url': url, 'description': description}
             compute_resource_serializer = ComputeResourceSerializer(data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
         return cr
 
-    def modify_compute_resource(self, name, new_name, description):
+    def modify_compute_resource(self, name, new_name, url, description):
         """
         Modify an existing compute resource and add the current date as a new
         modification date.
@@ -96,12 +100,11 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             raise NameError("Compute resource '%s' does not exists" % name)
-        if new_name or description:
-            data = {'name': cr.name, 'description': cr.description}
-            if new_name:
-                data['name'] = new_name
-            if description:
-                data['description'] = description
+        if new_name or url or description:
+            data = {}
+            data['name'] = new_name if new_name else cr.name
+            data['compute_url'] = url if url else cr.compute_url
+            data['description'] = description if description else cr.description
             compute_resource_serializer = ComputeResourceSerializer(cr, data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
@@ -241,10 +244,11 @@ class PluginManager(object):
         """
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
-            self.add_compute_resource(options.computeresource, options.description)
+            self.add_compute_resource(options.computeresource, options.url,
+                                      options.description)
         elif options.subparser_name == 'modify':
             self.modify_compute_resource(options.computeresource, options.name,
-                                         options.description)
+                                         options.url, options.description)
         elif options.subparser_name == 'register':
             if options.pluginurl:
                 self.register_plugin_by_url(options.pluginurl, options.computeresource,

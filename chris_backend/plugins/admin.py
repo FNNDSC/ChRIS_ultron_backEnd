@@ -18,7 +18,7 @@ plugin_readonly_fields = [fld.name for fld in Plugin._meta.fields if
 
 class ComputeResourceAdmin(admin.ModelAdmin):
     readonly_fields = ['creation_date', 'modification_date']
-    list_display = ('name', 'description', 'id')
+    list_display = ('name', 'compute_url', 'description', 'id')
     list_filter = ['name', 'creation_date', 'modification_date']
     search_fields = ['name', 'description']
 
@@ -26,14 +26,15 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         """
         Overriden to only show the required fields in the add compute resource page.
         """
-        self.fields = ['name', 'description']
+        self.fields = ['name', 'compute_url', 'description']
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """
         Overriden to show all compute resources's fields in the compute resource page.
         """
-        self.fields = ['name', 'description', 'creation_date', 'modification_date']
+        self.fields = ['name', 'compute_url', 'description', 'creation_date',
+                       'modification_date']
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 

@@ -9,7 +9,6 @@ Local settings
 """
 
 from .common import *  # noqa
-import os
 import swiftclient
 
 # Quick-start development settings - unsuitable for production
@@ -84,10 +83,7 @@ conn = swiftclient.Connection(
 conn.put_container(SWIFT_CONTAINER_NAME)
 
 # ChRIS store settings
-CHRIS_STORE_URL = 'http://chrisstore:8010/api/v1/'
-
-# pfcon service settings
-PFCON_URL = 'http://pfcon_service:5005'
+CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
@@ -125,6 +121,8 @@ INSTALLED_APPS += ['django_extensions']
 # TESTING
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+
+COMPUTE_RESOURCE_URL = 'http://pfcon.local:5005'
 
 # corsheaders
 # ------------------------------------------------------------------------------

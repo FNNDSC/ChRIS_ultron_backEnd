@@ -19,9 +19,9 @@ This page describes how to quickly get the set of services comprising the ChRIS 
 #### Install latest Docker and Docker Compose. 
 
 Currently tested platforms:
-* ``Docker 17.04.0+``
-* ``Docker Compose 1.10.0+``
-* ``Ubuntu 16.04+ and MAC OS X 10.11+``
+* ``Docker 18.06.0+``
+* ``Docker Compose 1.22.0+``
+* ``Ubuntu 18.04+ and MAC OS X 10.14+``
 
 #### On a Linux machine make sure to add your computer user to the ``docker`` group
 
