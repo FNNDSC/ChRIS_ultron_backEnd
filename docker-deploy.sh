@@ -73,10 +73,8 @@ if [[ "$1" == 'up' ]]; then
     windowBottom
 
     title -d 1 "Waiting until ChRIS store is ready to accept connections..."
-    docker-compose exec chrisstore sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
+    docker-compose exec chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
-
-
 
     title -d 1 "Waiting until CUBE is ready to accept connections..."
     docker-compose exec chris sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
@@ -85,7 +83,7 @@ if [[ "$1" == 'up' ]]; then
     if [ ! -f FS/.setup ]; then
 
         title -d 1 "Creating superuser chris in ChRIS store"
-        docker-compose exec chrisstore sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        docker-compose exec chris_store sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
         windowBottom
 
         title -d 1 "Creating superuser chris in CUBE"
@@ -93,11 +91,11 @@ if [[ "$1" == 'up' ]]; then
         windowBottom
 
         title -d 1 "Uploading the plugin fnndsc/pl-dircopy"
-        docker-compose exec chrisstore python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy.py --json 2> /dev/null)"
+        docker-compose exec chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy.py --json 2> /dev/null)"
         windowBottom
 
         title -d 1 "Adding host compute environment"
-        docker-compose exec chris python plugins/services/manager.py add host "Local compute"
+        docker-compose exec chris python plugins/services/manager.py add host "http://pfcon.local:5005" --description "Local compute"
         windowBottom
 
         title -d 1 "Registering pl-dircopy from store to CUBE"

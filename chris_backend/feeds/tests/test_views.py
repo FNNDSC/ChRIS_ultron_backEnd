@@ -5,12 +5,15 @@ import json
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from feeds.models import Note, Tag, Tagging, Feed, Comment
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ViewTests(TestCase):
@@ -34,7 +37,7 @@ class ViewTests(TestCase):
         self.feedname = "Feed1"
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create basic models
         

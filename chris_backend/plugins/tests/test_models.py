@@ -2,10 +2,14 @@
 import logging
 
 from django.test import TestCase
+from django.conf import settings
 
 from plugins.models import PluginMeta, PluginMetaFilter, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ModelTests(TestCase):
@@ -19,7 +23,7 @@ class ModelTests(TestCase):
                                              'default': "./"}}
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a plugin
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')
@@ -54,7 +58,7 @@ class ComputeResourceModelTests(ModelTests):
             self.compute_resource.delete()
         # test the success case
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="test", description="test description")
+            name="test", compute_url=COMPUTE_RESOURCE_URL)
         plugin_compute_resources = list(plugin.compute_resources.all())
         plugin_compute_resources.append(compute_resource)
         plugin.compute_resources.set(plugin_compute_resources)

@@ -37,7 +37,6 @@ class PluginInstanceManager(object):
         # a minimum job ID string length
         self.str_jid_prefix = 'chris-jid-'
 
-        self.str_http = settings.PFCON_URL
         self.c_plugin_inst = plugin_instance
 
     def run_plugin_instance_app(self, parameter_dict):
@@ -211,10 +210,11 @@ class PluginInstanceManager(object):
         str_dmsgExec = json.dumps(d_msg, indent=4, sort_keys=True)
         str_dmsgStat = json.dumps(d_status, indent=4, sort_keys=True)
 
+        remote_url = self.c_plugin_inst.compute_resource.compute_url
         str_pfurlCmdHeader = """\npfurl \\
                     --verb POST --raw --http %s/api/v1/cmd \\
                     --httpResponseBodyParse                             \\
-                    --jsonwrapper 'payload' --msg '""" % self.str_http
+                    --jsonwrapper 'payload' --msg '""" % remote_url
         str_pfurlCmdExec = str_pfurlCmdHeader + """
             %s
             '
@@ -232,11 +232,11 @@ class PluginInstanceManager(object):
         str_service = 'pfcon'
         if isinstance(d_response, dict):
             logger.info('looks like we got a successful response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', self.str_http)
+            logger.info('comms were sent to -->%s<--', remote_url)
             logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
         else:
             logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', self.str_http)
+            logger.info('comms were sent to -->%s<--', remote_url)
             logger.info('response from pfurl(): -->%s<--', d_response)
         if "Connection refused" in d_response:
             logging.error('fatal error in talking to %s', str_service)
@@ -328,11 +328,10 @@ class PluginInstanceManager(object):
         """
         This method sends the JSON 'msg' argument to the remote service.
         """
-        # pudb.set_trace()
-
+        remote_url = self.c_plugin_inst.compute_resource.compute_url
         serviceCall = pfurl.Pfurl(
             msg                     = json.dumps(d_msg),
-            http                    = self.str_http,
+            http                    = remote_url,
             verb                    = 'POST',
             # contentType             = 'application/json',
             b_raw                   = True,
