@@ -1,6 +1,43 @@
 """
 Plugin instance app manager module that provides functionality to run and check the
 execution status of a plugin instance's app (ChRIS / pfcon interface).
+
+NOTE:
+
+    This module is now executed as part of an asynchronous celery worker.
+    For instance, to debug 'check_plugin_instance_app_exec_status' method synchronously
+    with pudb.set_trace() you need to:
+
+    1. Once CUBE is running, and assuming some plugininstance has been POSTed, start a
+    python shell on the manage.py code (note <IMAGE> below is the chris:dev container):
+
+    docker exec -ti <IMAGE> python manage.py shell
+
+    You should now be in a python shell.
+
+    3. To simulate operations on a given plugin with id <id>,
+    instantiate the relevant objects (for ex, for id=1):
+
+    from plugininstances.models import PluginInstance
+    from plugininstances.services import manager
+
+    plg_inst = PluginInstance.objects.get(id=1)
+    plg_inst_manager = manager.PluginInstanceManager(plg_inst)
+
+    4. And finally, call the method:
+
+    plg_inst_manager.check_plugin_instance_app_exec_status()
+
+    Any pudb.set_trace() calls in this method will now be handled by the pudb debugger.
+
+    5. Finally, after each change to this method, reload this module:
+
+    import importlib
+    importlib.reload(manager)
+
+    and also re-instantiate the service:
+
+    plg_inst_manager = manager.PluginInstanceManager(plg_inst)
 """
 
 import logging
@@ -202,47 +239,7 @@ class PluginInstanceManager(object):
                     "service": str_IOPhost
                 }
         }
-        d_status = {
-            "action": "status",
-            "meta": {
-                "remote": {
-                    "key": str_serviceName
-                }
-            }
-        }
-        str_dmsgExec = json.dumps(d_msg, indent=4, sort_keys=True)
-        str_dmsgStat = json.dumps(d_status, indent=4, sort_keys=True)
-
-        remote_url = self.c_plugin_inst.compute_resource.compute_url
-        str_pfurlCmdHeader = """\npfurl \\
-                    --verb POST --raw --http %s/api/v1/cmd \\
-                    --httpResponseBodyParse                             \\
-                    --jsonwrapper 'payload' --msg '""" % remote_url
-        str_pfurlCmdExec = str_pfurlCmdHeader + """
-            %s
-            '
-            """ % str_dmsgExec
-        logger.info('pfurlCmdExec = %s', str_pfurlCmdExec)
-
-        str_pfurlCmdStatus = str_pfurlCmdHeader + """
-            %s
-            '
-            """ % str_dmsgStat
-        logger.info('pfurlCmdStatus = %s', str_pfurlCmdStatus)
-
-        d_response = self.app_service_call(d_msg)
-
-        str_service = 'pfcon'
-        if isinstance(d_response, dict):
-            logger.info('looks like we got a successful response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', remote_url)
-            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
-        else:
-            logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', remote_url)
-            logger.info('response from pfurl(): -->%s<--', d_response)
-        if "Connection refused" in d_response:
-            logging.error('fatal error in talking to %s', str_service)
+        self.app_service_call(d_msg)
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -250,47 +247,7 @@ class PluginInstanceManager(object):
         service to determine job status and if just finished without error,
         register output files.
         """
-        # NOTE:
-        #
-        # This is now part of an asynchronous celery worker. To debug
-        # synchronously with pudb.set_trace() you need to:
-        #
-        # 1. Once CUBE is running, and assuming some plugininstance
-        #    has been POSTed, start a python shell on the manage.py
-        #    code (note <IMAGE> below is the chris:dev container):
-        #
-        #         docker exec -ti <IMAGE> python manage.py shell
-        #
-        #     You should now be in a python shell.
-        #
-        # 3. To simulate operations on a given plugin with id <id>,
-        #    instantiate the relevant objects (for ex, for id=1):
-        #
-        #         from plugininstances.models import PluginInstance
-        #         from plugininstances.services import manager
-        #
-        #         plg_inst           = PluginInstance.objects.get(id=1)
-        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
-        #
-        # 4. And finally, call this method:
-        #
-        #         plg_inst_manager.check_plugin_instance_app_exec_status()
-        #
-        #     Any pudb.set_trace() calls in this method will now be
-        #     handled by the pudb debugger.
-        #
-        # 5. Finally, after each change to this method, reload this module:
-        #
-        #         import importlib
-        #
-        #         importlib.reload(manager)
-        #
-        #     and also re-instantiate the service
-        #
-        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
-
         # pudb.set_trace()
-
         d_msg = {
             "action": "status",
             "meta": {
@@ -344,6 +301,18 @@ class PluginInstanceManager(object):
         )
         # speak to the service...
         d_response = json.loads(serviceCall())
+
+        str_service = 'pfcon'
+        if isinstance(d_response, dict):
+            logger.info('looks like we got a successful response from %s', str_service)
+            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
+        else:
+            logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
+            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('response from pfurl(): -->%s<--', d_response)
+        if "Connection refused" in d_response:
+            logging.error('fatal error in talking to %s', str_service)
         return d_response
 
     def app_service_fsplugin_inputdirManage(self, inputdir):
@@ -386,11 +355,11 @@ class PluginInstanceManager(object):
         if str_inputdir:
             # Check if dir spec exists in swift
             try:
-                obj_exists = self.swift_manager.obj_exists(str_inputdir)
+                path_exists = self.swift_manager.path_exists(str_inputdir)
             except Exception as e:
                 logger.error('Swift storage error, detail: %s' % str(e))
                 return str_inputdir
-            if obj_exists:
+            if path_exists:
                 return str_inputdir
             str_squashFile = os.path.join(homedir,
                                           'data/squashInvalidDir/squashInvalidDir.txt')

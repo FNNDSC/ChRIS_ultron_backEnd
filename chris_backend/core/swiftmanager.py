@@ -64,6 +64,12 @@ class SwiftManager(object):
                 l_ls = [d_obj['name'] for d_obj in ld_obj]
         return l_ls
 
+    def path_exists(self, path):
+        """
+        Return True/False if passed path exists in swift storage.
+        """
+        return len(self.ls(path)) > 0
+
     def obj_exists(self, obj_path):
         """
         Return True/False if passed object exists in swift storage.
@@ -74,16 +80,15 @@ class SwiftManager(object):
         """
         Upload a file into swift storage.
         """
-        if not self.obj_exists(swift_path):
-            conn = self.get_connection()
-            try:
-                conn.put_object(self.container_name,
-                                swift_path,
-                                contents=contents,
-                                **kwargs)
-            except Exception as e:
-                logger.error(str(e))
-                raise
+        conn = self.get_connection()
+        try:
+            conn.put_object(self.container_name,
+                            swift_path,
+                            contents=contents,
+                            **kwargs)
+        except Exception as e:
+            logger.error(str(e))
+            raise
 
     def upload_files(self, local_dir, swift_prefix='', **kwargs):
         """
@@ -109,10 +114,11 @@ class SwiftManager(object):
         for root, dirs, files in os.walk(local_dir):
             swift_base = root.replace(local_dir, swift_prefix) if swift_prefix else root
             for filename in files:
-                local_file_path = os.path.join(root, filename)
-                with open(local_file_path, 'r') as f:
-                    swift_path = os.path.join(swift_base, filename)
-                    self.upload_file(swift_path, f.read(), **kwargs)
+                swift_path = os.path.join(swift_base, filename)
+                if not self.obj_exists(swift_path):
+                    local_file_path = os.path.join(root, filename)
+                    with open(local_file_path, 'r') as f:
+                        self.upload_file(swift_path, f.read(), **kwargs)
 
     def delete_obj(self, obj_path):
         """
