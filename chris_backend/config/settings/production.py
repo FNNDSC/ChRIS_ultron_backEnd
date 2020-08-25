@@ -6,7 +6,7 @@ Production Configurations
 
 from .common import *  # noqa
 from environs import Env, EnvValidationError
-import swiftclient
+from core.swiftmanager import SwiftManager
 
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
@@ -58,14 +58,13 @@ SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
 SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
 SWIFT_KEY = get_secret('SWIFT_KEY')
 SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
-SWIFT_AUTO_CREATE_CONTAINER = True
-# Initiate a swift service connection and create 'users' container
-conn = swiftclient.Connection(
-    user=SWIFT_USERNAME,
-    key=SWIFT_KEY,
-    authurl=SWIFT_AUTH_URL,
-)
-conn.put_container(SWIFT_CONTAINER_NAME)
+SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
+                           'key': SWIFT_KEY,
+                           'authurl': SWIFT_AUTH_URL}
+try:
+    SwiftManager(SWIFT_CONTAINER_NAME, SWIFT_CONNECTION_PARAMS).create_container()
+except Exception as e:
+    raise ImproperlyConfigured(str(e))
 
 
 # CHRIS STORE SERVICE CONFIGURATION

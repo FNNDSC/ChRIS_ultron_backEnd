@@ -1,13 +1,17 @@
 
+import logging
+
 from django.conf import settings
 from rest_framework import serializers
 
-import swiftclient
-
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
+from core.swiftmanager import SwiftManager
 
 from .models import PACS, PACSFile
+
+
+logger = logging.getLogger(__name__)
 
 
 class PACSSerializer(serializers.HyperlinkedModelSerializer):
@@ -72,11 +76,14 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["File path must start with 'SERVICES/PACS/'."])
         # verify that the file is indeed already in Swift
-        conn = swiftclient.Connection(user=settings.SWIFT_USERNAME,
-                                      key=settings.SWIFT_KEY,
-                                      authurl=settings.SWIFT_AUTH_URL)
-        object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
-        if not object_list:
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        try:
+            swift_path_exists = swift_manager.obj_exists(path)
+        except Exception as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
+            raise serializers.ValidationError(["Could not find this path."])
+        if not swift_path_exists:
             raise serializers.ValidationError(["Could not find this path."])
         return path
 

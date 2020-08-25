@@ -9,7 +9,11 @@ Local settings
 """
 
 from .common import *  # noqa
-import swiftclient
+from core.swiftmanager import SwiftManager
+
+# Normally you should not import ANYTHING from Django directly
+# into your settings, but ImproperlyConfigured is an exception.
+from django.core.exceptions import ImproperlyConfigured
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
@@ -73,14 +77,13 @@ SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
 SWIFT_CONTAINER_NAME = 'users'
-SWIFT_AUTO_CREATE_CONTAINER = True
-# Initiate a swift service connection and create 'users' container
-conn = swiftclient.Connection(
-    user=SWIFT_USERNAME,
-    key=SWIFT_KEY,
-    authurl=SWIFT_AUTH_URL,
-)
-conn.put_container(SWIFT_CONTAINER_NAME)
+SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
+                           'key': SWIFT_KEY,
+                           'authurl': SWIFT_AUTH_URL}
+try:
+    SwiftManager(SWIFT_CONTAINER_NAME, SWIFT_CONNECTION_PARAMS).create_container()
+except Exception as e:
+    raise ImproperlyConfigured(str(e))
 
 # ChRIS store settings
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'

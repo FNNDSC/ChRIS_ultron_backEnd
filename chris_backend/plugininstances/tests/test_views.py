@@ -11,11 +11,11 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from rest_framework import status
 
-import swiftclient
 from celery.contrib.testing.worker import start_worker
 
 from core.celery import app as celery_app
 from core.celery import task_routes
+from core.swiftmanager import SwiftManager
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PathParameter, FloatParameter, STATUS_TYPES
@@ -760,18 +760,12 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
 
     @tag('integration')
     def test_integration_fileresource_download_success(self):
-
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt',
-                            contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_file('/tests/file1.txt', file1.read(),
+                                      content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
@@ -779,7 +773,7 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
         self.assertEqual(str(response.content, 'utf-8'), "test file")
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, '/tests/file1.txt')
+        swift_manager.delete_obj('/tests/file1.txt')
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

@@ -5,6 +5,7 @@ execution status of a plugin instance's app (ChRIS / pfcon interface).
 
 import logging
 import os
+import io
 import time
 import json
 import zlib, base64
@@ -14,7 +15,7 @@ from django.conf import settings
 
 import pfurl
 
-from .swiftmanager import SwiftManager
+from core.swiftmanager import SwiftManager
 
 if settings.DEBUG:
     import pdb
@@ -38,6 +39,8 @@ class PluginInstanceManager(object):
         self.str_jid_prefix = 'chris-jid-'
 
         self.c_plugin_inst = plugin_instance
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                          settings.SWIFT_CONNECTION_PARAMS)
 
     def run_plugin_instance_app(self, parameter_dict):
         """
@@ -348,10 +351,9 @@ class PluginInstanceManager(object):
         This method is responsible for managing the 'inputdir' in the
         case of FS plugins.
 
-        Typically, an FS plugin does not have an inputdir spec, since this
-        is only a requirement for DS plugins. Nonetheless, the underlying management
-        system (pfcon/pfurl) does require some non-zero inputdir spec in order
-        to operate correctly.
+        An FS plugin does not have an inputdir spec, since this is only a requirement
+        for DS plugins. Nonetheless, the underlying management system (pfcon/pfurl) does
+        require some non-zero inputdir spec in order to operate correctly.
 
         The hack here is to store data somewhere in swift and accessing it as a
         "pseudo" inputdir for FS plugins. For example, if an FS plugin has no arguments
@@ -367,7 +369,7 @@ class PluginInstanceManager(object):
         plugins. Thus, if a type 'path' argument is specified, this 'path'
         is assumed to denote a location in object storage.
 
-        In the case then that a 'path' type argument is specified, there
+        In the case when a 'path' type argument is specified, there
         are certain important caveats:
 
             1. Only one 'path' type argument is assumed / fully supported.
@@ -378,48 +380,47 @@ class PluginInstanceManager(object):
         with the text 'squash' in its filename and the file will contain
         some descriptive message)
         """
-        str_inputdir = inputdir
+        # Remove any leading noise on the inputdir
+        str_inputdir = inputdir.strip().lstrip('.')
         homedir = os.path.expanduser("~")
-        if not str_inputdir:
-            # No parameter of type 'path' was submitted, so input dir is empty
-            str_squashFile = os.path.join(homedir,
-                                          'data/squashEmptyDir/squashEmptyDir.txt')
-            str_squashMsg = 'Empty input dir.'
-        else:
+        if str_inputdir:
             # Check if dir spec exists in swift
-            d_objExists = SwiftManager.objExists(obj=str_inputdir, prependBucketPath=True)
-            if d_objExists['status']:
-                str_inputdir = d_objExists['objPath']
+            try:
+                obj_exists = self.swift_manager.obj_exists(str_inputdir)
+            except Exception as e:
+                logger.error('Swift storage error, detail: %s' % str(e))
+                return str_inputdir
+            if obj_exists:
                 return str_inputdir
             str_squashFile = os.path.join(homedir,
                                           'data/squashInvalidDir/squashInvalidDir.txt')
             str_squashMsg = 'Path specified in object storage does not exist!'
+        else:
+            # No parameter of type 'path' was submitted, so input dir is empty
+            str_squashFile = os.path.join(homedir,
+                                          'data/squashEmptyDir/squashEmptyDir.txt')
+            str_squashMsg = 'Empty input dir.'
 
         # Check if squash file already exists in object storage
-        d_objExists = SwiftManager.objExists(obj=str_squashFile, prependBucketPath=True)
-        if d_objExists['status']:
+        try:
+            obj_exists = self.swift_manager.obj_exists(str_squashFile)
+        except Exception as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
+            return str_inputdir
+        if obj_exists:
             # Here the file was found, so 'objPath' is a file spec.
             # We need to prune this into a path spec...
-            str_inputdir = os.path.dirname(d_objExists['objPath'])
+            str_inputdir = os.path.dirname(str_squashFile)
         else:
-            try:
-                # Create a squash file with possibly descriptive message...
-                str_squashFilePath = os.path.split(str_squashFile)[0]
-                if not os.path.exists(str_squashFilePath):
-                    os.makedirs(str_squashFilePath)
-                os.chdir(str_squashFilePath)
-                with open(str_squashFile, 'w') as f:
-                    print(str_squashMsg, file=f)
-                # and push to swift...
-                d_objPut = SwiftManager.objPut(
-                    file=str_squashFile,
-                    prependBucketPath=True
-                )
-                str_swiftLocation = d_objPut['objectFileList'][0]
-                str_inputdir = os.path.dirname(str_swiftLocation)
-            except Exception as e:
-                logger.exception(e)
-                #logger.debug('Could not create squash file', exc_info=True)
+            # Create a squash file in Swift storage with descriptive message...
+            with io.StringIO(str_squashMsg) as f:
+                try:
+                    self.swift_manager.upload_file(str_squashFile, f.read(),
+                                                   content_type='text/plain')
+                except Exception as e:
+                    logger.error('Swift storage error, detail: %s' % str(e))
+                else:
+                    str_inputdir = os.path.dirname(str_squashFile)
         return str_inputdir
 
     def app_register_files(self, d_response, d_msg):
