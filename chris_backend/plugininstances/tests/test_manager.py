@@ -8,8 +8,7 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-import swiftclient
-
+from core.swiftmanager import SwiftManager
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
@@ -214,15 +213,7 @@ class PluginInstanceManagerTests(TestCase):
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         str_fileCreatedByPlugin = os.path.join(pl_inst.get_output_path(), 'out.txt')
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # make sure str_fileCreatedByPlugin file was created in Swift storage
-        object_list = conn.get_container(
-            settings.SWIFT_CONTAINER_NAME,
-            prefix=str_fileCreatedByPlugin,
-            full_listing=True)[1]
-        self.assertEqual(object_list[0]['name'], str_fileCreatedByPlugin)
+        self.assertTrue(swift_manager.obj_exists(str_fileCreatedByPlugin))

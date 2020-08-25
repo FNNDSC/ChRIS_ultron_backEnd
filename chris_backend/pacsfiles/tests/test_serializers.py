@@ -10,7 +10,7 @@ from rest_framework import serializers
 
 from pacsfiles.models import PACS, PACSFile
 from pacsfiles.serializers import PACSFileSerializer
-from pacsfiles.serializers import swiftclient
+from pacsfiles.serializers import SwiftManager
 
 
 class PACSFileSerializerTests(TestCase):
@@ -43,20 +43,12 @@ class PACSFileSerializerTests(TestCase):
         """
         pacsfiles_serializer = PACSFileSerializer()
         path = 'SERVICES/PACS/MyPACS/123456-Jorge/brain/brain_mri/file1.dcm'
-        object_list = []
-        container_data = ['', object_list]
 
-        with mock.patch.object(swiftclient.Connection, '__init__',
-                               return_value=None) as conn_init_mock:
-            with mock.patch.object(swiftclient.Connection, 'get_container',
-                                   return_value=container_data) as conn_get_container_mock:
-                with self.assertRaises(serializers.ValidationError):
-                    pacsfiles_serializer.validate_path(path)
-                conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
-                                                  key=settings.SWIFT_KEY,
-                                                  authurl=settings.SWIFT_AUTH_URL)
-                conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
-                                                   prefix=path)
+        with mock.patch.object(SwiftManager, 'obj_exists',
+                               return_value=False) as obj_exists_mock:
+            with self.assertRaises(serializers.ValidationError):
+                pacsfiles_serializer.validate_path(path)
+            obj_exists_mock.assert_called_with(path.strip(' ').strip('/'))
 
     @tag('integration')
     def test_integration_validate_path_failure_does_not_exist(self):
@@ -76,28 +68,20 @@ class PACSFileSerializerTests(TestCase):
         """
         pacsfiles_serializer = PACSFileSerializer()
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME)
-
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, path, contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_file(path, file1.read(), content_type='text/plain')
+
         for _ in range(20):
-            object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
-            if object_list:
+            if swift_manager.obj_exists(path):
                 break
             time.sleep(0.2)
         self.assertEqual(pacsfiles_serializer.validate_path(path), path)
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, path)
+        swift_manager.delete_obj(path)
 
     def test_validate_updates_validated_data(self):
         """
