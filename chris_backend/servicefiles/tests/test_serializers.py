@@ -110,7 +110,7 @@ class ServiceFileSerializerTests(TestCase):
                                      settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file(path, file1.read(), content_type='text/plain')
+            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
         for _ in range(20):
             if swift_manager.obj_exists(path):
                 break

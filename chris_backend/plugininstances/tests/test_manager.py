@@ -84,8 +84,8 @@ class PluginInstanceManagerTests(TestCase):
         """
         Test whether the manager can run an already registered plugin app.
         """
-        with mock.patch.object(PluginInstanceManager, 'app_service_call',
-                               return_value='response') as app_service_call_mock:
+        with mock.patch.object(PluginInstanceManager, 'call_app_service',
+                               return_value='response') as call_app_service_mock:
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
             (pl_inst, tf) = PluginInstance.objects.get_or_create(
@@ -99,7 +99,7 @@ class PluginInstanceManagerTests(TestCase):
             plg_inst_manager = PluginInstanceManager(pl_inst)
             plg_inst_manager.run_plugin_instance_app(parameter_dict)
             self.assertEqual(pl_inst.status, 'started')
-            app_service_call_mock.assert_called_once()
+            call_app_service_mock.assert_called_once()
 
     @tag('integration')
     def test_integration_mananger_can_run_registered_plugin_app(self):
@@ -142,8 +142,8 @@ class PluginInstanceManagerTests(TestCase):
         Test whether the manager can check a plugin's app execution status
         """
         pass
-        # with mock.patch.object(PluginInstanceManager, 'app_service_call',
-        #                        return_value='response') as app_service_call_mock:
+        # with mock.patch.object(PluginInstanceManager, 'call_app_service',
+        #                        return_value='response') as call_app_service_mock:
         #
         #     user = User.objects.get(username=self.username)
         #     plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
@@ -161,11 +161,11 @@ class PluginInstanceManagerTests(TestCase):
         #         "action": "status",
         #         "meta": {
         #             "remote": {
-        #                 "key": plg_inst_manager.str_jid_prefix + str(pl_inst.id)
+        #                 "key": plg_inst_manager.str_job_id
         #             }
         #         }
         #     }
-        #     app_service_call_mock.assert_called_with(msg)
+        #     call_app_service_mock.assert_called_with(msg)
 
     @tag('integration', 'error-pman')
     def test_integration_mananger_can_check_plugin_instance_app_exec_status(self):

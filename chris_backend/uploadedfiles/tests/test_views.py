@@ -181,7 +181,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
         # upload file to Swift storage
         upload_path = "{}/uploads/file1.txt".format(self.username)
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file(upload_path, file1.read(), content_type='text/plain')
+            swift_manager.upload_obj(upload_path, file1.read(), content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
