@@ -75,7 +75,7 @@ class ServiceFileListViewTests(ServiceFileViewTests):
 
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file(path, file1.read(), content_type='text/plain')
+            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
 
         # make the POST request using the chris user
         self.client.login(username=chris_username, password=chris_password)
@@ -174,7 +174,7 @@ class ServiceFileResourceViewTests(ServiceFileViewTests):
                                      settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file(self.path, file1.read(), content_type='text/plain')
+            swift_manager.upload_obj(self.path, file1.read(), content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)

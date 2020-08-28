@@ -5,7 +5,8 @@ Swift storage manager module.
 import logging
 import os
 
-import swiftclient
+from swiftclient import Connection
+from swiftclient.exceptions import ClientException
 
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,8 @@ class SwiftManager(object):
         if self._conn is not None:
             return self._conn
         try:
-            self._conn = swiftclient.Connection(**self.conn_params)
-        except Exception as e:
+            self._conn = Connection(**self.conn_params)
+        except ClientException as e:
             logger.error(str(e))
             raise
         return self._conn
@@ -40,7 +41,7 @@ class SwiftManager(object):
         conn = self.get_connection()
         try:
             conn.put_container(self.container_name)
-        except Exception as e:
+        except ClientException as e:
             logger.error(str(e))
             raise
 
@@ -57,7 +58,7 @@ class SwiftManager(object):
                 ld_obj = conn.get_container(self.container_name,
                                             prefix=path,
                                             full_listing=True)[1]
-            except Exception as e:
+            except ClientException as e:
                 logger.error(str(e))
                 raise
             else:
@@ -74,11 +75,20 @@ class SwiftManager(object):
         """
         Return True/False if passed object exists in swift storage.
         """
-        return obj_path in self.ls(obj_path)
+        conn = self.get_connection()
+        try:
+            conn.head_object(self.container_name, obj_path)
+        except ClientException as e:
+            if e.http_status == 404:
+                return False
+            else:
+                logger.error(str(e))
+                raise
+        return True
 
-    def upload_file(self, swift_path, contents, **kwargs):
+    def upload_obj(self, swift_path, contents, **kwargs):
         """
-        Upload a file into swift storage.
+        Upload an object (a file contents) into swift storage.
         """
         conn = self.get_connection()
         try:
@@ -86,7 +96,31 @@ class SwiftManager(object):
                             swift_path,
                             contents=contents,
                             **kwargs)
-        except Exception as e:
+        except ClientException as e:
+            logger.error(str(e))
+            raise
+
+    def download_obj(self, obj_path, **kwargs):
+        """
+        Download an object from swift storage.
+        """
+        conn = self.get_connection()
+        try:
+            resp_headers, obj_contents = conn.get_object(self.container_name,
+                                                         obj_path, **kwargs)
+        except ClientException as e:
+            logger.error(str(e))
+            raise
+        return obj_contents
+
+    def delete_obj(self, obj_path):
+        """
+        Delete an object from swift storage.
+        """
+        conn = self.get_connection()
+        try:
+            conn.delete_object(self.container_name, obj_path)
+        except ClientException as e:
             logger.error(str(e))
             raise
 
@@ -118,15 +152,4 @@ class SwiftManager(object):
                 if not self.obj_exists(swift_path):
                     local_file_path = os.path.join(root, filename)
                     with open(local_file_path, 'r') as f:
-                        self.upload_file(swift_path, f.read(), **kwargs)
-
-    def delete_obj(self, obj_path):
-        """
-        Delete an object from swift storage.
-        """
-        conn = self.get_connection()
-        try:
-            conn.delete_object(self.container_name, obj_path)
-        except Exception as e:
-            logger.error(str(e))
-            raise
+                        self.upload_obj(swift_path, f.read(), **kwargs)

@@ -764,7 +764,7 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
                                      settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file('/tests/file1.txt', file1.read(),
+            swift_manager.upload_obj('/tests/file1.txt', file1.read(),
                                       content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)

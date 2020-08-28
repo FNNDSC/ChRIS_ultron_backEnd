@@ -227,7 +227,7 @@ class PluginInstanceModelTests(ModelTests):
         output_path = plg_inst.get_output_path()
         path = output_path + '/file1.txt'
         with io.StringIO("test file") as file1:
-            swift_manager.upload_file(path, file1.read(),
+            swift_manager.upload_obj(path, file1.read(),
                                       content_type='text/plain')
 
         plg_inst.register_output_files(swiftState={'d_swiftstore': {'filesPushed': 1}})
