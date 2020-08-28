@@ -45,11 +45,12 @@ class SwiftManager(object):
             logger.error(str(e))
             raise
 
-    def ls(self, path):
+    def ls(self, path, **kwargs):
         """
         Return a list of objects in the swift storage with the provided path
         as a prefix.
         """
+        b_full_listing = kwargs.get('full_listing', True)
         l_ls = []  # listing of names to return
         if path:
             conn = self.get_connection()
@@ -57,7 +58,7 @@ class SwiftManager(object):
                 # get the full list of objects in Swift storage with given prefix
                 ld_obj = conn.get_container(self.container_name,
                                             prefix=path,
-                                            full_listing=True)[1]
+                                            full_listing=b_full_listing)[1]
             except ClientException as e:
                 logger.error(str(e))
                 raise
@@ -69,7 +70,7 @@ class SwiftManager(object):
         """
         Return True/False if passed path exists in swift storage.
         """
-        return len(self.ls(path)) > 0
+        return len(self.ls(path, full_listing=False)) > 0
 
     def obj_exists(self, obj_path):
         """
@@ -112,6 +113,18 @@ class SwiftManager(object):
             logger.error(str(e))
             raise
         return obj_contents
+
+    def copy_obj(self, obj_path, dest_path, **kwargs):
+        """
+        Copy an object to a new destination in swift storage.
+        """
+        conn = self.get_connection()
+        dest = os.path.join('/' + self.container_name, dest_path.lstrip('/'))
+        try:
+            conn.copy_object(self.container_name, obj_path, dest, **kwargs)
+        except ClientException as e:
+            logger.error(str(e))
+            raise
 
     def delete_obj(self, obj_path):
         """
