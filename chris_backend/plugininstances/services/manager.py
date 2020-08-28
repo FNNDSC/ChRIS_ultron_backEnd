@@ -356,7 +356,6 @@ class PluginInstanceManager(object):
         """
         # Remove any leading noise on the inputdir
         str_inputdir = inputdir.strip().lstrip('.')
-        homedir = os.path.expanduser("~")
         if str_inputdir:
             # Check if dir spec exists in swift
             try:
@@ -366,13 +365,17 @@ class PluginInstanceManager(object):
                 return str_inputdir
             if path_exists:
                 return str_inputdir
-            str_squashFile = os.path.join(homedir,
-                                          'data/squashInvalidDir/squashInvalidDir.txt')
+            str_squashFile = os.path.join(
+                self.data_dir,
+                'squashInvalidDir/squashInvalidDir.txt'
+            ).lstrip('/')
             str_squashMsg = 'Path specified in object storage does not exist!'
         else:
             # No parameter of type 'path' was submitted, so input dir is empty
-            str_squashFile = os.path.join(homedir,
-                                          'data/squashEmptyDir/squashEmptyDir.txt')
+            str_squashFile = os.path.join(
+                self.data_dir,
+                'squashEmptyDir/squashEmptyDir.txt'
+            ).lstrip('/')
             str_squashMsg = 'Empty input dir.'
 
         try:
