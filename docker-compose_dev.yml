@@ -19,16 +19,16 @@ services:
     image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-    environment:
-      - CHRIS_DEBUG_QUIET
     ports:
       - "8000:8000"
     depends_on:
       - chris_dev_db
       - swift_service
       - queue
-      - chrisstore
+      - chris_store
       - pfcon_service
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
@@ -48,6 +48,8 @@ services:
       - swift_service
       - queue
       - pfcon_service
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Worker"
       role: "Backend development async worker"
@@ -61,17 +63,21 @@ services:
       - MYSQL_DATABASE=chris_dev
       - MYSQL_USER=chris
       - MYSQL_PASSWORD=Chris1234
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Backend development database"
 
   queue:
     image: rabbitmq:3
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Task Queue"
       role: "Backend development async task queue"
 
-  chrisstore:
+  chris_store:
     image: ${STOREREPO}/chris_store
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
@@ -94,6 +100,10 @@ services:
     depends_on:
       - chris_store_db
       - swift_service
+    networks:
+      local:
+        aliases:
+          - chris-store.local
     labels:
       name: "ChRIS_store"
       role: "Chris store service"
@@ -107,6 +117,8 @@ services:
       - MYSQL_DATABASE=chris_store
       - MYSQL_USER=chris
       - MYSQL_PASSWORD=Chris1234
+    networks:
+      - local
     labels:
       name: "ChRIS_store MySQL Database"
       role: "Chris store database"
@@ -121,6 +133,8 @@ services:
       - SWIFT_KEY=testing
     ports:
       - "8080:8080"
+    networks:
+      - local
     labels:
       name: "Swift"
       role: "Swift object storage service"
@@ -134,6 +148,10 @@ services:
       - swift_service
       - pman_service
       - pfioh_service
+    networks:
+      local:
+        aliases:
+          - pfcon.local
     labels:
       name: "pfcon"
       role: "pfcon service"
@@ -148,6 +166,8 @@ services:
       - ./FS/remote:/hostFS/storeBase:z
     ports:
       - "5055:5055"
+    networks:
+      - local
     labels:
       name: "pfioh"
       role: "pfioh service"
@@ -177,9 +197,14 @@ services:
       - ./FS/remote:/hostFS/storeBase:z
     ports:
       - "5010:5010"
+    networks:
+      - local
     labels:
       name: "pman"
       role: "pman service"
+
+networks:
+  local:
 
 volumes:
   chris_dev_db_data:

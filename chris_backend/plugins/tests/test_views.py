@@ -4,12 +4,15 @@ import logging
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ViewTests(TestCase):
@@ -22,7 +25,7 @@ class ViewTests(TestCase):
         self.password = 'bar'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create API user
         User.objects.create_user(username=self.username,
@@ -65,7 +68,7 @@ class ComputeResourceListViewTests(ViewTests):
     def test_compute_resource_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "host description")
+        self.assertContains(response, COMPUTE_RESOURCE_URL)
 
     def test_compute_resource_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -84,7 +87,7 @@ class ComputeResourceListQuerySearchViewTests(ViewTests):
     def test_compute_resource_list_query_search_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "host description")
+        self.assertContains(response, COMPUTE_RESOURCE_URL)
 
     def test_compute_resource_list_query_search_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -105,7 +108,7 @@ class ComputeResourceDetailViewTests(ViewTests):
     def test_compute_resource_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
-        self.assertContains(response, "host description")
+        self.assertContains(response, COMPUTE_RESOURCE_URL)
 
     def test_compute_resource_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
@@ -246,10 +249,10 @@ class PluginComputeResourceListViewTests(ViewTests):
         self.list_url = reverse("plugin-computeresource-list", kwargs={"pk": plugin.id})
 
     def test_plugin_compute_resource_list_success(self):
-        ComputeResource.objects.get_or_create(name="new", description="new description")
+        ComputeResource.objects.get_or_create(name="new", compute_url=COMPUTE_RESOURCE_URL)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "host description")
+        self.assertContains(response, COMPUTE_RESOURCE_URL)
         self.assertNotContains(response, "new")  # compute resource list is plugin-specific
 
     def test_plugin_compute_resource_list_failure_unauthenticated(self):

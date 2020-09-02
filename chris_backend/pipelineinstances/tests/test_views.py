@@ -6,7 +6,7 @@ from unittest import mock
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin
@@ -15,6 +15,9 @@ from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParam
 from plugininstances.models import PluginInstance
 from pipelines.models import Pipeline, PluginPiping
 from pipelineinstances.models import PipelineInstance
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ViewTests(TestCase):
@@ -35,7 +38,7 @@ class ViewTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')

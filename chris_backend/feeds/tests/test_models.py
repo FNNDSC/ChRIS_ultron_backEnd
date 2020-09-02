@@ -3,10 +3,14 @@ import logging
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from feeds.models import Note, Feed
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class FeedModelTests(TestCase):
@@ -24,7 +28,7 @@ class FeedModelTests(TestCase):
         self.password = 'bar'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a "fs" plugin
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_name,

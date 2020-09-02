@@ -1,20 +1,58 @@
 """
 Plugin instance app manager module that provides functionality to run and check the
 execution status of a plugin instance's app (ChRIS / pfcon interface).
+
+NOTE:
+
+    This module is now executed as part of an asynchronous celery worker.
+    For instance, to debug 'check_plugin_instance_app_exec_status' method synchronously
+    with pudb.set_trace() you need to:
+
+    1. Once CUBE is running, and assuming some plugininstance has been POSTed, start a
+    python shell on the manage.py code (note <IMAGE> below is the chris:dev container):
+
+    docker exec -ti <IMAGE> python manage.py shell
+
+    You should now be in a python shell.
+
+    3. To simulate operations on a given plugin with id <id>,
+    instantiate the relevant objects (for ex, for id=1):
+
+    from plugininstances.models import PluginInstance
+    from plugininstances.services import manager
+
+    plg_inst = PluginInstance.objects.get(id=1)
+    plg_inst_manager = manager.PluginInstanceManager(plg_inst)
+
+    4. And finally, call the method:
+
+    plg_inst_manager.check_plugin_instance_app_exec_status()
+
+    Any pudb.set_trace() calls in this method will now be handled by the pudb debugger.
+
+    5. Finally, after each change to this method, reload this module:
+
+    import importlib
+    importlib.reload(manager)
+
+    and also re-instantiate the service:
+
+    plg_inst_manager = manager.PluginInstanceManager(plg_inst)
 """
 
 import logging
 import os
-import time
+import io
 import json
 import zlib, base64
+import zipfile
 
 from django.utils import timezone
 from django.conf import settings
 
 import pfurl
 
-from .swiftmanager import SwiftManager
+from core.swiftmanager import SwiftManager, ClientException
 
 if settings.DEBUG:
     import pdb
@@ -29,16 +67,20 @@ class PluginInstanceManager(object):
 
     def __init__(self, plugin_instance):
 
+        self.c_plugin_inst = plugin_instance
+
         # hardcode mounting points for the input and outputdir in the app's container!
         self.str_app_container_inputdir = '/share/incoming'
         self.str_app_container_outputdir = '/share/outgoing'
 
-        # A job ID prefix string. Necessary since some schedulers require
-        # a minimum job ID string length
-        self.str_jid_prefix = 'chris-jid-'
+        # some schedulers require a minimum job ID string length
+        self.str_job_id = 'chris-jid-' + str(plugin_instance.id)
 
-        self.str_http = settings.PFCON_URL
-        self.c_plugin_inst = plugin_instance
+        # local data dir to store zip files before transmitting to the remote
+        self.data_dir = os.path.join(os.path.expanduser("~"), 'data')
+
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                          settings.SWIFT_CONNECTION_PARAMS)
 
     def run_plugin_instance_app(self, parameter_dict):
         """
@@ -104,22 +146,19 @@ class PluginInstanceManager(object):
         else:
             # WARNING: Inputdir assumed to only be the last 'path' parameter!
             str_inputdir = parameter_dict[path_param_names[-1]] if path_param_names else ''
-            str_inputdir = self.app_service_fsplugin_inputdirManage(str_inputdir)
+            str_inputdir = self.manage_app_service_fsplugin_inputdir(str_inputdir)
+        #logger.debug('inputdir = %s', str_inputdir)
 
         str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
         l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
         str_allCmdLineArgs = ' '.join(l_appArgs)
         str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
         logger.info('cmd = %s', str_cmd)
-        #logger.debug('inputdir = %s', str_inputdir)
 
         str_outputdir = self.c_plugin_inst.get_output_path()
         # logger.debug('outputdir = %s', str_outputdir)
 
-        d_pluginInst = vars(self.c_plugin_inst)
-        # logger.debug('d_pluginInst = %s', d_pluginInst)
-
-        str_serviceName = self.str_jid_prefix + str(d_pluginInst['id'])
+        # logger.debug('d_pluginInst = %s', vars(self.c_plugin_inst))
         str_IOPhost = self.c_plugin_inst.compute_resource.name
         d_msg = {
             "action": "coordinate",
@@ -166,23 +205,23 @@ class PluginInstanceManager(object):
 
             "meta-compute":
                 {
-                    'cmd': "%s %s" % (self.c_plugin_inst.plugin.execshell, str_cmd),
+                    'cmd': "%s %s" % (plugin.execshell, str_cmd),
                     'threaded': True,
                     'auid': self.c_plugin_inst.owner.username,
-                    'jid': str_serviceName,
-                    'number_of_workers': str(d_pluginInst['number_of_workers']),
-                    'cpu_limit': str(d_pluginInst['cpu_limit']),
-                    'memory_limit': str(d_pluginInst['memory_limit']),
-                    'gpu_limit': d_pluginInst['gpu_limit'],
+                    'jid': self.str_job_id,
+                    'number_of_workers': str(self.c_plugin_inst.number_of_workers),
+                    'cpu_limit': str(self.c_plugin_inst.cpu_limit),
+                    'memory_limit': str(self.c_plugin_inst.memory_limit),
+                    'gpu_limit': str(self.c_plugin_inst.gpu_limit),
                     "container":
                         {
                             "target":
                                 {
-                                    "image": self.c_plugin_inst.plugin.dock_image,
+                                    "image": plugin.dock_image,
                                     "cmdParse": False,
-                                    "selfexec": self.c_plugin_inst.plugin.selfexec,
-                                    "selfpath": self.c_plugin_inst.plugin.selfpath,
-                                    "execshell": self.c_plugin_inst.plugin.execshell
+                                    "selfexec": plugin.selfexec,
+                                    "selfpath": plugin.selfpath,
+                                    "execshell": plugin.execshell
                                 },
                             "manager":
                                 {
@@ -193,53 +232,14 @@ class PluginInstanceManager(object):
                                             "meta-store": "key",
                                             "serviceType": "docker",
                                             "shareDir": "%shareDir",
-                                            "serviceName": str_serviceName
+                                            "serviceName": self.str_job_id
                                         }
                                 }
                         },
                     "service": str_IOPhost
                 }
         }
-        d_status = {
-            "action": "status",
-            "meta": {
-                "remote": {
-                    "key": str_serviceName
-                }
-            }
-        }
-        str_dmsgExec = json.dumps(d_msg, indent=4, sort_keys=True)
-        str_dmsgStat = json.dumps(d_status, indent=4, sort_keys=True)
-
-        str_pfurlCmdHeader = """\npfurl \\
-                    --verb POST --raw --http %s/api/v1/cmd \\
-                    --httpResponseBodyParse                             \\
-                    --jsonwrapper 'payload' --msg '""" % self.str_http
-        str_pfurlCmdExec = str_pfurlCmdHeader + """
-            %s
-            '
-            """ % str_dmsgExec
-        logger.info('pfurlCmdExec = %s', str_pfurlCmdExec)
-
-        str_pfurlCmdStatus = str_pfurlCmdHeader + """
-            %s
-            '
-            """ % str_dmsgStat
-        logger.info('pfurlCmdStatus = %s', str_pfurlCmdStatus)
-
-        d_response = self.app_service_call(d_msg)
-
-        str_service = 'pfcon'
-        if isinstance(d_response, dict):
-            logger.info('looks like we got a successful response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', self.str_http)
-            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
-        else:
-            logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', self.str_http)
-            logger.info('response from pfurl(): -->%s<--', d_response)
-        if "Connection refused" in d_response:
-            logging.error('fatal error in talking to %s', str_service)
+        self.call_app_service(d_msg)
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -247,75 +247,40 @@ class PluginInstanceManager(object):
         service to determine job status and if just finished without error,
         register output files.
         """
-        # NOTE:
-        #
-        # This is now part of an asynchronous celery worker. To debug
-        # synchronously with pudb.set_trace() you need to:
-        #
-        # 1. Once CUBE is running, and assuming some plugininstance
-        #    has been POSTed, start a python shell on the manage.py
-        #    code (note <IMAGE> below is the chris:dev container):
-        #
-        #         docker exec -ti <IMAGE> python manage.py shell
-        #
-        #     You should now be in a python shell.
-        #
-        # 3. To simulate operations on a given plugin with id <id>,
-        #    instantiate the relevant objects (for ex, for id=1):
-        #
-        #         from plugininstances.models import PluginInstance
-        #         from plugininstances.services import manager
-        #
-        #         plg_inst           = PluginInstance.objects.get(id=1)
-        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
-        #
-        # 4. And finally, call this method:
-        #
-        #         plg_inst_manager.check_plugin_instance_app_exec_status()
-        #
-        #     Any pudb.set_trace() calls in this method will now be
-        #     handled by the pudb debugger.
-        #
-        # 5. Finally, after each change to this method, reload this module:
-        #
-        #         import importlib
-        #
-        #         importlib.reload(manager)
-        #
-        #     and also re-instantiate the service
-        #
-        #         plg_inst_manager   = manager.PluginInstanceManager(plg_inst)
-
         # pudb.set_trace()
-
         d_msg = {
             "action": "status",
             "meta": {
                     "remote": {
-                        "key": self.str_jid_prefix + str(self.c_plugin_inst.id)
+                        "key": self.str_job_id
                     }
             }
         }
-        d_responseStatus = self.responseStatus_decode(
-            self.app_rawAndSummaryInfo_serialize(self.app_service_call(d_msg))
-        )
-        str_responseStatus = d_responseStatus['response']
-        logger.info('Current job remote status = %s', str_responseStatus)
-
-        d_response = d_responseStatus['d_serialize']['d_response']
+        d_response = self.call_app_service(d_msg)
         logger.info('d_response = %s', json.dumps(d_response, indent=4, sort_keys=True))
 
-        if d_responseStatus['status']:
-            str_DBstatus = self.c_plugin_inst.status
-            logger.info('Current job DB status = %s', str_DBstatus)
+        str_responseStatus = self.serialize_app_response_status(d_response)
+        logger.info('Current job remote status = %s', str_responseStatus)
 
-            if 'swiftPut:True' in str_responseStatus and \
-                    str_DBstatus != 'finishedSuccessfully':
-                self.app_register_files(d_response, d_msg)
+        str_DBstatus = self.c_plugin_inst.status
+        logger.info('Current job DB status = %s', str_DBstatus)
+
+        if 'swiftPut:True' in str_responseStatus and \
+                str_DBstatus != 'finishedSuccessfully':
+            # register output files
+            d_swiftState = d_response['jobOperation']['info']['swiftPut']
+            self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
+
+            self.c_plugin_inst.status = 'finishedSuccessfully'
+            logger.info("Saving job DB status   as '%s'", self.c_plugin_inst.status)
+            self.c_plugin_inst.end_date = timezone.now()
+            logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
+
+            self.c_plugin_inst.save()
 
         # Some possible error handling...
         if str_responseStatus == 'finishedWithError':
-            self.app_handleRemoteError()
+            self.handle_app_remote_error()
 
     def cancel_plugin_instance_app_exec(self):
         """
@@ -324,15 +289,14 @@ class PluginInstanceManager(object):
         """
         pass
 
-    def app_service_call(self, d_msg):
+    def call_app_service(self, d_msg):
         """
         This method sends the JSON 'msg' argument to the remote service.
         """
-        # pudb.set_trace()
-
+        remote_url = self.c_plugin_inst.compute_resource.compute_url
         serviceCall = pfurl.Pfurl(
             msg                     = json.dumps(d_msg),
-            http                    = self.str_http,
+            http                    = remote_url,
             verb                    = 'POST',
             # contentType             = 'application/json',
             b_raw                   = True,
@@ -342,17 +306,28 @@ class PluginInstanceManager(object):
         )
         # speak to the service...
         d_response = json.loads(serviceCall())
+
+        str_service = 'pfcon'
+        if isinstance(d_response, dict):
+            logger.info('looks like we got a successful response from %s', str_service)
+            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
+        else:
+            logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
+            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('response from pfurl(): -->%s<--', d_response)
+        if "Connection refused" in d_response:
+            logging.error('fatal error in talking to %s', str_service)
         return d_response
 
-    def app_service_fsplugin_inputdirManage(self, inputdir):
+    def manage_app_service_fsplugin_inputdir(self, inputdir):
         """
         This method is responsible for managing the 'inputdir' in the
         case of FS plugins.
 
-        Typically, an FS plugin does not have an inputdir spec, since this
-        is only a requirement for DS plugins. Nonetheless, the underlying management
-        system (pfcon/pfurl) does require some non-zero inputdir spec in order
-        to operate correctly.
+        An FS plugin does not have an inputdir spec, since this is only a requirement
+        for DS plugins. Nonetheless, the underlying management system (pfcon/pfurl) does
+        require some non-zero inputdir spec in order to operate correctly.
 
         The hack here is to store data somewhere in swift and accessing it as a
         "pseudo" inputdir for FS plugins. For example, if an FS plugin has no arguments
@@ -368,7 +343,7 @@ class PluginInstanceManager(object):
         plugins. Thus, if a type 'path' argument is specified, this 'path'
         is assumed to denote a location in object storage.
 
-        In the case then that a 'path' type argument is specified, there
+        In the case when a 'path' type argument is specified, there
         are certain important caveats:
 
             1. Only one 'path' type argument is assumed / fully supported.
@@ -377,91 +352,53 @@ class PluginInstanceManager(object):
         (squashed means that the system will still execute, but the returned
         output directory from the FS plugin will contain only a single file
         with the text 'squash' in its filename and the file will contain
-        some descriptive message)
+        some descriptive message).
         """
-        str_inputdir = inputdir
-        homedir = os.path.expanduser("~")
-        if not str_inputdir:
-            # No parameter of type 'path' was submitted, so input dir is empty
-            str_squashFile = os.path.join(homedir,
-                                          'data/squashEmptyDir/squashEmptyDir.txt')
-            str_squashMsg = 'Empty input dir.'
-        else:
+        # Remove any leading noise on the inputdir
+        str_inputdir = inputdir.strip().lstrip('.')
+        if str_inputdir:
             # Check if dir spec exists in swift
-            d_objExists = SwiftManager.objExists(obj=str_inputdir, prependBucketPath=True)
-            if d_objExists['status']:
-                str_inputdir = d_objExists['objPath']
-                return str_inputdir
-            str_squashFile = os.path.join(homedir,
-                                          'data/squashInvalidDir/squashInvalidDir.txt')
-            str_squashMsg = 'Path specified in object storage does not exist!'
-
-        # Check if squash file already exists in object storage
-        d_objExists = SwiftManager.objExists(obj=str_squashFile, prependBucketPath=True)
-        if d_objExists['status']:
-            # Here the file was found, so 'objPath' is a file spec.
-            # We need to prune this into a path spec...
-            str_inputdir = os.path.dirname(d_objExists['objPath'])
-        else:
             try:
-                # Create a squash file with possibly descriptive message...
-                str_squashFilePath = os.path.split(str_squashFile)[0]
-                if not os.path.exists(str_squashFilePath):
-                    os.makedirs(str_squashFilePath)
-                os.chdir(str_squashFilePath)
-                with open(str_squashFile, 'w') as f:
-                    print(str_squashMsg, file=f)
-                # and push to swift...
-                d_objPut = SwiftManager.objPut(
-                    file=str_squashFile,
-                    prependBucketPath=True
-                )
-                str_swiftLocation = d_objPut['objectFileList'][0]
-                str_inputdir = os.path.dirname(str_swiftLocation)
-            except Exception as e:
-                logger.exception(e)
-                #logger.debug('Could not create squash file', exc_info=True)
+                path_exists = self.swift_manager.path_exists(str_inputdir)
+            except ClientException as e:
+                logger.error('Swift storage error, detail: %s' % str(e))
+                return str_inputdir
+            if path_exists:
+                return str_inputdir
+            str_squashFile = os.path.join(
+                self.data_dir,
+                'squashInvalidDir/squashInvalidDir.txt'
+            ).lstrip('/')
+            str_squashMsg = 'Path specified in object storage does not exist!'
+        else:
+            # No parameter of type 'path' was submitted, so input dir is empty
+            str_squashFile = os.path.join(
+                self.data_dir,
+                'squashEmptyDir/squashEmptyDir.txt'
+            ).lstrip('/')
+            str_squashMsg = 'Empty input dir.'
+
+        try:
+            if not self.swift_manager.obj_exists(str_squashFile):
+                with io.StringIO(str_squashMsg) as f:
+                    self.swift_manager.upload_obj(str_squashFile, f.read(),
+                                                  content_type='text/plain')
+        except ClientException as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
+        else:
+            # We need to prune this into a path spec...
+            str_inputdir = os.path.dirname(str_squashFile)
+
         return str_inputdir
 
-    def app_register_files(self, d_response, d_msg):
+    def serialize_app_response_status(self, d_response):
         """
-        Method to register files received from the remote process into CUBE.
-        """
-        b_swiftFound = False
-        d_swiftState = {}
-        if 'swiftPut' in d_response['jobOperation']['info']:
-            d_swiftState = d_response['jobOperation']['info']['swiftPut']
-            b_swiftFound = True
-        maxPolls = 10
-        currentPoll = 1
-        while not b_swiftFound and currentPoll <= maxPolls:
-            if 'swiftPut' in d_response['jobOperation']['info']:
-                d_swiftState = d_response['jobOperation']['info']['swiftPut']
-                logger.info('Found swift return data on poll %d', currentPoll)
-                break
-            logger.info('swift return data not found on poll %d; sleeping...',
-                        currentPoll)
-            time.sleep(0.2)
-            d_response = self.app_service_call(d_msg)
-            currentPoll += 1
-        d_register = self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
-
-        str_responseStatus = 'finishedSuccessfully'
-        self.c_plugin_inst.status = str_responseStatus
-        logger.info("Saving job DB status   as '%s'", self.c_plugin_inst.status)
-
-        self.c_plugin_inst.end_date = timezone.now()
-        logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
-
-        self.c_plugin_inst.save()
-        return d_register
-
-    def app_rawAndSummaryInfo_serialize(self, d_response):
-        """
-        Serialize and save the 'jobOperation' and 'jobOperationSummary'
+        Serialize and save the 'jobOperation' and 'jobOperationSummary'.
         """
         str_summary = json.dumps(d_response['jobOperationSummary'])
+        #logger.debug("str_summary = '%s'", str_summary)
         str_raw = self.json_zipToStr(d_response['jobOperation'])
+
         # Still WIP about what is best summary...
         # a couple of options / ideas linger
         try:
@@ -473,21 +410,34 @@ class PluginInstanceManager(object):
                 ['l_logs'][0]
         except:
             str_containerLogs = "Container logs not currently available."
-        #logger.debug("str_summary = '%s'", str_summary)
+
+        # update plugin instance with status info
         self.c_plugin_inst.summary = str_summary
         self.c_plugin_inst.raw = str_raw
         self.c_plugin_inst.save()
 
-        return {
-            'status': True,
-            'raw': str_raw,
-            'summary': str_summary,
-            'd_response': d_response
-        }
+        str_responseStatus = ""
+        for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
+            if str_action == 'compute':
+                for str_part in ['submit', 'return']:
+                    str_actionStatus = str(d_response['jobOperationSummary'] \
+                                               [str_action] \
+                                               [str_part] \
+                                               ['status'])
+                    str_actionStatus = ''.join(str_actionStatus.split())
+                    str_responseStatus += str_action + '.' + str_part + ':' + \
+                                          str_actionStatus + ';'
+            else:
+                str_actionStatus = str(d_response['jobOperationSummary'] \
+                                           [str_action] \
+                                           ['status'])
+                str_actionStatus = ''.join(str_actionStatus.split())
+                str_responseStatus += str_action + ':' + str_actionStatus + ';'
+        return str_responseStatus
 
-    def app_handleRemoteError(self):
+    def handle_app_remote_error(self):
         """
-        Collect the 'stderr' from the remote app
+        Collect the 'stderr' from the remote app.
         """
         str_deepVal = ''
         def str_deepnest(d):
@@ -503,54 +453,51 @@ class PluginInstanceManager(object):
             "action": "search",
             "meta": {
                 "key": "jid",
-                "value": self.str_jid_prefix + str(self.c_plugin_inst.id),
+                "value": self.str_job_id,
                 "job": "0",
                 "when": "end",
                 "field": "stderr"
             }
         }
-        d_response = self.app_service_call(d_msg)
+        d_response = self.call_app_service(d_msg)
         str_deepnest(d_response['d_ret'])
         logger.error('deepVal = %s', str_deepVal)
 
         d_msg['meta']['field'] = 'returncode'
-        d_response = self.app_service_call(d_msg)
+        d_response = self.call_app_service(d_msg)
         str_deepnest(d_response['d_ret'])
         logger.error('deepVal = %s', str_deepVal)
 
-    @staticmethod
-    def responseStatus_decode(d_serialize):
+    def create_zip_file(self, swift_paths):
         """
-        Based on the information in d_response['jobOperationSummary']
-        determine and return a single string decoding.
+        Create job zip file ready for transmission to the remote from a list of swift
+        storage paths (prefixes).
         """
-        str_responseStatus  = ""
-        b_status            = False
-        if d_serialize['status']:
-            b_status        = True
-            for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
-                if str_action == 'compute':
-                    for str_part in ['submit', 'return']:
-                        str_actionStatus    = str(d_serialize['d_response']\
-                                                            ['jobOperationSummary']\
-                                                            [str_action]\
-                                                            [str_part]\
-                                                            ['status'])
-                        str_actionStatus    = ''.join(str_actionStatus.split())
-                        str_responseStatus += str_action + '.' + str_part + ':' +\
-                                                str_actionStatus + ';'
-                else:
-                    str_actionStatus        = str(d_serialize['d_response']\
-                                                            ['jobOperationSummary']\
-                                                            [str_action]\
-                                                            ['status'])
-                    str_actionStatus        = ''.join(str_actionStatus.split())
-                    str_responseStatus     += str_action + ':' + str_actionStatus + ';'
-        return {
-            'status':       b_status,
-            'response':     str_responseStatus,
-            'd_serialize':  d_serialize
-        }
+        if not os.path.exists(self.data_dir):
+            try:
+                os.makedirs(self.data_dir)  # create data dir
+            except OSError as e:
+                msg = 'Creation of dir %s failed, detail: %s' % (self.data_dir, str(e))
+                logger.error(msg)
+
+        zipfile_path = os.path.join(self.data_dir, self.str_job_id + '.zip')
+        with zipfile.ZipFile(zipfile_path, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
+            for swift_path in swift_paths:
+                l_ls = []
+                try:
+                    l_ls = self.swift_manager.ls(swift_path)
+                except ClientException as e:
+                    msg = 'Listing of swift storage files in %s failed, detail: %s' % (
+                    swift_path, str(e))
+                    logger.error(msg)
+                for obj_path in l_ls:
+                    try:
+                        contents = self.swift_manager.download_obj(obj_path)
+                    except ClientException as e:
+                        msg = 'Downloading of file %s from swift storage for %s job ' \
+                              'failed, detail: %s' % (obj_path, self.str_job_id, str(e))
+                        logger.error(msg)
+                    job_data_zip.writestr(obj_path, contents)
 
     @staticmethod
     def json_zipToStr(json_data):
@@ -558,10 +505,8 @@ class PluginInstanceManager(object):
         Return a string of compressed JSON data, suitable for transmission
         back to a client.
         """
-        str_compressed = base64.b64encode(
+        return base64.b64encode(
             zlib.compress(
                 json.dumps(json_data).encode('utf-8')
             )
         ).decode('ascii')
-
-        return str_compressed

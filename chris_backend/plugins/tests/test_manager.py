@@ -1,14 +1,17 @@
 
 import logging
-import time
 from unittest import mock
 
 from django.test import TestCase
+from django.conf import settings
 
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugins.models import ComputeResource
 from plugins.services import manager
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class PluginManagerTests(TestCase):
@@ -46,7 +49,7 @@ class PluginManagerTests(TestCase):
         self.pl_manager = manager.PluginManager()
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a plugin
         data = self.plg_meta_data.copy()

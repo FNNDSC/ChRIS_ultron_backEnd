@@ -5,7 +5,7 @@ import json
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin
@@ -14,6 +14,9 @@ from plugins.models import PluginParameter
 from plugins.models import DefaultStrParameter, DefaultBoolParameter
 from plugins.models import DefaultFloatParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ViewTests(TestCase):
@@ -31,7 +34,7 @@ class ViewTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugin
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')

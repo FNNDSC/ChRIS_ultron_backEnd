@@ -8,12 +8,14 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-import swiftclient
-
+from core.swiftmanager import SwiftManager
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
 from plugininstances.services.manager import PluginInstanceManager
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class PluginInstanceManagerTests(TestCase):
@@ -51,7 +53,7 @@ class PluginInstanceManagerTests(TestCase):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create a plugin
         data = self.plg_meta_data.copy()
@@ -82,8 +84,8 @@ class PluginInstanceManagerTests(TestCase):
         """
         Test whether the manager can run an already registered plugin app.
         """
-        with mock.patch.object(PluginInstanceManager, 'app_service_call',
-                               return_value='response') as app_service_call_mock:
+        with mock.patch.object(PluginInstanceManager, 'call_app_service',
+                               return_value='response') as call_app_service_mock:
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
             (pl_inst, tf) = PluginInstance.objects.get_or_create(
@@ -97,7 +99,7 @@ class PluginInstanceManagerTests(TestCase):
             plg_inst_manager = PluginInstanceManager(pl_inst)
             plg_inst_manager.run_plugin_instance_app(parameter_dict)
             self.assertEqual(pl_inst.status, 'started')
-            app_service_call_mock.assert_called_once()
+            call_app_service_mock.assert_called_once()
 
     @tag('integration')
     def test_integration_mananger_can_run_registered_plugin_app(self):
@@ -140,8 +142,8 @@ class PluginInstanceManagerTests(TestCase):
         Test whether the manager can check a plugin's app execution status
         """
         pass
-        # with mock.patch.object(PluginInstanceManager, 'app_service_call',
-        #                        return_value='response') as app_service_call_mock:
+        # with mock.patch.object(PluginInstanceManager, 'call_app_service',
+        #                        return_value='response') as call_app_service_mock:
         #
         #     user = User.objects.get(username=self.username)
         #     plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
@@ -159,11 +161,11 @@ class PluginInstanceManagerTests(TestCase):
         #         "action": "status",
         #         "meta": {
         #             "remote": {
-        #                 "key": plg_inst_manager.str_jid_prefix + str(pl_inst.id)
+        #                 "key": plg_inst_manager.str_job_id
         #             }
         #         }
         #     }
-        #     app_service_call_mock.assert_called_with(msg)
+        #     call_app_service_mock.assert_called_with(msg)
 
     @tag('integration', 'error-pman')
     def test_integration_mananger_can_check_plugin_instance_app_exec_status(self):
@@ -211,15 +213,7 @@ class PluginInstanceManagerTests(TestCase):
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         str_fileCreatedByPlugin = os.path.join(pl_inst.get_output_path(), 'out.txt')
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # make sure str_fileCreatedByPlugin file was created in Swift storage
-        object_list = conn.get_container(
-            settings.SWIFT_CONTAINER_NAME,
-            prefix=str_fileCreatedByPlugin,
-            full_listing=True)[1]
-        self.assertEqual(object_list[0]['name'], str_fileCreatedByPlugin)
+        self.assertTrue(swift_manager.obj_exists(str_fileCreatedByPlugin))

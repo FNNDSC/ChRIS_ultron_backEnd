@@ -7,8 +7,12 @@ from unittest.mock import ANY
 from django.test import TestCase
 from django import forms
 from django.utils import timezone
+from django.conf import settings
 
 from plugins import admin as pl_admin
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ComputeResourceAdminTests(TestCase):
@@ -96,7 +100,7 @@ class ComputeResourceAdminTests(TestCase):
         attempts to delete a compute resource that would result in orphan plugins.
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
         (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
         (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])
@@ -116,7 +120,7 @@ class ComputeResourceAdminTests(TestCase):
         attempts to delete compute resources that would result in orphan plugins.
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
         (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
         (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])
@@ -153,7 +157,7 @@ class PluginAdminFormTests(TestCase):
         logging.disable(logging.WARNING)
 
         (self.compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
         # create a plugin
         self.plugin_name = "simplecopyapp"
         self.plugin_version = "0.1"
@@ -310,7 +314,7 @@ class PluginAdminTests(TestCase):
         is the last associated plugin.
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
         (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
         (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])
@@ -327,7 +331,7 @@ class PluginAdminTests(TestCase):
         associated plugin is deleted.
         """
         (compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
         (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='pacspull', type='fs')
         (plg, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plg.compute_resources.set([compute_resource])

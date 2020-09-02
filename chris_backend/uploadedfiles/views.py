@@ -1,17 +1,21 @@
 
+import logging
+
 from django.conf import settings
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
 
-import swiftclient
-
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
+from core.swiftmanager import SwiftManager
 
-from .models import UploadedFile, UploadedFileFilter, uploaded_file_path
+from .models import UploadedFile, UploadedFileFilter
 from .serializers import UploadedFileSerializer
 from .permissions import IsOwnerOrChris
+
+
+logger = logging.getLogger(__name__)
 
 
 class UploadedFileList(generics.ListCreateAPIView):
@@ -88,13 +92,12 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         user_file = self.get_object()
         old_swift_path = user_file.fname.name
         serializer.save()
-        # initiate a Swift service connection to delete the old object from swift
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, old_swift_path)
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        try:
+            swift_manager.delete_obj(old_swift_path)
+        except Exception as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
 
     def perform_destroy(self, instance):
         """
@@ -102,13 +105,12 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         swift_path = instance.fname.name
         instance.delete()
-        # initiate a Swift service connection to delete the object from swift
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, swift_path)
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        try:
+            swift_manager.delete_obj(swift_path)
+        except Exception as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
 
 
 class UploadedFileResource(generics.GenericAPIView):

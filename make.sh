@@ -184,10 +184,6 @@ title -d 1 "Setting global exports..."
     fi
     echo -e "${STEP}.1 For pman override to swarm containers, exporting\nSTOREBASE=$STOREBASE " | ./boxes.sh
     export STOREBASE=$STOREBASE
-    if (( b_debug )) ; then
-        echo -e "${STEP}.2 Setting debug quiet to OFF. Note this is noisy!" | ./boxes.sh
-        export CHRIS_DEBUG_QUIET=0
-    fi
 windowBottom
 
 if (( b_restart )) ; then
@@ -436,7 +432,7 @@ else
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
-            exec chrisstore sh -c                   \
+            exec chris_store sh -c                   \
             'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
         echo -en "\033[2A\033[2K"
         cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
@@ -451,13 +447,13 @@ else
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
-            exec chrisstore /bin/bash -c            \
+            exec chris_store /bin/bash -c            \
             'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
-            exec chrisstore /bin/bash -c            \
+            exec chris_store /bin/bash -c            \
             'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
@@ -465,20 +461,20 @@ else
         echo "Creating superuser cubeadmin:cubeadmin1234..."            | ./boxes.sh
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
-            exec chrisstore /bin/bash -c            \
+            exec chris_store /bin/bash -c            \
             'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         windowBottom
 
         docker-compose -f docker-compose_dev.yml    \
-            exec chrisstore /bin/bash -c            \
+            exec chris_store /bin/bash -c            \
             'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"' >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
         windowBottom
-        docker-compose -f docker-compose_dev.yml restart chrisstore     >& dc.out > /dev/null
+        docker-compose -f docker-compose_dev.yml restart chris_store     >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
@@ -535,7 +531,7 @@ else
             windowBottom
 
             docker-compose -f docker-compose_dev.yml                                \
-                exec chrisstore python plugins/services/manager.py add "$CONTAINER" \
+                exec chris_store python plugins/services/manager.py add "$CONTAINER" \
                 cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"              \
                 --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
             status=$?
@@ -568,7 +564,7 @@ else
         PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
-            exec chrisstore python pipelines/services/manager.py        \
+            exec chris_store python pipelines/services/manager.py        \
             add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
 
         PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
@@ -582,7 +578,7 @@ else
         PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
-            exec chrisstore python pipelines/services/manager.py        \
+            exec chris_store python pipelines/services/manager.py        \
             add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
         echo -en "\033[2A\033[2K"
     windowBottom
@@ -633,7 +629,7 @@ else
             computeDescription="${ENV} description"
             docker-compose -f docker-compose_dev.yml                    \
                 exec chris_dev python plugins/services/manager.py       \
-                add "$ENV" "$ENV Description"
+                add "$ENV" "http://pfcon.local:5005" --description "$ENV Description"
             docker-compose -f docker-compose_dev.yml                    \
                 exec chris_dev python plugins/services/manager.py       \
                 register $ENV --pluginname "$CONTAINER"

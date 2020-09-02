@@ -10,7 +10,7 @@ from rest_framework import serializers
 
 from servicefiles.models import Service, ServiceFile
 from servicefiles.serializers import ServiceFileSerializer
-from servicefiles.serializers import swiftclient
+from servicefiles.serializers import SwiftManager
 
 
 class ServiceFileSerializerTests(TestCase):
@@ -52,21 +52,13 @@ class ServiceFileSerializerTests(TestCase):
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        object_list = [{'name': path}]
-        container_data = ['', object_list]
-        with mock.patch.object(swiftclient.Connection, '__init__',
-                               return_value=None) as conn_init_mock:
-            with mock.patch.object(swiftclient.Connection, 'get_container',
-                                   return_value=container_data) as conn_get_container_mock:
-                new_data = servicefiles_serializer.validate(data)
-                self.assertIn('service', new_data)
-                self.assertNotIn('service_name', new_data)
-                self.assertEqual(new_data.get('path'), path.strip(' ').strip('/'))
-                conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
-                                                  key=settings.SWIFT_KEY,
-                                                  authurl=settings.SWIFT_AUTH_URL)
-                conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
-                                                   prefix=path)
+        with mock.patch.object(SwiftManager, 'obj_exists',
+                               return_value=True) as obj_exists_mock:
+            new_data = servicefiles_serializer.validate(data)
+            self.assertIn('service', new_data)
+            self.assertNotIn('service_name', new_data)
+            self.assertEqual(new_data.get('path'), path.strip(' ').strip('/'))
+            obj_exists_mock.assert_called_with(new_data.get('path'))
 
     def test_validate_failure_path_does_not_start_with_SERVICES_PACS(self):
         """
@@ -87,19 +79,11 @@ class ServiceFileSerializerTests(TestCase):
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        object_list = []
-        container_data = ['', object_list]
-        with mock.patch.object(swiftclient.Connection, '__init__',
-                               return_value=None) as conn_init_mock:
-            with mock.patch.object(swiftclient.Connection, 'get_container',
-                                   return_value=container_data) as conn_get_container_mock:
-                with self.assertRaises(serializers.ValidationError):
-                    servicefiles_serializer.validate(data)
-                conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
-                                                  key=settings.SWIFT_KEY,
-                                                  authurl=settings.SWIFT_AUTH_URL)
-                conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
-                                                   prefix=path)
+        with mock.patch.object(SwiftManager, 'obj_exists',
+                               return_value=False) as obj_exists_mock:
+            with self.assertRaises(serializers.ValidationError):
+                servicefiles_serializer.validate(data)
+            obj_exists_mock.assert_called_with(path.strip(' ').strip('/'))
 
     @tag('integration')
     def test_integration_validate_path_failure_does_not_exist(self):
@@ -121,28 +105,20 @@ class ServiceFileSerializerTests(TestCase):
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME)
 
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, path, contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
         for _ in range(20):
-            object_list = conn.get_container(settings.SWIFT_CONTAINER_NAME, prefix=path)[1]
-            if object_list:
+            if swift_manager.obj_exists(path):
                 break
             time.sleep(0.2)
         self.assertEqual(servicefiles_serializer.validate(data).get('path'), path)
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, path)
+        swift_manager.delete_obj(path)
 
     def test_validate_validates_path_has_not_already_been_registered(self):
         """

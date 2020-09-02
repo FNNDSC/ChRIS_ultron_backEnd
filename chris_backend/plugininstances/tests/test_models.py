@@ -14,8 +14,11 @@ from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PluginInstanceFilter
-from plugininstances.models import swiftclient
+from plugininstances.models import SwiftManager
 from plugininstances.models import PluginInstanceManager
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ModelTests(TestCase):
@@ -33,7 +36,7 @@ class ModelTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name,
@@ -194,24 +197,16 @@ class PluginInstanceModelTests(ModelTests):
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         output_path = pl_inst.get_output_path()
-        object_list = [{'name': output_path + '/file1.txt'}]
-        container_data = ['', object_list]
+        object_list = [output_path + '/file1.txt']
 
-        with mock.patch.object(swiftclient.Connection, '__init__',
-                               return_value=None) as conn_init_mock:
-            with mock.patch.object(swiftclient.Connection, 'get_container',
-                                   return_value=container_data) as conn_get_container_mock:
-                pl_inst.register_output_files(
-                    swiftState={'d_swiftstore': {'filesPushed': 1}}
-                )
-                conn_init_mock.assert_called_with(user=settings.SWIFT_USERNAME,
-                                                  key=settings.SWIFT_KEY,
-                                                  authurl=settings.SWIFT_AUTH_URL,)
-                conn_get_container_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME,
-                                                   prefix=output_path, full_listing=True)
-                self.assertEqual(PluginInstanceFile.objects.count(), 1)
-                plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=pl_inst)
-                self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
+        with mock.patch.object(SwiftManager, 'ls', return_value=object_list) as ls_mock:
+            pl_inst.register_output_files(
+                swiftState={'d_swiftstore': {'filesPushed': 1}}
+            )
+            ls_mock.assert_called_with(output_path)
+            self.assertEqual(PluginInstanceFile.objects.count(), 1)
+            plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=pl_inst)
+            self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
 
     @tag('integration')
     def test_integration_register_output_files(self):
@@ -225,29 +220,23 @@ class PluginInstanceModelTests(ModelTests):
         plg_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME)
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
 
         # upload file to Swift storage
         output_path = plg_inst.get_output_path()
+        path = output_path + '/file1.txt'
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt',
-                            contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_obj(path, file1.read(),
+                                      content_type='text/plain')
 
         plg_inst.register_output_files(swiftState={'d_swiftstore': {'filesPushed': 1}})
         self.assertEqual(PluginInstanceFile.objects.count(), 1)
         plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=plg_inst)
-        self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
+        self.assertEqual(plg_inst_file.fname.name, path)
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, output_path + '/file1.txt')
+        swift_manager.delete_obj(path)
 
     def test_cancel(self):
         """

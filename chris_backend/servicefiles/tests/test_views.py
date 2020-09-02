@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
+from core.swiftmanager import SwiftManager
 from servicefiles.models import Service, ServiceFile
 from servicefiles import views
 
@@ -67,23 +68,15 @@ class ServiceFileListViewTests(ServiceFileViewTests):
         chris_username = 'chris'
         chris_password = 'chris1234'
         User.objects.create_user(username=chris_username, password=chris_password)
-
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
 
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME
-                           )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, path,
-                            contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
+
         # make the POST request using the chris user
         self.client.login(username=chris_username, password=chris_password)
         response = self.client.post(self.create_read_url, data=self.post,
@@ -91,7 +84,7 @@ class ServiceFileListViewTests(ServiceFileViewTests):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, path)
+        swift_manager.delete_obj(path)
 
     def test_servicefile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -177,20 +170,11 @@ class ServiceFileResourceViewTests(ServiceFileViewTests):
 
     @tag('integration')
     def test_integration_servicefileresource_download_success(self):
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
-        # create container in case it doesn't already exist
-        conn.put_container(settings.SWIFT_CONTAINER_NAME
-                           )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, self.path,
-                            contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_obj(self.path, file1.read(), content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
@@ -198,7 +182,7 @@ class ServiceFileResourceViewTests(ServiceFileViewTests):
         self.assertEqual(str(response.content, 'utf-8'), "test file")
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, self.path)
+        swift_manager.delete_obj(self.path)
 
     def test_fileresource_download_failure_unauthenticated(self):
         response = self.client.get(self.download_url)

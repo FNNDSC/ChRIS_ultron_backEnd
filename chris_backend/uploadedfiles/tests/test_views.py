@@ -4,8 +4,6 @@ import json
 import io
 from unittest import mock
 
-import swiftclient
-
 from django.test import TestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -13,6 +11,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
+from core.swiftmanager import SwiftManager
 from uploadedfiles.models import UploadedFile, uploaded_file_path
 from uploadedfiles import views
 
@@ -70,19 +69,16 @@ class UploadedFileListViewTests(UploadedFileViewTests):
         # POST request using multipart/form-data to be able to upload file
         self.client.login(username=self.username, password=self.password)
         upload_path = "{}/uploads/file2.txt".format(self.username)
+
         with io.StringIO("test file") as f:
             post = {"fname": f, "upload_path": upload_path}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, upload_path)
+        swift_manager.delete_obj(upload_path)
 
     def test_uploadedfile_create_failure_unauthenticated(self):
         upload_path = "{}/uploads/file2.txt".format(self.username)
@@ -139,10 +135,10 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
     def test_uploadedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         swift_path = self.uploadedfile.fname.name
-        mocked_method = 'uploadedfiles.views.swiftclient.Connection.delete_object'
-        with mock.patch(mocked_method) as delete_object_mock:
+        mocked_method = 'uploadedfiles.views.SwiftManager.delete_obj'
+        with mock.patch(mocked_method) as delete_obj_mock:
             response = self.client.delete(self.read_update_delete_url)
-            delete_object_mock.assert_called_with(settings.SWIFT_CONTAINER_NAME, swift_path)
+            delete_obj_mock.assert_called_with(swift_path)
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
             self.assertEqual(UploadedFile.objects.count(), 0)
 
@@ -180,18 +176,12 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
     @tag('integration')
     def test_integration_uploadedfileresource_download_success(self):
-        # initiate a Swift service connection
-        conn = swiftclient.Connection(
-            user=settings.SWIFT_USERNAME,
-            key=settings.SWIFT_KEY,
-            authurl=settings.SWIFT_AUTH_URL,
-        )
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         upload_path = "{}/uploads/file1.txt".format(self.username)
         with io.StringIO("test file") as file1:
-            conn.put_object(settings.SWIFT_CONTAINER_NAME, upload_path,
-                            contents=file1.read(),
-                            content_type='text/plain')
+            swift_manager.upload_obj(upload_path, file1.read(), content_type='text/plain')
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
@@ -199,7 +189,7 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
         self.assertEqual(str(response.content, 'utf-8'), "test file")
 
         # delete file from Swift storage
-        conn.delete_object(settings.SWIFT_CONTAINER_NAME, upload_path)
+        swift_manager.delete_obj(upload_path)
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

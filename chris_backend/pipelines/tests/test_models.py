@@ -3,6 +3,7 @@ import logging
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
@@ -10,6 +11,9 @@ from plugins.models import PluginParameter, DefaultIntParameter
 from pipelines.models import Pipeline
 from pipelines.models import PluginPiping
 from pipelines.models import DEFAULT_PIPING_PARAMETER_MODELS
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class ModelTests(TestCase):
@@ -24,7 +28,7 @@ class ModelTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", description="host description")
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
 
         # create plugin
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')

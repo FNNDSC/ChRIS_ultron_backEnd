@@ -18,16 +18,17 @@ services:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
       - ./secrets/.swift_service.env
-      - ./secrets/.pfcon_service.env
     ports:
       - "8000:8000"
     depends_on:
       - chris_db
       - swift_service
       - queue
-      - chrisstore
+      - chris_store
       - pfcon_service
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Production server using Apache's mod_wsgi"
@@ -40,13 +41,14 @@ services:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
       - ./secrets/.swift_service.env
-      - ./secrets/.pfcon_service.env
     depends_on:
       - chris_db
       - swift_service
       - queue
       - pfcon_service
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Worker"
       role: "Production async worker"
@@ -58,6 +60,8 @@ services:
     env_file:
       - ./secrets/.chris_db.env
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Production MySQL database"
@@ -65,11 +69,13 @@ services:
   queue:
     image: rabbitmq:3
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Task Queue"
       role: "Production async task queue"
 
-  chrisstore:
+  chris_store:
     image: ${CHRISREPO}/chris_store
     env_file:
       - ./secrets/.chris_store.env
@@ -81,6 +87,10 @@ services:
       - chris_store_db
       - swift_service
     restart: on-failure
+    networks:
+      local:
+        aliases:
+          - chris-store.local
     labels:
       name: "ChRIS_store"
       role: "Chris store service"
@@ -92,6 +102,8 @@ services:
     env_file:
       - ./secrets/.chris_store_db.env
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "ChRIS_store MySQL Database"
       role: "Chris store database"
@@ -106,6 +118,8 @@ services:
     ports:
       - "8080:8080"
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "swift"
       role: "swift object storage service"
@@ -114,7 +128,6 @@ services:
     image: ${CHRISREPO}/pfcon
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
     env_file:
-      - ./secrets/.pfcon_service.env
       - ./secrets/.swift_service.env
     ports:
       - "5005:5005"
@@ -123,6 +136,10 @@ services:
       - pman_service
       - pfioh_service
     restart: on-failure
+    networks:
+      local:
+        aliases:
+          - pfcon.local
     labels:
       name: "pfcon"
       role: "pfcon service"
@@ -138,6 +155,8 @@ services:
     ports:
       - "5055:5055"
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "pfioh"
       role: "pfioh service"
@@ -163,9 +182,14 @@ services:
     ports:
       - "5010:5010"
     restart: on-failure
+    networks:
+      - local
     labels:
       name: "pman"
       role: "pman service"
+
+networks:
+  local:
 
 volumes:
   chris_db_data:
