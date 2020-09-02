@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #
 # NAME
@@ -502,6 +503,7 @@ else
                          "pl-freesurfer_pp"
                          "pl-z2labelmap"
                          "pl-mri10yr06mo01da_normal"
+                         "pl-brainmri_preprocessed"
     )
 
     title -d 1 "Checking on container plugins and pulling latest versions where needed..."
@@ -611,6 +613,9 @@ else
                          "pl-z2labelmap^moc"
                          "pl-mri10yr06mo01da_normal"
                          "pl-mri10yr06mo01da_normal^moc"
+                         "pl-brainmri_preprocessed"
+
+
     )
 
     title -d 1 "Automatically registering some plugins from the ChRIS store into CUBE..."
