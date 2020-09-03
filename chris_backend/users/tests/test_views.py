@@ -1,12 +1,17 @@
 
 import logging
 import json
+from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.conf import settings
 
 from rest_framework import status
+
+from uploadedfiles.models import UploadedFile
+from users.serializers import SwiftManager
 
 
 class UserViewTests(TestCase):
@@ -42,11 +47,35 @@ class UserCreateViewTests(UserViewTests):
                                    {"name": "email", "value": self.email}]}})
 
     def test_user_create_success(self):
+        with mock.patch.object(SwiftManager, 'upload_obj',
+                               return_value=None) as upload_obj_mock:
+            response = self.client.post(self.create_url, data=self.post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data["username"], self.username)
+            self.assertEqual(response.data["email"], self.email)
+
+            welcome_file_path = '%s/uploads/welcome.txt' % self.username
+            upload_obj_mock.assert_called_with(welcome_file_path, mock.ANY,
+                                               content_type='text/plain')
+
+    @tag('integration')
+    def test_integration_user_create_success(self):
         response = self.client.post(self.create_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["username"], self.username)
         self.assertEqual(response.data["email"], self.email)
+
+        user = User.objects.get(username=self.username)
+        welcome_file_path = '%s/uploads/welcome.txt' % self.username
+        welcome_file = UploadedFile.objects.get(owner=user)
+        self.assertEqual(welcome_file.fname.name, welcome_file_path)
+
+        # delete welcome file
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager.delete_obj(welcome_file_path)
 
     def test_user_create_failure_already_exists(self):
         User.objects.create_user(username=self.username,

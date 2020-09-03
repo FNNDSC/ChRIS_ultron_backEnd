@@ -1,18 +1,24 @@
 
+import logging
 import pathlib
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
+from core.swiftmanager import SwiftManager
 from plugins.models import TYPES
 from feeds.models import Feed
 
 from .models import PluginInstance, PluginInstanceFile
 from .models import FloatParameter, IntParameter, BoolParameter
 from .models import PathParameter, UnextpathParameter, StrParameter
+
+
+logger = logging.getLogger(__name__)
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
@@ -45,7 +51,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'title',  'previous_id', 'compute_resource_name',
+        fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
                   'plugin_id', 'plugin_name', 'plugin_version', 'pipeline_id',
                   'pipeline_name', 'pipeline_inst_id', 'pipeline_inst', 'feed_id',
                   'start_date', 'end_date', 'status', 'summary', 'raw',
@@ -175,9 +181,9 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = StrParameter
@@ -189,9 +195,9 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = IntParameter
@@ -203,9 +209,9 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = FloatParameter
@@ -217,9 +223,9 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = BoolParameter
@@ -232,14 +238,18 @@ def validate_paths(user, string):
     Custom function to check that a user is allowed to access the provided object storage
     paths.
     """
+    swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                 settings.SWIFT_CONNECTION_PARAMS)
     path_list = [s.strip() for s in string.split(',')]
     for path in path_list:
         path_parts = pathlib.Path(path).parts
         if len(path_parts) == 0:
+            # trying to access the root of the storage
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
         if path_parts[0] != user.username and path_parts[0] != 'SERVICES':
             if len(path_parts) == 1 or path_parts[1] == 'uploads':
+                # trying to access another user's root or personal space
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
             try:
@@ -252,6 +262,17 @@ def validate_paths(user, string):
             if user not in feed.owner.all():
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
+        else:
+            # check whether path exists in swift
+            try:
+                path_exists = swift_manager.path_exists(path)
+            except Exception as e:
+                logger.error('Swift storage error, detail: %s' % str(e))
+                raise serializers.ValidationError(
+                    ["Could not validate this path."])
+            if not path_exists:
+                raise serializers.ValidationError(
+                    ["This field may not be an invalid path."])
     return ','.join(path_list)
 
 
@@ -259,9 +280,9 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = PathParameter
@@ -288,9 +309,9 @@ class UnextpathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                 read_only=True)
+                                                      read_only=True)
     plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                 read_only=True)
+                                                       read_only=True)
 
     class Meta:
         model = UnextpathParameter
@@ -343,7 +364,7 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the default parameter value regardless of its type.
         """
         return obj.value
-        
+
 
 PARAMETER_SERIALIZERS = {'string': StrParameterSerializer,
                          'integer': IntParameterSerializer,

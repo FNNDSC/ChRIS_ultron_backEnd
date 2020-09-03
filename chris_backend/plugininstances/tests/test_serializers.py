@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
+from plugininstances.serializers import SwiftManager
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import (PathParameterSerializer,
                                          UnextpathParameterSerializer)
@@ -304,6 +305,19 @@ class PathParameterSerializerTests(SerializerTests):
             path_parm_serializer.validate_value(self.other_username + '/feed_%s' %
                                                 pl_inst.feed.id)
 
+    def test_validate_value_fail_path_does_not_exist(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access a path that does not exist in the internal storage.
+        """
+        user = User.objects.get(username=self.username)
+        path_parm_serializer = PathParameterSerializer(user=user)
+        with mock.patch.object(SwiftManager, 'path_exists',
+                               return_value=False) as path_exists_mock:
+            with self.assertRaises(serializers.ValidationError):
+                path_parm_serializer.validate_value(self.username)
+            path_exists_mock.assert_called_with(self.username)
+
     def test_validate_value_success(self):
         """
         Test whether overriden validate_value method successfully returns a valid
@@ -319,10 +333,12 @@ class PathParameterSerializerTests(SerializerTests):
         path_parm_serializer = PathParameterSerializer(user=user)
         value = "{}, {}/feed_{} ".format(self.username, self.other_username,
                                          pl_inst.feed.id)
-        returned_value = path_parm_serializer.validate_value(value)
-        self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
-                                                                self.other_username,
-                                                                pl_inst.feed.id))
+        with mock.patch.object(SwiftManager, 'path_exists',
+                               return_value=True) as path_exists_mock:
+            returned_value = path_parm_serializer.validate_value(value)
+            self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
+                                                                    self.other_username,
+                                                                    pl_inst.feed.id))
 
 
 class UnextpathParameterSerializerTests(SerializerTests):
@@ -339,7 +355,7 @@ class UnextpathParameterSerializerTests(SerializerTests):
         Test whether overriden validate_value method raises a serializers.ValidationError
         when user tries to access an invalid root path.
         """
-        path_parm_serializer = PathParameterSerializer(user=self.user)
+        path_parm_serializer = UnextpathParameterSerializer(user=self.user)
         with self.assertRaises(serializers.ValidationError):
             path_parm_serializer.validate_value("./")
         with self.assertRaises(serializers.ValidationError):
@@ -384,6 +400,19 @@ class UnextpathParameterSerializerTests(SerializerTests):
             path_parm_serializer.validate_value(self.other_username + '/feed_%s' %
                                                 pl_inst.feed.id)
 
+    def test_validate_value_fail_path_does_not_exist(self):
+        """
+        Test whether overriden validate_value method raises a serializers.ValidationError
+        when user tries to access a path that does not exist in the internal storage.
+        """
+        user = User.objects.get(username=self.username)
+        path_parm_serializer = UnextpathParameterSerializer(user=user)
+        with mock.patch.object(SwiftManager, 'path_exists',
+                               return_value=False) as path_exists_mock:
+            with self.assertRaises(serializers.ValidationError):
+                path_parm_serializer.validate_value(self.username)
+            path_exists_mock.assert_called_with(self.username)
+
     def test_validate_value_success(self):
         """
         Test whether overriden validate_value method successfully returns a valid
@@ -399,7 +428,9 @@ class UnextpathParameterSerializerTests(SerializerTests):
         path_parm_serializer = UnextpathParameterSerializer(user=user)
         value = "{}, {}/feed_{} ".format(self.username, self.other_username,
                                          pl_inst.feed.id)
-        returned_value = path_parm_serializer.validate_value(value)
-        self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
-                                                                self.other_username,
-                                                                pl_inst.feed.id))
+        with mock.patch.object(SwiftManager, 'path_exists',
+                               return_value=True) as path_exists_mock:
+            returned_value = path_parm_serializer.validate_value(value)
+            self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
+                                                                    self.other_username,
+                                                                    pl_inst.feed.id))

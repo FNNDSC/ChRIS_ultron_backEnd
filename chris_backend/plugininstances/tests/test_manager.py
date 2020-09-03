@@ -1,6 +1,7 @@
 
 import logging
 import os
+import io
 import time
 from unittest import mock
 
@@ -23,6 +24,9 @@ class PluginInstanceManagerTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                          settings.SWIFT_CONNECTION_PARAMS)
 
         self.plugin_fs_name = "simplefsapp"
         self.username = 'foo'
@@ -120,17 +124,30 @@ class PluginInstanceManagerTests(TestCase):
         #     if not os.path.exists(test_dir):
         #         os.makedirs(test_dir)
 
+        # upload a file to the Swift storage user's space
+        user_space_path = '%s/uploads/' % self.username
+        with io.StringIO('Test file') as f:
+            self.swift_manager.upload_obj(user_space_path + 'test.txt', f.read(),
+                                          content_type='text/plain')
+
+        # create a plugin's instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
-                                            value=self.username)
-        parameter_dict = {'dir': self.username}
+                                            value=user_space_path)
+        parameter_dict = {'dir': user_space_path}
         plg_inst_manager = PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app(parameter_dict)
         self.assertEqual(pl_inst.status, 'started')
+
+        # delete files from swift storage
+        self.swift_manager.delete_obj(user_space_path + 'test.txt')
+        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        for path in obj_paths:
+            self.swift_manager.delete_obj(path)
 
         # finally:
         #     # remove test directory
@@ -178,15 +195,21 @@ class PluginInstanceManagerTests(TestCase):
 
             This must be fixed in later versions!
         """
+        # upload a file to the Swift storage user's space
+        user_space_path = '%s/uploads/' % self.username
+        with io.StringIO('Test file') as f:
+            self.swift_manager.upload_obj(user_space_path + 'test.txt', f.read(),
+                                          content_type='text/plain')
 
+        # create a plugin's instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
-                                            value=self.username)
-        parameter_dict = {'dir': self.username}
+                                            value=user_space_path)
+        parameter_dict = {'dir': user_space_path}
 
         plg_inst_manager = PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app(parameter_dict)
@@ -213,7 +236,11 @@ class PluginInstanceManagerTests(TestCase):
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         str_fileCreatedByPlugin = os.path.join(pl_inst.get_output_path(), 'out.txt')
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
         # make sure str_fileCreatedByPlugin file was created in Swift storage
-        self.assertTrue(swift_manager.obj_exists(str_fileCreatedByPlugin))
+        self.assertTrue(self.swift_manager.obj_exists(str_fileCreatedByPlugin))
+
+        # delete files from swift storage
+        self.swift_manager.delete_obj(user_space_path + 'test.txt')
+        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        for path in obj_paths:
+            self.swift_manager.delete_obj(path)
