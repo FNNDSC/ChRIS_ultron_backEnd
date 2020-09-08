@@ -92,13 +92,14 @@ class TasksViewTests(TransactionTestCase):
 
     def setUp(self):
 
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                          settings.SWIFT_CONNECTION_PARAMS)
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
         self.username = 'foo'
         self.password = 'bar'
         self.other_username = 'boo'
         self.other_password = 'far'
-
         self.content_type = 'application/vnd.collection+json'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -133,8 +134,9 @@ class PluginInstanceListViewTests(TasksViewTests):
         super(PluginInstanceListViewTests, self).setUp()
         plugin = Plugin.objects.get(meta__name="pacspull")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        self.user_space_path = '%s/uploads/' % self.username
         self.post = json.dumps(
-            {"template": {"data": [{"name": "dir", "value": self.username}]}})
+            {"template": {"data": [{"name": "dir", "value": self.user_space_path}]}})
 
     def test_plugin_instance_create_success(self):
         with mock.patch.object(views.run_plugin_instance, 'delay',
@@ -150,7 +152,7 @@ class PluginInstanceListViewTests(TasksViewTests):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
             # check that the run_plugin_instance task was called with appropriate args
-            parameters_dict = {'dir': self.username}
+            parameters_dict = {'dir': self.user_space_path}
             delay_mock.assert_called_with(response.data['id'], parameters_dict)
 
     @tag('integration')
@@ -199,12 +201,20 @@ class PluginInstanceListViewTests(TasksViewTests):
             type=parameters[0]['type'],
             flag=parameters[0]['flag'])
 
+        # upload a file to the Swift storage user's space
+        with io.StringIO('Test file') as f:
+            self.swift_manager.upload_obj(self.user_space_path + 'test.txt', f.read(),
+                                          content_type='text/plain')
+
         # make POST API request to create a plugin instance
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # delete files from swift storage
+        self.swift_manager.delete_obj(self.user_space_path + 'test.txt')
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -302,18 +312,24 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             type=parameters[0]['type'],
             flag=parameters[0]['flag'])
 
+        # upload a file to the Swift storage user's space
+        user_space_path = '%s/uploads/' % self.username
+        with io.StringIO('Test file') as f:
+            self.swift_manager.upload_obj(user_space_path + 'test.txt', f.read(),
+                                          content_type='text/plain')
+
         # create a plugin's instance
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
-                                            value=self.username)
+                                            value=user_space_path)
         self.read_update_delete_url = reverse("plugininstance-detail",
                                               kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
         plg_inst_manager = PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app({'dir': self.username})
+        plg_inst_manager.run_plugin_instance_app({'dir': user_space_path})
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)
@@ -339,6 +355,12 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                 b_checkAgain = False
             currentLoop += 1
         self.assertContains(response, "finishedSuccessfully")
+
+        # delete files from swift storage
+        self.swift_manager.delete_obj(user_space_path + 'test.txt')
+        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        for path in obj_paths:
+            self.swift_manager.delete_obj(path)
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)

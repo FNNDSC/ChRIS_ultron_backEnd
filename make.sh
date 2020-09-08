@@ -653,31 +653,18 @@ else
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c                                 \
             'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;' >& dc.out >/dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
-        echo "Saving superuser chris:chris1234..."                      | ./boxes.sh
-        windowBottom
         docker-compose -f docker-compose_dev.yml                        \
-            exec chris_dev /bin/bash -c \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out >/dev/null
+            exec chris_dev /bin/bash -c                                 \
+            'python manage.py shell -c "from django.contrib.auth.models import User; user=User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
 
         echo ""                                                         | ./boxes.sh
-        echo "Setting superuser user cube:cube1234..."                  | ./boxes.sh
+        echo "Setting normal user cube:cube1234..."                     | ./boxes.sh
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
             exec chris_dev /bin/bash -c                                 \
-            'python manage.py createsuperuser --noinput --username cube --email dev@babymri.org 2> /dev/null;' >& dc.out >/dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
-        echo "Saving superuser user cube:cube1234..."                   | ./boxes.sh
-        windowBottom
-        docker-compose -f docker-compose_dev.yml                        \
-            exec chris_dev /bin/bash -c                                 \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cube\"); user.set_password(\"cube1234\"); user.save()"' >& dc.out >/dev/null
+            'python manage.py shell -c "from users.serializers import UserSerializer; us=UserSerializer(data={\"username\":\"cube\",\"password\":\"cube1234\",\"email\":\"cube@babymri.org\"}); us.is_valid(); us.save()"' >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
     windowBottom

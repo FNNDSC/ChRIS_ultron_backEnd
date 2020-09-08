@@ -143,10 +143,12 @@ class PluginInstanceManager(object):
         if self.c_plugin_inst.previous:
             # WARNING: 'ds' plugins can also have 'path' parameters!
             str_inputdir = self.c_plugin_inst.previous.get_output_path()
-        else:
+        elif path_param_names:
             # WARNING: Inputdir assumed to only be the last 'path' parameter!
-            str_inputdir = parameter_dict[path_param_names[-1]] if path_param_names else ''
-            str_inputdir = self.manage_app_service_fsplugin_inputdir(str_inputdir)
+            str_inputdir = parameter_dict[path_param_names[-1]].strip('/')
+        else:
+            # No parameter of type 'path' or 'unextpath' was submitted, input dir is empty
+            str_inputdir = self.manage_app_service_fsplugin_empty_inputdir()
         #logger.debug('inputdir = %s', str_inputdir)
 
         str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
@@ -280,7 +282,11 @@ class PluginInstanceManager(object):
 
         # Some possible error handling...
         if str_responseStatus == 'finishedWithError':
+            self.c_plugin_inst.status = 'finishedWithError'
+            self.c_plugin_inst.save()
             self.handle_app_remote_error()
+
+        return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):
         """
@@ -304,23 +310,23 @@ class PluginInstanceManager(object):
             b_httpResponseBodyParse = True,
             jsonwrapper             = 'payload',
         )
+        logger.info('comms sent to pfcon service at -->%s<--', remote_url)
+        logger.info('message sent: %s', json.dumps(d_msg, indent=2))
+
         # speak to the service...
         d_response = json.loads(serviceCall())
 
-        str_service = 'pfcon'
         if isinstance(d_response, dict):
-            logger.info('looks like we got a successful response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('looks like we got a successful response from pfcon service')
             logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
         else:
-            logger.info('looks like we got an UNSUCCESSFUL response from %s', str_service)
-            logger.info('comms were sent to -->%s<--', remote_url)
+            logger.info('looks like we got an UNSUCCESSFUL response from pfcon service')
             logger.info('response from pfurl(): -->%s<--', d_response)
         if "Connection refused" in d_response:
-            logging.error('fatal error in talking to %s', str_service)
+            logging.error('fatal error in talking to pfcon service')
         return d_response
 
-    def manage_app_service_fsplugin_inputdir(self, inputdir):
+    def manage_app_service_fsplugin_empty_inputdir(self):
         """
         This method is responsible for managing the 'inputdir' in the
         case of FS plugins.
@@ -354,30 +360,9 @@ class PluginInstanceManager(object):
         with the text 'squash' in its filename and the file will contain
         some descriptive message).
         """
-        # Remove any leading noise on the inputdir
-        str_inputdir = inputdir.strip().lstrip('.')
-        if str_inputdir:
-            # Check if dir spec exists in swift
-            try:
-                path_exists = self.swift_manager.path_exists(str_inputdir)
-            except ClientException as e:
-                logger.error('Swift storage error, detail: %s' % str(e))
-                return str_inputdir
-            if path_exists:
-                return str_inputdir
-            str_squashFile = os.path.join(
-                self.data_dir,
-                'squashInvalidDir/squashInvalidDir.txt'
-            ).lstrip('/')
-            str_squashMsg = 'Path specified in object storage does not exist!'
-        else:
-            # No parameter of type 'path' was submitted, so input dir is empty
-            str_squashFile = os.path.join(
-                self.data_dir,
-                'squashEmptyDir/squashEmptyDir.txt'
-            ).lstrip('/')
-            str_squashMsg = 'Empty input dir.'
-
+        str_inputdir = os.path.join(self.data_dir, 'squashEmptyDir').lstrip('/')
+        str_squashFile = os.path.join(str_inputdir, 'squashEmptyDir.txt')
+        str_squashMsg = 'Empty input dir.'
         try:
             if not self.swift_manager.obj_exists(str_squashFile):
                 with io.StringIO(str_squashMsg) as f:
@@ -385,10 +370,6 @@ class PluginInstanceManager(object):
                                                   content_type='text/plain')
         except ClientException as e:
             logger.error('Swift storage error, detail: %s' % str(e))
-        else:
-            # We need to prune this into a path spec...
-            str_inputdir = os.path.dirname(str_squashFile)
-
         return str_inputdir
 
     def serialize_app_response_status(self, d_response):
