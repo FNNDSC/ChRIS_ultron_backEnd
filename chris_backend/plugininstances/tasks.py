@@ -5,13 +5,13 @@ from .models import PluginInstance
 
 
 @shared_task
-def run_plugin_instance(plg_inst_id, parameters_dict):
+def run_plugin_instance(plg_inst_id):
     """
     Run the app corresponding to this plugin instance.
     """
     #from celery.contrib import rdb;rdb.set_trace()
     plugin_inst = PluginInstance.objects.get(pk=plg_inst_id)
-    plugin_inst.run(parameters_dict)
+    plugin_inst.run()
 
 
 @shared_task

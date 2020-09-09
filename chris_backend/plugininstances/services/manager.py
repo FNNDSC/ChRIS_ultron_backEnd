@@ -82,7 +82,7 @@ class PluginInstanceManager(object):
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
 
-    def run_plugin_instance_app(self, parameter_dict):
+    def run_plugin_instance_app(self):
         """
         Run a plugin instance's app via a call to a remote service provider.
         """
@@ -100,26 +100,25 @@ class PluginInstanceManager(object):
         # append the parameters to app's argument list and identify 'path' type parameters
         path_param_names = []
         unextpath_param_names = []
-        db_parameters = plugin.parameters.all()
-        for param_name in parameter_dict:
-            param_value = parameter_dict[param_name]
-            for db_param in db_parameters:
-                if db_param.name == param_name:
-                    if db_param.action == 'store':
-                        app_args.append(db_param.flag)
-                        value = param_value
-                        if db_param.type == 'unextpath':
-                            unextpath_param_names.append(param_name)
-                            value = self.str_app_container_inputdir
-                        if db_param.type == 'path':
-                            path_param_names.append(param_name)
-                            value = self.str_app_container_inputdir
-                        app_args.append(value)
-                    if db_param.action == 'store_true' and param_value:
-                        app_args.append(db_param.flag)
-                    if db_param.action == 'store_false' and not param_value:
-                        app_args.append(db_param.flag)
-                    break
+        parameter_dict = {}
+        param_instances = self.c_plugin_inst.get_parameter_instances()
+        for param_inst in param_instances:
+            param = param_inst.plugin_param
+            value = param_inst.value
+            parameter_dict[param.name] = value
+            if param.action == 'store':
+                app_args.append(param.flag)
+                if param.type == 'unextpath':
+                    unextpath_param_names.append(param.name)
+                    value = self.str_app_container_inputdir
+                if param.type == 'path':
+                    path_param_names.append(param.name)
+                    value = self.str_app_container_inputdir
+                app_args.append(value)
+            if param.action == 'store_true' and value:
+                app_args.append(param.flag)
+            if param.action == 'store_false' and not value:
+                app_args.append(param.flag)
 
         # Handle the case for 'fs'-type plugins that don't specify an inputdir
         # Passing an empty string through to pfurl will cause it to fail
@@ -261,31 +260,32 @@ class PluginInstanceManager(object):
         d_response = self.call_app_service(d_msg)
         logger.info('d_response = %s', json.dumps(d_response, indent=4, sort_keys=True))
 
-        str_responseStatus = self.serialize_app_response_status(d_response)
-        logger.info('Current job remote status = %s', str_responseStatus)
-
+        l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
+        logger.info('Current job remote status = %s', l_status)
         str_DBstatus = self.c_plugin_inst.status
         logger.info('Current job DB status = %s', str_DBstatus)
 
-        if 'swiftPut:True' in str_responseStatus and \
-                str_DBstatus != 'finishedSuccessfully':
+        str_responseStatus = self.serialize_app_response_status(d_response)
+        if str_DBstatus == 'started' and 'swiftPut:True' in str_responseStatus:
             # register output files
             d_swiftState = d_response['jobOperation']['info']['swiftPut']
             self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
 
-            self.c_plugin_inst.status = 'finishedSuccessfully'
-            logger.info("Saving job DB status   as '%s'", self.c_plugin_inst.status)
-            self.c_plugin_inst.end_date = timezone.now()
-            logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
-
-            self.c_plugin_inst.save()
+            if 'finishedSuccessfully' in l_status:
+                self.c_plugin_inst.status = 'finishedSuccessfully'
+                logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
+                self.c_plugin_inst.end_date = timezone.now()
+                logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
+                self.c_plugin_inst.save()
 
         # Some possible error handling...
-        if str_responseStatus == 'finishedWithError':
+        if 'finishedWithError' in l_status:
             self.c_plugin_inst.status = 'finishedWithError'
+            logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
+            self.c_plugin_inst.end_date = timezone.now()
+            logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
             self.c_plugin_inst.save()
             self.handle_app_remote_error()
-
         return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):
@@ -423,11 +423,12 @@ class PluginInstanceManager(object):
         str_deepVal = ''
         def str_deepnest(d):
             nonlocal str_deepVal
-            for k, v in d.items():
-                if isinstance(v, dict):
-                    str_deepnest(v)
-                else:
-                    str_deepVal = '%s' % ("{0} : {1}".format(k, v))
+            if d:
+                for k, v in d.items():
+                    if isinstance(v, dict):
+                        str_deepnest(v)
+                    else:
+                        str_deepVal = '%s' % ("{0} : {1}".format(k, v))
 
         # Collect the 'stderr' from the app service for this instance
         d_msg = {
@@ -441,12 +442,12 @@ class PluginInstanceManager(object):
             }
         }
         d_response = self.call_app_service(d_msg)
-        str_deepnest(d_response['d_ret'])
+        str_deepnest(d_response)
         logger.error('deepVal = %s', str_deepVal)
 
         d_msg['meta']['field'] = 'returncode'
         d_response = self.call_app_service(d_msg)
-        str_deepnest(d_response['d_ret'])
+        str_deepnest(d_response)
         logger.error('deepVal = %s', str_deepVal)
 
     def create_zip_file(self, swift_paths):

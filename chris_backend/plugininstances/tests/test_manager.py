@@ -99,9 +99,8 @@ class PluginInstanceManagerTests(TestCase):
             PathParameter.objects.get_or_create(plugin_inst=pl_inst,
                                                 plugin_param=pl_param,
                                                 value=self.username)
-            parameter_dict = {'dir': self.username}
             plg_inst_manager = PluginInstanceManager(pl_inst)
-            plg_inst_manager.run_plugin_instance_app(parameter_dict)
+            plg_inst_manager.run_plugin_instance_app()
             self.assertEqual(pl_inst.status, 'started')
             call_app_service_mock.assert_called_once()
 
@@ -138,9 +137,8 @@ class PluginInstanceManagerTests(TestCase):
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
-        parameter_dict = {'dir': user_space_path}
         plg_inst_manager = PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app(parameter_dict)
+        plg_inst_manager.run_plugin_instance_app()
         self.assertEqual(pl_inst.status, 'started')
 
         # delete files from swift storage
@@ -209,10 +207,8 @@ class PluginInstanceManagerTests(TestCase):
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
-        parameter_dict = {'dir': user_space_path}
-
         plg_inst_manager = PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app(parameter_dict)
+        plg_inst_manager.run_plugin_instance_app()
 
         plg_inst_manager.check_plugin_instance_app_exec_status()
         self.assertEqual(pl_inst.status, 'started')
