@@ -203,12 +203,12 @@ class PluginInstance(models.Model):
             self.status = 'cancelled'
             self.save()
 
-    def run(self, parameters_dict):
+    def run(self):
         """
         Custom method to run the app corresponding to this plugin instance.
         """
         plg_inst_manager = PluginInstanceManager(self)
-        plg_inst_manager.run_plugin_instance_app(parameters_dict)
+        plg_inst_manager.run_plugin_instance_app()
 
     def check_exec_status(self):
         """

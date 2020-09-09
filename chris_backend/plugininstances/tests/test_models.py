@@ -274,11 +274,10 @@ class PluginInstanceModelTests(ModelTests):
                 compute_resource=plugin.compute_resources.all()[0]
             )
             self.assertEqual(plg_inst.status, 'started')
-            parameters_dict = {'dir': './'}
-            plg_inst.run(parameters_dict)
+            plg_inst.run()
             self.assertEqual(plg_inst.status, 'started')
             # check that manager's run_plugin_instance_app method was called with appropriate args
-            run_plugin_instance_app_mock.assert_called_with(parameters_dict)
+            run_plugin_instance_app_mock.assert_called_with()
 
     def test_check_exec_status(self):
         """
