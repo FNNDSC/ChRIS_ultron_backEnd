@@ -152,8 +152,7 @@ class PluginInstanceListViewTests(TasksViewTests):
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
             # check that the run_plugin_instance task was called with appropriate args
-            parameters_dict = {'dir': self.user_space_path}
-            delay_mock.assert_called_with(response.data['id'], parameters_dict)
+            delay_mock.assert_called_with(response.data['id'])
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
@@ -329,7 +328,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
         # run the plugin instance
         plg_inst_manager = PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app({'dir': user_space_path})
+        plg_inst_manager.run_plugin_instance_app()
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)

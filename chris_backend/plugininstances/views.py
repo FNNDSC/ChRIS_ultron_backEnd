@@ -78,13 +78,11 @@ class PluginInstanceList(generics.ListCreateAPIView):
             compute_resource = plugin.compute_resources.get(name=cr_data['name'])
         plg_inst = serializer.save(owner=user, plugin=plugin, previous=previous,
                                    compute_resource=compute_resource)
-        parameters_dict = {}
         for param, param_serializer in parameter_serializers:
-            param_inst = param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
-            parameters_dict[param.name] = param_inst.value
+            param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
         # run the plugin's app
-        run_plugin_instance.delay(plg_inst.id, parameters_dict)  # call async task
+        run_plugin_instance.delay(plg_inst.id)  # call async task
 
     def list(self, request, *args, **kwargs):
         """
