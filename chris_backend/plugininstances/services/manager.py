@@ -97,22 +97,21 @@ class PluginInstanceManager(object):
         app_args.append("--saveinputmeta")
         # append flag to save output meta data (output description)
         app_args.append("--saveoutputmeta")
-        # append the parameters to app's argument list and identify 'path' type parameters
-        path_param_names = []
-        unextpath_param_names = []
-        parameter_dict = {}
+        # append the parameters to app's argument list and identify
+        # parameters of type 'unextpath' and 'path'
+        path_parameters_dict = {}
+        unextpath_parameters_dict = {}
         param_instances = self.c_plugin_inst.get_parameter_instances()
         for param_inst in param_instances:
             param = param_inst.plugin_param
             value = param_inst.value
-            parameter_dict[param.name] = value
             if param.action == 'store':
                 app_args.append(param.flag)
                 if param.type == 'unextpath':
-                    unextpath_param_names.append(param.name)
+                    unextpath_parameters_dict[param.name] = value
                     value = self.str_app_container_inputdir
                 if param.type == 'path':
-                    path_param_names.append(param.name)
+                    path_parameters_dict[param.name] = value
                     value = self.str_app_container_inputdir
                 app_args.append(value)
             if param.action == 'store_true' and value:
@@ -120,44 +119,27 @@ class PluginInstanceManager(object):
             if param.action == 'store_false' and not value:
                 app_args.append(param.flag)
 
-        # Handle the case for 'fs'-type plugins that don't specify an inputdir
-        # Passing an empty string through to pfurl will cause it to fail
-        # on its local directory check. The "hack" here is that the manager will
-        # "transparently" set the input dir to a location in swift in the case of
-        # FS-type plugins
-        #
-        #       /home/localuser/data/squashEmptyDir
-        #
-        # which in turn contains a "file"
-        #
-        #       /home/localuser/data/squashEmptyDir/squashEmptyDir.txt
-        #
-        # This "inputdir" is then sent along with `pfcon/pfurl` and is of
-        # course ignored by the actual plugin when it is run. This does have
-        # the anti-pattern side effect of possibly using this to send
-        # completely OOB (out of band) data to an FS plugin in this "fake"
-        # "inputdir" and could have implications. Right now though I don't
-        # see how an FS plugin could even access this fake "inputdir".
-        #
+        str_outputdir = self.c_plugin_inst.get_output_path()
+
+        # handle parameters of type 'unextpath'
+        self.handle_app_unextpath_parameters(unextpath_parameters_dict)
+
         if self.c_plugin_inst.previous:
             # WARNING: 'ds' plugins can also have 'path' parameters!
             str_inputdir = self.c_plugin_inst.previous.get_output_path()
-        elif path_param_names:
-            # WARNING: Inputdir assumed to only be the last 'path' parameter!
-            str_inputdir = parameter_dict[path_param_names[-1]].strip('/')
+        elif len(path_parameters_dict):
+            # WARNING: Inputdir assumed to only be one of the 'path' parameters!
+            path_list = next(iter(path_parameters_dict.values())).split(',')
+            str_inputdir = path_list[0].strip('/')
         else:
-            # No parameter of type 'path' or 'unextpath' was submitted, input dir is empty
+            # No parameter of type 'path' was submitted, input dir is empty
             str_inputdir = self.manage_app_service_fsplugin_empty_inputdir()
-        #logger.debug('inputdir = %s', str_inputdir)
 
         str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
         l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
         str_allCmdLineArgs = ' '.join(l_appArgs)
         str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
         logger.info('cmd = %s', str_cmd)
-
-        str_outputdir = self.c_plugin_inst.get_output_path()
-        # logger.debug('outputdir = %s', str_outputdir)
 
         # logger.debug('d_pluginInst = %s', vars(self.c_plugin_inst))
         str_IOPhost = self.c_plugin_inst.compute_resource.name
@@ -242,6 +224,32 @@ class PluginInstanceManager(object):
         }
         self.call_app_service(d_msg)
 
+    def handle_app_unextpath_parameters(self, unextpath_parameters_dict):
+        """
+        Handle parameters of type 'unextpath' passed to the plugin instance app.
+        """
+        outputdir = self.c_plugin_inst.get_output_path()
+        nobjects = 0
+        for param_name in unextpath_parameters_dict:
+            # each parameter value is a string of one or more paths separated by comma
+            path_list = unextpath_parameters_dict[param_name].split(',')
+            for path in path_list:
+                obj_list = []
+                try:
+                    obj_list = self.swift_manager.ls(path)
+                except ClientException as e:
+                    logger.error('Swift storage error, detail: %s' % str(e))
+                for obj in obj_list:
+                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
+                    try:
+                        self.swift_manager.copy_obj(obj, obj_output_path)
+                    except ClientException as e:
+                        logger.error('Swift storage error, detail: %s' % str(e))
+                    else:
+                        nobjects += 1
+        swiftState = {'d_swiftstore': {'filesPushed': nobjects}}
+        self.c_plugin_inst.register_output_files(swiftState=swiftState)
+
     def check_plugin_instance_app_exec_status(self):
         """
         Check a plugin instance's app execution status. It connects to the remote
@@ -258,8 +266,6 @@ class PluginInstanceManager(object):
             }
         }
         d_response = self.call_app_service(d_msg)
-        logger.info('d_response = %s', json.dumps(d_response, indent=4, sort_keys=True))
-
         l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
         logger.info('Current job remote status = %s', l_status)
         str_DBstatus = self.c_plugin_inst.status
@@ -311,14 +317,14 @@ class PluginInstanceManager(object):
             jsonwrapper             = 'payload',
         )
         logger.info('comms sent to pfcon service at -->%s<--', remote_url)
-        logger.info('message sent: %s', json.dumps(d_msg, indent=2))
+        logger.info('message sent: %s', json.dumps(d_msg, indent=4))
 
         # speak to the service...
         d_response = json.loads(serviceCall())
 
         if isinstance(d_response, dict):
             logger.info('looks like we got a successful response from pfcon service')
-            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=2))
+            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=4))
         else:
             logger.info('looks like we got an UNSUCCESSFUL response from pfcon service')
             logger.info('response from pfurl(): -->%s<--', d_response)
@@ -328,8 +334,7 @@ class PluginInstanceManager(object):
 
     def manage_app_service_fsplugin_empty_inputdir(self):
         """
-        This method is responsible for managing the 'inputdir' in the
-        case of FS plugins.
+        This method is responsible for managing the 'inputdir' in the case of FS plugins.
 
         An FS plugin does not have an inputdir spec, since this is only a requirement
         for DS plugins. Nonetheless, the underlying management system (pfcon/pfurl) does
@@ -348,17 +353,6 @@ class PluginInstanceManager(object):
         'path' (i.e. there is no positional argument for inputdir as in DS
         plugins. Thus, if a type 'path' argument is specified, this 'path'
         is assumed to denote a location in object storage.
-
-        In the case when a 'path' type argument is specified, there
-        are certain important caveats:
-
-            1. Only one 'path' type argument is assumed / fully supported.
-            2. If an invalid object location is specified, this is squashed.
-
-        (squashed means that the system will still execute, but the returned
-        output directory from the FS plugin will contain only a single file
-        with the text 'squash' in its filename and the file will contain
-        some descriptive message).
         """
         str_inputdir = os.path.join(self.data_dir, 'squashEmptyDir').lstrip('/')
         str_squashFile = os.path.join(str_inputdir, 'squashEmptyDir.txt')
