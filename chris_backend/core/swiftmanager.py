@@ -159,7 +159,7 @@ class SwiftManager(object):
         """
         # upload all files down the <local_dir>
         for root, dirs, files in os.walk(local_dir):
-            swift_base = root.replace(local_dir, swift_prefix) if swift_prefix else root
+            swift_base = root.replace(local_dir, swift_prefix, 1) if swift_prefix else root
             for filename in files:
                 swift_path = os.path.join(swift_base, filename)
                 if not self.obj_exists(swift_path):
