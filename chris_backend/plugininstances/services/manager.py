@@ -240,13 +240,9 @@ class PluginInstanceManager(object):
                 except ClientException as e:
                     logger.error('Swift storage error, detail: %s' % str(e))
                 for obj in obj_list:
-                    obj_basename = obj.split('/')[-1]
-                    if obj == path:
-                        obj_output_path = outputdir + '/' + obj_basename
-                    else:
-                        obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
-                        if obj_output_path.split('/')[-1] != obj_basename:
-                            obj_output_path = outputdir + '/' + obj_basename
+                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
+                    if not obj_output_path.startswith(outputdir + '/'):
+                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
                     try:
                         self.swift_manager.copy_obj(obj, obj_output_path)
                     except ClientException as e:
