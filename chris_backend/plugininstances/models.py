@@ -138,6 +138,7 @@ class PluginInstance(models.Model):
         instance regardless of their type.
         """
         parameter_instances = []
+        parameter_instances.extend(list(self.unextpath_param.all()))
         parameter_instances.extend(list(self.path_param.all()))
         parameter_instances.extend(list(self.string_param.all()))
         parameter_instances.extend(list(self.integer_param.all()))
