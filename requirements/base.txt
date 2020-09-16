@@ -6,6 +6,7 @@ mysqlclient==1.4.6
 python-swiftclient==3.9.0
 django-storage-swift==1.2.19
 celery==4.4.2
+django-celery-beat==2.0.0
 mod-wsgi==4.7.1
 pfurl>=2.2.2.2
 python-chrisstoreclient==1.0.0
