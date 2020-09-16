@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_filters',
+    'django_celery_beat',
     'mod_wsgi.server',
     'rest_framework',
     'rest_framework.authtoken',

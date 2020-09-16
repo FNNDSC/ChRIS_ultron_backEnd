@@ -36,7 +36,7 @@ services:
   worker:
     image: ${CHRISREPO}/chris
     entrypoint: ''
-    command: celery -A core worker -c 1 -l info -Q main
+    command: celery -A core worker -c 4 -l info -Q main
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -52,6 +52,25 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Worker"
       role: "Production async worker"
+
+  scheduler:
+    image: ${CHRISREPO}/chris
+    entrypoint: ''
+    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - ./secrets/.chris.env
+      - ./secrets/.chris_db.env
+      - ./secrets/.swift_service.env
+    depends_on:
+      - chris_db
+      - swift_service
+      - queue
+    restart: on-failure
+    networks:
+      - local
+    labels:
+      name: "ChRIS_ultron_backEnd Periodic Tasks Scheduler"
+      role: "Production periodic tasks scheduler"
 
   chris_db:
     image: mysql:5
@@ -145,9 +164,8 @@ services:
       role: "pfcon service"
 
   pfioh_service:
-    # The following is a bit complicated... Basically we need to map a physical dir
-    # in the HOST to the key store in pfioh. The keystore is specified by the
-    # --storeBase flag.
+    # We need to map a physical dir in the HOST to the key store in pfioh.
+    # The keystore is specified by the --storeBase flag.
     image: ${CHRISREPO}/pfioh
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
