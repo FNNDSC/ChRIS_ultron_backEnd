@@ -205,7 +205,7 @@ if (( b_restart )) ; then
     cat dc.out | ./boxes.sh
     windowBottom
 
-    docker-compose -f docker-compose_dev.yml run --service-ports        \
+    docker-compose -f docker-compose_dev.yml run --use-aliases --service-ports        \
         ${RESTART}_service
 else
     title -d 1 "Pulling non-'local/' core containers where needed..."   \
@@ -415,7 +415,7 @@ else
                 "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
             echo ""                                                     | ./boxes.sh
             printf "%80s\n" "Clearing internal pman database..."        | ./boxes.sh
-            windowBottom
+	    windowBottom
             docker-compose --no-ansi -f docker-compose_dev.yml          \
                 exec pman_service pman_do --op DBclean                  >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
