@@ -81,8 +81,15 @@ class PluginInstanceList(generics.ListCreateAPIView):
         for param, param_serializer in parameter_serializers:
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
-        # run the plugin's app
-        run_plugin_instance.delay(plg_inst.id)  # call async task
+        if previous is None or previous.status == 'finishedSuccessfully':
+            # run the plugin's app
+            run_plugin_instance.delay(plg_inst.id)  # call async task
+        elif previous.status == 'started':
+            plg_inst.status = 'waitingForPrevious'
+            plg_inst.save()
+        elif previous.status in ('finishedWithError', 'cancelled'):
+            plg_inst.status = 'cancelled'
+            plg_inst.save()
 
     def list(self, request, *args, **kwargs):
         """
@@ -159,9 +166,20 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to check a plugin's instance status.
         """
-        instance = self.get_object()
-        # check execution status of plugin's app
-        check_plugin_instance_exec_status.delay(instance.id)  # call async task
+        plg_inst = self.get_object()
+        if plg_inst.status == 'waitingForPrevious':
+            if plg_inst.previous.status == 'finishedSuccessfully':
+                plg_inst.status = 'started'
+                plg_inst.save()
+                # run the plugin's app
+                run_plugin_instance.delay(plg_inst.id)  # call async task
+            elif plg_inst.previous.status in ('finishedWithError', 'cancelled'):
+                plg_inst.status = 'cancelled'
+                plg_inst.save()
+        elif plg_inst.status == 'started':
+            # check execution status of plugin's app
+            check_plugin_instance_exec_status.delay(plg_inst.id)  # call async task
+
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)

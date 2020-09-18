@@ -1,4 +1,6 @@
 
+from django.db.models import Q
+
 from celery import shared_task
 
 from .models import PluginInstance
@@ -24,14 +26,24 @@ def check_plugin_instance_exec_status(plg_inst_id):
 
 
 @shared_task
-def check_started_plugin_instances_exec_status():
+def check_scheduled_plugin_instances_exec_status():
     """
     Check the execution status of the apps corresponding to all the plugin instances
-    with 'started' DB status.
+    with 'started' or 'waitingForPrevious' DB status.
     """
-    instances = PluginInstance.objects.filter(status='started')
-    for plugin_inst in instances:
-        check_plugin_instance_exec_status.delay(plugin_inst.id)  # call async task
+    lookup = Q(status='started') | Q(status='waitingForPrevious')
+    instances = PluginInstance.objects.filter(lookup)
+    for plg_inst in instances:
+        if plg_inst.status == 'waitingForPrevious':
+            if plg_inst.previous.status == 'finishedSuccessfully':
+                plg_inst.status = 'started'
+                plg_inst.save()
+                run_plugin_instance.delay(plg_inst.id)  # call async task
+            elif plg_inst.previous.status in ('finishedWithError', 'cancelled'):
+                plg_inst.status = 'cancelled'
+                plg_inst.save()
+        else:
+            check_plugin_instance_exec_status.delay(plg_inst.id)  # call async task
 
 
 @shared_task  # toy task for testing celery stuff
