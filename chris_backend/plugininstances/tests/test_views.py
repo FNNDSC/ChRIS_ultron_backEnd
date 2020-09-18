@@ -78,7 +78,7 @@ class TasksViewTests(TransactionTestCase):
         # that is exclusively used for the automated tests
         celery_app.conf.update(task_routes=None)
         cls.celery_worker = start_worker(celery_app,
-                                         concurrency=2,
+                                         concurrency=1,
                                          perform_ping_check=False)
         cls.celery_worker.__enter__()
 
@@ -139,12 +139,15 @@ class PluginInstanceListViewTests(TasksViewTests):
             {"template": {"data": [{"name": "dir", "value": self.user_space_path}]}})
 
     def test_plugin_instance_create_success(self):
+        # add parameters to the plugin before the POST request
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        PluginParameter.objects.get_or_create(plugin=plugin, name='dir', type='string',
+                                              optional=False)
+
+        # first test 'fs' plugin instance (has no previous plugin instance)
+
         with mock.patch.object(views.run_plugin_instance, 'delay',
                                return_value=None) as delay_mock:
-            # add parameters to the plugin before the POST request
-            plugin = Plugin.objects.get(meta__name="pacspull")
-            PluginParameter.objects.get_or_create(plugin=plugin, name='dir', type='string',
-                                                  optional=False)
             # make API request
             self.client.login(username=self.username, password=self.password)
             response = self.client.post(self.create_read_url, data=self.post,
@@ -153,6 +156,54 @@ class PluginInstanceListViewTests(TasksViewTests):
 
             # check that the run_plugin_instance task was called with appropriate args
             delay_mock.assert_called_with(response.data['id'])
+            self.assertEqual(response.data['status'], 'started')
+
+        # now test 'ds' plugin instance (has previous plugin instance)
+
+        previous_plg_inst = PluginInstance.objects.get(pk=1)
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+        create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        post = json.dumps(
+            {"template": {"data": [{"name": "previous_id", "value": 1}]}})
+
+        previous_plg_inst.status = 'finishedSuccessfully'
+        previous_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+            self.assertEqual(response.data['status'], 'started')
+
+        previous_plg_inst.status = 'started'
+        previous_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was not called
+            delay_mock.assert_not_called()
+            self.assertEqual(response.data['status'], 'waitingForPrevious')
+
+        previous_plg_inst.status = 'finishedWithError'
+        previous_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was not called
+            delay_mock.assert_not_called()
+            self.assertEqual(response.data['status'], 'cancelled')
 
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
@@ -242,15 +293,19 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
-        # create a pacspull plugin instance
+
+        # create pacspull fs plugin instance
         plugin = Plugin.objects.get(meta__name="pacspull")
         user = User.objects.get(username=self.username)
         (self.pl_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        # create mri_convert ds plugin instance
         plugin = Plugin.objects.get(meta__name="mri_convert")
         PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=self.pl_inst,
             compute_resource=plugin.compute_resources.all()[0])
+
         self.read_update_delete_url = reverse("plugininstance-detail",
                                               kwargs={"pk": self.pl_inst.id})
 
@@ -261,9 +316,53 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             self.client.login(username=self.username, password=self.password)
             response = self.client.get(self.read_update_delete_url)
             self.assertContains(response, "pacspull")
+            self.assertEqual(response.data['status'], 'started')
 
-            # check that the check_plugin_instance_exec_status task was called once
+            # check that the check_plugin_instance_exec_status task was called with appropriate args
             delay_mock.assert_called_with(self.pl_inst.id)
+
+        previous_plg_inst = self.pl_inst
+        plg_inst = list(self.pl_inst.next.all())[0]
+        read_update_delete_url = reverse("plugininstance-detail",
+                                         kwargs={"pk": plg_inst.id})
+
+        plg_inst.status = 'waitingForPrevious'
+        plg_inst.save()
+        previous_plg_inst.status = 'finishedSuccessfully'
+        previous_plg_inst.save()
+        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
+                               return_value=None) as check_status_delay_mock:
+            with mock.patch.object(views.run_plugin_instance, 'delay',
+                                   return_value=None) as run_delay_mock:
+                # make API request
+                self.client.login(username=self.username, password=self.password)
+                response = self.client.get(read_update_delete_url)
+                self.assertContains(response, "mri_convert")
+                self.assertEqual(response.data['status'], 'started')
+
+                # check that the check_plugin_instance_exec_status task was not called
+                check_status_delay_mock.assert_not_called()
+                # check that the run_plugin_instance task was called with appropriate args
+                run_delay_mock.assert_called_with(plg_inst.id)
+
+        plg_inst.status = 'waitingForPrevious'
+        plg_inst.save()
+        previous_plg_inst.status = 'finishedWithError'
+        previous_plg_inst.save()
+        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
+                               return_value=None) as check_status_delay_mock:
+            with mock.patch.object(views.run_plugin_instance, 'delay',
+                                   return_value=None) as run_delay_mock:
+                # make API request
+                self.client.login(username=self.username, password=self.password)
+                response = self.client.get(read_update_delete_url)
+                self.assertContains(response, "mri_convert")
+                self.assertEqual(response.data['status'], 'cancelled')
+
+                # check that the check_plugin_instance_exec_status task was not called
+                check_status_delay_mock.assert_not_called()
+                # check that the run_plugin_instance task was not called
+                run_delay_mock.assert_not_called()
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):

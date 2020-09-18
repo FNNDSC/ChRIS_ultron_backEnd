@@ -21,7 +21,8 @@ from .services.manager import PluginInstanceManager
 logger = logging.getLogger(__name__)
 
 
-STATUS_TYPES = ['started', 'finishedSuccessfully', 'finishedWithError', 'cancelled']
+STATUS_TYPES = ['started', 'waitingForPrevious', 'finishedSuccessfully',
+                'finishedWithError', 'cancelled']
 
 
 class PluginInstance(models.Model):
@@ -208,8 +209,9 @@ class PluginInstance(models.Model):
         """
         Custom method to run the app corresponding to this plugin instance.
         """
-        plg_inst_manager = PluginInstanceManager(self)
-        plg_inst_manager.run_plugin_instance_app()
+        if self.status == 'started':
+            plg_inst_manager = PluginInstanceManager(self)
+            plg_inst_manager.run_plugin_instance_app()
 
     def check_exec_status(self):
         """

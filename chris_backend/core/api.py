@@ -236,6 +236,10 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PathParameterDetail.as_view(),
         name='pathparameter-detail'),
 
+    path('v1/plugins/unextpath-parameter/<int:pk>/',
+         plugininstance_views.UnextpathParameterDetail.as_view(),
+         name='unextpathparameter-detail'),
+
 
     path('v1/pipelines/<int:pk>/instances/',
         pipelineinstance_views.PipelineInstanceList.as_view(),
