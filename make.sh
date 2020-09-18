@@ -500,6 +500,8 @@ else
                          "pl-z2labelmap"
                          "pl-mri10yr06mo01da_normal"
                          "pl-brainmri_preprocessed"
+                         "pl-fastsurfer_inference"
+                         "pl-mgz2imgslices"
     )
 
     title -d 1 "Checking on container plugins and pulling latest versions where needed..."
@@ -610,6 +612,8 @@ else
                          "pl-mri10yr06mo01da_normal"
                          "pl-mri10yr06mo01da_normal^moc"
                          "pl-brainmri_preprocessed"
+                         "pl-fastsurfer_inference"
+                         "pl-mgz2imgslices"
 
 
     )
