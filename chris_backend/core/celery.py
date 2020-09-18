@@ -25,9 +25,19 @@ app.autodiscover_tasks()
 task_routes = {
     'plugininstances.tasks.sum': {'queue': 'main'},
     'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main'},
+    'plugininstances.tasks.check_scheduled_plugin_instances_exec_status':
+        {'queue': 'main'},
     'plugininstances.tasks.run_plugin_instance': {'queue': 'main'},
 }
 app.conf.update(task_routes=task_routes)
+
+# setup periodic tasks
+app.conf.beat_schedule = {
+    'check-scheduled-plugin-instances-exec-status-every-10-seconds': {
+        'task': 'plugininstances.tasks.check_scheduled_plugin_instances_exec_status',
+        'schedule': 10.0,
+    },
+}
 
 # use logging settings in Django settings
 @setup_logging.connect
