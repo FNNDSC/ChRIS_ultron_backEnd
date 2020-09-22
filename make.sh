@@ -8,7 +8,7 @@
 #
 #   make.sh                     [-r <service>]                  \
 #                               [-a <swarm-advertise-adr>]      \
-#                               [-p] [-s] [-i]                  \
+#                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
 #                               [-S <storeBaseOverride>]        \
 #                               [-e <computeEnv>]               \
@@ -19,8 +19,10 @@
 #   'make.sh' is the main entry point for instantiating a
 #   complete backend dev environment.
 #
-#   It creates a pattern of directories and symbolic links that reflect the
-#   declarative environment of the docker-compose_dev.yml contents.
+#   Using appropriate flags, this script can restart services
+#   in interactive mode, toggle unit/integration testing on or
+#   off, pause at a specified wait point, and even skip various
+#   introductory / informational steps.
 #
 # TYPICAL CASES:
 #
@@ -32,6 +34,19 @@
 #
 #       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
 #
+#   NOTE: What's up with the "sudo rm..." followed by "rm ..."?
+#
+#         This is a rather unintuitive work around if ChRIS is being
+#         instantiated on a NFS mounted volume (with the `rootsquash`
+#         set). Files down directory trees created by running ChRIS
+#         dockerized services might have mixed ownership and trying
+#         to delete these files as `root` on the host running the
+#         service might not remove files owned by a different user.
+#
+#         Hence this rather counter-intuitive construct where sometimes
+#         being `root` is not sufficient in deleting leftover files or
+#         directories.
+##
 # ARGS
 #
 #   -U
@@ -289,13 +304,15 @@ else
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightCyan}
         for CORE in ${A_CONTAINER[@]} ; do
             cparse $CORE " " "REPO" "CONTAINER" "MMN" "ENV"
+            printf "${White}%40s${Green}%40s${NC}\n"                            \
+                        "$CONTAINER" "stopping..."                              | ./boxes.sh
             docker ps -a                                                        |\
                 grep $CONTAINER                                                 |\
                 awk '{printf("docker stop %s && docker rm -vf %s\n", $1, $1);}' |\
                 sh >/dev/null                                                   | ./boxes.sh
-            printf "${White}%40s${Green}%40s${NC}\n"                            \
-                        "$CONTAINER" "stopped"                                  | ./boxes.sh
+            # echo -en "\033[2A\033[2K"
         done
+        echo "All containers stopped."                                          | ./boxes.sh
     windowBottom
 
     title -d 1 "Changing permissions to 755 on" "$(pwd)"
@@ -458,6 +475,7 @@ else
         cat dc.out                                                      | ./boxes.sh ${LightGreen}
         echo ""                                                         | ./boxes.sh
         echo "Creating superuser cubeadmin:cubeadmin1234..."            | ./boxes.sh
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
         docker-compose -f docker-compose_dev.yml    \
             exec chris_store /bin/bash -c            \
@@ -516,21 +534,23 @@ else
 
     title -d 1 "Automatically uploading some plugins to the ChRIS store..."
         declare -i i=1
-        echo ""                                                     | ./boxes.sh
-        echo ""                                                     | ./boxes.sh
+        declare -i b_uploadSuccess=0
+        declare -i b_uploadFail=0
+        echo ""                                                         | ./boxes.sh
+        echo ""                                                         | ./boxes.sh
         for plugin in "${chris_store_plugins[@]}"; do
             cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
             CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null"
             PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null)
-            # echo "$PLUGIN_REP" | python -m json.tool                    | ./boxes.sh ${LightGreen}
+            # echo "$PLUGIN_REP" | python -m json.tool                  | ./boxes.sh ${LightGreen}
             echo -en "\033[2A\033[2K"
             printf "%8s${Cyan}%28s${NC}%5s${LightBlue}%39s\n" \
-              "${STEP}.$i: " "[ $CONTAINER ]" "--->" "[ ChRIS Store ]"   | ./boxes.sh
+              "${STEP}.$i: " "[ $CONTAINER ]" "--->" "[ ChRIS Store ]"  | ./boxes.sh
             windowBottom
 
-            docker-compose -f docker-compose_dev.yml                                \
-                exec chris_store python plugins/services/manager.py add "$CONTAINER" \
-                cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"              \
+            docker-compose -f docker-compose_dev.yml                                    \
+                exec chris_store python plugins/services/manager.py add "$CONTAINER"    \
+                cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"                  \
                 --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
             status=$?
             echo -en "\033[2A\033[2K"
@@ -539,13 +559,29 @@ else
             if (( $status == 0 )) ; then
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                         "ChRIS store upload" "[ success ]"              | ./boxes.sh
+                b_uploadSuccess=$(( b_uploadSuccess+=1 ))
             else
-                printf "%40s${Yellow}%40s${NC}\n"                     \
+                printf "%40s${Yellow}%40s${NC}\n"                       \
                         "ChRIS store upload" "[ failure ]"              | ./boxes.sh
+                b_uploadFail=$(( b_uploadFail+=1 ))
             fi
             ((i++))
             windowBottom
         done
+        echo -en "\033[2A\033[2K"
+        echo ""                                                         | ./boxes.sh
+        if (( b_uploadSuccess > 0 )) ; then
+            printf "${LightCyan}%20s${LightGreen}%-60s${NC}\n"          \
+                "$b_uploadSuccess"                                      \
+                " plugin(s) successfully uploaded to ChRIS Store"       | ./boxes.sh
+        fi
+        if (( b_uploadFail > 0 )) ; then
+            printf "${Brown}%20s${Brown}%-60s${NC}\n"                   \
+                "$b_uploadFail"                                         \
+                " plugin(s) did not upload to ChRIS Store. WARNING"     | ./boxes.sh
+        fi
+        echo ""                                                         | ./boxes.sh
+        windowBottom
 
     title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
                             "(unmutable and available to all users)"
@@ -562,7 +598,7 @@ else
         PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
-            exec chris_store python pipelines/services/manager.py        \
+            exec chris_store python pipelines/services/manager.py       \
             add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
 
         PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
@@ -576,7 +612,7 @@ else
         PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
         windowBottom
         docker-compose -f docker-compose_dev.yml                        \
-            exec chris_store python pipelines/services/manager.py        \
+            exec chris_store python pipelines/services/manager.py       \
             add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
         echo -en "\033[2A\033[2K"
     windowBottom
@@ -611,6 +647,8 @@ else
 
     title -d 1 "Automatically registering some plugins from the ChRIS store into CUBE..."
         declare -i i=1
+        declare -i b_registerSuccess=0
+        declare -i b_registerFail=0
         echo ""                                                     | ./boxes.sh
         echo ""                                                     | ./boxes.sh
         for plugin in "${chris_plugins[@]}"; do
@@ -627,20 +665,36 @@ else
                 add "$ENV" "http://pfcon.local:5005" --description "$ENV Description"
             docker-compose -f docker-compose_dev.yml                    \
                 exec chris_dev python plugins/services/manager.py       \
-                register $ENV --pluginname "$CONTAINER"
+                register $ENV --pluginname "$CONTAINER"  >& dc.out >/dev/null
             status=$?
             echo -en "\033[2A\033[2K"
+            cat dc.out | ./boxes.sh
 
             if (( $status == 0 )) ; then
                 printf "%40s${LightGreen}%40s${NC}\n"                   \
                     "CUBE registation" "[ success ]"                    | ./boxes.sh
+                b_registerSuccess=$(( b_registerSuccess+=1 ))
             else
-                printf "%40s${Yellow}%40s${NC}\n"                     \
+                printf "%40s${Yellow}%40s${NC}\n"                       \
                     "CUBE registration" "[ failure ]"                   | ./boxes.sh
+                b_registerFail=$(( b_registerFail+=1 ))
             fi
             ((i++))
             windowBottom
         done
+        echo ""                                                         | ./boxes.sh
+        if (( b_registerSuccess )) ; then
+            printf "${LightCyan}%20s${LightGreen}%-60s${NC}\n"          \
+                "$b_registerSuccess"                                    \
+                " plugin(s) successfully registered to ChRIS"           | ./boxes.sh
+        fi
+        if (( b_registerFail )) ; then
+            printf "${Brown}%20s${Brown}%-60s${NC}\n"                   \
+                "$b_registerFail"                                       \
+                " plugin(s) did not register to ChRIS. WARNING"         | ./boxes.sh
+        fi
+        echo ""                                                         | ./boxes.sh
+        windowBottom
 
     title -d 1 "Creating two ChRIS API users"
         echo "Setting superuser chris:chris1234..."                     | ./boxes.sh
