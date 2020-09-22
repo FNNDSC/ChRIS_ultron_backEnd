@@ -4,6 +4,7 @@ from django.urls import path, re_path, include
 from rest_framework.urlpatterns import format_suffix_patterns
 from rest_framework.authtoken.views import obtain_auth_token
 
+from core import views as core_views
 from feeds import views as feed_views
 from plugins import views as plugin_views
 from plugininstances import views as plugininstance_views
@@ -26,6 +27,10 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/users/<int:pk>/',
         user_views.UserDetail.as_view(), name='user-detail'),
+
+
+    path('v1/chrisinstance/<int:pk>/',
+         core_views.ChrisInstanceDetail.as_view(), name='chrisinstance-detail'),
 
 
     path('v1/',
