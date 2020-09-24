@@ -754,30 +754,26 @@ else
         cat dc.out | ./boxes.sh
    windowBottom
 
+    if (( ! b_skipIntegrationTests )) ; then
+        title -d 1 "Restarting the satellite services pfcon/pfioh/pman to clean their memory"
+            windowBottom
+            docker-compose --no-ansi -f docker-compose_dev.yml restart pman_service >& dc.out > /dev/null
+            docker-compose --no-ansi -f docker-compose_dev.yml restart pfioh_service >& dc.out > /dev/null
+            docker-compose --no-ansi -f docker-compose_dev.yml restart pfcon_service >& dc.out > /dev/null
+            echo -en "\033[2A\033[2K"
+            cat dc.out | ./boxes.sh
+        windowBottom
+    fi
+
     if (( !  b_norestartinteractive_chris_dev )) ; then
         title -d 1 "Restarting CUBE's Django development server"        \
                             "in interactive mode..."
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "Stopping" "pman_service"                       | ./boxes.sh
-            windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml stop pman_service >& dc.out > /dev/null
-            echo -en "\033[2A\033[2K"
-            cat dc.out | ./boxes.sh
-
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "rm -f" "pman_service"                          | ./boxes.sh
-            windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml rm -f pman_service >& dc.out > /dev/null
-            echo -en "\033[2A\033[2K"
-            cat dc.out | ./boxes.sh
-
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "Stopping" "chris_dev"                          | ./boxes.sh
             windowBottom
             docker-compose --no-ansi -f docker-compose_dev.yml stop chris_dev >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
-
 
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "rm -f" "chris_dev"                             | ./boxes.sh
