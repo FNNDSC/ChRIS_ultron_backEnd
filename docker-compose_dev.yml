@@ -59,7 +59,7 @@ services:
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     entrypoint: ''
-    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       - chris_dev_db
       - swift_service
