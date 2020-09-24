@@ -133,7 +133,8 @@ class PluginInstanceManagerTests(TestCase):
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+            title='test3', plugin=plugin,
+            owner=user, compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
@@ -143,9 +144,9 @@ class PluginInstanceManagerTests(TestCase):
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        for path in obj_paths:
-            self.swift_manager.delete_obj(path)
+        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # for path in obj_paths:
+        #     self.swift_manager.delete_obj(path)
 
         # finally:
         #     # remove test directory
@@ -203,7 +204,8 @@ class PluginInstanceManagerTests(TestCase):
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+            title='test4', plugin=plugin, owner=user,
+            compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
@@ -237,6 +239,6 @@ class PluginInstanceManagerTests(TestCase):
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        for path in obj_paths:
-            self.swift_manager.delete_obj(path)
+        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # for path in obj_paths:
+        #     self.swift_manager.delete_obj(path)
