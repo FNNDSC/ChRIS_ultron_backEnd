@@ -519,7 +519,7 @@ else
                          "pl-mri10yr06mo01da_normal"
                          "pl-brainmri_preprocessed"
                          "pl-fastsurfer_inference"
-                         "pl-mgz2imageslices"
+                         "pl-mgz2imgslices"
     )
 
     title -d 1 "Checking on container plugins and pulling latest versions where needed..."
@@ -649,7 +649,7 @@ else
                          "pl-mri10yr06mo01da_normal^moc"
                          "pl-brainmri_preprocessed"
                          "pl-fastsurfer_inference"
-                         "pl-mgz2imageslices"
+                         "pl-mgz2imgslices"
 
 
     )
