@@ -7,7 +7,6 @@ SWIFTPATHPREFIX=""
 PULLDIR="./"
 PUSHDIR="./"
 ACTION="list"
-echo($SWIFTIP)
 
 declare -i Gb_verbose=0
 
