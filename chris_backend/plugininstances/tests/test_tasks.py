@@ -60,15 +60,18 @@ class PluginInstanceTasksTests(TasksTests):
             plugin=plugin,
             owner=user,
             compute_resource=plugin.compute_resources.all()[0])
+        self.plg_inst.status = 'started'
+        self.plg_inst.save()
 
     def test_task_run_plugin_instance(self):
-        with mock.patch.object(tasks.PluginInstance, 'run',
+        with mock.patch.object(tasks.PluginInstanceManager, 'run_plugin_instance_app',
                                return_value=None) as run_mock:
             tasks.run_plugin_instance(self.plg_inst.id)
             run_mock.assert_called_with()
 
     def test_task_check_plugin_instance_exec_status(self):
-        with mock.patch.object(tasks.PluginInstance, 'check_exec_status',
+        with mock.patch.object(tasks.PluginInstanceManager,
+                               'check_plugin_instance_app_exec_status',
                                return_value=None) as check_exec_status_mock:
             tasks.check_plugin_instance_exec_status(self.plg_inst.id)
             check_exec_status_mock.assert_called_with()
@@ -100,7 +103,7 @@ class PluginInstanceTasksTests(TasksTests):
                                    return_value=None) as run_delay_mock:
                 tasks.check_scheduled_plugin_instances_exec_status()
                 plg_inst.refresh_from_db()
-                self.assertEqual(plg_inst.status, 'started')
+                self.assertEqual(plg_inst.status, 'scheduled')
 
                 # check that the check_plugin_instance_exec_status task was not called
                 check_status_delay_mock.assert_not_called()

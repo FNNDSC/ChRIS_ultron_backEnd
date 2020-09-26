@@ -18,7 +18,7 @@ from core.celery import task_routes
 from core.swiftmanager import SwiftManager
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
-from plugininstances.models import PathParameter, FloatParameter, STATUS_TYPES
+from plugininstances.models import PathParameter, FloatParameter
 from plugininstances.services.manager import PluginInstanceManager
 from plugininstances import views
 
@@ -156,7 +156,7 @@ class PluginInstanceListViewTests(TasksViewTests):
 
             # check that the run_plugin_instance task was called with appropriate args
             delay_mock.assert_called_with(response.data['id'])
-            self.assertEqual(response.data['status'], 'started')
+            self.assertEqual(response.data['status'], 'scheduled')
 
         # now test 'ds' plugin instance (has previous plugin instance)
 
@@ -177,7 +177,7 @@ class PluginInstanceListViewTests(TasksViewTests):
 
             # check that the run_plugin_instance task was called with appropriate args
             delay_mock.assert_called_with(response.data['id'])
-            self.assertEqual(response.data['status'], 'started')
+            self.assertEqual(response.data['status'], 'scheduled')
 
         previous_plg_inst.status = 'started'
         previous_plg_inst.save()
@@ -310,6 +310,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                                               kwargs={"pk": self.pl_inst.id})
 
     def test_plugin_instance_detail_success(self):
+        self.pl_inst.status = 'started'
+        self.pl_inst.save()
         with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
                                return_value=None) as delay_mock:
             # make API request
@@ -338,7 +340,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                 self.client.login(username=self.username, password=self.password)
                 response = self.client.get(read_update_delete_url)
                 self.assertContains(response, "mri_convert")
-                self.assertEqual(response.data['status'], 'started')
+                self.assertEqual(response.data['status'], 'scheduled')
 
                 # check that the check_plugin_instance_exec_status task was not called
                 check_status_delay_mock.assert_not_called()
@@ -419,7 +421,10 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         # create a plugin's instance
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+            title='test2', plugin=plugin,
+            owner=user, compute_resource=plugin.compute_resources.all()[0])
+        pl_inst.status = 'scheduled'
+        pl_inst.save()
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
         self.read_update_delete_url = reverse("plugininstance-detail",
@@ -475,11 +480,17 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertContains(response, "Test instance")
         self.assertContains(response, "cancelled")
 
-    def test_plugin_instance_update_failure_cannot_update_status_if_current_status_is_not_started_or_cancelled(self):
+    def test_plugin_instance_update_failure_current_status_is_finishedSuccessfully_or_finishedWithError(self):
         put = json.dumps({
             "template": {"data": [{"name": "status", "value": "cancelled"}]}})
 
         self.pl_inst.status = 'finishedSuccessfully'
+        self.pl_inst.save()
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.pl_inst.status = 'finishedWithError'
         self.pl_inst.save()
         self.client.login(username=self.username, password=self.password)
         response = self.client.put(self.read_update_delete_url, data=put,
@@ -539,24 +550,23 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         plugin = Plugin.objects.get(meta__name="pacspull")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
-        # set first instance's status
-        inst.status = STATUS_TYPES[0]
+
         plugin = Plugin.objects.get(meta__name="mri_convert")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=inst,
             compute_resource=plugin.compute_resources.all()[0])
         # set second instance's status
-        inst.status = STATUS_TYPES[2]
+        inst.status = 'finishedSuccessfully'
+        inst.save()
 
-        self.list_url = reverse("allplugininstance-list-query-search") + '?status=' + \
-                        STATUS_TYPES[0]
+        self.list_url = reverse("allplugininstance-list-query-search") + '?status=created'
 
     def test_plugin_instance_query_search_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         # response should only contain the instances that match the query
-        self.assertContains(response, STATUS_TYPES[0])
-        self.assertNotContains(response, STATUS_TYPES[1])
+        self.assertContains(response, 'created')
+        self.assertNotContains(response,'finishedSuccessfully')
 
     def test_plugin_instance_query_search_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)

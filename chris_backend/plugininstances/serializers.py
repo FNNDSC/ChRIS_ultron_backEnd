@@ -105,10 +105,12 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to validate a change of status.
         """
-        if self.instance and (status != 'cancelled' or
-                              self.instance.status not in ['started', 'cancelled']):
+        instance = self.instance
+        if instance and (status != 'cancelled' or
+                         instance.status in ('finishedSuccessfully',
+                                             'finishedWithError')):
             msg = "Can not change status from '%s' to '%s'."
-            raise serializers.ValidationError([msg % (self.instance.status, status)])
+            raise serializers.ValidationError([msg % (instance.status, status)])
         return status
 
     def validate_gpu_limit(self, gpu_limit):

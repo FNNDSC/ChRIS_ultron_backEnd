@@ -148,8 +148,8 @@ class PluginInstanceSerializerTests(SerializerTests):
     def test_validate_status(self):
         """
         Test whether overriden validate_status method raises a serializers.ValidationError
-        when the status is not 'cancelled' or the current instance status is not 'started'
-        or 'cancelled'.
+        when the status is not 'cancelled' or the current instance status is
+        'finishedSuccessfully' or 'finishedWithError.
         """
         plugin = self.plugin
         owner = self.user
@@ -162,6 +162,10 @@ class PluginInstanceSerializerTests(SerializerTests):
         (plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=owner, compute_resource=plugin.compute_resources.all()[0])
         plg_inst.status = 'finishedSuccessfully'
+        plg_inst_serializer = PluginInstanceSerializer(plg_inst)
+        with self.assertRaises(serializers.ValidationError):
+            plg_inst_serializer.validate_status('cancelled')
+        plg_inst.status = 'finishedWithError'
         plg_inst_serializer = PluginInstanceSerializer(plg_inst)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_status('cancelled')

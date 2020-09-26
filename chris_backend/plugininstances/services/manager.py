@@ -86,6 +86,9 @@ class PluginInstanceManager(object):
         """
         Run a plugin instance's app via a call to a remote service provider.
         """
+        if self.c_plugin_inst.status == 'cancelled':
+            return
+
         plugin = self.c_plugin_inst.plugin
         app_args = []
         # append app's container input dir to app's argument list (only for ds plugins)
@@ -223,6 +226,8 @@ class PluginInstanceManager(object):
                 }
         }
         self.call_app_service(d_msg)
+        self.c_plugin_inst.status = 'started'
+        self.c_plugin_inst.save()
 
     def handle_app_unextpath_parameters(self, unextpath_parameters_dict):
         """
@@ -258,7 +263,9 @@ class PluginInstanceManager(object):
         service to determine job status and if just finished without error,
         register output files.
         """
-        # pudb.set_trace()
+        if self.c_plugin_inst.status == 'cancelled':
+            return self.c_plugin_inst.status
+
         d_msg = {
             "action": "status",
             "meta": {

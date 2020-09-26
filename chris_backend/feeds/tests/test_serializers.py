@@ -175,10 +175,10 @@ class FeedSerializerTests(SerializerTests):
 
     def test_get_started_jobs(self):
         """
-        Test whether overriden get_started_jobs method returns the correct number of
-        associated plugin instances in 'started' status.
+        Test whether overriden get_created_jobs method returns the correct number of
+        associated plugin instances in 'created' status.
         """
-        count = self.feed_serializer.get_started_jobs(self.feed_serializer.instance)
+        count = self.feed_serializer.get_created_jobs(self.feed_serializer.instance)
         self.assertEqual(count, 1)
 
     def test_get_finished_jobs(self):

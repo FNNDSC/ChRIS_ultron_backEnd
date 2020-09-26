@@ -17,7 +17,8 @@ from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly
-from .tasks import run_plugin_instance, check_plugin_instance_exec_status
+from .tasks import (run_plugin_instance, check_plugin_instance_exec_status,
+                    cancel_plugin_instance)
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -82,9 +83,11 @@ class PluginInstanceList(generics.ListCreateAPIView):
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
         if previous is None or previous.status == 'finishedSuccessfully':
-            # run the plugin's app
+            # schedule the plugin's app to run
+            plg_inst.status = 'scheduled'   # status changes to 'scheduled' right away
+            plg_inst.save()
             run_plugin_instance.delay(plg_inst.id)  # call async task
-        elif previous.status == 'started':
+        elif previous.status in ('created', 'waitingForPrevious', 'scheduled', 'started'):
             plg_inst.status = 'waitingForPrevious'
             plg_inst.save()
         elif previous.status in ('finishedWithError', 'cancelled'):
@@ -169,9 +172,9 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         plg_inst = self.get_object()
         if plg_inst.status == 'waitingForPrevious':
             if plg_inst.previous.status == 'finishedSuccessfully':
-                plg_inst.status = 'started'
+                plg_inst.status = 'scheduled'  # status changes to 'scheduled' right away
                 plg_inst.save()
-                # run the plugin's app
+                # schedule the plugin's app to run
                 run_plugin_instance.delay(plg_inst.id)  # call async task
             elif plg_inst.previous.status in ('finishedWithError', 'cancelled'):
                 plg_inst.status = 'cancelled'
@@ -179,7 +182,6 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         elif plg_inst.status == 'started':
             # check execution status of plugin's app
             check_plugin_instance_exec_status.delay(plg_inst.id)  # call async task
-
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)
@@ -205,8 +207,12 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         if 'status' in self.request.data:
             instance = self.get_object()
             descendants = instance.get_descendant_instances()
-            for inst in descendants:
-                inst.cancel()
+            if instance.status == 'started':
+                cancel_plugin_instance.delay(instance.id)  # call async task
+            for plg_inst in descendants:
+                plg_inst.status = 'cancelled'
+                plg_inst.save()
+
         super(PluginInstanceDetail, self).perform_update(serializer)
 
     def destroy(self, request, *args, **kwargs):
@@ -216,8 +222,11 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         instance = self.get_object()
         descendants = instance.get_descendant_instances()
-        for inst in descendants:
-            inst.cancel()
+        if instance.status == 'started':
+            cancel_plugin_instance.delay(instance.id)  # call async task
+        for plg_inst in descendants:
+            plg_inst.status = 'cancelled'
+            plg_inst.save()
         return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
 
 
