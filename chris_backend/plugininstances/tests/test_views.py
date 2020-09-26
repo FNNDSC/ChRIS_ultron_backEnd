@@ -110,8 +110,8 @@ class TasksViewTests(TransactionTestCase):
                                  password=self.chris_password)
         User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
-        User.objects.create_user(username=self.username,
-                                 password=self.password)
+        user = User.objects.create_user(username=self.username,
+                                        password=self.password)
 
         # create two plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
@@ -123,6 +123,16 @@ class TasksViewTests(TransactionTestCase):
         (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
         plugin_ds.compute_resources.set([self.compute_resource])
         plugin_ds.save()
+
+        # create pacspull fs plugin instance
+        (self.pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin_fs, owner=user,
+            compute_resource=plugin_fs.compute_resources.all()[0])
+
+        # create mri_convert ds plugin instance
+        PluginInstance.objects.get_or_create(
+            plugin=plugin_ds, owner=user, previous=self.pl_inst,
+            compute_resource=plugin_ds.compute_resources.all()[0])
 
 
 class PluginInstanceListViewTests(TasksViewTests):
@@ -136,7 +146,8 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.user_space_path = '%s/uploads/' % self.username
         self.post = json.dumps(
-            {"template": {"data": [{"name": "dir", "value": self.user_space_path}]}})
+            {"template": {"data": [{"name": "dir", "value": self.user_space_path},
+                                   {"name": "title", "value": 'test1'}]}})
 
     def test_plugin_instance_create_success(self):
         # add parameters to the plugin before the POST request
@@ -160,11 +171,11 @@ class PluginInstanceListViewTests(TasksViewTests):
 
         # now test 'ds' plugin instance (has previous plugin instance)
 
-        previous_plg_inst = PluginInstance.objects.get(pk=1)
+        previous_plg_inst = PluginInstance.objects.get(title='test1')
         plugin = Plugin.objects.get(meta__name="mri_convert")
         create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         post = json.dumps(
-            {"template": {"data": [{"name": "previous_id", "value": 1}]}})
+            {"template": {"data": [{"name": "previous_id", "value": previous_plg_inst.id}]}})
 
         previous_plg_inst.status = 'finishedSuccessfully'
         previous_plg_inst.save()
@@ -257,9 +268,9 @@ class PluginInstanceListViewTests(TasksViewTests):
                                           content_type='text/plain')
 
         # make POST API request to create a plugin instance
-        self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.client.login(username=self.username, password=self.password)
-        response = self.client.post(self.create_read_url, data=self.post,
+        response = self.client.post(create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -272,11 +283,6 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_instance_list_success(self):
-        # create a pacspull plugin instance
-        plugin = Plugin.objects.get(meta__name="pacspull")
-        user = User.objects.get(username=self.username)
-        PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "pacspull")
@@ -293,18 +299,6 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
     def setUp(self):
         super(PluginInstanceDetailViewTests, self).setUp()
-
-        # create pacspull fs plugin instance
-        plugin = Plugin.objects.get(meta__name="pacspull")
-        user = User.objects.get(username=self.username)
-        (self.pl_inst, tf) = PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
-
-        # create mri_convert ds plugin instance
-        plugin = Plugin.objects.get(meta__name="mri_convert")
-        PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, previous=self.pl_inst,
-            compute_resource=plugin.compute_resources.all()[0])
 
         self.read_update_delete_url = reverse("plugininstance-detail",
                                               kwargs={"pk": self.pl_inst.id})
@@ -427,8 +421,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         pl_inst.save()
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
-        self.read_update_delete_url = reverse("plugininstance-detail",
-                                              kwargs={"pk": pl_inst.id})
+        read_update_delete_url = reverse("plugininstance-detail",
+                                         kwargs={"pk": pl_inst.id})
 
         # run the plugin instance
         plg_inst_manager = PluginInstanceManager(pl_inst)
@@ -436,7 +430,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
         # make API GET request
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_update_delete_url)
+        response = self.client.get(read_update_delete_url)
         self.assertContains(response, "simplefsapp")
         self.assertContains(response, 'started')
 
@@ -448,7 +442,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         b_checkAgain = True
         time.sleep(10)
         while b_checkAgain:
-            response = self.client.get(self.read_update_delete_url)
+            response = self.client.get(read_update_delete_url)
             str_responseStatus = response.data['status']
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
@@ -461,9 +455,9 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        for path in obj_paths:
-            self.swift_manager.delete_obj(path)
+        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # for path in obj_paths:
+        #     self.swift_manager.delete_obj(path)
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)

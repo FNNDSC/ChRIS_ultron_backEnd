@@ -143,9 +143,9 @@ class PluginInstanceManagerTests(TestCase):
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        for path in obj_paths:
-            self.swift_manager.delete_obj(path)
+        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # for path in obj_paths:
+        #     self.swift_manager.delete_obj(path)
 
         # finally:
         #     # remove test directory
@@ -237,6 +237,6 @@ class PluginInstanceManagerTests(TestCase):
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        for path in obj_paths:
-            self.swift_manager.delete_obj(path)
+        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # for path in obj_paths:
+        #     self.swift_manager.delete_obj(path)
