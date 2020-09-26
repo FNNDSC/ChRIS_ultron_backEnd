@@ -28,6 +28,7 @@ task_routes = {
     'plugininstances.tasks.check_scheduled_plugin_instances_exec_status':
         {'queue': 'main'},
     'plugininstances.tasks.run_plugin_instance': {'queue': 'main'},
+    'plugininstances.tasks.cancel_plugin_instance': {'queue': 'main'},
 }
 app.conf.update(task_routes=task_routes)
 

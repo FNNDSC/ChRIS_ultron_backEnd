@@ -10,6 +10,7 @@ from pipelines.models import Pipeline
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import PARAMETER_SERIALIZERS
+from plugininstances.tasks import cancel_plugin_instance
 from plugins.fields import MemoryInt, CPUInt
 
 from .models import PipelineInstance, PipelineInstanceFilter
@@ -244,12 +245,15 @@ class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Overriden to check that non of the associated plugin instances is in the
-        'started' status before attempting to delete the pipeline instance.
+        Overriden to cancel all the associated plugin instances before attempting to
+        delete the pipeline instance.
         """
         pipeline_inst = self.get_object()
         for plg_inst in pipeline_inst.plugin_instances.all():
-            plg_inst.cancell()
+            if plg_inst.status == 'started':
+                cancel_plugin_instance.delay(plg_inst.id)  # call async task
+            plg_inst.status = 'cancelled'
+            plg_inst.save()
         return super(PipelineInstanceDetail, self).destroy(request, *args, **kwargs)
 
 

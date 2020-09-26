@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 
-from plugininstances.models import STATUS_TYPES
+from plugininstances.models import STATUS_CHOICES
 from .models import Note, Feed, Tag, Tagging, Comment
 
 
@@ -92,6 +92,9 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     creator_username = serializers.SerializerMethodField()
+    created_jobs = serializers.SerializerMethodField()
+    waiting_jobs = serializers.SerializerMethodField()
+    scheduled_jobs = serializers.SerializerMethodField()
     started_jobs = serializers.SerializerMethodField()
     finished_jobs = serializers.SerializerMethodField()
     errored_jobs = serializers.SerializerMethodField()
@@ -109,9 +112,10 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
-                  'creator_username', 'started_jobs', 'finished_jobs', 'errored_jobs',
-                  'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
-                  'files', 'plugin_instances')
+                  'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
+                  'started_jobs', 'finished_jobs', 'errored_jobs', 'cancelled_jobs',
+                  'owner', 'note', 'tags', 'taggings', 'comments', 'files',
+                  'plugin_instances')
 
     def validate_name(self, name):
         """
@@ -144,11 +148,36 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         return obj.get_creator().username
 
+    def get_created_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'created' status.
+        """
+        if 'created' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'created'.")
+        return obj.get_plugin_instances_status_count('created')
+
+    def get_waiting_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'waitingForPrevious' status.
+        """
+        if 'waitingForPrevious' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'waitingForPrevious'."
+            raise KeyError(msg)
+        return obj.get_plugin_instances_status_count('waitingForPrevious')
+
+    def get_scheduled_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'scheduled' status.
+        """
+        if 'scheduled' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'scheduled'.")
+        return obj.get_plugin_instances_status_count('scheduled')
+
     def get_started_jobs(self, obj):
         """
         Overriden to get the number of plugin instances in 'started' status.
         """
-        if 'started' not in STATUS_TYPES:
+        if 'started' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'started'.")
         return obj.get_plugin_instances_status_count('started')
 
@@ -156,7 +185,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the number of plugin instances in 'finishedSuccessfully' status.
         """
-        if 'finishedSuccessfully' not in STATUS_TYPES:
+        if 'finishedSuccessfully' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: "
                            "'finishedSuccessfully'.")
         return obj.get_plugin_instances_status_count('finishedSuccessfully')
@@ -165,7 +194,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the number of plugin instances in 'finishedWithError' status.
         """
-        if 'finishedWithError' not in STATUS_TYPES:
+        if 'finishedWithError' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: "
                            "'finishedWithError'.")
         return obj.get_plugin_instances_status_count('finishedWithError')
@@ -174,7 +203,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the number of plugin instances in 'cancelled' status.
         """
-        if 'cancelled' not in STATUS_TYPES:
+        if 'cancelled' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'cancelled'.")
         return obj.get_plugin_instances_status_count('cancelled')
 

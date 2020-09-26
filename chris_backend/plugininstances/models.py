@@ -15,21 +15,25 @@ from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
-from .services.manager import PluginInstanceManager
 
 
 logger = logging.getLogger(__name__)
 
 
-STATUS_TYPES = ['started', 'waitingForPrevious', 'finishedSuccessfully',
-                'finishedWithError', 'cancelled']
+STATUS_CHOICES = [("created", "Default initial"),
+                  ("waitingForPrevious", "Waiting for previous to finish"),
+                  ("scheduled", "Scheduled to the worker"),
+                  ("started", "Sent to remote compute"),
+                  ("finishedSuccessfully", "Finished successfully"),
+                  ("finishedWithError", "Finished with error"),
+                  ("cancelled", "Cancelled")]
 
 
 class PluginInstance(models.Model):
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, default=STATUS_TYPES[0])
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
     summary = models.CharField(max_length=4000, blank=True, default='')
     raw = models.TextField(blank=True, default='')
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
@@ -193,34 +197,6 @@ class PluginInstance(models.Model):
             'outputPath':   output_path,
             'pollLoop':     poll_loop
         }
-
-    def cancel(self):
-        """
-        Custom method to cancel the execution of the app corresponding to this plugin
-        instance.
-        """
-        if self.status == 'started':
-            plg_inst_manager = PluginInstanceManager(self)
-            plg_inst_manager.cancel_plugin_instance_app_exec()
-            self.status = 'cancelled'
-            self.save()
-
-    def run(self):
-        """
-        Custom method to run the app corresponding to this plugin instance.
-        """
-        if self.status == 'started':
-            plg_inst_manager = PluginInstanceManager(self)
-            plg_inst_manager.run_plugin_instance_app()
-
-    def check_exec_status(self):
-        """
-        Custom method to check the execution status of the app corresponding to this
-        plugin instance.
-        """
-        if self.status == 'started':
-            plg_inst_manager = PluginInstanceManager(self)
-            plg_inst_manager.check_plugin_instance_app_exec_status()
 
 
 class PluginInstanceFilter(FilterSet):

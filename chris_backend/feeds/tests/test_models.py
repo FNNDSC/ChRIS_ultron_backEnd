@@ -77,11 +77,17 @@ class FeedModelTests(TestCase):
     def test_get_plugin_instances_status_count(self):
         """
         Test whether custom get_plugin_instances_status_count method properly returns
-        the number of plugin instances with a specific exec status.
+        the number of plugin instances with a specific status.
         """
         feed = Feed.objects.get(name=self.feed_name)
-        count = feed.get_plugin_instances_status_count('started')
+        count = feed.get_plugin_instances_status_count('created')
         self.assertEqual(count, 1)
+        count = feed.get_plugin_instances_status_count('waitingForPrevious')
+        self.assertEqual(count, 0)
+        count = feed.get_plugin_instances_status_count('scheduled')
+        self.assertEqual(count, 0)
+        count = feed.get_plugin_instances_status_count('started')
+        self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('finishedSuccessfully')
         self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('finishedWithError')
