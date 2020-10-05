@@ -54,6 +54,12 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/debug.log',
+            'formatter': 'simple'
         }
     },
     'loggers': {
@@ -61,13 +67,19 @@ LOGGING = {
             'level': 'INFO',
             'handlers': ['console_simple'],
         },
+    'plugininstances.services.manager': {
+            'level': 'DEBUG',
+            'handlers': ['file'],
+            'propagate': False
+        },
     }
 }
+
 for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
             'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users']:
     LOGGING['loggers'][app] = {
             'level': 'DEBUG',
-            'handlers': ['console_verbose'],
+            'handlers': ['console_verbose', 'file'],
             'propagate': False  # required to avoid double logging with root logger
         }
 

@@ -16,42 +16,63 @@ from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
 
+import json
+
+if settings.DEBUG:
+    import pdb
+    import pudb
+    import rpudb
+    from celery.contrib import rdb
 
 logger = logging.getLogger(__name__)
 
 
-STATUS_CHOICES = [("created", "Default initial"),
-                  ("waitingForPrevious", "Waiting for previous to finish"),
-                  ("scheduled", "Scheduled to the worker"),
-                  ("started", "Sent to remote compute"),
-                  ("finishedSuccessfully", "Finished successfully"),
-                  ("finishedWithError", "Finished with error"),
-                  ("cancelled", "Cancelled")]
+STATUS_CHOICES = [("created",               "Default initial"),
+                  ("waitingForPrevious",    "Waiting for previous to finish"),
+                  ("scheduled",             "Scheduled to the worker"),
+                  ("started",               "Sent to remote compute"),
+                  ("finishedSuccessfully",  "Finished successfully"),
+                  ("finishedWithError",     "Finished with error"),
+                  ("cancelled",             "Cancelled")]
 
 
 class PluginInstance(models.Model):
-    title = models.CharField(max_length=100, blank=True)
-    start_date = models.DateTimeField(auto_now_add=True)
-    end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
-    summary = models.CharField(max_length=4000, blank=True, default='')
-    raw = models.TextField(blank=True, default='')
-    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
-                                 related_name='next')
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
-    feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
-                             related_name='plugin_instances')
-    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
-    compute_resource = models.ForeignKey(ComputeResource, null=True,
-                                         on_delete=models.SET_NULL,
-                                         related_name='plugin_instances')
-    pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
-                                      on_delete=models.SET_NULL,
-                                      related_name='plugin_instances')
-    cpu_limit = CPUField(null=True)
-    memory_limit = MemoryField(null=True)
-    number_of_workers = models.IntegerField(null=True)
-    gpu_limit = models.IntegerField(null=True)
+    title               = models.CharField(     max_length      = 100,
+                                                blank           = True)
+    start_date          = models.DateTimeField( auto_now_add    = True)
+    end_date            = models.DateTimeField( auto_now_add    = True)
+    status              = models.CharField(     max_length      = 30,
+                                                choices         = STATUS_CHOICES,
+                                                default         = 'created')
+    summary             = models.CharField(     max_length      = 4000,
+                                                blank           = True,
+                                                default         = '')
+    raw                 = models.TextField(     blank           = True,
+                                                default='')
+    previous            = models.ForeignKey(    "self",
+                                                on_delete       = models.CASCADE,
+                                                null            = True,
+                                                related_name    = 'next')
+    plugin              = models.ForeignKey(    Plugin,
+                                                on_delete       = models.CASCADE,
+                                                related_name    = 'instances')
+    feed                = models.ForeignKey(    Feed,
+                                                on_delete       = models.CASCADE,
+                                                related_name    = 'plugin_instances')
+    owner               = models.ForeignKey(    'auth.User',
+                                                on_delete       = models.CASCADE)
+    compute_resource    = models.ForeignKey(    ComputeResource,
+                                                null            = True,
+                                                on_delete       = models.SET_NULL,
+                                                related_name    = 'plugin_instances')
+    pipeline_inst       = models.ForeignKey(    PipelineInstance,
+                                                null            = True,
+                                                on_delete       = models.SET_NULL,
+                                                related_name    = 'plugin_instances')
+    cpu_limit           = CPUField(             null            = True)
+    memory_limit        = MemoryField(          null            = True)
+    number_of_workers   = models.IntegerField(  null            = True)
+    gpu_limit           = models.IntegerField(  null            = True)
 
     class Meta:
         ordering = ('-start_date',)
@@ -71,7 +92,7 @@ class PluginInstance(models.Model):
                 self.feed = self.previous.feed
         self._set_compute_defaults()
         super(PluginInstance, self).save(*args, **kwargs)
-            
+
     def _save_feed(self):
         """
         Custom internal method to create and save a new feed to the DB.
@@ -117,7 +138,7 @@ class PluginInstance(models.Model):
             queue.extend(list(visited.next.all()))
             descendant_instances.append(visited)
         return descendant_instances
-            
+
     def get_output_path(self):
         """
         Custom method to get the output directory for files generated by
@@ -156,46 +177,72 @@ class PluginInstance(models.Model):
         Custom method to register files generated by the plugin instance object
         with the REST API.
         """
-        d_swiftstate = kwargs['swiftState'] if 'swiftState' in kwargs else {}
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+
+        # If using `rpudb` need to have the creation point in an
+        # exception condition to prevent mulitple attempts to create
+        # the same telnet server...
+        # try:
+        #     rpudb.set_trace(addr='0.0.0.0', port=7901)
+        # except:
+        #     pass
+        # pudb.set_trace()
+
+        d_swiftstate    = kwargs['swiftState'] if 'swiftState' in kwargs else {}
+        swift_manager   = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                      settings.SWIFT_CONNECTION_PARAMS)
-        output_path = self.get_output_path()
+        output_path     = self.get_output_path()
 
         # the following gets the full list of objects in the swift storage
         # with prefix of <output_path>. Since there is a lag in consistency
-        # of swift state from different clients, we poll here using the 
+        # of swift state from different clients, we poll here using the
         # information returned from pfcon that indicates how many files
 
-        object_name_list = []
-        objects_reported_in_swift = 0
-        if 'd_swiftstore' in d_swiftstate:
-            objects_reported_in_swift = d_swiftstate['d_swiftstore']['filesPushed']
-
-        for poll_loop in range(20):
-            if len(object_name_list) == objects_reported_in_swift: break
-            time.sleep(0.3)
-            try:
-                object_name_list = swift_manager.ls(output_path)
-            except Exception as e:
-                logger.error('Swift storage error, detail: %s' % str(e))
+        waitPoll        = 0
+        maxWaitPoll     = 20
+        l_objCurrentlyReportedBySwift   = swift_manager.ls(output_path)
+        if 'd_swift_ls' in d_swiftstate.keys():
+            # This conditional processes the case where a remote process
+            # has returned data that has been pushed into swift by ancillary
+            # services
+            l_objPutIntoSwift           = d_swiftstate['d_swift_ls']['lsList']
+        else:
+            # This conditional addressed the case where an internal CUBE
+            # process and *not* a remote execution pushed data into swift
+            l_objPutIntoSwift           = l_objCurrentlyReportedBySwift
+        while not all(obj in l_objCurrentlyReportedBySwift \
+                      for obj in l_objPutIntoSwift) \
+              and waitPoll < maxWaitPoll:
+            time.sleep(0.2)
+            waitPoll += 1
+            l_objCurrentlyReportedBySwift   = swift_manager.ls(output_path)
 
         file_count = 0
-        for obj_name in object_name_list:
-            # avoid re-register a file already registered which makes this idempotent
+        for obj_name in l_objCurrentlyReportedBySwift:
+            # avoid re-register a file already registered which
+            # makes this idempotent
+            logger.info('Getting  -->%s<--', obj_name)
             try:
                 self.files.get(fname=obj_name)
             except ObjectDoesNotExist:
                 plg_inst_file = PluginInstanceFile(plugin_inst=self)
                 plg_inst_file.fname.name = obj_name
-                plg_inst_file.save()
+                try:
+                    # This try/except should protect against trying to
+                    # save/registering the same file/object twice
+                    plg_inst_file.save()
+                except:
+                    pass
+            # except:
+            #     # This is for debugging
+            #     pudb.set_trace()
             file_count += 1
 
         return {
             'status':       True,
-            'l_object':     object_name_list,
+            'l_object':     l_objCurrentlyReportedBySwift,
             'total':        file_count,
             'outputPath':   output_path,
-            'pollLoop':     poll_loop
+            'pollLoop':     waitPoll
         }
 
 
@@ -287,8 +334,8 @@ class StrParameter(models.Model):
 
     def __str__(self):
         return self.value
-    
-    
+
+
 class IntParameter(models.Model):
     value = models.IntegerField()
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
@@ -301,7 +348,7 @@ class IntParameter(models.Model):
 
     def __str__(self):
         return str(self.value)
-    
+
 
 class FloatParameter(models.Model):
     value = models.FloatField()

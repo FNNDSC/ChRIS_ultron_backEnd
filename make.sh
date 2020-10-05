@@ -201,32 +201,37 @@ title -d 1 "Setting global exports..."
 windowBottom
 
 if (( b_restart )) ; then
-    title -d 1 "Restarting ${RESTART} service"                          \
+    title -d 1 "Restarting ${RESTART}"                                  \
                     "in interactive mode..."
     printf "${LightCyan}%40s${LightGreen}%40s\n"                        \
-                "Stopping" "${RESTART}_service"                         | ./boxes.sh
+                "Stopping" "${RESTART}"                                 | ./boxes.sh
     windowBottom
 
-    docker-compose --no-ansi -f docker-compose_dev.yml stop ${RESTART}_service >& dc.out > /dev/null
+    docker-compose --no-ansi -f docker-compose_dev.yml stop ${RESTART}  >& dc.out > /dev/null
     echo -en "\033[2A\033[2K"
     cat dc.out | ./boxes.sh
 
     printf "${LightCyan}%40s${LightGreen}%40s\n"                        \
-                "rm -f" "${RESTART}_service"                            | ./boxes.sh
+                "rm -f" "${RESTART}"                                    | ./boxes.sh
     windowBottom
 
-    docker-compose --no-ansi -f docker-compose_dev.yml rm -f ${RESTART}_service >& dc.out > /dev/null
+    docker-compose --no-ansi -f docker-compose_dev.yml rm -f ${RESTART} >& dc.out > /dev/null
     echo -en "\033[2A\033[2K"
     cat dc.out | ./boxes.sh
     windowBottom
 
     docker-compose -f docker-compose_dev.yml run --use-aliases --service-ports        \
-        ${RESTART}_service
+        ${RESTART}
 else
     title -d 1 "Pulling non-'local/' core containers where needed..."   \
                 "and creating appropriate .env for docker-compose"
-    docker pull mysql:5         | ./boxes.sh
-    docker pull rabbitmq:3      | ./boxes.sh
+    printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
+                "docker pull" " library/mysql"                          | ./boxes.sh
+    docker pull mysql:5                                                 | ./boxes.sh
+    echo ""                                                             | ./boxes.sh
+    printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
+                "docker pull " "library/rabbitmq"                       | ./boxes.sh
+    docker pull rabbitmq:3                                              | ./boxes.sh
     if (( ! b_skipIntro )) ; then
         echo "# Variables declared here are available to"               > .env
         echo "# docker-compose on execution"                            >>.env
@@ -236,8 +241,8 @@ else
             if [[ $REPO != "local" ]] ; then
                 echo ""                                                 | ./boxes.sh
                 CMD="docker pull ${REPO}/$CONTAINER"
-                printf "${LightCyan}%-40s${Green}%40s${Yellow}\n"       \
-                            "docker pull" "${REPO}/$CONTAINER"          | ./boxes.sh
+                printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"       \
+                            "docker pull" " ${REPO}/$CONTAINER"         | ./boxes.sh
                 windowBottom
                 sleep 1
                 echo $CMD | sh                                          | ./boxes.sh -c
@@ -261,8 +266,8 @@ else
                 CMD="docker run ${REPO}/$CONTAINER --version"
                 Ver=$(echo $CMD | sh | grep Version)
                 echo -en "\033[2A\033[2K"
-                printf "${White}%40s${Green}%40s${Yellow}\n"            \
-                        "${REPO}/$CONTAINER" "$Ver"                     | ./boxes.sh
+                printf "${White}%40s${Green}%-40s${Yellow}\n"            \
+                        "${REPO}/$CONTAINER" " $Ver"                     | ./boxes.sh
             fi
         done
         # Determine the versions of pfurl *inside* pfcon and chris:dev
@@ -270,14 +275,14 @@ else
         CMD="docker run --entrypoint /usr/local/bin/pfurl ${PFCONREPO}/pfcon${TAG} --version"
         Ver=$(echo $CMD | sh | grep Version)
         echo -en "\033[2A\033[2K"
-        printf "${White}%40s${Green}%40s${Yellow}\n"                    \
-                    "pfurl inside ${PFCONREPO}/pfcon${TAG}" "$Ver"      | ./boxes.sh
+        printf "${White}%40s${Green}%-40s${Yellow}\n"                   \
+                    "pfurl inside ${PFCONREPO}/pfcon${TAG}" " $Ver"     | ./boxes.sh
         windowBottom
         CMD="docker run --entrypoint /usr/local/bin/pfurl ${CHRISREPO}/chris:dev --version"
         Ver=$(echo $CMD | sh | grep Version)
         echo -en "\033[2A\033[2K"
-        printf "${White}%40s${Green}%40s${Yellow}\n"                    \
-                    "pfurl inside ${CHRISREPO}/CUBE" "$Ver"             | ./boxes.sh
+        printf "${White}%40s${Green}%-40s${Yellow}\n"                   \
+                    "pfurl inside ${CHRISREPO}/CUBE" " $Ver"            | ./boxes.sh
         windowBottom
     fi
 
@@ -359,14 +364,35 @@ else
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
     windowBottom
 
-    title -d 1 "Pause for manual restart of services?"
+    title -d 1  "Pause for manual restart of services?"                         \
+                "Restarting services here allows for real time logging of integration tests"
     if (( b_pause )) ; then
-        echo "Pausing... hit *ANY* key to continue"                     | ./boxes.sh
+        boxcenter "Note manual restart is OPTIONAL!"                        ${Yellow}
+        boxcenter ""
+        boxcenter "If you don't want to enable better realtime logging,"
+        boxcenter "simply ignore this and hit *ANY* key to  continue..."
+        boxcenter ""
+        boxcenter "To log the 'worker' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r worker"                                  ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pfcon' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pfcon_service"                           ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pfioh' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pfioh_service"                           ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pman' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pman_service"                            ${LightCyan}
+        boxcenter ""
+        boxcenter "NOTE: Restart services in this order:"                   ${LightGreen}
+        boxcenter "worker, pfcon, pfioh, pman"                              ${LightGreen}
+        boxcenter ""
+        boxcenter "Pausing... hit *ANY* key to continue"                    ${Yellow}
         windowBottom
         old_stty_cfg=$(stty -g)
         stty raw -echo ; REPLY=$(head -c 1) ; stty $old_stty_cfg
         echo -en "\033[2A\033[2K"
-        echo "Resuming..."                                              | ./boxes.sh
+        boxcenter "Resuming..."
     fi
     windowBottom
 
@@ -432,7 +458,7 @@ else
                 "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
             echo ""                                                     | ./boxes.sh
             printf "%80s\n" "Clearing internal pman database..."        | ./boxes.sh
-	    windowBottom
+	        windowBottom
             docker-compose --no-ansi -f docker-compose_dev.yml          \
                 exec pman_service pman_do --op DBclean                  >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
@@ -522,7 +548,7 @@ else
         for plugin in "${chris_store_plugins[@]}" ; do
             cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
             if [[ $REPO == "fnndsc" ]] ; then
-                printf "${Cyan}%25s${NC}<--${LightBlue}[ dockerhub ]${NC}::${LightGreen}%37s\n" \
+                printf "${Cyan}%25s${NC}<--${LightBlue}[ dockerhub ]${NC}::${LightGreen}%37s\n"\
                     "[ $CONTAINER ]" "$REPO/$CONTAINER"                 | ./boxes.sh
                 windowBottom
                 CMD="docker pull $REPO/$CONTAINER"
@@ -544,7 +570,7 @@ else
             PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null)
             # echo "$PLUGIN_REP" | python -m json.tool                  | ./boxes.sh ${LightGreen}
             echo -en "\033[2A\033[2K"
-            printf "%8s${Cyan}%28s${NC}%5s${LightBlue}%39s\n" \
+            printf "%8s${Cyan}%28s${NC}%5s${LightBlue}%39s\n"           \
               "${STEP}.$i: " "[ $CONTAINER ]" "--->" "[ ChRIS Store ]"  | ./boxes.sh
             windowBottom
 
@@ -682,6 +708,7 @@ else
             ((i++))
             windowBottom
         done
+        echo -en "\033[2A\033[2K"
         echo ""                                                         | ./boxes.sh
         if (( b_registerSuccess )) ; then
             printf "${LightCyan}%20s${LightGreen}%-60s${NC}\n"          \
@@ -745,16 +772,65 @@ else
         cat dc.out | ./boxes.sh
    windowBottom
 
-    if (( ! b_skipIntegrationTests )) ; then
-        title -d 1 "Restarting the satellite services pfcon/pfioh/pman to clean their memory"
-            windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml restart pman_service >& dc.out > /dev/null
-            docker-compose --no-ansi -f docker-compose_dev.yml restart pfioh_service >& dc.out > /dev/null
-            docker-compose --no-ansi -f docker-compose_dev.yml restart pfcon_service >& dc.out > /dev/null
-            echo -en "\033[2A\033[2K"
-            cat dc.out | ./boxes.sh
+    if (( ! b_skipIntegrationTests && ! b_pause )) ; then
+        title -d 1 "Automatic restart of satellite services pfcon/pfioh/pman to clear" \
+                   "any lingering traces of integration tests..."
+        echo "Restarting pman..."                                   | ./boxes.sh ${Yellow}
         windowBottom
+        docker-compose --no-ansi -f docker-compose_dev.yml restart pman_service >& dc.out > /dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | ./boxes.sh
+        echo "Restarting pfioh..."                                  | ./boxes.sh ${Yellow}
+        windowBottom
+        docker-compose --no-ansi -f docker-compose_dev.yml restart pfioh_service >& dc.out > /dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | ./boxes.sh
+        echo "Restarting pfcon..."                                  | ./boxes.sh ${Yellow}
+        windowBottom
+        docker-compose --no-ansi -f docker-compose_dev.yml restart pfcon_service >& dc.out > /dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | ./boxes.sh
     fi
+
+    if (( b_pause )) ; then
+        title -d 1  "Pause for manual restart of services?"             \
+                    "Restarting services here allows for real timelogging of running system"
+        boxcenter "Note manual restart is OPTIONAL!"                            ${Yellow}
+        boxcenter ""
+        boxcenter "┌────────┐"                                                  ${Red}
+        boxcenter "│  STOP  │"                                                  ${Red}
+        boxcenter "└────────┘"                                                  ${Red}
+        boxcenter "If you have already done a manual restart for integration"   ${Red}
+        boxcenter "test logging, you MUST abort this instance and restart   "   ${Red}
+        boxcenter "CUBE. Make sure that you DO NOT perform a manual restart "   ${Red}
+        boxcenter "of services at the integration tests.                    "   ${Red}
+        boxcenter ""
+        boxcenter "If you don't want to enable better realtime logging,"
+        boxcenter "simply ignore this and hit *ANY* key to  continue..."
+        boxcenter ""
+        boxcenter "To log the 'worker' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r worker"                                  ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pfcon' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pfcon_service"                           ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pfioh' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pfioh_service"                           ${LightCyan}
+        boxcenter ""
+        boxcenter "To log 'pman' in realtime, in a separate terminal, do..."
+        boxcenter "./make.sh -s -r pman_service"                            ${LightCyan}
+        boxcenter ""
+        boxcenter "NOTE: Restart services in this order:"                   ${LightGreen}
+        boxcenter "worker, pfcon, pfioh, pman"                              ${LightGreen}
+        boxcenter ""
+        boxcenter "Pausing... hit *ANY* key to continue"                    ${Yellow}
+        windowBottom
+        old_stty_cfg=$(stty -g)
+        stty raw -echo ; REPLY=$(head -c 1) ; stty $old_stty_cfg
+        echo -en "\033[2A\033[2K"
+        boxcenter "Resuming..."
+    fi
+    windowBottom
 
     if (( !  b_norestartinteractive_chris_dev )) ; then
         title -d 1 "Restarting CUBE's Django development server"        \
