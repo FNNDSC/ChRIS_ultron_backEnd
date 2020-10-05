@@ -43,6 +43,15 @@ services:
       - CELERY_RDB_HOST=0.0.0.0
     ports:
       - "6900:6900"
+      - "6901:6901"
+      - "6902:6902"
+      - "6903:6903"
+      - "6904:6904"
+      - "6905:6905"
+      - "6906:6906"
+      - "6907:6907"
+      - "7901:7901"
+      - "7902:7902"
     depends_on:
       - chris_dev_db
       - swift_service
@@ -160,6 +169,10 @@ services:
   pfcon_service:
     image: ${PFCONREPO}/pfcon${TAG}
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
+    # volumes:
+    #   - ../../forks/pfcon/pfcon/pfcon.py:/usr/local/lib/python3.8/dist-packages/pfcon/pfcon.py
+    #   - ../../forks/pfurl/pfurl/pfurl.py:/usr/local/lib/python3.8/dist-packages/pfurl/pfurl.py
+    #   - ../../forks/pfcon/pfcon/swiftmanager.py:/usr/local/lib/python3.8/dist-packages/pfcon/swiftmanager.py
     ports:
       - "5005:5005"
     depends_on:

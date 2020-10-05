@@ -62,9 +62,17 @@ WhiteBG='\033[1;47m'
 
 function center {
   termwidth=80
-  padding="$(printf '%0.1s' ={1..500})"
+  padding="$(printf '%0.1s' ' '{1..500})"
   printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))" "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))" "$padding"
 }
+
+function boxcenter {
+  color=$2
+  termwidth=80
+  padding="$(printf '%0.1s' ' '{1..500})"
+  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))" "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))" "$padding" | ./boxes.sh $color
+}
+
 
 function title {
     declare -i b_date=0
