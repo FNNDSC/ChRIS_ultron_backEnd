@@ -456,11 +456,8 @@ else
         if (( $status == 0 )) ; then
             printf "%40s${LightGreen}%40s${NC}\n"                       \
                 "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
-            echo ""                                                     | ./boxes.sh
-            printf "%80s\n" "Clearing internal pman database..."        | ./boxes.sh
-	        windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml          \
-                exec pman_service pman_do --op DBclean                  >& dc.out >/dev/null
+	          windowBottom
+	          echo ""
             echo -en "\033[2A\033[2K"
             cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
         else
@@ -776,7 +773,10 @@ else
         title -d 1 "Automatic restart of satellite services pfcon/pfioh/pman to clear" \
                    "any lingering traces of integration tests..."
         echo "Restarting pman..."                                   | ./boxes.sh ${Yellow}
+        echo ""                                                     | ./boxes.sh
+        printf "%80s\n" "Clearing internal pman database..."        | ./boxes.sh
         windowBottom
+        docker-compose --no-ansi -f docker-compose_dev.yml exec pman_service pman_do --op DBclean >& dc.out >/dev/null
         docker-compose --no-ansi -f docker-compose_dev.yml restart pman_service >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh

@@ -67,11 +67,6 @@ LOGGING = {
             'level': 'INFO',
             'handlers': ['console_simple'],
         },
-    'plugininstances.services.manager': {
-            'level': 'DEBUG',
-            'handlers': ['file'],
-            'propagate': False
-        },
     }
 }
 

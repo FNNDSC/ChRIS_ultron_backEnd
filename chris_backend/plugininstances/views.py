@@ -87,7 +87,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
             plg_inst.status = 'scheduled'   # status changes to 'scheduled' right away
             plg_inst.save()
             run_plugin_instance.delay(plg_inst.id)  # call async task
-        elif previous.status in ('created', 'waitingForPrevious', 'scheduled', 'started'):
+        elif previous.status in ('created', 'waitingForPrevious', 'scheduled',
+                                 'registeringFiles', 'started'):
             plg_inst.status = 'waitingForPrevious'
             plg_inst.save()
         elif previous.status in ('finishedWithError', 'cancelled'):
@@ -170,16 +171,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to check a plugin's instance status.
         """
         plg_inst = self.get_object()
-        if plg_inst.status == 'waitingForPrevious':
-            if plg_inst.previous.status == 'finishedSuccessfully':
-                plg_inst.status = 'scheduled'  # status changes to 'scheduled' right away
-                plg_inst.save()
-                # schedule the plugin's app to run
-                run_plugin_instance.delay(plg_inst.id)  # call async task
-            elif plg_inst.previous.status in ('finishedWithError', 'cancelled'):
-                plg_inst.status = 'cancelled'
-                plg_inst.save()
-        elif plg_inst.status == 'started':
+        if plg_inst.status == 'started':
             # check execution status of plugin's app
             check_plugin_instance_exec_status.delay(plg_inst.id)  # call async task
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
