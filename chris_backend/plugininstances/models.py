@@ -3,11 +3,12 @@ import logging
 import time
 
 from django.db import models
+from django.db.utils import IntegrityError
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 
 import django_filters
 from django_filters.rest_framework import FilterSet
+from swiftclient.exceptions import ClientException
 
 from core.swiftmanager import SwiftManager
 from feeds.models import Feed
@@ -16,13 +17,12 @@ from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
 
-import json
-
 if settings.DEBUG:
     import pdb
     import pudb
     import rpudb
     from celery.contrib import rdb
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,48 +31,35 @@ STATUS_CHOICES = [("created",               "Default initial"),
                   ("waitingForPrevious",    "Waiting for previous to finish"),
                   ("scheduled",             "Scheduled to the worker"),
                   ("started",               "Sent to remote compute"),
+                  ("registeringFiles",      "Registering output files"),
                   ("finishedSuccessfully",  "Finished successfully"),
                   ("finishedWithError",     "Finished with error"),
                   ("cancelled",             "Cancelled")]
 
 
 class PluginInstance(models.Model):
-    title               = models.CharField(     max_length      = 100,
-                                                blank           = True)
-    start_date          = models.DateTimeField( auto_now_add    = True)
-    end_date            = models.DateTimeField( auto_now_add    = True)
-    status              = models.CharField(     max_length      = 30,
-                                                choices         = STATUS_CHOICES,
-                                                default         = 'created')
-    summary             = models.CharField(     max_length      = 4000,
-                                                blank           = True,
-                                                default         = '')
-    raw                 = models.TextField(     blank           = True,
-                                                default='')
-    previous            = models.ForeignKey(    "self",
-                                                on_delete       = models.CASCADE,
-                                                null            = True,
-                                                related_name    = 'next')
-    plugin              = models.ForeignKey(    Plugin,
-                                                on_delete       = models.CASCADE,
-                                                related_name    = 'instances')
-    feed                = models.ForeignKey(    Feed,
-                                                on_delete       = models.CASCADE,
-                                                related_name    = 'plugin_instances')
-    owner               = models.ForeignKey(    'auth.User',
-                                                on_delete       = models.CASCADE)
-    compute_resource    = models.ForeignKey(    ComputeResource,
-                                                null            = True,
-                                                on_delete       = models.SET_NULL,
-                                                related_name    = 'plugin_instances')
-    pipeline_inst       = models.ForeignKey(    PipelineInstance,
-                                                null            = True,
-                                                on_delete       = models.SET_NULL,
-                                                related_name    = 'plugin_instances')
-    cpu_limit           = CPUField(             null            = True)
-    memory_limit        = MemoryField(          null            = True)
-    number_of_workers   = models.IntegerField(  null            = True)
-    gpu_limit           = models.IntegerField(  null            = True)
+    title = models.CharField(max_length=100, blank=True)
+    start_date = models.DateTimeField(auto_now_add=True)
+    end_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
+    summary = models.CharField(max_length=4000, blank=True, default='')
+    raw = models.TextField(blank=True, default='')
+    previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
+                                 related_name='next')
+    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
+                             related_name='plugin_instances')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    compute_resource = models.ForeignKey(ComputeResource, null=True,
+                                         on_delete=models.SET_NULL,
+                                         related_name='plugin_instances')
+    pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
+                                      on_delete=models.SET_NULL,
+                                      related_name='plugin_instances')
+    cpu_limit = CPUField(null=True)
+    memory_limit = MemoryField(null=True)
+    number_of_workers = models.IntegerField(null=True)
+    gpu_limit = models.IntegerField(null=True)
 
     class Meta:
         ordering = ('-start_date',)
@@ -179,7 +166,7 @@ class PluginInstance(models.Model):
         """
 
         # If using `rpudb` need to have the creation point in an
-        # exception condition to prevent mulitple attempts to create
+        # exception condition to prevent multiple attempts to create
         # the same telnet server...
         # try:
         #     rpudb.set_trace(addr='0.0.0.0', port=7901)
@@ -189,7 +176,7 @@ class PluginInstance(models.Model):
 
         d_swiftstate    = kwargs['swiftState'] if 'swiftState' in kwargs else {}
         swift_manager   = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+                                       settings.SWIFT_CONNECTION_PARAMS)
         output_path     = self.get_output_path()
 
         # the following gets the full list of objects in the swift storage
@@ -197,48 +184,49 @@ class PluginInstance(models.Model):
         # of swift state from different clients, we poll here using the
         # information returned from pfcon that indicates how many files
 
-        waitPoll        = 0
-        maxWaitPoll     = 20
-        l_objCurrentlyReportedBySwift   = swift_manager.ls(output_path)
+        l_objCurrentlyReportedBySwift = []
+        try:
+            l_objCurrentlyReportedBySwift = swift_manager.ls(output_path)
+        except ClientException as e:
+            logger.error('Swift storage error, detail: %s' % str(e))
+
         if 'd_swift_ls' in d_swiftstate.keys():
-            # This conditional processes the case where a remote process
-            # has returned data that has been pushed into swift by ancillary
-            # services
+            # This conditional processes the case where a remote process has
+            # returned data that has been pushed into swift by ancillary services
             l_objPutIntoSwift           = d_swiftstate['d_swift_ls']['lsList']
         else:
             # This conditional addressed the case where an internal CUBE
             # process and *not* a remote execution pushed data into swift
             l_objPutIntoSwift           = l_objCurrentlyReportedBySwift
-        while not all(obj in l_objCurrentlyReportedBySwift \
-                      for obj in l_objPutIntoSwift) \
-              and waitPoll < maxWaitPoll:
+
+        maxWaitPoll     = 20
+        waitPoll        = 0
+        while (waitPoll < maxWaitPoll) and not all(obj in l_objCurrentlyReportedBySwift
+                                                   for obj in l_objPutIntoSwift):
             time.sleep(0.2)
             waitPoll += 1
-            l_objCurrentlyReportedBySwift   = swift_manager.ls(output_path)
+            try:
+                l_objCurrentlyReportedBySwift = swift_manager.ls(output_path)
+            except ClientException as e:
+                logger.error('Swift storage error, detail: %s' % str(e))
+
+        b_status = False
+        if all(obj in l_objCurrentlyReportedBySwift for obj in l_objPutIntoSwift):
+            b_status = True
 
         file_count = 0
         for obj_name in l_objCurrentlyReportedBySwift:
-            # avoid re-register a file already registered which
-            # makes this idempotent
-            logger.info('Getting  -->%s<--', obj_name)
+            logger.info('Registering  -->%s<--', obj_name)
+            plg_inst_file = PluginInstanceFile(plugin_inst=self)
+            plg_inst_file.fname.name = obj_name
             try:
-                self.files.get(fname=obj_name)
-            except ObjectDoesNotExist:
-                plg_inst_file = PluginInstanceFile(plugin_inst=self)
-                plg_inst_file.fname.name = obj_name
-                try:
-                    # This try/except should protect against trying to
-                    # save/registering the same file/object twice
-                    plg_inst_file.save()
-                except:
-                    pass
-            # except:
-            #     # This is for debugging
-            #     pudb.set_trace()
+                plg_inst_file.save()
+            except IntegrityError:  # avoid re-register a file already registered
+                logger.info('-->%s<-- already registered', obj_name)
             file_count += 1
 
         return {
-            'status':       True,
+            'status':       b_status,
             'l_object':     l_objCurrentlyReportedBySwift,
             'total':        file_count,
             'outputPath':   output_path,
@@ -293,7 +281,7 @@ class PluginInstanceFilter(FilterSet):
 
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=4000)
+    fname = models.FileField(max_length=1024, unique=True)
     plugin_inst = models.ForeignKey(PluginInstance, db_index=True,
                                     on_delete=models.CASCADE, related_name='files')
 

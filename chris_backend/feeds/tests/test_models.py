@@ -88,6 +88,8 @@ class FeedModelTests(TestCase):
         self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('started')
         self.assertEqual(count, 0)
+        count = feed.get_plugin_instances_status_count('registeringFiles')
+        self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('finishedSuccessfully')
         self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('finishedWithError')

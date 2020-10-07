@@ -313,52 +313,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             response = self.client.get(self.read_update_delete_url)
             self.assertContains(response, "pacspull")
             self.assertEqual(response.data['status'], 'started')
-
             # check that the check_plugin_instance_exec_status task was called with appropriate args
             delay_mock.assert_called_with(self.pl_inst.id)
-
-        previous_plg_inst = self.pl_inst
-        plg_inst = list(self.pl_inst.next.all())[0]
-        read_update_delete_url = reverse("plugininstance-detail",
-                                         kwargs={"pk": plg_inst.id})
-
-        plg_inst.status = 'waitingForPrevious'
-        plg_inst.save()
-        previous_plg_inst.status = 'finishedSuccessfully'
-        previous_plg_inst.save()
-        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
-                               return_value=None) as check_status_delay_mock:
-            with mock.patch.object(views.run_plugin_instance, 'delay',
-                                   return_value=None) as run_delay_mock:
-                # make API request
-                self.client.login(username=self.username, password=self.password)
-                response = self.client.get(read_update_delete_url)
-                self.assertContains(response, "mri_convert")
-                self.assertEqual(response.data['status'], 'scheduled')
-
-                # check that the check_plugin_instance_exec_status task was not called
-                check_status_delay_mock.assert_not_called()
-                # check that the run_plugin_instance task was called with appropriate args
-                run_delay_mock.assert_called_with(plg_inst.id)
-
-        plg_inst.status = 'waitingForPrevious'
-        plg_inst.save()
-        previous_plg_inst.status = 'finishedWithError'
-        previous_plg_inst.save()
-        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
-                               return_value=None) as check_status_delay_mock:
-            with mock.patch.object(views.run_plugin_instance, 'delay',
-                                   return_value=None) as run_delay_mock:
-                # make API request
-                self.client.login(username=self.username, password=self.password)
-                response = self.client.get(read_update_delete_url)
-                self.assertContains(response, "mri_convert")
-                self.assertEqual(response.data['status'], 'cancelled')
-
-                # check that the check_plugin_instance_exec_status task was not called
-                check_status_delay_mock.assert_not_called()
-                # check that the run_plugin_instance task was not called
-                run_delay_mock.assert_not_called()
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):

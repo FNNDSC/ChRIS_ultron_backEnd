@@ -96,6 +96,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     waiting_jobs = serializers.SerializerMethodField()
     scheduled_jobs = serializers.SerializerMethodField()
     started_jobs = serializers.SerializerMethodField()
+    registering_jobs = serializers.SerializerMethodField()
     finished_jobs = serializers.SerializerMethodField()
     errored_jobs = serializers.SerializerMethodField()
     cancelled_jobs = serializers.SerializerMethodField()
@@ -113,9 +114,9 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
                   'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
-                  'started_jobs', 'finished_jobs', 'errored_jobs', 'cancelled_jobs',
-                  'owner', 'note', 'tags', 'taggings', 'comments', 'files',
-                  'plugin_instances')
+                  'started_jobs', 'registering_jobs', 'finished_jobs', 'errored_jobs',
+                  'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
+                  'files', 'plugin_instances')
 
     def validate_name(self, name):
         """
@@ -180,6 +181,15 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         if 'started' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'started'.")
         return obj.get_plugin_instances_status_count('started')
+
+    def get_registering_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'registeringFiles' status.
+        """
+        if 'registeringFiles' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'registeringFiles'."
+            raise KeyError(msg)
+        return obj.get_plugin_instances_status_count('registeringFiles')
 
     def get_finished_jobs(self, obj):
         """

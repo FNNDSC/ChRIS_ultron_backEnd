@@ -90,7 +90,7 @@ class PluginInstanceManager(object):
         Run a plugin instance's app via a call to a remote service provider.
         """
         if self.c_plugin_inst.status == 'cancelled':
-            return
+            return self.c_plugin_inst.status
 
         plugin = self.c_plugin_inst.plugin
         app_args = []
@@ -257,8 +257,8 @@ class PluginInstanceManager(object):
                         logger.error('Swift storage error, detail: %s' % str(e))
                     else:
                         nobjects += 1
-        swiftState = {'d_swiftstore': {'filesPushed': nobjects}}
-        self.c_plugin_inst.register_output_files(swiftState=swiftState)
+        #swiftState = {'d_swiftstore': {'filesPushed': nobjects}}
+        #self.c_plugin_inst.register_output_files(swiftState=swiftState)
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -289,16 +289,17 @@ class PluginInstanceManager(object):
                 logger.info("Registering swift objects to CUBE")
                 d_swiftState = d_response['jobOperation']['info']['swiftPut']
                 logger.info("swiftState = %s" % json.dumps(d_swiftState, indent = 4))
-                # This setting of status could probably be something like
-                # 'registering' so that the FE can already start displaying info.
-                # Also, changing the status here protects against unnecessary
-                # collisions on `register_output_files()`.
-                self.c_plugin_inst.status   = 'finishedSuccessfully'
+                # This setting of status protects against unnecessary concurrent
+                # collisions on `register_output_files()` and better informs the FE
+                self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()
-                self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
-                # Finally, once the `register_output_files` is done, we can set
-                # the state to the "proper" 'finishedSuccessfully
-                self.c_plugin_inst.status   = 'finishedSuccessfully'
+                d = self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
+                # Once the `register_output_files` is done, we can set
+                # the proper finall state
+                if d['status']:
+                    self.c_plugin_inst.status = 'finishedSuccessfully'
+                else:
+                    self.c_plugin_inst.status = 'finishedWithError'
                 logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
                 self.c_plugin_inst.end_date = timezone.now()
                 logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)

@@ -76,53 +76,11 @@ class PluginInstanceTasksTests(TasksTests):
             tasks.check_plugin_instance_exec_status(self.plg_inst.id)
             check_exec_status_mock.assert_called_with()
 
-    def test_task_check_scheduled_plugin_instances_exec_status(self):
+    def test_task_check_started_plugin_instances_exec_status(self):
         with mock.patch.object(tasks.check_plugin_instance_exec_status, 'delay',
                                return_value=None) as delay_mock:
-            tasks.check_scheduled_plugin_instances_exec_status()
+            tasks.check_started_plugin_instances_exec_status()
 
             # check that the check_plugin_instance_exec_status task was called with appropriate args
             delay_mock.assert_called_with(self.plg_inst.id)
             self.assertEqual(self.plg_inst.status, 'started')
-
-        # create mri_convert ds plugin instance
-        previous_plg_inst = self.plg_inst
-        user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(meta__name="mri_convert")
-        (plg_inst, tf) = PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, previous=previous_plg_inst,
-            compute_resource=plugin.compute_resources.all()[0])
-
-        plg_inst.status = 'waitingForPrevious'
-        plg_inst.save()
-        previous_plg_inst.status = 'finishedSuccessfully'
-        previous_plg_inst.save()
-        with mock.patch.object(tasks.check_plugin_instance_exec_status, 'delay',
-                               return_value=None) as check_status_delay_mock:
-            with mock.patch.object(tasks.run_plugin_instance, 'delay',
-                                   return_value=None) as run_delay_mock:
-                tasks.check_scheduled_plugin_instances_exec_status()
-                plg_inst.refresh_from_db()
-                self.assertEqual(plg_inst.status, 'scheduled')
-
-                # check that the check_plugin_instance_exec_status task was not called
-                check_status_delay_mock.assert_not_called()
-                # check that the run_plugin_instance task was called with appropriate args
-                run_delay_mock.assert_called_with(plg_inst.id)
-
-        plg_inst.status = 'waitingForPrevious'
-        plg_inst.save()
-        previous_plg_inst.status = 'finishedWithError'
-        previous_plg_inst.save()
-        with mock.patch.object(tasks.check_plugin_instance_exec_status, 'delay',
-                               return_value=None) as check_status_delay_mock:
-            with mock.patch.object(tasks.run_plugin_instance, 'delay',
-                                   return_value=None) as run_delay_mock:
-                tasks.check_scheduled_plugin_instances_exec_status()
-                plg_inst.refresh_from_db()
-                self.assertEqual(plg_inst.status, 'cancelled')
-
-                # check that the check_plugin_instance_exec_status task was not called
-                check_status_delay_mock.assert_not_called()
-                # check that the run_plugin_instance task was not called
-                run_delay_mock.assert_not_called()
