@@ -407,25 +407,25 @@ class PluginInstanceManager(object):
         """
         Serialize and save the 'jobOperation' and 'jobOperationSummary'.
         """
-        str_summary = json.dumps(d_response['jobOperationSummary'])
-        #logger.debug("str_summary = '%s'", str_summary)
-        str_raw = self.json_zipToStr(d_response['jobOperation'])
-
         # Still WIP about what is best summary...
-        # a couple of options / ideas linger
+
         try:
-            str_containerLogs = d_response['jobOperation'] \
-                ['info'] \
+            str_logsFromCompute = d_response['jobOperationSummary'] \
                 ['compute'] \
                 ['return'] \
-                ['d_ret'] \
                 ['l_logs'][0]
-        except:
-            str_containerLogs = "Container logs not currently available."
+
+            if len(str_logsFromCompute) > 3000:
+                d_response['jobOperationSummary'] \
+                    ['compute'] \
+                    ['return'] \
+                    ['l_logs'][0] = str_logsFromCompute[-3000:]
+        except Exception:
+            logger.info('Compute logs not currently available.')
 
         # update plugin instance with status info
-        self.c_plugin_inst.summary = str_summary
-        self.c_plugin_inst.raw = str_raw
+        self.c_plugin_inst.summary = json.dumps(d_response['jobOperationSummary'])
+        self.c_plugin_inst.raw = self.json_zipToStr(d_response['jobOperation'])
         self.c_plugin_inst.save()
 
         str_responseStatus = ""
