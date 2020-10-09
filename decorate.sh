@@ -21,6 +21,14 @@ UNMARK(){ echo -en "\033[27m";}                         # the same as 'tput rmso
  WRITE(){ echo -en "\033(B";}                           # return to normal mode from 'garbage' on the screen
   BLUE(){ echo -en "\033c\033[0;1m\033[37;44m\033[J";}  # reset screen, set background to blue and font to white
 
+# Set
+bold='\033[1m'
+dim='\033[2m'
+underline='\033[4m'
+blink='\033[5m'
+reverse='\033[7m'
+hidden='\033[8m'
+
 # Foreground
 RED='\033[0;31m'
 NC='\033[m' # No Color
@@ -63,16 +71,70 @@ WhiteBG='\033[1;47m'
 function center {
   termwidth=80
   padding="$(printf '%0.1s' ' '{1..500})"
-  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))" "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))" "$padding"
+  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"  \
+            "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"  \
+            "$padding"
 }
 
 function boxcenter {
   color=$2
   termwidth=80
   padding="$(printf '%0.1s' ' '{1..500})"
-  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))" "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))" "$padding" | ./boxes.sh $color
+  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"  \
+            "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"  \
+            "$padding"                                      | ./boxes.sh $color
 }
 
+function colorSpec_parse {
+    #
+    # Accept an input color spec, for example:
+    #
+    #       blink;Yellow
+    #
+    # and return the appropriate ESC sequence.
+    #
+    # Note that in testing it seems as though not all
+    # attributes (blink, underline, etc) work on all
+    # colors.
+    #
+
+    colorSpec=$1
+    IFS=';' read -ra a_color <<< $colorSpec
+    if (( ${#a_color[@]} > 1 )) ; then
+        colorSet=${a_color[0]}
+        colorVal=${a_color[1]}
+    else
+        colorSet=NC
+        colorVal=${a_color[0]}
+    fi
+    escColor=\$${colorSet}\$${colorVal}
+    echo $escColor
+}
+
+function tcprint {
+    # Print two (colorized) arguments with left/right box
+    # decorations and optional column width specifiers
+    #
+    #        leftColor   leftMsg     rightColor    rightMsg     leftColW rightColW
+    # tcprint Yellow  "left Message" LightGreen "right Message"   "20"     "60"
+    #
+    # column width specifiers left/right as optional 3rd and 4th args
+
+    colorLeft="$1"
+    leftMsg="$2"
+    colorRight="$3"
+    rightMsg="$4"
+    declare -i  leftCol="$5"
+    declare -i rightCol="$6"
+
+    eval  leftColor=$(colorSpec_parse $colorLeft)
+    eval rightColor=$(colorSpec_parse $colorRight)
+
+    printf "${NC}%q%*s${NC}%q%*s${NC}\n"                           \
+            "$leftColor"  "$leftCol"  "$leftMsg"    \
+            "$rightColor" "$rightCol" "$rightMsg"   | ./boxes.sh
+
+}
 
 function title {
     declare -i b_date=0
