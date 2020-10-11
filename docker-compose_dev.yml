@@ -112,6 +112,8 @@ services:
       - DJANGO_SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
       - DJANGO_CORS_ORIGIN_ALLOW_ALL=true
       - DJANGO_CORS_ORIGIN_WHITELIST=babymri.org
+      - DJANGO_SECURE_PROXY_SSL_HEADER=
+      - DJANGO_USE_X_FORWARDED_HOST=false
       - DATABASE_HOST=chris_store_db
       - DATABASE_PORT=3306
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
