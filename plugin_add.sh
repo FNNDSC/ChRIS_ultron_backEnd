@@ -37,10 +37,6 @@
 #       JSON representation during the store registration phase.
 #
 
-# 24 hour time locale
-export LC_TIME=en_GB.utf-8  # or whatever you want
-export LC_ALL=$LC_TIME
-
 source ./decorate.sh
 source ./cparse.sh
 
