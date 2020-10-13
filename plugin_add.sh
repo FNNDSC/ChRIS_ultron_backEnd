@@ -6,7 +6,9 @@
 #
 # SYNPOSIS
 #
-#   plugin_add.sh [-s <step>] [-j] <commaSeparatedListOfPluginSpecsToAdd>
+#   plugin_add.sh [-t dev|deploy]                                       \
+#                 [-s <step>] [-j]                                      \
+#                 <commaSeparatedListOfPluginSpecsToAdd>
 #
 # DESC
 #
@@ -25,6 +27,14 @@
 ##
 # ARGS
 #
+#   [-t dev|deploy]
+#
+#       Choose either 'dev' or 'deploy' targets. This affects the choice of
+#       underlying docker-compose yaml to process as well as the name of the
+#       chris service.
+#
+#       Default is 'dev'.
+#
 #   [-s <step>]
 #
 #       Start STEP counter at <step>. This is useful for cases when
@@ -40,6 +50,9 @@
 source ./decorate.sh
 source ./cparse.sh
 
+DOCKER_COMPOSE_FILE=docker-compose_dev.yml
+CHRIS=chris_dev
+TARGET=dev
 declare -i STEP=0
 declare -i b_json=0
 HERE=$(pwd)
@@ -49,13 +62,26 @@ if [[ -f .env ]] ; then
     source .env
 fi
 
-while getopts "s:j" opt; do
+while getopts "f:s:j" opt; do
     case $opt in
         s)  STEP=$OPTARG
             STEP=$(( STEP -1 ))                 ;;
+        t)  TARGET=$OPTARG                      ;;
         j)  b_json=1                            ;;
     esac
 done
+
+case $TARGET in
+    dev)    DOCKER_COMPOSE_FILE=docker-compose_dev.yml
+            CHRIS=chris_dev
+            ;;
+    deploy) DOCKER_COMPOSE_FILE=docker-compose.yml
+            CHRIS=chris
+            ;;
+    *)      DOCKER_COMPOSE_FILE=docker-compose_dev.yml
+            CHRIS=chris_dev
+            ;;
+esac
 
 declare -a a_PLUGINRepoEnv=()
 declare -a a_storePluginUser=()
@@ -77,7 +103,7 @@ windowBottom
 title -d 1 "Removing any duplicate <REPO>/<CONTAINER> from plugin list..."
     a_storePluginUser=($(printf "%s\n" "${a_storePluginUser[@]}" | sort -u | tr '\n' ' '))
     numElements=${#a_storePluginUser[@]}
-    tcprint "Blink;Yellow" "Unique hits " LightCyan "$numElements" "40" "-40"
+    tcprint "Yellow" "Unique hits " LightCyan "$numElements" "40" "-40"
     for plugin in "${a_storePluginUser[@]}" ; do
         tcprint Yellow "Image " LightCyan $plugin "40" "-40"
     done
@@ -142,7 +168,7 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         "$i: " "$REPO/$CONTAINER" "JSON representation<--" "[ pushing  ]"           | ./boxes.sh
 
         windowBottom
-        docker-compose -f docker-compose_dev.yml                                    \
+        docker-compose -f ${DOCKER_COMPOSE_FILE}                                    \
             exec chris_store python plugins/services/manager.py add "$CONTAINER"    \
             cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"                  \
             --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
@@ -216,8 +242,8 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[     adding    ]"        | ./boxes.sh
         windowBottom
         computeDescription="${ENV} description"
-        docker-compose -f docker-compose_dev.yml                    \
-            exec chris_dev python plugins/services/manager.py       \
+        docker-compose -f ${DOCKER_COMPOSE_FILE}                    \
+            exec ${CHRIS} python plugins/services/manager.py        \
             add "$ENV" "http://pfcon.local:5005"                    \
             --description "$ENV Description" >& dc.out >/dev/null
         status=$?
@@ -229,8 +255,8 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${blink}${LightGreen}%-17s${NC}\n"  \
         "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[ registering   ]"          | ./boxes.sh
         windowBottom
-        docker-compose -f docker-compose_dev.yml                    \
-            exec chris_dev python plugins/services/manager.py       \
+        docker-compose -f ${DOCKER_COMPOSE_FILE}                    \
+            exec ${CHRIS} python plugins/services/manager.py        \
             register $ENV --pluginname "$CONTAINER"  >& dc.out >/dev/null
         status=$?
         echo -en "\033[3A\033[2K"

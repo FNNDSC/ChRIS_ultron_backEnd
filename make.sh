@@ -350,7 +350,7 @@ else
             echo "lines is $lines"
         fi
         if (( ! b_FSOK )) ; then
-            printf "There should only be 1 directory and no files in the FS tree!\n"  | ./boxes.sh ${Red}
+            printf "There should only be 1 directory and no files in the FS tree!\n"    | ./boxes.sh ${Red}
             printf "Please manually clean/delete the entire FS tree and re-run.\n"      | ./boxes.sh ${Yellow}
             printf "\nThis script will now exit with code '1'.\n\n"                     | ./boxes.sh ${Yellow}
             exit 1
@@ -359,7 +359,8 @@ else
                     "Tree state" "[ OK ]"                               | ./boxes.sh
     windowBottom
 
-    title -d 1 "Starting CUBE containerized development environment using " "./docker-compose_dev.yml"
+    title -d 1  "Starting CUBE containerized development environment using "            \
+                "./docker-compose_dev.yml"
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         echo "docker-compose -f docker-compose_dev.yml up -d"           | ./boxes.sh ${LightCyan}
         windowBottom
@@ -485,68 +486,36 @@ else
     windowBottom
 
     title -d 1 "Creating two ChRIS STORE API users"
-        echo ""                                                         | ./boxes.sh
-        echo "Creating superuser chris:chris1234..."                    | ./boxes.sh
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-        windowBottom
-        docker-compose -f docker-compose_dev.yml    \
-            exec chris_store /bin/bash -c            \
-            'python manage.py createsuperuser --noinput --username chris --email chris@babymri.org 2> /dev/null;' >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                      | ./boxes.sh ${LightGreen}
-        windowBottom
-        docker-compose -f docker-compose_dev.yml    \
-            exec chris_store /bin/bash -c            \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                      | ./boxes.sh ${LightGreen}
-        echo ""                                                         | ./boxes.sh
-        echo "Creating superuser cubeadmin:cubeadmin1234..."            | ./boxes.sh
-        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-        windowBottom
-        docker-compose -f docker-compose_dev.yml    \
-            exec chris_store /bin/bash -c            \
-            'python manage.py createsuperuser --noinput --username cubeadmin --email cubeadmin@babymri.org 2> /dev/null;' >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                      | ./boxes.sh ${LightGreen}
-        windowBottom
-
-        docker-compose -f docker-compose_dev.yml    \
-            exec chris_store /bin/bash -c            \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user = User.objects.get(username=\"cubeadmin\"); user.set_password(\"cubeadmin1234\"); user.save()"' >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                      | ./boxes.sh ${LightGreen}
-        echo ""                                                         | ./boxes.sh
-        windowBottom
-        docker-compose -f docker-compose_dev.yml restart chris_store     >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                      | ./boxes.sh ${LightGreen}
-        echo ""                                                         | ./boxes.sh
     windowBottom
+    # Note, emails and user names MUST be unique. Creating a new user
+    # with the same email as an existing one will throw an error!
+    # -U creates a 'superuser'
+    STEP=$(expr $STEP + 1 )
+    ./user_add.sh -s $STEP -U -S " chris:chris1234:dev@babymri.org,                \
+                                cubeadmin:cubeadmin1234:cubeadmin@babymri.org"
+
+    title -d 1 "Creating two ChRIS API users"
+    windowBottom
+    # Note, emails and user names MUST be unique. Creating a new user
+    # with the same email as an existing one will throw an error!
+    # -U creates a 'superuser'
+    STEP=$(expr $STEP + 1 )
+    ./user_add.sh -s $STEP -U 'chris:chris1234:dev@babymri.org'
+    STEP=$(expr $STEP + 1 )
+    # This creates a 'normaluser'
+    ./user_add.sh -s $STEP 'cube:cube1234:cube@babymri.org'
 
     title -d 1 "Plugin management..."
     windowBottom
+    STEP=$(expr $STEP + 1 )
     ./plugin_add.sh -s $STEP "\
                         fnndsc/pl-simplefsapp,                          \
-                        fnndsc/pl-simplefsapp^moc,                      \
                         fnndsc/pl-simpledsapp,                          \
-                        fnndsc/pl-simpledsapp^moc,                      \
                         fnndsc/pl-s3retrieve,                           \
-                        fnndsc/pl-s3push,                               \
-                        fnndsc/pl-dircopy,                              \
-                        fnndsc/pl-pfdicom_tagextract::dcm_tagExtract,   \
-                        fnndsc/pl-pfdicom_tagsub::dcm_tagSub,           \
-                        fnndsc/pl-pacscopy,                             \
-                        fnndsc/pl-mpcs,                                 \
-                        fnndsc/pl-mpcs^moc,                             \
-                        fnndsc/pl-freesurfer_pp,                        \
-                        fnndsc/pl-freesurfer_pp^moc,                    \
-                        fnndsc/pl-z2labelmap,                           \
-                        fnndsc/pl-z2labelmap^moc,                       \
-                        fnndsc/pl-mri10yr06mo01da_normal,               \
-                        fnndsc/pl-mri10yr06mo01da_normal^moc
+                        fnndsc/pl-dircopy
     "
-    STEP=21
+
+    STEP=$(expr $STEP + 4 )
     title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
                             "(unmutable and available to all users)"
         S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve.py --version)
@@ -579,28 +548,6 @@ else
             exec chris_store python pipelines/services/manager.py       \
             add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
         echo -en "\033[2A\033[2K"
-    windowBottom
-
-    title -d 1 "Creating two ChRIS API users"
-        echo "Setting superuser chris:chris1234..."                     | ./boxes.sh
-        windowBottom
-        docker-compose -f docker-compose_dev.yml                        \
-            exec chris_dev /bin/bash -c                                 \
-            'python manage.py createsuperuser --noinput --username chris --email dev@babymri.org 2> /dev/null;' >& dc.out >/dev/null
-        docker-compose -f docker-compose_dev.yml                        \
-            exec chris_dev /bin/bash -c                                 \
-            'python manage.py shell -c "from django.contrib.auth.models import User; user=User.objects.get(username=\"chris\"); user.set_password(\"chris1234\"); user.save()"' >& dc.out >/dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
-        echo ""                                                         | ./boxes.sh
-        echo "Setting normal user cube:cube1234..."                     | ./boxes.sh
-        windowBottom
-        docker-compose -f docker-compose_dev.yml                        \
-            exec chris_dev /bin/bash -c                                 \
-            'python manage.py shell -c "from users.serializers import UserSerializer; us=UserSerializer(data={\"username\":\"cube\",\"password\":\"cube1234\",\"email\":\"cube@babymri.org\"}); us.is_valid(); us.save()"' >& dc.out >/dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
     windowBottom
 
     title -d 1 "Automatically creating a locked pipeline in CUBE"       \
