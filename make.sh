@@ -485,28 +485,36 @@ else
         echo ""                                                         | ./boxes.sh
     windowBottom
 
-    title -d 1 "Creating two ChRIS STORE API users"
-    windowBottom
+    ###
+    ### Create two ChRIS STORE API users using a helper script
+    ###
     # Note, emails and user names MUST be unique. Creating a new user
     # with the same email as an existing one will throw an error!
-    # -U creates a 'superuser'
+    #
+    # Also, '-U' creates a 'superuser' and a '-S' denotes a ChRIS Store
+    # user (otherwise a ChRIS/CUBE user is assumed).
+    ###
     STEP=$(expr $STEP + 1 )
     ./user_add.sh -s $STEP -U -S " chris:chris1234:dev@babymri.org,                \
                                 cubeadmin:cubeadmin1234:cubeadmin@babymri.org"
 
-    title -d 1 "Creating two ChRIS API users"
-    windowBottom
+    ###
+    ### Create two ChRIS API users using a helper script
+    ###
     # Note, emails and user names MUST be unique. Creating a new user
     # with the same email as an existing one will throw an error!
-    # -U creates a 'superuser'
+    #
+    # Also, '-U' creates a 'superuser'
+    ###
     STEP=$(expr $STEP + 1 )
     ./user_add.sh -s $STEP -U 'chris:chris1234:dev@babymri.org'
     STEP=$(expr $STEP + 1 )
-    # This creates a 'normaluser'
+    # This creates a 'normaluser' (note there is no '-U').
     ./user_add.sh -s $STEP 'cube:cube1234:cube@babymri.org'
 
-    title -d 1 "Plugin management..."
-    windowBottom
+    ###
+    ### Add plugins to the system using a helper script
+    ###
     STEP=$(expr $STEP + 1 )
     ./plugin_add.sh -s $STEP "\
                         fnndsc/pl-simplefsapp,                          \
