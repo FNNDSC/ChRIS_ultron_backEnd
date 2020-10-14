@@ -12,6 +12,7 @@
 #
 
 ./plugin_add.sh  "\
+                    fnndsc/pl-dsdircopy,                            \
                     fnndsc/pl-simplefsapp^moc,                      \
                     fnndsc/pl-simpledsapp^moc,                      \
                     fnndsc/pl-s3push,                               \
