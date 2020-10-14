@@ -166,7 +166,7 @@ function title {
              {'printf("%*s%*s\n", 40+length($1)/2, $1, 41-length($1)/2, "");'})
     fi
     printf "\n"
-    DATE=" $(date --rfc-3339=s) [$(hostname)] "
+    DATE=" $(date -R) [$(hostname)] "
     lDATE=${#DATE}
     if (( b_date )) ; then
         printf "${NC}${White}"
