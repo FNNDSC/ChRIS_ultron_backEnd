@@ -181,7 +181,7 @@ fi
             "$i: " "$username" "$accountType" "[   error    ]"            | ./boxes.sh
             b_createFail=$(( b_createFail+=1 ))
         fi
-        echo ""                                                           | boxes.sh
+        echo ""                                                           | ./boxes.sh
         ((i++))
         windowBottom
     done
