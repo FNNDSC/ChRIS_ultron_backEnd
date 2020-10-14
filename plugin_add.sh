@@ -111,6 +111,8 @@ windowBottom
 
 title -d 1  "Checking on container plugins " \
             "and pulling latest versions where needed..."
+    declare -i b_pullSuccess=0
+    declare -i b_pullFail=0
     for plugin in "${a_storePluginUser[@]}" ; do
         cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
         if [[ $REPO == "fnndsc" ]] ; then
@@ -121,6 +123,7 @@ title -d 1  "Checking on container plugins " \
             echo $CMD | sh >& dc.out >/dev/null
             status=$?
             if (( status == 0 )) ; then
+                b_pullSuccess=$(( b_pullSuccess+=1 ))
                 report="[ success ]"
                 reportColor=LightGreen
                 a_storePluginOK+=("$plugin")
@@ -128,6 +131,7 @@ title -d 1  "Checking on container plugins " \
                 printf "${LightBlueBG}${White}[ dockerhub ]${NC}::${LightCyan}%-35s${Yellow}%19s${LightGreenBG}${White}%-11s${NC}\n"     \
                 "$REPO/$CONTAINER" "latest<--" "$report"                            | ./boxes.sh
             else
+                b_pullFail=$(( b_pullFail+=1 ))
                 report="[ failed  ]"
                 reportColor=LightRed
                 echo -en "\033[3A\033[2K"
@@ -137,6 +141,31 @@ title -d 1  "Checking on container plugins " \
             cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'    | ./boxes.sh
         fi
     done
+    if (( b_pullSuccess > 0 )) ; then
+        printf "${LightCyan}%16s${LightGreen}%-64s${NC}\n"              \
+            "$b_pullSuccess"                                            \
+            " images successfully pulled"                               | ./boxes.sh
+        echo ""                                                         | ./boxes.sh
+    fi
+    if (( b_pullFail > 0 )) ; then
+        printf "${LightRed}%16s${Brown}%-64s${NC}\n"                    \
+            "$b_pullFail"                                               \
+        " images were not successfully pulled."                         | ./boxes.sh
+        boxcenter " "
+        boxcenter "The attempt to pull some containers resulted in a "  ${LightRed}
+        boxcenter "failure. There are many possible reasons for this "  ${LightRed}
+        boxcenter "but the first thing to verify  is that  the image "  ${LightRed}
+        boxcenter "names passed are correct. You  can  also directly "  ${LightRed}
+        boxcenter "try and pull the failed images with               "  ${LightRed}
+        boxcenter " "
+        boxcenter "docker pull <imageName> "                            ${White}
+        boxcenter " "
+        boxcenter "Note that  if  you do  NOT  have sudoless docker "   ${Yellow}
+        boxcenter "configured, you  should run  this  script using  "   ${Yellow}
+        boxcenter " "
+        boxcenter "sudo ./plugin_add.sh ..."                            ${White}
+        boxcenter " "
+    fi
 windowBottom
 
 title -d 1 "Uploading plugin representations to the ChRIS store..."
