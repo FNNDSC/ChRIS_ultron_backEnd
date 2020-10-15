@@ -272,6 +272,7 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(create_read_url, data=self.post,
                                     content_type=self.content_type)
+        time.sleep(2)  # wait for the worker to finish
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # delete files from swift storage
