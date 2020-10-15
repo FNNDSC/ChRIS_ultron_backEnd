@@ -461,10 +461,6 @@ else
         if (( $status == 0 )) ; then
             printf "%40s${LightGreen}%40s${NC}\n"                       \
                 "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
-	          windowBottom
-	          echo ""
-            echo -en "\033[2A\033[2K"
-            cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh ${LightBlue}
         else
             printf "%40s${Red}%40s${NC}\n"                              \
                 "CUBE Integration tests" "[ failure ]"                  | ./boxes.sh
