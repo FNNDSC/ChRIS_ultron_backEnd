@@ -6,13 +6,13 @@
 #
 # SYNOPSIS
 #
-#       cparse.sh <cstring> <extension> "REPO" "CONTAINER" "MMN" "ENV"
+#       cparse.sh <cstring> "REPO" "CONTAINER" "MMN" "ENV"
 #
 # DESCRIPTION
 #
 #       cparse.sh parses a <cstring> of pattern:
 #
-#               [<repo>/]<container>[::<mainModuleName>[^<env>]]
+#               [<repo>/]<container>[::<mainModuleName>[%<extension>[^<env>]]]
 #
 #       and returns
 #
@@ -24,10 +24,6 @@
 #
 #       The container name string to parse.
 #
-# <extension>
-#
-#       An extension to append to the <mainModuleName>. Since most
-#       ChRIS plugins are python modules, this usually is just ".py".
 #
 # RETURN
 #
@@ -39,15 +35,18 @@
 #       the <container> part of the string.
 #
 # MMN
-#       if not passed, defaults to the <container> string, with
-#       ".py" appended and sans a possibly leading "pl-".
+#       if not passed, defaults to the <container> string
+#
+# EXT
+#       if not passed, defaults to empty.
 #
 # ENV
 #       if not passed, defaults to "host", else <env>.
 #
 # EXAMPLE
 #
-#       cparse.sh "local/pl-dircopy::directoryCopy^moc" ".py"
+#       source cparse.sh
+#       cparse_do "local/pl-dircopy::directoryCopy:%.py^moc"
 #
 
 
@@ -95,7 +94,18 @@ else:
         str_env         = l_spec[1]
         str_remain      = l_spec[0]
 
-# [:<mainModuleName]
+# [:<extension]
+l_spec          = str_remain.split('%')
+if len(l_spec) == 1:
+        # No trailing [%<extension>]
+        str_extension   = ""
+        str_remain      = l_spec[0]
+else:
+        # There is a trailing [%<extension>]
+        str_extension   = l_spec[1]
+        str_remain      = l_spec[0]
+
+# [::<mainModuleName]
 l_spec          = str_remain.split('::')
 if len(l_spec) == 1:
         # No trailing [::<mainModuleName>]
@@ -110,9 +120,11 @@ else:
         str_mmn         = l_spec[1]
         str_remain      = l_spec[0]
 
+
+
 str_container           = str_remain
 
-print("%s %s %s %s" % (str_repo, str_container, str_mmn, str_env))
+print("%s %s %s%s %s" % (str_repo, str_container, str_mmn, str_extension, str_env))
 
 EOF
 )
