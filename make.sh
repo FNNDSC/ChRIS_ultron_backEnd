@@ -253,7 +253,7 @@ else
         echo "# Variables declared here are available to"               > .env
         echo "# docker-compose on execution"                            >>.env
         for CORE in ${A_CONTAINER[@]} ; do
-            cparse $CORE " " "REPO" "CONTAINER" "MMN" "ENV"
+            cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             echo "${ENV}=${REPO}"                                       >>.env
             if [[ $REPO != "local" ]] ; then
                 echo ""                                                 | ./boxes.sh
@@ -272,7 +272,7 @@ else
     if (( ! b_skipIntro )) ; then
         title -d 1 "Will use containers with following version info:"
         for CORE in ${A_CONTAINER[@]} ; do
-            cparse $CORE " " "REPO" "CONTAINER" "MMN" "ENV"
+            cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             if [[   $CONTAINER != "chris:dev"            && \
                     $CONTAINER != "chris_store"          && \
                     $CONTAINER != "pl-pacsretrieve"      && \
@@ -325,7 +325,7 @@ else
         docker-compose --no-ansi -f docker-compose_dev.yml rm -vf >& dc.out > /dev/null
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightCyan}
         for CORE in ${A_CONTAINER[@]} ; do
-            cparse $CORE " " "REPO" "CONTAINER" "MMN" "ENV"
+            cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             printf "${White}%40s${Green}%40s${NC}\n"                            \
                         "$CONTAINER" "stopping..."                              | ./boxes.sh
             docker ps -a                                                        |\
