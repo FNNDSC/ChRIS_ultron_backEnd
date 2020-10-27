@@ -54,12 +54,11 @@ CREPO=fnndsc
 
 function cparse {
         pluginSpec=$1
-        pluginExt=$2
 
-        local __repo=$3
-        local __container=$4
-        local __mainModuleName=$5
-        local __env=$6
+        local __repo=$2
+        local __container=$3
+        local __mainModuleName=$4
+        local __env=$5
 
         export pluginSpec=$pluginSpec
         export CREPO=$CREPO
@@ -128,10 +127,11 @@ print("%s %s %s%s %s" % (str_repo, str_container, str_mmn, str_extension, str_en
 
 EOF
 )
-        str_repo=$(echo $l_parse | awk '{print $1}')
-        str_container=$(echo $l_parse | awk '{print $2}')
-        str_mmn=$(echo $l_parse | awk '{print $3}')$pluginExt
-        str_env=$(echo $l_parse | awk '{print $4}')
+        str_repo=$(         echo $l_parse | awk '{print $1}'    )
+        str_container=$(    echo $l_parse | awk '{print $2}'    )
+        str_mmn=$(          echo $l_parse | awk '{print $3}'    )
+        str_env=$(          echo $l_parse | awk '{print $4}'    )
+
         eval $__repo="'$str_repo'"
         eval $__container="'$str_container'"
         eval $__mainModuleName="'$str_mmn'"
@@ -140,9 +140,9 @@ EOF
 }
 
 function cparse_do {
-        TESTNAME="local/pl-dircopy:directoryCopy^moc"
+        TESTNAME="local/pl-dircopy::directoryCopy%.py^moc"
 
-        cparse "$1" "$2" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse "$1" "REPO" "CONTAINER" "MMN" "ENV"
 
         echo $REPO
         echo $CONTAINER
