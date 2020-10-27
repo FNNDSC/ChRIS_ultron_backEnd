@@ -29,7 +29,8 @@
                     fnndsc/pl-mri10yr06mo01da_normal%.py,               \
                     fnndsc/pl-mri10yr06mo01da_normal%.py^moc,           \
                     fnndsc/pl-mgz2lut_report%.py,                       \
-                    fnndsc/pl-pfdo_mgz2img
+                    fnndsc/pl-pfdo_mgz2img,                             \
+                    fnndsc/pl-pfdo_med2img
 "
 
 #
