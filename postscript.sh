@@ -12,23 +12,24 @@
 #
 
 ./plugin_add.sh  "\
-                    fnndsc/pl-dsdircopy,                            \
-                    fnndsc/pl-simplefsapp^moc,                      \
-                    fnndsc/pl-simpledsapp^moc,                      \
-                    fnndsc/pl-s3push,                               \
-                    fnndsc/pl-pfdicom_tagextract::dcm_tagExtract,   \
-                    fnndsc/pl-pfdicom_tagsub::dcm_tagSub,           \
-                    fnndsc/pl-mpcs,                                 \
-                    fnndsc/pl-mpcs^moc,                             \
-                    fnndsc/pl-fshack,                               \
-                    fnndsc/pl-fastsurfer_inference,                 \
-                    fnndsc/pl-freesurfer_pp,                        \
-                    fnndsc/pl-freesurfer_pp^moc,                    \
-                    fnndsc/pl-z2labelmap,                           \
-                    fnndsc/pl-z2labelmap^moc,                       \
-                    fnndsc/pl-mri10yr06mo01da_normal,               \
-                    fnndsc/pl-mri10yr06mo01da_normal^moc,           \
-                    fnndsc/pl-mgz2lut_report
+                    fnndsc/pl-dsdircopy%.py,                            \
+                    fnndsc/pl-simplefsapp%.py^moc,                      \
+                    fnndsc/pl-simpledsapp%.py^moc,                      \
+                    fnndsc/pl-s3push%.py,                               \
+                    fnndsc/pl-pfdicom_tagextract::dcm_tagExtract%.py,   \
+                    fnndsc/pl-pfdicom_tagsub::dcm_tagSub%.py,           \
+                    fnndsc/pl-mpcs%.py,                                 \
+                    fnndsc/pl-mpcs%.py^moc,                             \
+                    fnndsc/pl-fshack%.py,                               \
+                    fnndsc/pl-fastsurfer_inference%.py,                 \
+                    fnndsc/pl-freesurfer_pp%.py,                        \
+                    fnndsc/pl-freesurfer_pp%.py^moc,                    \
+                    fnndsc/pl-z2labelmap%.py,                           \
+                    fnndsc/pl-z2labelmap%.py^moc,                       \
+                    fnndsc/pl-mri10yr06mo01da_normal%.py,               \
+                    fnndsc/pl-mri10yr06mo01da_normal%.py^moc,           \
+                    fnndsc/pl-mgz2lut_report%.py,                       \
+                    fnndsc/pl-pfdo_mgz2img
 "
 
 #

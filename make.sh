@@ -26,13 +26,26 @@
 #
 # TYPICAL CASES:
 #
-#   Run full CUBE instantiation with tests:
+#  ┌─────────────────────────────────────┐
+#  │ Most of the time, you will do this: │
+#  ├─────────────────────────────────────┴────────────────────────────┐
+#  │ Skip unit and integration tests and start backend in daemon mode │
+#  │ (the "dev" way when you want to test new plugins etc):           │
+#  │	                                                              │
+#  │      ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -i │
+#  └──────────────────────────────────────────────────────────────────┘
+#
+#   Run full CUBE instantiation with tests (the "real-do-only-once" way
+#   to be sure the system actually works on your env):
 #
 #       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
 #
-#   Skip unit and integration tests and the intro:
 #
-#       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
+#   Skip unit and integration tests and the skip the intro
+#   (the "quick-n-dirty" way -- when you are deep in dev mode and
+#   restarting the system for the 50th time on a Monday morning):
+#
+#       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -i -s
 #
 #   NOTE: What's up with the "sudo rm..." followed by "rm ..."?
 #
