@@ -60,7 +60,7 @@
 CREPO=fnndsc
 
 function cparse {
-        pluginSpec=$1
+        local pluginSpec=$1
 
         local __repo=$2
         local __container=$3
@@ -69,14 +69,16 @@ function cparse {
 
         # remove trailing "^moc" if present, resulting in a normal
         # docker image name e.g. fnndsc/chris or fnndsc/chris:latest
-        str_dock="${pluginSpec%\^*}"
-        str_env=$(echo $pluginSpec | grep -Po '(?<=\^).+$' || echo host)
+        local str_dock="${pluginSpec%\^*}"
+        local str_env=$(echo $pluginSpec | grep -Po '(?<=\^).+$' || echo host)
 
         # get the repo portion of "repo/name:tag"
         # or produce a default repo, "fnndsc"
-        str_repo=$(echo $str_dock | grep -Po '^.+(?=\/)' || echo $CREPO)
+        local str_repo=$(echo $str_dock | grep -Po '^.+(?=\/)' || echo $CREPO)
         # get the name:tag portion of "repo/name:tag"
-        str_container="${str_dock#*/}"
+        local str_container="${str_dock#*/}"
+
+        local exit_code=0
 
         # we will use "docker inspect" to find out the executable specified
         # in the container image's Dockerfile by CMD
@@ -84,12 +86,17 @@ function cparse {
         # note: instead of using what we were given, $str_dock,
         # we are rebuilding the string by concatention of its parts
         # because above we might have implicitly filled the repo as "fnndsc"
-        json=$(docker image inspect "$str_repo/$str_container")
+        local json=$(docker image inspect "$str_repo/$str_container")
+
+        if [ "$exit_code" -ne 0 ]; then
+                return $exit_code
+        fi
 
         # best way to inspect JSON is to use jq, of course.
         # but we also provide a fallback using coreutils if jq is not installed
         if which jq > /dev/null; then
                 str_mmn=$(echo $json | jq -r '.[0].Config.Cmd[0]')
+                exit_code=$?
         else
                 # fallback strategy: use `tr` to join string on line breaks,
                 # because grep operates per-line.
@@ -98,6 +105,14 @@ function cparse {
                 # finally, `cut` extracts the first string element of the array
                 str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
                         | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
+                exit_code=$?
+                if [ -z "$str_mmn" ]; then
+                        exit_code=1
+                fi
+        fi
+
+        if [ "$exit_code" -ne 0 ]; then
+                return $exit_code
         fi
 
         # register results into given variable names
@@ -105,5 +120,4 @@ function cparse {
         eval $__container="'$str_container'"
         eval $__mainModuleName="'$str_mmn'"
         eval $__env="'$str_env'"
-
 }
