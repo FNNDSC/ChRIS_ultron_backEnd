@@ -103,11 +103,15 @@ function cparse {
                 # the first `grep` selects the `"Config": {...}` object.
                 # the second `grep` selects the `"Cmd": [...]` array.
                 # finally, `cut` extracts the first string element of the array
+
                 str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
                         | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
-                exit_code=$?
+                # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
+                # the services pman, pfioh, pfcon might not have CMD
+                # in this situation we should not fail the script,
+                # just return the string value "null" to match what `jq` would produce
                 if [ -z "$str_mmn" ]; then
-                        exit_code=1
+                        str_mmn=null
                 fi
         fi
 
