@@ -78,7 +78,7 @@ function cparse {
         # get the name:tag portion of "repo/name:tag"
         local str_container="${str_dock#*/}"
 
-        local exit_code=0
+        local str_mmn
 
         # we will use "docker inspect" to find out the executable specified
         # in the container image's Dockerfile by CMD
@@ -86,38 +86,31 @@ function cparse {
         # note: instead of using what we were given, $str_dock,
         # we are rebuilding the string by concatention of its parts
         # because above we might have implicitly filled the repo as "fnndsc"
-        local json=$(docker image inspect "$str_repo/$str_container")
+        local json=$(docker image inspect "$str_repo/$str_container" 2> /dev/null)
 
-        if [ "$exit_code" -ne 0 ]; then
-                return $exit_code
-        fi
+        if [ "$?" -eq "0" ]; then
+                # best way to inspect JSON is to use jq, of course.
+                # but we also provide a fallback using coreutils if jq is not installed
+                if which jq > /dev/null; then
+                        str_mmn=$(echo $json | jq -r '.[0].Config.Cmd[0]')
+                else
+                        # fallback strategy: use `tr` to join string on line breaks,
+                        # because grep operates per-line.
+                        # the first `grep` selects the `"Config": {...}` object.
+                        # the second `grep` selects the `"Cmd": [...]` array.
+                        # finally, `cut` extracts the first string element of the array
 
-        # best way to inspect JSON is to use jq, of course.
-        # but we also provide a fallback using coreutils if jq is not installed
-        if which jq > /dev/null; then
-                str_mmn=$(echo $json | jq -r '.[0].Config.Cmd[0]')
-                exit_code=$?
-        else
-                # fallback strategy: use `tr` to join string on line breaks,
-                # because grep operates per-line.
-                # the first `grep` selects the `"Config": {...}` object.
-                # the second `grep` selects the `"Cmd": [...]` array.
-                # finally, `cut` extracts the first string element of the array
-
-                str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
-                        | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
-                # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
-                # the services pman, pfioh, pfcon might not have CMD
-                # in this situation we should not fail the script,
-                # just return the string value "null" to match what `jq` would produce
-                if [ -z "$str_mmn" ]; then
-                        str_mmn=null
+                        str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
+                                | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
                 fi
         fi
-
-        if [ "$exit_code" -ne 0 ]; then
-                return $exit_code
-        fi
+        # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
+        # the services pman, pfioh, pfcon might not have CMD
+        # in this situation we should not fail the script,
+        # just return the string value "null" to match what `jq` would produce
+        
+        # str_mmn will be empty in case of any failures, like docker image was not pulled yet
+        str_mmn="${str_mmn:-null}"
 
         # register results into given variable names
         eval $__repo="'$str_repo'"
