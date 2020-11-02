@@ -10,13 +10,20 @@
 #
 # DESCRIPTION
 #
-#       cparse.sh parses a <cstring> of pattern:
+#       cparse.sh produces information about a container image, e.g.
 #
-#               [<repo>/]<container>[::<mainModuleName>[%<extension>[^<env>]]]
+#               fnndsc/pl-app
+#
+#       And optionally splices out a trailing string after the "^"
+#       character and saves it as "env" (this is an odd legacy spec) e.g.
+#
+#               fnndsc/pl-app^moc
 #
 #       and returns
 #
-#               <repo> <container> <mainModuleName><extension> <env>
+#               <repo> <container> <executable> <env>
+#
+#       where <executable> is the runnable binary specified by Dockerfile CMD
 #
 # ARGS
 #
@@ -35,119 +42,77 @@
 #       the <container> part of the string.
 #
 # MMN
-#       if not passed, defaults to the <container> string
-#
-# EXT
-#       if not passed, defaults to empty.
+#       executable inside the container image, set by CMD inof Dockerfile.
+#       If image was not pulled, MMN will be "null"
 #
 # ENV
 #       if not passed, defaults to "host", else <env>.
 #
 # EXAMPLE
 #
-#       source cparse.sh
-#       cparse_do "local/pl-dircopy::directoryCopy:%.py^moc"
+#       cparse fnndsc/pl-pfdicom_tagextract repo container mmn env
+#       echo $repo $container $mmn $env
 #
 
 
 CREPO=fnndsc
 
 function cparse {
-        pluginSpec=$1
+        local pluginSpec=$1
 
         local __repo=$2
         local __container=$3
         local __mainModuleName=$4
         local __env=$5
 
-        export pluginSpec=$pluginSpec
-        export CREPO=$CREPO
+        # remove trailing "^moc" if present, resulting in a normal
+        # docker image name e.g. fnndsc/chris or fnndsc/chris:latest
+        local str_dock="${pluginSpec%\^*}"
+        local str_env=$(echo $pluginSpec | grep -Po '(?<=\^).+$' || echo host)
 
-l_parse=$(python3 - << EOF
-import os
+        # get the repo portion of "repo/name:tag"
+        # or produce a default repo, "fnndsc"
+        local str_repo=$(echo $str_dock | grep -Po '^.+(?=\/)' || echo $CREPO)
+        # get the name:tag portion of "repo/name:tag"
+        local str_container="${str_dock#*/}"
 
-b_done          = False
+        local str_mmn
 
-str_pluginSpec  = os.environ['pluginSpec']
-str_CREPO       = os.environ['CREPO']
+        # we will use "docker inspect" to find out the executable specified
+        # in the container image's Dockerfile by CMD
 
-# [<repo>/]
-l_spec          = str_pluginSpec.split('/')
-if len(l_spec) == 1:
-        # No leading [<repo>/]
-        str_repo        = str_CREPO
-        str_remain      = l_spec[0]
-else:
-        # There is a leading [<repo>/]
-        str_repo        = l_spec[0]
-        str_remain      = l_spec[1]
+        # note: instead of using what we were given, $str_dock,
+        # we are rebuilding the string by concatention of its parts
+        # because above we might have implicitly filled the repo as "fnndsc"
+        local json=$(docker image inspect "$str_repo/$str_container" 2> /dev/null)
 
-# [^<env>]
-l_spec          = str_remain.split('^')
-if len(l_spec) == 1:
-        # No trailing [^<env>]
-        str_env         = 'host'
-        str_remain      = l_spec[0]
-else:
-        # There is a trailing [^<env>]
-        str_env         = l_spec[1]
-        str_remain      = l_spec[0]
+        if [ "$?" -eq "0" ]; then
+                # best way to inspect JSON is to use jq, of course.
+                # but we also provide a fallback using coreutils if jq is not installed
+                if which jq > /dev/null; then
+                        str_mmn=$(echo $json | jq -r '.[0].Config.Cmd[0]')
+                else
+                        # fallback strategy: use `tr` to join string on line breaks,
+                        # because grep operates per-line.
+                        # the first `grep` selects the `"Config": {...}` object.
+                        # the second `grep` selects the `"Cmd": [...]` array.
+                        # finally, `cut` extracts the first string element of the array
 
-# [:<extension]
-l_spec          = str_remain.split('%')
-if len(l_spec) == 1:
-        # No trailing [%<extension>]
-        str_extension   = ""
-        str_remain      = l_spec[0]
-else:
-        # There is a trailing [%<extension>]
-        str_extension   = l_spec[1]
-        str_remain      = l_spec[0]
+                        str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
+                                | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
+                fi
+        fi
+        # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
+        # the services pman, pfioh, pfcon might not have CMD
+        # in this situation we should not fail the script,
+        # just return the string value "null" to match what `jq` would produce
+        
+        # str_mmn will be empty in case of any failures, like docker image was not pulled yet
+        str_mmn="${str_mmn:-null}"
 
-# [::<mainModuleName]
-l_spec          = str_remain.split('::')
-if len(l_spec) == 1:
-        # No trailing [::<mainModuleName>]
-        l_mmn           = l_spec[0].split('pl-')
-        if len(l_mmn) == 1:
-                str_mmn = l_spec[0]
-        else:
-                str_mmn = l_mmn[1]
-        str_remain      = l_spec[0]
-else:
-        # There is a trailing [::<mainModuleName>]
-        str_mmn         = l_spec[1]
-        str_remain      = l_spec[0]
-
-
-
-str_container           = str_remain
-
-print("%s %s %s%s %s" % (str_repo, str_container, str_mmn, str_extension, str_env))
-
-EOF
-)
-        str_repo=$(         echo $l_parse | awk '{print $1}'    )
-        str_container=$(    echo $l_parse | awk '{print $2}'    )
-        str_mmn=$(          echo $l_parse | awk '{print $3}'    )
-        str_env=$(          echo $l_parse | awk '{print $4}'    )
-
+        # register results into given variable names
         eval $__repo="'$str_repo'"
         eval $__container="'$str_container'"
         eval $__mainModuleName="'$str_mmn'"
         eval $__env="'$str_env'"
-
 }
-
-function cparse_do {
-        TESTNAME="local/pl-dircopy::directoryCopy%.py^moc"
-
-        cparse "$1" "REPO" "CONTAINER" "MMN" "ENV"
-
-        echo $REPO
-        echo $CONTAINER
-        echo $MMN
-        echo $ENV
-}
-
-

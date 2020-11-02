@@ -526,10 +526,10 @@ else
     ###
     STEP=$(expr $STEP + 1 )
     ./plugin_add.sh -s $STEP "\
-                        fnndsc/pl-simplefsapp%.py,                      \
-                        fnndsc/pl-simpledsapp%.py,                      \
-                        fnndsc/pl-s3retrieve%.py,                       \
-                        fnndsc/pl-dircopy%.py
+                        fnndsc/pl-simplefsapp,                      \
+                        fnndsc/pl-simpledsapp,                      \
+                        fnndsc/pl-s3retrieve,                       \
+                        fnndsc/pl-dircopy
     "
 
     STEP=$(expr $STEP + 4 )

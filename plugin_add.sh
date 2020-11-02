@@ -18,13 +18,13 @@
 # Notes on pluginList
 #
 # The plugin list is a comma separated list, each element conforming to a
-# cparse specification, i.e:
+# cparse specification, e.g.:
 #
-#           fnndsc/pl-pfdicom_tagextract::dcm_tagExtract%.py^moc
+#           fnndsc/pl-pfdicom_tagextract^moc
 #
 # templatized as:
 #
-#       [<repo>/]<container>[::<mainModuleName>[%<extension>[^<env>]]]
+#       [<repo>/]<container>[^<env>]
 #
 ##
 # ARGS
@@ -324,4 +324,3 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
     fi
     echo ""                                                             | ./boxes.sh
     windowBottom
-
