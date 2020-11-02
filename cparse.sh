@@ -42,10 +42,8 @@
 #       the <container> part of the string.
 #
 # MMN
-#       if not passed, defaults to the <container> string
-#
-# EXT
-#       if not passed, defaults to empty.
+#       executable inside the container image, set by CMD inof Dockerfile.
+#       If image was not pulled, MMN will be "null"
 #
 # ENV
 #       if not passed, defaults to "host", else <env>.
