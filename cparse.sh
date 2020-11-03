@@ -68,11 +68,17 @@ function cparse {
         # remove trailing "^moc" if present, resulting in a normal
         # docker image name e.g. fnndsc/chris or fnndsc/chris:latest
         local str_dock="${pluginSpec%\^*}"
-        local str_env=$(echo $pluginSpec | grep -Po '(?<=\^).+$' || echo host)
+        local str_env=host
+        if [ "$pluginSpec" != "$str_dock" ]; then
+                str_env=$(echo $pluginSpec | sed 's/^.*\^//')
+        fi
 
         # get the repo portion of "repo/name:tag"
         # or produce a default repo, "fnndsc"
-        local str_repo=$(echo $str_dock | grep -Po '^.+(?=\/)' || echo $CREPO)
+        local str_repo=fnndsc
+        if [[ "$str_dock" == *"/"* ]]; then
+                str_repo=$(echo $str_dock | sed 's/\/.*$//')
+        fi
         # get the name:tag portion of "repo/name:tag"
         local str_container="${str_dock#*/}"
 
@@ -94,12 +100,12 @@ function cparse {
                 else
                         # fallback strategy: use `tr` to join string on line breaks,
                         # because grep operates per-line.
-                        # the first `grep` selects the `"Config": {...}` object.
-                        # the second `grep` selects the `"Cmd": [...]` array.
-                        # finally, `cut` extracts the first string element of the array
+                        # `grep` selects the `"Config": {...}` object.
+                        # `sed` selects the `"Cmd": [...]` array.
+                        # finally, `cut` extracts the first string element of the array.
 
                         str_mmn=$(echo $json | tr -d '\n' | grep -m 1 -o '"Config": {.*\}' \
-                                | grep -m 1 -Po '(?<="Cmd": \[).+?(?=\])' | cut -d '"' -f2)
+                                | sed 's/"Config": {.*"Cmd": \[//' | cut -d '"' -f2)
                 fi
         fi
         # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
