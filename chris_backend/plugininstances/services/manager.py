@@ -43,15 +43,14 @@ NOTE:
 import logging
 import os
 import io
-import json
 import zlib, base64
 import zipfile
+import requests
 
 from django.utils import timezone
 from django.conf import settings
 
 import pfurl
-import time
 import json
 
 from core.swiftmanager import SwiftManager, ClientException
@@ -152,6 +151,7 @@ class PluginInstanceManager(object):
         d_msg = {
             "action": "coordinate",
             "threadAction": True,
+            "jid": self.str_job_id,
             "meta-store":
                 {
                     "meta": "meta-compute",
@@ -228,7 +228,15 @@ class PluginInstanceManager(object):
                     "service": str_IOPhost
                 }
         }
-        self.call_app_service(d_msg)
+        zip_file_path = self.create_zip_file([str_inputdir])
+        remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
+        logger.info('message sent: %s', json.dumps(d_msg, indent=4))
+        r = requests.post(remote_url,
+                          files={'data_file': open(zip_file_path, 'rb')},
+                          data=d_msg,
+                          timeout=30)
+        logger.info('response from pfcon: %s', r.text)
+        #self.call_app_service(d_msg)
         self.c_plugin_inst.status = 'started'
         self.c_plugin_inst.save()
 
@@ -511,6 +519,7 @@ class PluginInstanceManager(object):
                               'failed, detail: %s' % (obj_path, self.str_job_id, str(e))
                         logger.error(msg)
                     job_data_zip.writestr(obj_path, contents)
+        return zipfile_path
 
     @staticmethod
     def json_zipToStr(json_data):
