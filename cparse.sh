@@ -93,13 +93,15 @@ function cparse {
         
         # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
         # the services pman, pfioh, pfcon might not have CMD
+        # so the else block sets str_mmn to "ERR_NO_CMD"
         local str_mmn=$(docker image inspect --format \
                 '{{with .Config.Cmd}}{{(index . 0)}}{{else}}ERR_NO_CMD{{end}}' \
                 "$str_repo/$str_container" 2> /dev/null)
 
         # in case docker insepct fails (like when image hasn't been pulled yet)
-        # set str_mmn to "null"
-        if [ "$?" -ne "0" ]; then
+        # an error is printed to stderr and a newline character is printed to stdout
+        # if $str_mmn is just whitespace, assume image hasn't been pulled yet
+        if [[ "$str_mmn" =~ ^[[:space:]]*$ ]]; then
                 str_mmn=ERR_IMAGE_NOT_PULLED
         fi
 
