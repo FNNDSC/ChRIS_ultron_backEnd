@@ -233,7 +233,7 @@ class PluginInstanceManager(object):
         logger.info('message sent: %s', json.dumps(d_msg, indent=4))
         r = requests.post(remote_url,
                           files={'data_file': open(zip_file_path, 'rb')},
-                          data=d_msg,
+                          data={'msg': json.dumps(d_msg)},
                           timeout=30)
         logger.info('response from pfcon: %s', r.text)
         #self.call_app_service(d_msg)
