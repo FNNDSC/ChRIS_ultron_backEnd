@@ -78,9 +78,6 @@ class PluginInstanceManager(object):
         # some schedulers require a minimum job ID string length
         self.str_job_id = 'chris-jid-' + str(plugin_instance.id)
 
-        # local data dir to store zip files before transmitting to the remote
-        self.data_dir = os.path.join(os.path.expanduser("~"), 'data')
-
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
 
@@ -228,11 +225,11 @@ class PluginInstanceManager(object):
                     "service": str_IOPhost
                 }
         }
-        zip_file_path = self.create_zip_file([str_inputdir])
+        zip_file = self.create_zip_file([str_inputdir])
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
         logger.info('message sent: %s', json.dumps(d_msg, indent=4))
         r = requests.post(remote_url,
-                          files={'data_file': open(zip_file_path, 'rb')},
+                          files={'data_file': zip_file.getvalue()},
                           data={'msg': json.dumps(d_msg)},
                           timeout=30)
         logger.info('response from pfcon: %s', r.text)
@@ -399,7 +396,8 @@ class PluginInstanceManager(object):
         plugins). Thus, if a type 'path' argument is specified, this 'path'
         is assumed to denote a location in object storage.
         """
-        str_inputdir = os.path.join(self.data_dir, 'squashEmptyDir').lstrip('/')
+        data_dir = os.path.join(os.path.expanduser("~"), 'data')
+        str_inputdir = os.path.join(data_dir, 'squashEmptyDir').lstrip('/')
         str_squashFile = os.path.join(str_inputdir, 'squashEmptyDir.txt')
         str_squashMsg = 'Empty input dir.'
         try:
@@ -494,15 +492,8 @@ class PluginInstanceManager(object):
         Create job zip file ready for transmission to the remote from a list of swift
         storage paths (prefixes).
         """
-        if not os.path.exists(self.data_dir):
-            try:
-                os.makedirs(self.data_dir)  # create data dir
-            except OSError as e:
-                msg = 'Creation of dir %s failed, detail: %s' % (self.data_dir, str(e))
-                logger.error(msg)
-
-        zipfile_path = os.path.join(self.data_dir, self.str_job_id + '.zip')
-        with zipfile.ZipFile(zipfile_path, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
+        memory_zip_file = io.BytesIO()
+        with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for swift_path in swift_paths:
                 l_ls = []
                 try:
@@ -519,7 +510,8 @@ class PluginInstanceManager(object):
                               'failed, detail: %s' % (obj_path, self.str_job_id, str(e))
                         logger.error(msg)
                     job_data_zip.writestr(obj_path, contents)
-        return zipfile_path
+        memory_zip_file.seek(0)
+        return memory_zip_file
 
     @staticmethod
     def json_zipToStr(json_data):
