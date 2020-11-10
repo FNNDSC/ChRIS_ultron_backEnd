@@ -227,6 +227,7 @@ class PluginInstanceManager(object):
         }
         zip_file = self.create_zip_file([str_inputdir])
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
+        logger.info('sent POST to pfcon service url -->%s<--', remote_url)
         logger.info('message sent: %s', json.dumps(d_msg, indent=4))
         r = requests.post(remote_url,
                           files={'data_file': zip_file.getvalue()},
@@ -276,48 +277,41 @@ class PluginInstanceManager(object):
             return self.c_plugin_inst.status
 
         if self.c_plugin_inst.status == 'started':
-            d_msg = {
-                "action": "status",
-                "meta": {
-                        "remote": {
-                            "key": self.str_job_id
-                        }
-                }
-            }
-            d_response = self.call_app_service(d_msg)
-            l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
+            remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
+            remote_url = remote_url + self.str_job_id + '/'
+            logger.info('sent GET to pfcon service url -->%s<--', remote_url)
+            r = requests.get(remote_url, timeout=30)
+            logger.info('response from pfcon: %s', r.text)
+            d_response = r.json()
+
+            #l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
+            l_status = d_response['remoteServer']['d_ret']['l_status']
             logger.info('Current job remote status = %s', l_status)
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
-            str_responseStatus = self.serialize_app_response_status(d_response)
-            if 'swiftPut:True' in str_responseStatus:
+            #str_responseStatus = self.serialize_app_response_status(d_response)
+            if 'finishedSuccessfully' in l_status:
+                remote_url = remote_url + 'file/'
+                logger.info('sent GET to pfcon service url -->%s<--', remote_url)
+                r = requests.get(remote_url, timeout=30)  # download zip file
+                swift_filenames = self.unpack_zip_file(r.content)
+
                 logger.info("Registering swift objects to CUBE")
-                d_swiftState = d_response['jobOperation']['info']['swiftPut']
-                logger.info("swiftState = %s" % json.dumps(d_swiftState, indent = 4))
                 # This setting of status protects against unnecessary concurrent
                 # collisions on `register_output_files()` and better informs the FE
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()
-                d = self.c_plugin_inst.register_output_files(swiftState=d_swiftState)
-                # Once the `register_output_files` is done, we can set
-                # the proper finall state
-                if d['status']:
-                    self.c_plugin_inst.status = 'finishedSuccessfully'
-                else:
-                    self.c_plugin_inst.status = 'finishedWithError'
-                logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
-                self.c_plugin_inst.end_date = timezone.now()
-                logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
-                self.c_plugin_inst.save()
+                self.c_plugin_inst.register_output_files(swift_filenames)
+                self.c_plugin_inst.status = 'finishedSuccessfully'
 
-            # Some possible error handling...
             if 'finishedWithError' in l_status:
                 self.c_plugin_inst.status = 'finishedWithError'
-                logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
-                self.c_plugin_inst.end_date = timezone.now()
-                logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
-                self.c_plugin_inst.save()
-                self.handle_app_remote_error()
+
+            logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
+            self.c_plugin_inst.end_date = timezone.now()
+            logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
+            self.c_plugin_inst.save()
+
         return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):
@@ -453,40 +447,6 @@ class PluginInstanceManager(object):
                 str_responseStatus += str_action + ':' + str_actionStatus + ';'
         return str_responseStatus
 
-    def handle_app_remote_error(self):
-        """
-        Collect the 'stderr' from the remote app.
-        """
-        str_deepVal = ''
-        def str_deepnest(d):
-            nonlocal str_deepVal
-            if d:
-                for k, v in d.items():
-                    if isinstance(v, dict):
-                        str_deepnest(v)
-                    else:
-                        str_deepVal = '%s' % ("{0} : {1}".format(k, v))
-
-        # Collect the 'stderr' from the app service for this instance
-        d_msg = {
-            "action": "search",
-            "meta": {
-                "key": "jid",
-                "value": self.str_job_id,
-                "job": "0",
-                "when": "end",
-                "field": "stderr"
-            }
-        }
-        d_response = self.call_app_service(d_msg)
-        str_deepnest(d_response)
-        logger.error('deepVal = %s', str_deepVal)
-
-        d_msg['meta']['field'] = 'returncode'
-        d_response = self.call_app_service(d_msg)
-        str_deepnest(d_response)
-        logger.error('deepVal = %s', str_deepVal)
-
     def create_zip_file(self, swift_paths):
         """
         Create job zip file ready for transmission to the remote from a list of swift
@@ -512,6 +472,21 @@ class PluginInstanceManager(object):
                     job_data_zip.writestr(obj_path, contents)
         memory_zip_file.seek(0)
         return memory_zip_file
+
+    def unpack_zip_file(self, zip_file_content):
+        """
+        Unpack job zip file from the remote into swift storage.
+        """
+        job_data_zip = zipfile.ZipFile(io.BytesIO(zip_file_content))
+        filenames = job_data_zip.namelist()
+        output_path = self.c_plugin_inst.get_output_path() + '/'
+        swift_filenames = []
+        for fname in filenames:
+            content = job_data_zip.read(fname)
+            swift_fname = output_path + fname.lstrip('/')
+            swift_filenames.append(swift_fname)
+            self.swift_manager.upload_obj(swift_fname, content)
+        return swift_filenames
 
     @staticmethod
     def json_zipToStr(json_data):
