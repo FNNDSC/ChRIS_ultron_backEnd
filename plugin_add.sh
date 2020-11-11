@@ -18,11 +18,13 @@
 # Notes on pluginList
 #
 # The plugin list is a comma separated list, each element conforming to a
-# cparse specification, i.e:
+# cparse specification, e.g.:
 #
-#               fnndsc/pl-pfdicom_tagextract::dcm_tagExtract^moc
+#           fnndsc/pl-pfdicom_tagextract^moc
 #
-#               [<repo>/]<container>[::<mainModuleName>[^<env>]]
+# templatized as:
+#
+#       [<repo>/]<container>[^<env>]
 #
 ##
 # ARGS
@@ -93,7 +95,7 @@ IFS=',' read -ra a_PLUGINRepoEnv <<< "$L_PLUGINS"
 
 title -d 1 "Creating array of <REPO>/<CONTAINER> from plugin list..."
     for plugin in "${a_PLUGINRepoEnv[@]}" ; do
-        cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         tcprint Yellow "Processing env [$ENV] for " LightCyan "$REPO/$CONTAINER" "40" "-40"
         a_storePluginUser+=("$REPO/$CONTAINER")
     done
@@ -114,7 +116,7 @@ title -d 1  "Checking on container plugins " \
     declare -i b_pullSuccess=0
     declare -i b_pullFail=0
     for plugin in "${a_storePluginUser[@]}" ; do
-        cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         if [[ $REPO == "fnndsc" ]] ; then
             printf "${LightBlueBG}${White}[ dockerhub ]${NC}::${LightCyan}%-35s${Yellow}%19s${blink}${LightGreen}%-11s${NC}\n" \
                 "$REPO/$CONTAINER" "latest<--" "[ pulling ]"                        | ./boxes.sh
@@ -177,7 +179,7 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
     echo ""                                                         | ./boxes.sh
     for plugin in "${a_PLUGINRepoEnv[@]}"; do
         echo -en "\033[2A\033[2K"
-        cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null"
 
         printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${blink}${LightGreen}%12s${NC}\n"       \
@@ -264,7 +266,7 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
     echo ""                                                     | ./boxes.sh
     echo ""                                                     | ./boxes.sh
     for plugin in "${a_PLUGINRepoEnv[@]}"; do
-        cparse $plugin ".py" "REPO" "CONTAINER" "MMN" "ENV"
+        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         echo -en "\033[2A\033[2K"
 
         printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${blink}${LightGreen}%-17s${NC}\n"  \
@@ -322,4 +324,3 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
     fi
     echo ""                                                             | ./boxes.sh
     windowBottom
-

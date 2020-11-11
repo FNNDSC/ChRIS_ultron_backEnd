@@ -16,8 +16,8 @@
                     fnndsc/pl-simplefsapp^moc,                      \
                     fnndsc/pl-simpledsapp^moc,                      \
                     fnndsc/pl-s3push,                               \
-                    fnndsc/pl-pfdicom_tagextract::dcm_tagExtract,   \
-                    fnndsc/pl-pfdicom_tagsub::dcm_tagSub,           \
+                    fnndsc/pl-pfdicom_tagextract,                   \
+                    fnndsc/pl-pfdicom_tagsub,                       \
                     fnndsc/pl-mpcs,                                 \
                     fnndsc/pl-mpcs^moc,                             \
                     fnndsc/pl-fshack,                               \
@@ -28,7 +28,9 @@
                     fnndsc/pl-z2labelmap^moc,                       \
                     fnndsc/pl-mri10yr06mo01da_normal,               \
                     fnndsc/pl-mri10yr06mo01da_normal^moc,           \
-                    fnndsc/pl-mgz2lut_report
+                    fnndsc/pl-mgz2lut_report,                       \
+                    fnndsc/pl-pfdo_mgz2img,                         \
+                    fnndsc/pl-pfdo_med2img
 "
 
 #

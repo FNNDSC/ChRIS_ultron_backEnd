@@ -6,17 +6,24 @@
 #
 # SYNOPSIS
 #
-#       cparse.sh <cstring> <extension> "REPO" "CONTAINER" "MMN" "ENV"
+#       cparse.sh <cstring> "REPO" "CONTAINER" "MMN" "ENV"
 #
 # DESCRIPTION
 #
-#       cparse.sh parses a <cstring> of pattern:
+#       cparse.sh produces information about a container image, e.g.
 #
-#               [<repo>/]<container>[::<mainModuleName>[^<env>]]
+#               fnndsc/pl-app
+#
+#       And optionally splices out a trailing string after the "^"
+#       character and saves it as "env" (this is an odd legacy spec) e.g.
+#
+#               fnndsc/pl-app^moc
 #
 #       and returns
 #
-#               <repo> <container> <mainModuleName><extension> <env>
+#               <repo> <container> <executable> <env>
+#
+#       where <executable> is the runnable binary specified by Dockerfile CMD
 #
 # ARGS
 #
@@ -24,10 +31,6 @@
 #
 #       The container name string to parse.
 #
-# <extension>
-#
-#       An extension to append to the <mainModuleName>. Since most
-#       ChRIS plugins are python modules, this usually is just ".py".
 #
 # RETURN
 #
@@ -39,103 +42,72 @@
 #       the <container> part of the string.
 #
 # MMN
-#       if not passed, defaults to the <container> string, with
-#       ".py" appended and sans a possibly leading "pl-".
+#       executable inside the container image, set by CMD inof Dockerfile.
+#       If image was not pulled, MMN will be "null"
 #
 # ENV
 #       if not passed, defaults to "host", else <env>.
 #
 # EXAMPLE
 #
-#       cparse.sh "local/pl-dircopy::directoryCopy^moc" ".py"
+#       cparse fnndsc/pl-pfdicom_tagextract repo container mmn env
+#       echo $repo $container $mmn $env
 #
 
 
 CREPO=fnndsc
 
 function cparse {
-        pluginSpec=$1
-        pluginExt=$2
+        local pluginSpec=$1
 
-        local __repo=$3
-        local __container=$4
-        local __mainModuleName=$5
-        local __env=$6
+        local __repo=$2
+        local __container=$3
+        local __mainModuleName=$4
+        local __env=$5
 
-        export pluginSpec=$pluginSpec
-        export CREPO=$CREPO
+        # remove trailing "^moc" if present, resulting in a normal
+        # docker image name e.g. fnndsc/chris or fnndsc/chris:latest
+        local str_dock="${pluginSpec%\^*}"
+        local str_env=host
+        if [ "$pluginSpec" != "$str_dock" ]; then
+                str_env=$(echo $pluginSpec | sed 's/^.*\^//')
+        fi
 
-l_parse=$(python3 - << EOF
-import os
+        # get the repo portion of "repo/name:tag"
+        # or produce a default repo, "fnndsc"
+        local str_repo=fnndsc
+        if [[ "$str_dock" == *"/"* ]]; then
+                str_repo=$(echo $str_dock | sed 's/\/.*$//')
+        fi
+        # get the name:tag portion of "repo/name:tag"
+        local str_container="${str_dock#*/}"
 
-b_done          = False
+        local str_mmn
 
-str_pluginSpec  = os.environ['pluginSpec']
-str_CREPO       = os.environ['CREPO']
+        # we will use "docker inspect" to find out the executable specified
+        # in the container image's Dockerfile by CMD
 
-# [<repo>/]
-l_spec          = str_pluginSpec.split('/')
-if len(l_spec) == 1:
-        # No leading [<repo>/]
-        str_repo        = str_CREPO
-        str_remain      = l_spec[0]
-else:
-        # There is a leading [<repo>/]
-        str_repo        = l_spec[0]
-        str_remain      = l_spec[1]
+        # note: instead of using what we were given, $str_dock,
+        # we are rebuilding the string by concatention of its parts
+        # because above we might have implicitly filled the repo as "fnndsc"
+        
+        # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
+        # the services pman, pfioh, pfcon might not have CMD
+        # so the else block sets str_mmn to "ERR_NO_CMD"
+        local str_mmn=$(docker image inspect --format \
+                '{{with .Config.Cmd}}{{(index . 0)}}{{else}}ERR_NO_CMD{{end}}' \
+                "$str_repo/$str_container" 2> /dev/null)
 
-# [^<env>]
-l_spec          = str_remain.split('^')
-if len(l_spec) == 1:
-        # No trailing [^<env>]
-        str_env         = 'host'
-        str_remain      = l_spec[0]
-else:
-        # There is a trailing [^<env>]
-        str_env         = l_spec[1]
-        str_remain      = l_spec[0]
+        # in case docker insepct fails (like when image hasn't been pulled yet)
+        # an error is printed to stderr and a newline character is printed to stdout
+        # if $str_mmn is just whitespace, assume image hasn't been pulled yet
+        if [[ "$str_mmn" =~ ^[[:space:]]*$ ]]; then
+                str_mmn=ERR_IMAGE_NOT_PULLED
+        fi
 
-# [:<mainModuleName]
-l_spec          = str_remain.split('::')
-if len(l_spec) == 1:
-        # No trailing [::<mainModuleName>]
-        l_mmn           = l_spec[0].split('pl-')
-        if len(l_mmn) == 1:
-                str_mmn = l_spec[0]
-        else:
-                str_mmn = l_mmn[1]
-        str_remain      = l_spec[0]
-else:
-        # There is a trailing [::<mainModuleName>]
-        str_mmn         = l_spec[1]
-        str_remain      = l_spec[0]
-
-str_container           = str_remain
-
-print("%s %s %s %s" % (str_repo, str_container, str_mmn, str_env))
-
-EOF
-)
-        str_repo=$(echo $l_parse | awk '{print $1}')
-        str_container=$(echo $l_parse | awk '{print $2}')
-        str_mmn=$(echo $l_parse | awk '{print $3}')$pluginExt
-        str_env=$(echo $l_parse | awk '{print $4}')
+        # register results into given variable names
         eval $__repo="'$str_repo'"
         eval $__container="'$str_container'"
         eval $__mainModuleName="'$str_mmn'"
         eval $__env="'$str_env'"
-
 }
-
-function cparse_do {
-        TESTNAME="local/pl-dircopy:directoryCopy^moc"
-
-        cparse "$1" "$2" "REPO" "CONTAINER" "MMN" "ENV"
-
-        echo $REPO
-        echo $CONTAINER
-        echo $MMN
-        echo $ENV
-}
-
-
