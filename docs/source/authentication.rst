@@ -16,7 +16,7 @@ In order to receive an access token a POST request like the following must be ma
 
       POST /api/v1/auth-token/ HTTP/1.1
       Host: localhost:8000
-      Accept: application/json
+      Content-Type: application/json
 
       {
         "username": "bob",
