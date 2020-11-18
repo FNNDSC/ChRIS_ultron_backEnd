@@ -15,7 +15,7 @@ NOTE:
 
     You should now be in a python shell.
 
-    3. To simulate operations on a given plugin with id <id>,
+    2. To simulate operations on a given plugin with id <id>,
     instantiate the relevant objects (for ex, for id=1):
 
     from plugininstances.models import PluginInstance
@@ -24,13 +24,13 @@ NOTE:
     plg_inst = PluginInstance.objects.get(id=1)
     plg_inst_manager = manager.PluginInstanceManager(plg_inst)
 
-    4. And finally, call the method:
+    3. And finally, call the method:
 
     plg_inst_manager.check_plugin_instance_app_exec_status()
 
     Any pudb.set_trace() calls in this method will now be handled by the pudb debugger.
 
-    5. Finally, after each change to this method, reload this module:
+    4. Finally, after each change to this method, reload this module:
 
     import importlib
     importlib.reload(manager)
@@ -114,7 +114,7 @@ class PluginInstanceManager(object):
                     value = self.str_app_container_inputdir
                 if param.type == 'path':
                     path_parameters_dict[param.name] = value
-                    value = self.str_app_container_inputdir
+                    value = self.str_app_container_inputdir  # + '/' + value
                 app_args.append(value)
             if param.action == 'store_true' and value:
                 app_args.append(param.flag)
@@ -285,7 +285,7 @@ class PluginInstanceManager(object):
             d_response = r.json()
 
             #l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
-            l_status = d_response['remoteServer']['d_ret']['l_status']
+            l_status = d_response['d_ret']['l_status']
             logger.info('Current job remote status = %s', l_status)
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
