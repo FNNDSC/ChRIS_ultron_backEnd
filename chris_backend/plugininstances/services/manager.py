@@ -96,9 +96,9 @@ class PluginInstanceManager(object):
         # append app's container output dir to app's argument list
         app_args.append(self.str_app_container_outputdir)
         # append flag to save input meta data (passed options)
-        app_args.append("--saveinputmeta")
+        app_args.append('--saveinputmeta')
         # append flag to save output meta data (output description)
-        app_args.append("--saveoutputmeta")
+        app_args.append('--saveoutputmeta')
         # append the parameters to app's argument list and identify
         # parameters of type 'unextpath' and 'path'
         path_parameters_dict = {}
@@ -121,8 +121,6 @@ class PluginInstanceManager(object):
             if param.action == 'store_false' and not value:
                 app_args.append(param.flag)
 
-        str_outputdir = self.c_plugin_inst.get_output_path()
-
         # handle parameters of type 'unextpath'
         self.handle_app_unextpath_parameters(unextpath_parameters_dict)
 
@@ -143,98 +141,31 @@ class PluginInstanceManager(object):
         str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
         logger.info('cmd = %s', str_cmd)
 
-        # logger.debug('d_pluginInst = %s', vars(self.c_plugin_inst))
-        str_IOPhost = self.c_plugin_inst.compute_resource.name
-        d_msg = {
-            "action": "coordinate",
-            "threadAction": True,
-            "jid": self.str_job_id,
-            "meta-store":
-                {
-                    "meta": "meta-compute",
-                    "key": "jid"
-                },
-
-            "meta-data":
-                {
-                    "remote":
-                        {
-                            "key": "%meta-store"
-                        },
-                    "localSource":
-                        {
-                            "path": str_inputdir,
-                            "storageType": "swift"
-                        },
-                    "localTarget":
-                        {
-                            "path": str_outputdir,
-                            "createDir": True
-                        },
-                    "specialHandling":
-                        {
-                            "op": "plugin",
-                            "cleanup": True
-                        },
-                    "transport":
-                        {
-                            "mechanism": "compress",
-                            "compress":
-                                {
-                                    "archive": "zip",
-                                    "unpack": True,
-                                    "cleanup": True
-                                }
-                        },
-                    "service": str_IOPhost
-                },
-
-            "meta-compute":
-                {
-                    'cmd': "%s %s" % (plugin.execshell, str_cmd),
-                    'threaded': True,
-                    'auid': self.c_plugin_inst.owner.username,
-                    'jid': self.str_job_id,
-                    'number_of_workers': str(self.c_plugin_inst.number_of_workers),
-                    'cpu_limit': str(self.c_plugin_inst.cpu_limit),
-                    'memory_limit': str(self.c_plugin_inst.memory_limit),
-                    'gpu_limit': str(self.c_plugin_inst.gpu_limit),
-                    "container":
-                        {
-                            "target":
-                                {
-                                    "image": plugin.dock_image,
-                                    "cmdParse": False,
-                                    "selfexec": plugin.selfexec,
-                                    "selfpath": plugin.selfpath,
-                                    "execshell": plugin.execshell
-                                },
-                            "manager":
-                                {
-                                    "image": "fnndsc/swarm",
-                                    "app": "swarm.py",
-                                    "env":
-                                        {
-                                            "meta-store": "key",
-                                            "serviceType": "docker",
-                                            "shareDir": "%shareDir",
-                                            "serviceName": self.str_job_id
-                                        }
-                                }
-                        },
-                    "service": str_IOPhost
-                }
+        payload = {
+            'jid': self.str_job_id,
+            'cmd': '%s %s' % (plugin.execshell, str_cmd),
+            'auid': self.c_plugin_inst.owner.username,
+            'number_of_workers': str(self.c_plugin_inst.number_of_workers),
+            'cpu_limit': str(self.c_plugin_inst.cpu_limit),
+            'memory_limit': str(self.c_plugin_inst.memory_limit),
+            'gpu_limit': str(self.c_plugin_inst.gpu_limit),
+            'image': plugin.dock_image,
+            'selfexec': plugin.selfexec,
+            'selfpath': plugin.selfpath,
+            'execshell': plugin.execshell,
+            'service': self.c_plugin_inst.compute_resource.name
         }
         zip_file = self.create_zip_file([str_inputdir])
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
         logger.info('sent POST to pfcon service url -->%s<--', remote_url)
-        logger.info('message sent: %s', json.dumps(d_msg, indent=4))
+        logger.info('payload sent: %s', json.dumps(payload, indent=4))
+
         r = requests.post(remote_url,
                           files={'data_file': zip_file.getvalue()},
-                          data={'msg': json.dumps(d_msg)},
+                          data=payload,
                           timeout=30)
         logger.info('response from pfcon: %s', r.text)
-        #self.call_app_service(d_msg)
+
         self.c_plugin_inst.status = 'started'
         self.c_plugin_inst.save()
 
@@ -263,8 +194,6 @@ class PluginInstanceManager(object):
                         logger.error('Swift storage error, detail: %s' % str(e))
                     else:
                         nobjects += 1
-        #swiftState = {'d_swiftstore': {'filesPushed': nobjects}}
-        #self.c_plugin_inst.register_output_files(swiftState=swiftState)
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -272,7 +201,6 @@ class PluginInstanceManager(object):
         service to determine job status and if just finished without error,
         register output files.
         """
-
         if self.c_plugin_inst.status == 'cancelled':
             return self.c_plugin_inst.status
 
@@ -320,50 +248,6 @@ class PluginInstanceManager(object):
         to cancel job.
         """
         pass
-
-    def call_app_service(self, d_msg):
-        """
-        This method sends the JSON 'msg' argument to the remote service.
-        """
-        remote_url = self.c_plugin_inst.compute_resource.compute_url
-        serviceCall = pfurl.Pfurl(
-            msg                     = json.dumps(d_msg),
-            http                    = remote_url,
-            verb                    = 'POST',
-            # contentType             = 'application/json',
-            b_raw                   = True,
-            b_quiet                 = True,
-            b_httpResponseBodyParse = True,
-            jsonwrapper             = 'payload',
-        )
-        logger.info('comms sent to pfcon service at -->%s<--', remote_url)
-        logger.info('message sent: %s', json.dumps(d_msg, indent=4))
-
-        # Leave here for now... might be useful for later debugging.
-        # with open('/tmp/%d-%s-%s.json' % \
-        #          (time.time_ns() // 1000000,
-        #           d_msg['action'],
-        #           self.str_job_id), 'w') as l:
-        #          json.dump(d_msg, l, indent = 4)
-
-        # logger.debug('comms sent to pfcon service at -->%s<--', remote_url)
-        # logger.debug('message sent: %s', json.dumps(d_msg, indent=4))
-
-        # try:
-        #     rpudb.set_trace(addr='0.0.0.0', port=7901)
-        # except:
-        #     pudb.set_trace()
-        d_response = json.loads(serviceCall())
-
-        if isinstance(d_response, dict):
-            logger.info('looks like we got a successful response from pfcon service')
-            logger.info('response from pfurl(): %s', json.dumps(d_response, indent=4))
-        else:
-            logger.info('looks like we got an UNSUCCESSFUL response from pfcon service')
-            logger.info('response from pfurl(): -->%s<--', d_response)
-        if "Connection refused" in d_response:
-            logging.error('fatal error in talking to pfcon service')
-        return d_response
 
     def manage_app_service_fsplugin_empty_inputdir(self):
         """
