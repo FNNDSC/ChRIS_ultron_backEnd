@@ -81,15 +81,15 @@ class PluginInstanceManager(object):
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
 
-    def run_plugin_instance_app(self):
+    def get_plugin_instance_app_cmd(self):
         """
-        Run a plugin instance's app via a call to a remote service provider.
+        Get the plugin instance app's cmd, unextpath and path parameters in a tuple.
         """
-        if self.c_plugin_inst.status == 'cancelled':
-            return self.c_plugin_inst.status
-
         plugin = self.c_plugin_inst.plugin
         app_args = []
+        path_parameters_dict = {}
+        unextpath_parameters_dict = {}
+
         # append app's container input dir to app's argument list (only for ds plugins)
         if plugin.meta.type == 'ds':
             app_args.append(self.str_app_container_inputdir)
@@ -101,8 +101,6 @@ class PluginInstanceManager(object):
         app_args.append('--saveoutputmeta')
         # append the parameters to app's argument list and identify
         # parameters of type 'unextpath' and 'path'
-        path_parameters_dict = {}
-        unextpath_parameters_dict = {}
         param_instances = self.c_plugin_inst.get_parameter_instances()
         for param_inst in param_instances:
             param = param_inst.plugin_param
@@ -121,24 +119,36 @@ class PluginInstanceManager(object):
             if param.action == 'store_false' and not value:
                 app_args.append(param.flag)
 
-        # handle parameters of type 'unextpath'
-        self.handle_app_unextpath_parameters(unextpath_parameters_dict)
-
-        if self.c_plugin_inst.previous:
-            # WARNING: 'ds' plugins can also have 'path' parameters!
-            str_inputdir = self.c_plugin_inst.previous.get_output_path()
-        elif len(path_parameters_dict):
-            # WARNING: Inputdir assumed to only be one of the 'path' parameters!
-            path_list = next(iter(path_parameters_dict.values())).split(',')
-            str_inputdir = path_list[0].strip('/')
-        else:
-            # No parameter of type 'path' was submitted, input dir is empty
-            str_inputdir = self.manage_app_service_fsplugin_empty_inputdir()
-
         str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
         l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
         str_allCmdLineArgs = ' '.join(l_appArgs)
         str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
+        return str_cmd, unextpath_parameters_dict, path_parameters_dict
+
+    def run_plugin_instance_app(self):
+        """
+        Run the plugin instance's app via a call to a remote service provider.
+        """
+        if self.c_plugin_inst.status == 'cancelled':
+            return self.c_plugin_inst.status
+
+        str_cmd, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd()
+        # handle parameters of type 'unextpath'
+        self._handle_app_unextpath_parameters(d_unextpath_params)
+        if self.c_plugin_inst.previous:
+            # WARNING: 'ds' plugins can also have 'path' parameters!
+            str_inputdir = self.c_plugin_inst.previous.get_output_path()
+        elif len(d_path_params):
+            # WARNING: Inputdir assumed to only be one of the 'path' parameters!
+            path_list = next(iter(d_path_params.values())).split(',')
+            str_inputdir = path_list[0].strip('/')
+        else:
+            # No parameter of type 'path' was submitted, input dir is empty
+            str_inputdir = self._manage_app_service_fsplugin_empty_inputdir()
+
+        zip_file = self.create_zip_file([str_inputdir])  # create data file to transmit
+
+        plugin = self.c_plugin_inst.plugin
         payload = {
             'jid': self.str_job_id,
             'cmd': '%s %s' % (plugin.execshell, str_cmd),
@@ -151,13 +161,10 @@ class PluginInstanceManager(object):
             'selfexec': plugin.selfexec,
             'selfpath': plugin.selfpath,
             'execshell': plugin.execshell,
-            'service': self.c_plugin_inst.compute_resource.name
         }
-        zip_file = self.create_zip_file([str_inputdir])
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
         logger.info('sent POST to pfcon service url -->%s<--', remote_url)
         logger.info('payload sent: %s', json.dumps(payload, indent=4))
-
         try:
             r = requests.post(remote_url,
                               files={'data_file': zip_file.getvalue()},
@@ -180,34 +187,6 @@ class PluginInstanceManager(object):
                 else:
                     self.c_plugin_inst.status = 'cancelled'
         self.c_plugin_inst.save()
-
-    def handle_app_unextpath_parameters(self, unextpath_parameters_dict):
-        """
-        Handle parameters of type 'unextpath' passed to the plugin instance app.
-        """
-        outputdir = self.c_plugin_inst.get_output_path()
-        obj_output_path_list = []
-        for param_name in unextpath_parameters_dict:
-            # each parameter value is a string of one or more paths separated by comma
-            path_list = unextpath_parameters_dict[param_name].split(',')
-            for path in path_list:
-                obj_list = []
-                try:
-                    obj_list = self.swift_manager.ls(path)
-                except ClientException as e:
-                    logger.error('Swift storage error, detail: %s' % str(e))
-                for obj in obj_list:
-                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
-                    if not obj_output_path.startswith(outputdir + '/'):
-                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
-                    try:
-                        self.swift_manager.copy_obj(obj, obj_output_path)
-                    except ClientException as e:
-                        logger.error('Swift storage error, detail: %s' % str(e))
-                    else:
-                        obj_output_path_list.append(obj_output_path)
-        logger.info("Registering output files not extracted from swift with CUBE")
-        self.c_plugin_inst.register_output_files(obj_output_path_list)
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -236,12 +215,11 @@ class PluginInstanceManager(object):
 
             logger.info('successful response from pfcon: %s', r.text)
             d_response = r.json()
-            #l_status = d_response['jobOperationSummary']['compute']['return']['l_status']
-            l_status = d_response['d_ret']['l_status']
+            l_status = d_response['compute']['d_ret']['l_status']
             logger.info('Current job remote status = %s', l_status)
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
-            #str_responseStatus = self.serialize_app_response_status(d_response)
+            #str_responseStatus = self._write_app_logs(d_response)
             if 'finishedSuccessfully' in l_status:
                 remote_url = remote_url + 'file/'
                 logger.info('sent GET to pfcon service url -->%s<--', remote_url)
@@ -280,7 +258,35 @@ class PluginInstanceManager(object):
         """
         pass
 
-    def manage_app_service_fsplugin_empty_inputdir(self):
+    def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
+        """
+        Handle parameters of type 'unextpath' passed to the plugin instance app.
+        """
+        outputdir = self.c_plugin_inst.get_output_path()
+        obj_output_path_list = []
+        for param_name in unextpath_parameters_dict:
+            # each parameter value is a string of one or more paths separated by comma
+            path_list = unextpath_parameters_dict[param_name].split(',')
+            for path in path_list:
+                obj_list = []
+                try:
+                    obj_list = self.swift_manager.ls(path)
+                except ClientException as e:
+                    logger.error('Swift storage error, detail: %s' % str(e))
+                for obj in obj_list:
+                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
+                    if not obj_output_path.startswith(outputdir + '/'):
+                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
+                    try:
+                        self.swift_manager.copy_obj(obj, obj_output_path)
+                    except ClientException as e:
+                        logger.error('Swift storage error, detail: %s' % str(e))
+                    else:
+                        obj_output_path_list.append(obj_output_path)
+        logger.info("Registering output files not extracted from swift with CUBE")
+        self.c_plugin_inst.register_output_files(obj_output_path_list)
+
+    def _manage_app_service_fsplugin_empty_inputdir(self):
         """
         This method is responsible for managing the 'inputdir' in the case of
         FS plugins.
@@ -318,11 +324,45 @@ class PluginInstanceManager(object):
             logger.error('Swift storage error, detail: %s' % str(e))
         return str_inputdir
 
-    def serialize_app_response_status(self, d_response):
+    def _write_app_logs(self, d_response=None):
         """
         Serialize and save the 'jobOperation' and 'jobOperationSummary'.
         """
         # Still WIP about what is best summary...
+
+        d_jobStatusSummary = {
+            'pushPath': {
+                'status': False
+            },
+            'pullPath': {
+                'status': False
+            },
+            'compute': {
+                'status': False,
+                'submit': {
+                    'status': False
+                },
+                'return': {
+                    'status': False,
+                    'l_status': [],
+                    'l_logs': []
+                }
+            },
+        }
+        """
+        d_ret['d_jobStatus'] = self.jobStatus_do(key=str_key,
+                                                 action='getInfo',
+                                                 op='all')
+        d_ret['d_jobStatusSummary'] = self.summaryStatus_process(d_ret['d_jobStatus'])
+        str_statusFile = os.path.join(str_localDestination, 'jobStatus.json')
+        with open(str_statusFile, 'w') as f:
+            json.dump(d_ret['d_jobStatus'], f)
+        f.close()
+        str_summaryFile = os.path.join(str_localDestination, 'jobStatusSummary.json')
+        with open(str_summaryFile, 'w') as f:
+            json.dump(d_ret['d_jobStatusSummary'], f)
+        f.close()
+        """
 
         try:
             str_logsFromCompute = d_response['jobOperationSummary'] \
