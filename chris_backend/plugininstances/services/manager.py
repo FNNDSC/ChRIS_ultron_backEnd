@@ -56,9 +56,7 @@ import json
 from core.swiftmanager import SwiftManager, ClientException
 
 if settings.DEBUG:
-    import pdb
-    import pudb
-    import rpudb
+    import pdb, pudb, rpudb
     from celery.contrib import rdb
 
 

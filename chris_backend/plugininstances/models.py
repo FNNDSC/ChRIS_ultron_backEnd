@@ -1,6 +1,5 @@
 
 import logging
-import time
 
 from django.db import models
 from django.db.utils import IntegrityError
@@ -8,9 +7,7 @@ from django.conf import settings
 
 import django_filters
 from django_filters.rest_framework import FilterSet
-from swiftclient.exceptions import ClientException
 
-from core.swiftmanager import SwiftManager
 from feeds.models import Feed
 from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
@@ -18,10 +15,7 @@ from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
 
 if settings.DEBUG:
-    import pdb
-    import pudb
-    import rpudb
-    from celery.contrib import rdb
+    import pdb, pudb
 
 
 logger = logging.getLogger(__name__)
