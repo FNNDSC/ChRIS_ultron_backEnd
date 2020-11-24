@@ -180,6 +180,10 @@ class PluginInstanceManager(object):
             if r.status_code == 200:
                 logger.info('successful response from pfcon: %s', r.text)
                 self.c_plugin_inst.status = 'started'
+                # update the job status and summary
+                d_resp = r.json()
+                d_jobStatusSummary = self._get_job_status_summary(d_resp, False, True)
+                self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
             else:
                 logger.error('error response from pfcon: %s', r.text)
                 if plugin.meta.type == 'ds':  # CUBE will retry later for 'ds' plugins
@@ -191,8 +195,8 @@ class PluginInstanceManager(object):
     def check_plugin_instance_app_exec_status(self):
         """
         Check a plugin instance's app execution status. It connects to the remote
-        service to determine job status and if just finished without error,
-        register output files.
+        service to determine job status and if finished without error then
+        downloads and unpacks zip file and registers output files.
         """
         if self.c_plugin_inst.status == 'cancelled':
             return self.c_plugin_inst.status
@@ -200,14 +204,13 @@ class PluginInstanceManager(object):
         if self.c_plugin_inst.status == 'started':
             remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
             remote_url = remote_url + self.str_job_id + '/'
-            logger.info('sent GET to pfcon service url -->%s<--', remote_url)
+            logger.info('sent GET status to pfcon service url -->%s<--', remote_url)
 
             try:
                 r = requests.get(remote_url, timeout=30)
             except (Timeout, RequestException) as e:
                 logging.error('error in talking to pfcon service, detail: %s', str(e))
                 return self.c_plugin_inst.status  # return here, CUBE will retry later
-
             if r.status_code != 200:
                 # could not get status (third party pman service inaccessible)
                 logger.error('error response from pfcon: %s', r.text)
@@ -219,10 +222,15 @@ class PluginInstanceManager(object):
             logger.info('Current job remote status = %s', l_status)
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
-            #str_responseStatus = self._write_app_logs(d_response)
+            # save the job status and summary
+            d_jobStatusSummary = self._get_job_status_summary(d_response)
+            self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+            self.c_plugin_inst.raw = self.json_zipToStr(d_response)
+            self.c_plugin_inst.save()
+
             if 'finishedSuccessfully' in l_status:
                 remote_url = remote_url + 'file/'
-                logger.info('sent GET to pfcon service url -->%s<--', remote_url)
+                logger.info('sent GET zip file to pfcon service url -->%s<--', remote_url)
                 try:
                     r = requests.get(remote_url, timeout=30)  # download zip file
                 except (Timeout, RequestException) as e:
@@ -231,11 +239,16 @@ class PluginInstanceManager(object):
 
                 if r.status_code == 200:
                     # only one concurrent async task should get here
+                    # data successfully downloaded so update summary
+                    d_jobStatusSummary = self._get_job_status_summary(d_response, True)
+                    self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+
                     logger.info("Registering output files from remote with CUBE")
                     self.c_plugin_inst.status = 'registeringFiles'
                     self.c_plugin_inst.save()   # inform FE about new instance status
                     swift_filenames = self.unpack_zip_file(r.content)
                     self.c_plugin_inst.register_output_files(swift_filenames)
+
                     self.c_plugin_inst.status = 'finishedSuccessfully'
                     logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
                     self.c_plugin_inst.end_date = timezone.now()
@@ -324,9 +337,9 @@ class PluginInstanceManager(object):
             logger.error('Swift storage error, detail: %s' % str(e))
         return str_inputdir
 
-    def _write_app_logs(self, d_response=None):
+    def _get_job_status_summary(self, d_response, pulled_data=False, initial=False):
         """
-        Serialize and save the 'jobOperation' and 'jobOperationSummary'.
+        Get a job status summary dictionary from pfcon response.
         """
         # Still WIP about what is best summary...
 
@@ -338,7 +351,6 @@ class PluginInstanceManager(object):
                 'status': False
             },
             'compute': {
-                'status': False,
                 'submit': {
                     'status': False
                 },
@@ -349,58 +361,24 @@ class PluginInstanceManager(object):
                 }
             },
         }
-        """
-        d_ret['d_jobStatus'] = self.jobStatus_do(key=str_key,
-                                                 action='getInfo',
-                                                 op='all')
-        d_ret['d_jobStatusSummary'] = self.summaryStatus_process(d_ret['d_jobStatus'])
-        str_statusFile = os.path.join(str_localDestination, 'jobStatus.json')
-        with open(str_statusFile, 'w') as f:
-            json.dump(d_ret['d_jobStatus'], f)
-        f.close()
-        str_summaryFile = os.path.join(str_localDestination, 'jobStatusSummary.json')
-        with open(str_summaryFile, 'w') as f:
-            json.dump(d_ret['d_jobStatusSummary'], f)
-        f.close()
-        """
-
-        try:
-            str_logsFromCompute = d_response['jobOperationSummary'] \
-                ['compute'] \
-                ['return'] \
-                ['l_logs'][0]
-
-            if len(str_logsFromCompute) > 3000:
-                d_response['jobOperationSummary'] \
-                    ['compute'] \
-                    ['return'] \
-                    ['l_logs'][0] = str_logsFromCompute[-3000:]
-        except Exception:
-            logger.info('Compute logs not currently available.')
-
-        # update plugin instance with status info
-        self.c_plugin_inst.summary = json.dumps(d_response['jobOperationSummary'])
-        self.c_plugin_inst.raw = self.json_zipToStr(d_response['jobOperation'])
-        self.c_plugin_inst.save()
-
-        str_responseStatus = ""
-        for str_action in ['pushPath', 'compute', 'pullPath', 'swiftPut']:
-            if str_action == 'compute':
-                for str_part in ['submit', 'return']:
-                    str_actionStatus = str(d_response['jobOperationSummary'] \
-                                               [str_action] \
-                                               [str_part] \
-                                               ['status'])
-                    str_actionStatus = ''.join(str_actionStatus.split())
-                    str_responseStatus += str_action + '.' + str_part + ':' + \
-                                          str_actionStatus + ';'
-            else:
-                str_actionStatus = str(d_response['jobOperationSummary'] \
-                                           [str_action] \
-                                           ['status'])
-                str_actionStatus = ''.join(str_actionStatus.split())
-                str_responseStatus += str_action + ':' + str_actionStatus + ';'
-        return str_responseStatus
+        d_c = d_response['compute']
+        if initial:
+            d_jobStatusSummary['pushPath']['status'] = d_response['pushData']['status']
+            d_jobStatusSummary['compute']['submit']['status'] = d_c['status']
+        else:
+            d_jobStatusSummary['pushPath']['status'] = True
+            d_jobStatusSummary['pullPath']['status'] = pulled_data
+            d_jobStatusSummary['compute']['submit']['status'] = True
+            d_jobStatusSummary['compute']['return']['status'] = d_c['status']
+            d_jobStatusSummary['compute']['return']['l_status'] = d_c['d_ret']['l_status']
+            d_jobStatusSummary['compute']['return']['l_logs'] = d_c['d_ret']['l_logs']
+            try:
+                logs = d_jobStatusSummary['compute']['return']['l_logs'][0]
+                if len(logs) > 3000:
+                    d_jobStatusSummary['compute']['return']['l_logs'][0] = logs[-3000:]
+            except Exception:
+                logger.info('Compute logs not currently available.')
+        return d_jobStatusSummary
 
     def create_zip_file(self, swift_paths):
         """
