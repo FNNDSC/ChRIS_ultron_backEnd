@@ -170,17 +170,16 @@ services:
 
   pfcon_service:
     image: ${PFCONREPO}/pfcon${TAG}
-    command: ["--forever", "--httpResponse", "--verbosity", "1"]
-    # volumes:
-    #   - ../../forks/pfcon/pfcon/pfcon.py:/usr/local/lib/python3.8/dist-packages/pfcon/pfcon.py
-    #   - ../../forks/pfurl/pfurl/pfurl.py:/usr/local/lib/python3.8/dist-packages/pfurl/pfurl.py
-    #   - ../../forks/pfcon/pfcon/swiftmanager.py:/usr/local/lib/python3.8/dist-packages/pfcon/swiftmanager.py
     ports:
       - "5005:5005"
     depends_on:
       - swift_service
       - pman_service
       - pfioh_service
+    environment:
+      - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+      - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/cmd
+      - DATA_SERVICE_URL=http://pfioh_service:5055/api/v1/cmd
     networks:
       local:
         aliases:

@@ -128,7 +128,7 @@
 #
 #       The 'local' family are containers that are assumed built on the local
 #       machine and assumed to exist. The 'local' containers are used when
-#       the 'pfcon/pman/pfioh/pfurl' services are being locally
+#       the 'pfcon/pman/pfioh' services are being locally
 #       developed/debugged.
 #
 #
@@ -191,7 +191,6 @@ declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
     "fnndsc/pfcon${TAG}^PFCONREPO"
-    "fnndsc/pfurl${TAG}^PFURLREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
     "fnndsc/swarm^SWARMREPO"
@@ -275,8 +274,6 @@ else
             cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             if [[   $CONTAINER != "chris:dev"            && \
                     $CONTAINER != "chris_store"          && \
-                    $CONTAINER != "pl-pacsretrieve"      && \
-                    $CONTAINER != "pl-pacsquery"         && \
                     $CONTAINER != "docker-swift-onlyone" && \
                     $CONTAINER != "swarm" ]] ; then
                 windowBottom
@@ -287,20 +284,6 @@ else
                         "${REPO}/$CONTAINER" " $Ver"                     | ./boxes.sh
             fi
         done
-        # Determine the versions of pfurl *inside* pfcon and chris:dev
-        windowBottom
-        CMD="docker run --entrypoint /usr/local/bin/pfurl ${PFCONREPO}/pfcon${TAG} --version"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -en "\033[2A\033[2K"
-        printf "${White}%40s${Green}%-40s${Yellow}\n"                   \
-                    "pfurl inside ${PFCONREPO}/pfcon${TAG}" " $Ver"     | ./boxes.sh
-        windowBottom
-        CMD="docker run --entrypoint /usr/local/bin/pfurl ${CHRISREPO}/chris:dev --version"
-        Ver=$(echo $CMD | sh | grep Version)
-        echo -en "\033[2A\033[2K"
-        printf "${White}%40s${Green}%-40s${Yellow}\n"                   \
-                    "pfurl inside ${CHRISREPO}/CUBE" " $Ver"            | ./boxes.sh
-        windowBottom
     fi
 
     title -d 1 "Stopping and restarting the docker swarm... "

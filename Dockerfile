@@ -37,10 +37,8 @@ RUN apt-get update                                               \
   && export LC_ALL=en_US.UTF-8                                   \
   && locale-gen en_US.UTF-8                                      \
   && dpkg-reconfigure locales                                    \
-  && apt-get install -y libmysqlclient-dev                       \
-  && apt-get install -y libssl-dev libcurl4-openssl-dev          \
+  && apt-get install -y libssl-dev libmysqlclient-dev            \
   && apt-get install -y apache2 apache2-dev                      \
-  && apt-get install -y bsdmainutils net-tools inetutils-ping    \
   && pip install -r ${REQPATH}/production.txt                    \
   && useradd -u $UID -ms /bin/bash localuser
 

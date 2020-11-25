@@ -42,10 +42,8 @@ RUN apt-get update                                                \
   && locale-gen en_US.UTF-8                                       \
   && dpkg-reconfigure locales                                     \
   && apt-get install sudo                                         \
-  && apt-get install -y libmysqlclient-dev                        \
-  && apt-get install -y libssl-dev libcurl4-openssl-dev           \
+  && apt-get install -y libssl-dev libmysqlclient-dev             \
   && apt-get install -y apache2 apache2-dev                       \
-  && apt-get install -y bsdmainutils vim net-tools inetutils-ping \
   && pip install --upgrade pip                                    \
   && pip install -r ${REQPATH}/local.txt                          \
   && pip3 install https://github.com/msbrogli/rpudb/archive/master.zip \
