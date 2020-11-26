@@ -52,7 +52,6 @@ if [[ "$1" == 'up' ]]; then
     "mysql:5"
     "rabbitmq:3"
     "fnndsc/pfcon"
-    "fnndsc/pfurl"
     "fnndsc/pfioh"
     "fnndsc/pman"
     "fnndsc/swarm"

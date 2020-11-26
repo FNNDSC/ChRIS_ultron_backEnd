@@ -173,7 +173,6 @@ services:
     ports:
       - "5005:5005"
     depends_on:
-      - swift_service
       - pman_service
       - pfioh_service
     environment:
@@ -184,6 +183,7 @@ services:
       local:
         aliases:
           - pfcon.local
+      remote:
     labels:
       name: "pfcon"
       role: "pfcon service"
@@ -198,7 +198,7 @@ services:
     ports:
       - "5055:5055"
     networks:
-      - local
+      - remote
     labels:
       name: "pfioh"
       role: "pfioh service"
@@ -229,13 +229,14 @@ services:
     ports:
       - "5010:5010"
     networks:
-      - local
+      - remote
     labels:
       name: "pman"
       role: "pman service"
 
 networks:
   local:
+  remote:
 
 volumes:
   chris_dev_db_data:

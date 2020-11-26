@@ -145,13 +145,11 @@ services:
 
   pfcon_service:
     image: ${CHRISREPO}/pfcon
-    command: ["--forever", "--httpResponse", "--verbosity", "1"]
     env_file:
-      - ./secrets/.swift_service.env
+      - ./secrets/.pfcon_service.env
     ports:
       - "5005:5005"
     depends_on:
-      - swift_service
       - pman_service
       - pfioh_service
     restart: on-failure
@@ -159,6 +157,7 @@ services:
       local:
         aliases:
           - pfcon.local
+      remote:
     labels:
       name: "pfcon"
       role: "pfcon service"
@@ -174,7 +173,7 @@ services:
       - "5055:5055"
     restart: on-failure
     networks:
-      - local
+      - remote
     labels:
       name: "pfioh"
       role: "pfioh service"
@@ -201,13 +200,14 @@ services:
       - "5010:5010"
     restart: on-failure
     networks:
-      - local
+      - remote
     labels:
       name: "pman"
       role: "pman service"
 
 networks:
   local:
+  remote:
 
 volumes:
   chris_db_data:
