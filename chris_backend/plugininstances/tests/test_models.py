@@ -1,7 +1,6 @@
 
 import logging
 import os
-import io
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -14,7 +13,6 @@ from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PluginInstanceFilter
-from plugininstances.models import SwiftManager
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -184,58 +182,6 @@ class PluginInstanceModelTests(ModelTests):
                                       '{0}_{1}/data'.format(pl_inst_ds.plugin.meta.name,
                                                             pl_inst_ds.id))
         self.assertEqual(pl_inst_ds.get_output_path(), ds_output_path)
-
-    def test_register_output_files(self):
-        """
-        Test whether custom register_output_files method properly registers a plugin's
-        output file with the REST API.
-        """
-        # create an 'fs' plugin instance
-        user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
-        output_path = pl_inst.get_output_path()
-        object_list = [output_path + '/file1.txt']
-
-        with mock.patch.object(SwiftManager, 'ls', return_value=object_list) as ls_mock:
-            pl_inst.register_output_files(
-                swiftState={'d_swiftstore': {'filesPushed': 1}}
-            )
-            ls_mock.assert_called_with(output_path)
-            self.assertEqual(PluginInstanceFile.objects.count(), 1)
-            plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=pl_inst)
-            self.assertEqual(plg_inst_file.fname.name, output_path + '/file1.txt')
-
-    @tag('integration')
-    def test_integration_register_output_files(self):
-        """
-        Test whether custom register_output_files method properly registers a plugin's
-        output file with the REST API.
-        """
-        # create an 'fs' plugin instance
-        user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-        plg_inst = PluginInstance.objects.create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
-
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
-
-        # upload file to Swift storage
-        output_path = plg_inst.get_output_path()
-        path = output_path + '/file1.txt'
-        with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(path, file1.read(),
-                                      content_type='text/plain')
-
-        plg_inst.register_output_files(swiftState={'d_swiftstore': {'filesPushed': 1}})
-        self.assertEqual(PluginInstanceFile.objects.count(), 1)
-        plg_inst_file = PluginInstanceFile.objects.get(plugin_inst=plg_inst)
-        self.assertEqual(plg_inst_file.fname.name, path)
-
-        # delete file from Swift storage
-        swift_manager.delete_obj(path)
 
 
 class PluginInstanceFilterModelTests(ModelTests):

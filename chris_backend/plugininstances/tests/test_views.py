@@ -272,7 +272,7 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(create_read_url, data=self.post,
                                     content_type=self.content_type)
-        time.sleep(2)  # wait for the worker to finish
+        time.sleep(5)  # wait for the worker to finish
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # delete files from swift storage
@@ -372,10 +372,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         # create a plugin's instance
         user = User.objects.get(username=self.username)
         (pl_inst, tf) = PluginInstance.objects.get_or_create(
-            title='test2', plugin=plugin,
-            owner=user, compute_resource=plugin.compute_resources.all()[0])
-        pl_inst.status = 'scheduled'
-        pl_inst.save()
+            title='test2', plugin=plugin, owner=user, status='scheduled',
+            compute_resource=plugin.compute_resources.all()[0])
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
         read_update_delete_url = reverse("plugininstance-detail",
@@ -385,16 +383,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         plg_inst_manager = PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app()
 
-        # make API GET request
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(read_update_delete_url)
-        self.assertContains(response, "simplefsapp")
-        self.assertContains(response, 'started')
-
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
-        maxLoopTries = 20
+        self.client.login(username=self.username, password=self.password)
+        maxLoopTries = 10
         currentLoop = 1
         b_checkAgain = True
         time.sleep(10)
@@ -409,6 +402,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                 b_checkAgain = False
             currentLoop += 1
         self.assertContains(response, "finishedSuccessfully")
+        self.assertContains(response, "simplefsapp")
 
         # delete files from swift storage
         self.swift_manager.delete_obj(user_space_path + 'test.txt')

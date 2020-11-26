@@ -4,7 +4,7 @@ execution status of a plugin instance's app (ChRIS / pfcon interface).
 
 NOTE:
 
-    This module is now executed as part of an asynchronous celery worker.
+    This module is executed as part of an asynchronous celery worker.
     For instance, to debug 'check_plugin_instance_app_exec_status' method synchronously
     with pudb.set_trace() you need to:
 
@@ -43,17 +43,18 @@ NOTE:
 import logging
 import os
 import io
-import zlib, base64
+import json
 import zipfile
 import requests
 from requests.exceptions import Timeout, RequestException
 
 from django.utils import timezone
 from django.conf import settings
-
-import json
+from django.db.utils import IntegrityError
 
 from core.swiftmanager import SwiftManager, ClientException
+from core.utils import json_zip2str
+from plugininstances.models import PluginInstanceFile
 
 if settings.DEBUG:
     import pdb, pudb, rpudb
@@ -142,7 +143,7 @@ class PluginInstanceManager(object):
             str_inputdir = path_list[0].strip('/')
         else:
             # No parameter of type 'path' was submitted, input dir is empty
-            str_inputdir = self._manage_app_service_fsplugin_empty_inputdir()
+            str_inputdir = self.manage_fsplugin_instance_app_empty_inputdir()
 
         zip_file = self.create_zip_file([str_inputdir])  # create data file to transmit
 
@@ -180,7 +181,7 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.status = 'started'
                 # update the job status and summary
                 d_resp = r.json()
-                d_jobStatusSummary = self._get_job_status_summary(d_resp, False, True)
+                d_jobStatusSummary = self.get_job_status_summary(d_resp, False, True)
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
             else:
                 logger.error('error response from pfcon: %s', r.text)
@@ -221,9 +222,9 @@ class PluginInstanceManager(object):
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
             # save the job status and summary
-            d_jobStatusSummary = self._get_job_status_summary(d_response)
+            d_jobStatusSummary = self.get_job_status_summary(d_response)
             self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-            self.c_plugin_inst.raw = self.json_zipToStr(d_response)
+            self.c_plugin_inst.raw = json_zip2str(d_response)
             self.c_plugin_inst.save()
 
             if 'finishedSuccessfully' in l_status:
@@ -238,14 +239,14 @@ class PluginInstanceManager(object):
                 if r.status_code == 200:
                     # only one concurrent async task should get here
                     # data successfully downloaded so update summary
-                    d_jobStatusSummary = self._get_job_status_summary(d_response, True)
+                    d_jobStatusSummary = self.get_job_status_summary(d_response, True)
                     self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
 
                     logger.info("Registering output files from remote with CUBE")
                     self.c_plugin_inst.status = 'registeringFiles'
                     self.c_plugin_inst.save()   # inform FE about new instance status
                     swift_filenames = self.unpack_zip_file(r.content)
-                    self.c_plugin_inst.register_output_files(swift_filenames)
+                    self._register_output_files(swift_filenames)
 
                     self.c_plugin_inst.status = 'finishedSuccessfully'
                     logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
@@ -269,43 +270,14 @@ class PluginInstanceManager(object):
         """
         pass
 
-    def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
-        """
-        Handle parameters of type 'unextpath' passed to the plugin instance app.
-        """
-        outputdir = self.c_plugin_inst.get_output_path()
-        obj_output_path_list = []
-        for param_name in unextpath_parameters_dict:
-            # each parameter value is a string of one or more paths separated by comma
-            path_list = unextpath_parameters_dict[param_name].split(',')
-            for path in path_list:
-                obj_list = []
-                try:
-                    obj_list = self.swift_manager.ls(path)
-                except ClientException as e:
-                    logger.error('Swift storage error, detail: %s' % str(e))
-                for obj in obj_list:
-                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
-                    if not obj_output_path.startswith(outputdir + '/'):
-                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
-                    try:
-                        self.swift_manager.copy_obj(obj, obj_output_path)
-                    except ClientException as e:
-                        logger.error('Swift storage error, detail: %s' % str(e))
-                    else:
-                        obj_output_path_list.append(obj_output_path)
-        logger.info("Registering output files not extracted from swift with CUBE")
-        self.c_plugin_inst.register_output_files(obj_output_path_list)
-
-    def _manage_app_service_fsplugin_empty_inputdir(self):
+    def manage_fsplugin_instance_app_empty_inputdir(self):
         """
         This method is responsible for managing the 'inputdir' in the case of
         FS plugins.
 
         An FS plugin does not have an inputdir spec, since this is only a
-        requirement for DS plugins. Nonetheless, the underlying management
-        system (pfcon/pfurl) does require some non-zero inputdir spec in order
-        to operate correctly.
+        requirement for DS plugins. Nonetheless, the remote services do
+        require some non-zero inputdir spec in order to operate correctly.
 
         The hack here is to store data somewhere in swift and accessing it as a
         "pseudo" inputdir for FS plugins. For example, if an FS plugin has no
@@ -313,14 +285,6 @@ class PluginInstanceManager(object):
         small dummy text file in swift storage. This is then transmitted as an
         'inputdir' to the compute environment, and can be completely ignored by
         the plugin.
-
-        Importantly, one major exception to the normal FS processing scheme
-        exists: an FS plugin that collects data from object storage. This
-        storage location is not an 'inputdir' in the traditional sense, and is
-        thus specified in the FS plugin argument list as argument of type
-        'path' (i.e. there is no positional argument for inputdir as in DS
-        plugins). Thus, if a type 'path' argument is specified, this 'path'
-        is assumed to denote a location in object storage.
         """
         data_dir = os.path.join(os.path.expanduser("~"), 'data')
         str_inputdir = os.path.join(data_dir, 'squashEmptyDir').lstrip('/')
@@ -334,49 +298,6 @@ class PluginInstanceManager(object):
         except ClientException as e:
             logger.error('Swift storage error, detail: %s' % str(e))
         return str_inputdir
-
-    def _get_job_status_summary(self, d_response, pulled_data=False, initial=False):
-        """
-        Get a job status summary dictionary from pfcon response.
-        """
-        # Still WIP about what is best summary...
-
-        d_jobStatusSummary = {
-            'pushPath': {
-                'status': False
-            },
-            'pullPath': {
-                'status': False
-            },
-            'compute': {
-                'submit': {
-                    'status': False
-                },
-                'return': {
-                    'status': False,
-                    'l_status': [],
-                    'l_logs': []
-                }
-            },
-        }
-        d_c = d_response['compute']
-        if initial:
-            d_jobStatusSummary['pushPath']['status'] = d_response['pushData']['status']
-            d_jobStatusSummary['compute']['submit']['status'] = d_c['status']
-        else:
-            d_jobStatusSummary['pushPath']['status'] = True
-            d_jobStatusSummary['pullPath']['status'] = pulled_data
-            d_jobStatusSummary['compute']['submit']['status'] = True
-            d_jobStatusSummary['compute']['return']['status'] = d_c['status']
-            d_jobStatusSummary['compute']['return']['l_status'] = d_c['d_ret']['l_status']
-            d_jobStatusSummary['compute']['return']['l_logs'] = d_c['d_ret']['l_logs']
-            try:
-                logs = d_jobStatusSummary['compute']['return']['l_logs'][0]
-                if len(logs) > 3000:
-                    d_jobStatusSummary['compute']['return']['l_logs'][0] = logs[-3000:]
-            except Exception:
-                logger.info('Compute logs not currently available.')
-        return d_jobStatusSummary
 
     def create_zip_file(self, swift_paths):
         """
@@ -420,14 +341,88 @@ class PluginInstanceManager(object):
             self.swift_manager.upload_obj(swift_fname, content)
         return swift_filenames
 
+    def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
+        """
+        Handle parameters of type 'unextpath' passed to the plugin instance app.
+        """
+        outputdir = self.c_plugin_inst.get_output_path()
+        obj_output_path_list = []
+        for param_name in unextpath_parameters_dict:
+            # each parameter value is a string of one or more paths separated by comma
+            path_list = unextpath_parameters_dict[param_name].split(',')
+            for path in path_list:
+                obj_list = []
+                try:
+                    obj_list = self.swift_manager.ls(path)
+                except ClientException as e:
+                    logger.error('Swift storage error, detail: %s' % str(e))
+                for obj in obj_list:
+                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
+                    if not obj_output_path.startswith(outputdir + '/'):
+                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
+                    try:
+                        self.swift_manager.copy_obj(obj, obj_output_path)
+                    except ClientException as e:
+                        logger.error('Swift storage error, detail: %s' % str(e))
+                    else:
+                        obj_output_path_list.append(obj_output_path)
+        logger.info("Registering output files not extracted from swift with CUBE")
+        self._register_output_files(obj_output_path_list)
+
+    def _register_output_files(self, filenames):
+        """
+        Register files generated by the plugin instance object with the REST API.
+        The 'filenames' arg is a list of obj names in object storage.
+        """
+        for obj_name in filenames:
+            logger.info('Registering  -->%s<--', obj_name)
+            plg_inst_file = PluginInstanceFile(plugin_inst=self.c_plugin_inst)
+            plg_inst_file.fname.name = obj_name
+            try:
+                plg_inst_file.save()
+            except IntegrityError:  # avoid re-register a file already registered
+                logger.info('-->%s<-- already registered', obj_name)
+
     @staticmethod
-    def json_zipToStr(json_data):
+    def get_job_status_summary(d_response, pulled_data=False, initial=False):
         """
-        Return a string of compressed JSON data, suitable for transmission
-        back to a client.
+        Get a job status summary dictionary from pfcon response.
         """
-        return base64.b64encode(
-            zlib.compress(
-                json.dumps(json_data).encode('utf-8')
-            )
-        ).decode('ascii')
+        # Still WIP about what is best summary...
+
+        d_jobStatusSummary = {
+            'pushPath': {
+                'status': False
+            },
+            'pullPath': {
+                'status': False
+            },
+            'compute': {
+                'submit': {
+                    'status': False
+                },
+                'return': {
+                    'status': False,
+                    'l_status': [],
+                    'l_logs': []
+                }
+            },
+        }
+        d_c = d_response['compute']
+        if initial:
+            d_jobStatusSummary['pushPath']['status'] = d_response['pushData']['status']
+            d_jobStatusSummary['compute']['submit']['status'] = d_c['status']
+        else:
+            d_jobStatusSummary['pushPath']['status'] = True
+            d_jobStatusSummary['pullPath']['status'] = pulled_data
+            d_jobStatusSummary['compute']['submit']['status'] = True
+            d_jobStatusSummary['compute']['return']['status'] = d_c['status']
+            d_jobStatusSummary['compute']['return']['l_status'] = d_c['d_ret']['l_status']
+            d_jobStatusSummary['compute']['return']['l_logs'] = d_c['d_ret']['l_logs']
+            try:
+                logs = d_jobStatusSummary['compute']['return']['l_logs'][0]
+                if len(logs) > 3000:
+                    d_jobStatusSummary['compute']['return']['l_logs'][0] = logs[-3000:]
+            except Exception:
+                logger.info('Compute logs not currently available.')
+        return d_jobStatusSummary

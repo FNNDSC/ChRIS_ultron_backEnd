@@ -1,5 +1,7 @@
 
 import os
+import json
+import zlib, base64
 
 
 def get_file_resource_link(file_serializer, obj):
@@ -16,3 +18,15 @@ def get_file_resource_link(file_serializer, obj):
     url = url_field.get_url(obj, view, request, format)
     # return url = current url + file name
     return url + os.path.basename(obj.fname.name)
+
+
+def json_zip2str(json_data):
+    """
+    Return a string of compressed JSON data, suitable for transmission
+    back to a client.
+    """
+    return base64.b64encode(
+        zlib.compress(
+            json.dumps(json_data).encode('utf-8')
+        )
+    ).decode('ascii')
