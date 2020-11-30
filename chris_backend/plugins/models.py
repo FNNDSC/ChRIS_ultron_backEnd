@@ -159,7 +159,7 @@ class Plugin(models.Model):
     execshell = models.CharField(max_length=50)
     selfpath = models.CharField(max_length=512)
     selfexec = models.CharField(max_length=50)
-    description = models.CharField(max_length=800, blank=True)
+    description = models.CharField(max_length=2000, blank=True)
     min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     max_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
