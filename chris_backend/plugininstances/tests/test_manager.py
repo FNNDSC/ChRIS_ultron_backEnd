@@ -111,54 +111,6 @@ class PluginInstanceManagerTests(TestCase):
             post_mock.assert_called_once()
             plg_inst_manager.get_job_status_summary.assert_called_once()
 
-    @tag('integration')
-    def test_integration_mananger_can_run_registered_plugin_app(self):
-        """
-        Test whether the manager can run an already registered plugin app.
-
-        NB: Note the directory overrides on input and output dirs! This
-            is file system space in the plugin container, and thus by hardcoding
-            this here we are relying on totally out-of-band knowledge! 
-
-            This must be fixed in later versions!
-        """
-        # try:
-        #     # create test directory where files are created
-        #     test_dir = settings.MEDIA_ROOT + '/test'
-        #     settings.MEDIA_ROOT = test_dir
-        #     if not os.path.exists(test_dir):
-        #         os.makedirs(test_dir)
-
-        # upload a file to the Swift storage user's space
-        user_space_path = '%s/uploads/' % self.username
-        with io.StringIO('Test file') as f:
-            self.swift_manager.upload_obj(user_space_path + 'test.txt', f.read(),
-                                          content_type='text/plain')
-
-        # create a plugin's instance
-        user = User.objects.get(username=self.username)
-        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-        pl_inst = PluginInstance.objects.create(
-            plugin=plugin, owner=user, status='scheduled',
-            compute_resource=plugin.compute_resources.all()[0])
-        pl_param = plugin.parameters.all()[0]
-        PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
-                                            value=user_space_path)
-        plg_inst_manager = PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app()
-        self.assertEqual(pl_inst.status, 'started')
-
-        # delete files from swift storage
-        self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
-        # for path in obj_paths:
-        #     self.swift_manager.delete_obj(path)
-
-        # finally:
-        #     # remove test directory
-        #     shutil.rmtree(test_dir, ignore_errors=True)
-        #     settings.MEDIA_ROOT = os.path.dirname(test_dir)
-
     def test_mananger_can_check_plugin_instance_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status
@@ -192,7 +144,7 @@ class PluginInstanceManagerTests(TestCase):
         #     post_mock.assert_called_with(msg)
 
     @tag('integration', 'error-pman')
-    def test_integration_mananger_can_check_plugin_instance_app_exec_status(self):
+    def test_integration_mananger_can_run_and_check_plugin_instance_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
 
@@ -219,6 +171,7 @@ class PluginInstanceManagerTests(TestCase):
                                             value=user_space_path)
         plg_inst_manager = PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app()
+        self.assertEqual(pl_inst.status, 'started')
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a

@@ -272,8 +272,34 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.post(create_read_url, data=self.post,
                                     content_type=self.content_type)
-        time.sleep(5)  # wait for the worker to finish
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # instance must be 'started' before checking its status
+        pl_inst = PluginInstance.objects.get(pk=response.data['id'])
+        for _ in range(10):
+            time.sleep(3)
+            pl_inst.refresh_from_db()
+            if pl_inst.status == 'started': break
+        self.assertEqual(pl_inst.status, 'started')  # instance must be started
+
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 10 second intervals.
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        maxLoopTries = 10
+        currentLoop = 1
+        b_checkAgain = True
+        time.sleep(10)
+        while b_checkAgain:
+            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            elif currentLoop < maxLoopTries:
+                time.sleep(10)
+            if currentLoop == maxLoopTries:
+                b_checkAgain = False
+            currentLoop += 1
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
         # delete files from swift storage
         self.swift_manager.delete_obj(self.user_space_path + 'test.txt')
