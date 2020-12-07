@@ -132,8 +132,6 @@ class PluginInstanceManager(object):
             return self.c_plugin_inst.status
 
         str_cmd, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd()
-        # handle parameters of type 'unextpath'
-        self._handle_app_unextpath_parameters(d_unextpath_params)
         if self.c_plugin_inst.previous:
             # WARNING: 'ds' plugins can also have 'path' parameters!
             str_inputdir = self.c_plugin_inst.previous.get_output_path()
@@ -146,9 +144,8 @@ class PluginInstanceManager(object):
             str_inputdir = self.manage_fsplugin_instance_app_empty_inputdir()
 
         zip_file = self.create_zip_file([str_inputdir])  # create data file to transmit
-
         plugin = self.c_plugin_inst.plugin
-        payload = {
+        payload = {  # create json payload to transmit
             'jid': self.str_job_id,
             'cmd': '%s %s' % (plugin.execshell, str_cmd),
             'auid': self.c_plugin_inst.owner.username,
@@ -171,24 +168,21 @@ class PluginInstanceManager(object):
                               timeout=30)
         except (Timeout, RequestException) as e:
             logging.error('error in talking to pfcon service, detail: %s', str(e))
-            if plugin.meta.type == 'ds':  # CUBE will retry later for 'ds' plugins
-                self.c_plugin_inst.status = 'waitingForPrevious'
-            else:
-                self.c_plugin_inst.status = 'cancelled'
+            self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
         else:
             if r.status_code == 200:
                 logger.info('successful response from pfcon: %s', r.text)
-                self.c_plugin_inst.status = 'started'
+                # handle parameters of type 'unextpath'
+                self._handle_app_unextpath_parameters(d_unextpath_params)
                 # update the job status and summary
+                self.c_plugin_inst.status = 'started'
                 d_resp = r.json()
                 d_jobStatusSummary = self.get_job_status_summary(d_resp, False, True)
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                self.c_plugin_inst.raw = json_zip2str(d_resp)
             else:
                 logger.error('error response from pfcon: %s', r.text)
-                if plugin.meta.type == 'ds':  # CUBE will retry later for 'ds' plugins
-                    self.c_plugin_inst.status = 'waitingForPrevious'
-                else:
-                    self.c_plugin_inst.status = 'cancelled'
+                self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
         self.c_plugin_inst.save()
 
     def check_plugin_instance_app_exec_status(self):

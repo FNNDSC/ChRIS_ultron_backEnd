@@ -201,7 +201,7 @@ class PluginInstanceListViewTests(TasksViewTests):
 
             # check that the run_plugin_instance task was not called
             delay_mock.assert_not_called()
-            self.assertEqual(response.data['status'], 'waitingForPrevious')
+            self.assertEqual(response.data['status'], 'waiting')
 
         previous_plg_inst.status = 'finishedWithError'
         previous_plg_inst.save()

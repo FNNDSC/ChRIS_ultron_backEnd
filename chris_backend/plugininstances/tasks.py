@@ -67,12 +67,12 @@ def cancel_plugin_instance(plg_inst_id):
 
 @shared_task(bind=True)
 @skip_if_running
-def run_waiting_for_previous_plugin_instances(self):  # task is passed info about itself
+def schedule_waiting_plugin_instances(self):  # task is passed info about itself
     """
-    Run the app corresponding to all plugin instances in 'waitingForPrevious' DB status
+    Schedule the apps corresponding to all plugin instances in 'waiting' DB status
     and whom previous plugin instance is in 'finishedSuccessfully' DB status.
     """
-    instances = PluginInstance.objects.filter(status='waitingForPrevious',
+    instances = PluginInstance.objects.filter(status='waiting',
                                               previous__status='finishedSuccessfully')
     for plg_inst in instances:
         plg_inst.status = 'scheduled'
@@ -92,14 +92,14 @@ def check_started_plugin_instances_exec_status():
 
 
 @shared_task
-def cancel_waiting_for_previous_plugin_instances():
+def cancel_waiting_plugin_instances():
     """
-    Cancel the app corresponding to all plugin instances in 'waitingForPrevious' DB
+    Cancel the apps corresponding to all plugin instances in 'waiting' DB
     status when their previous plugin instance is in either 'finishedWithError' or
     'cancelled' DB status.
     """
     lookup = Q(previous__status='finishedWithError') | Q(previous__status='cancelled')
-    instances = PluginInstance.objects.filter(status='waitingForPrevious').filter(lookup)
+    instances = PluginInstance.objects.filter(status='waiting').filter(lookup)
     for plg_inst in instances:
         plg_inst.status = 'cancelled'
         plg_inst.save()

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 STATUS_CHOICES = [("created",               "Default initial"),
-                  ("waitingForPrevious",    "Waiting for previous to finish"),
+                  ("waiting",               "Waiting to be scheduled"),
                   ("scheduled",             "Scheduled to the worker"),
                   ("started",               "Sent to remote compute"),
                   ("registeringFiles",      "Registering output files"),

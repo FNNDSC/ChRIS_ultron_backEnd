@@ -159,12 +159,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     def get_waiting_jobs(self, obj):
         """
-        Overriden to get the number of plugin instances in 'waitingForPrevious' status.
+        Overriden to get the number of plugin instances in 'waiting' status.
         """
-        if 'waitingForPrevious' not in [status[0] for status in STATUS_CHOICES]:
-            msg = "Undefined plugin instance execution status: 'waitingForPrevious'."
+        if 'waiting' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'waiting'."
             raise KeyError(msg)
-        return obj.get_plugin_instances_status_count('waitingForPrevious')
+        return obj.get_plugin_instances_status_count('waiting')
 
     def get_scheduled_jobs(self, obj):
         """

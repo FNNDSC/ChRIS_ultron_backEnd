@@ -82,7 +82,7 @@ class FeedModelTests(TestCase):
         feed = Feed.objects.get(name=self.feed_name)
         count = feed.get_plugin_instances_status_count('created')
         self.assertEqual(count, 1)
-        count = feed.get_plugin_instances_status_count('waitingForPrevious')
+        count = feed.get_plugin_instances_status_count('waiting')
         self.assertEqual(count, 0)
         count = feed.get_plugin_instances_status_count('scheduled')
         self.assertEqual(count, 0)

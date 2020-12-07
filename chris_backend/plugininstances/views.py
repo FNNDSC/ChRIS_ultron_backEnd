@@ -87,9 +87,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
             plg_inst.status = 'scheduled'   # status changes to 'scheduled' right away
             plg_inst.save()
             run_plugin_instance.delay(plg_inst.id)  # call async task
-        elif previous.status in ('created', 'waitingForPrevious', 'scheduled',
+        elif previous.status in ('created', 'waiting', 'scheduled',
                                  'registeringFiles', 'started'):
-            plg_inst.status = 'waitingForPrevious'
+            plg_inst.status = 'waiting'
             plg_inst.save()
         elif previous.status in ('finishedWithError', 'cancelled'):
             plg_inst.status = 'cancelled'

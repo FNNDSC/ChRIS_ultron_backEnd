@@ -27,27 +27,27 @@ task_routes = {
     'plugininstances.tasks.run_plugin_instance': {'queue': 'main'},
     'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main'},
     'plugininstances.tasks.cancel_plugin_instance': {'queue': 'main'},
-    'plugininstances.tasks.run_waiting_for_previous_plugin_instances':
+    'plugininstances.tasks.schedule_waiting_plugin_instances':
         {'queue': 'main'},
     'plugininstances.tasks.check_started_plugin_instances_exec_status':
         {'queue': 'main'},
-    'plugininstances.tasks.cancel_waiting_for_previous_plugin_instances':
+    'plugininstances.tasks.cancel_waiting_plugin_instances':
         {'queue': 'main'},
 }
 app.conf.update(task_routes=task_routes)
 
 # setup periodic tasks
 app.conf.beat_schedule = {
-    'run-waiting-for-previous-plugin-instances-every-10-seconds': {
-        'task': 'plugininstances.tasks.run_waiting_for_previous_plugin_instances',
+    'schedule-waiting-plugin-instances-every-10-seconds': {
+        'task': 'plugininstances.tasks.schedule_waiting_plugin_instances',
         'schedule': 10.0,
     },
     'check-started-plugin-instances-exec-status-every-10-seconds': {
         'task': 'plugininstances.tasks.check_started_plugin_instances_exec_status',
         'schedule': 10.0,
     },
-    'cancel-waiting-for-previous-plugin-instances-every-20-seconds': {
-        'task': 'plugininstances.tasks.cancel_waiting_for_previous_plugin_instances',
+    'cancel-waiting-plugin-instances-every-20-seconds': {
+        'task': 'plugininstances.tasks.cancel_waiting_plugin_instances',
         'schedule': 20.0,
     },
 }

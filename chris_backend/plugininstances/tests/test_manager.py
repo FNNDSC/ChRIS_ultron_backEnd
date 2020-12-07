@@ -5,7 +5,6 @@ import io
 import time
 import json
 from unittest import mock
-import requests
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
@@ -15,7 +14,7 @@ from core.swiftmanager import SwiftManager
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
-from plugininstances.services.manager import PluginInstanceManager
+from plugininstances.services import manager
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -92,24 +91,28 @@ class PluginInstanceManagerTests(TestCase):
         """
         response_mock = mock.Mock()
         response_mock.status_code = 200
-        with mock.patch.object(requests, 'post',
+        with mock.patch.object(manager.requests, 'post',
                                return_value=response_mock) as post_mock:
-            user = User.objects.get(username=self.username)
-            plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-            (pl_inst, tf) = PluginInstance.objects.get_or_create(
-                plugin=plugin, owner=user, status='scheduled',
-                compute_resource=plugin.compute_resources.all()[0])
-            pl_param = plugin.parameters.all()[0]
-            PathParameter.objects.get_or_create(plugin_inst=pl_inst,
-                                                plugin_param=pl_param,
-                                                value=self.username)
-            plg_inst_manager = PluginInstanceManager(pl_inst)
-            plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
-            plg_inst_manager.run_plugin_instance_app()
-            self.assertEqual(pl_inst.status, 'started')
-            self.assertEqual(pl_inst.summary, json.dumps('summary'))
-            post_mock.assert_called_once()
-            plg_inst_manager.get_job_status_summary.assert_called_once()
+            with mock.patch.object(manager, 'json_zip2str',
+                                   return_value='raw') as json_zip2str_mock:
+                user = User.objects.get(username=self.username)
+                plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+                (pl_inst, tf) = PluginInstance.objects.get_or_create(
+                    plugin=plugin, owner=user, status='scheduled',
+                    compute_resource=plugin.compute_resources.all()[0])
+                pl_param = plugin.parameters.all()[0]
+                PathParameter.objects.get_or_create(plugin_inst=pl_inst,
+                                                    plugin_param=pl_param,
+                                                    value=self.username)
+                plg_inst_manager = manager.PluginInstanceManager(pl_inst)
+                plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
+                plg_inst_manager.run_plugin_instance_app()
+                self.assertEqual(pl_inst.status, 'started')
+                self.assertEqual(pl_inst.summary, json.dumps('summary'))
+                self.assertEqual(pl_inst.raw, 'raw')
+                post_mock.assert_called_once()
+                json_zip2str_mock.assert_called_once()
+                plg_inst_manager.get_job_status_summary.assert_called_once()
 
     def test_mananger_can_check_plugin_instance_app_exec_status(self):
         """
@@ -118,7 +121,7 @@ class PluginInstanceManagerTests(TestCase):
         pass
         #    response_mock = mock.Mock()
         #    response_mock.status_code = 200
-        #    with mock.patch.object(requests, 'post',
+        #    with mock.patch.object(manager.requests, 'post',
         #                          return_value=response_mock) as post_mock:
         #
         #     user = User.objects.get(username=self.username)
@@ -130,7 +133,7 @@ class PluginInstanceManagerTests(TestCase):
         #     PathParameter.objects.get_or_create(plugin_inst=pl_inst,
         #                                         plugin_param=pl_param,
         #                                         value=self.username)
-        #     plg_inst_manager = PluginInstanceManager(pl_inst)
+        #     plg_inst_manager = manager.PluginInstanceManager(pl_inst)
         #     plg_inst_manager.check_plugin_instance_app_exec_status()
         #     self.assertEqual(pl_inst.status, 'started')
         #     msg = {
@@ -169,7 +172,7 @@ class PluginInstanceManagerTests(TestCase):
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
-        plg_inst_manager = PluginInstanceManager(pl_inst)
+        plg_inst_manager = manager.PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app()
         self.assertEqual(pl_inst.status, 'started')
 
