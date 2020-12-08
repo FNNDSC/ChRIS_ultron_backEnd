@@ -91,6 +91,17 @@ class PluginMetaSerializerTests(SerializerTests):
 
 class PluginSerializerTests(SerializerTests):
 
+    def test_validate_version(self):
+        """
+        Test whether overriden validate_version method raises a ValidationError when
+        wrong version type or format has been submitted.
+        """
+        plg_serializer = PluginSerializer()
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_version(1.2)
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_version('v1.2')
+
     def test_validate_app_workers_descriptor(self):
         """
         Test whether custom validate_app_workers_descriptor method raises a ValidationError

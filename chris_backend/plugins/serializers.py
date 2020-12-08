@@ -1,6 +1,7 @@
 
-from django.utils import timezone
+import re
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import ComputeResource, PluginMeta, Plugin, PluginParameter
@@ -116,6 +117,18 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         self.validate_app_descriptor_limits(data, 'min_gpu_limit', 'max_gpu_limit',
                                             err_msg)
         return data
+
+    def validate_version(self, version):
+        """
+        Overriden to check that a proper version type and format has been submitted.
+        """
+        if not isinstance(version, str):
+            raise serializers.ValidationError(["Invalid type for plugin app version "
+                                               "field. Must be a string."])
+        if not re.match(r"^[0-9.]+$", version):
+            raise serializers.ValidationError(["Invalid plugin app version number "
+                                               "format %s." % version])
+        return version
 
     @staticmethod
     def validate_app_workers_descriptor(descriptor_dict):
