@@ -176,7 +176,7 @@ class Plugin(models.Model):
     compute_resources = models.ManyToManyField(ComputeResource, related_name='plugins')
 
     class Meta:
-        unique_together = ('meta', 'version',)
+        unique_together = [['meta', 'version'], ['meta', 'dock_image']]
         ordering = ('meta', '-creation_date',)
 
     def __str__(self):

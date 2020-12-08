@@ -186,6 +186,12 @@ class PluginManager(object):
         plg_serializer = PluginSerializer(data=plg_repr)
         plg_serializer.is_valid(raise_exception=True)
 
+        # check DB constraints
+        plg_name = meta_serializer.validated_data.get('name')
+        self.validate_name_version(plg_serializer.validated_data.get('version'), plg_name)
+        self.validate_name_image(plg_serializer.validated_data.get('dock_image'),
+                                 plg_name)
+
         # collect and validate parameters
         parameters_serializers = []
         for parameter in parameters_data:
@@ -263,6 +269,33 @@ class PluginManager(object):
                 self.remove_plugin(options.id)
             if options.resourcename == 'compute':
                 self.remove_compute_resource(options.id)
+
+    @staticmethod
+    def validate_name_version(version, name):
+        """
+        Custom method to check if plugin name and version are unique together.
+        """
+        try:
+            Plugin.objects.get(meta__name=name, version=version)
+        except Plugin.DoesNotExist:
+            pass
+        else:
+            msg = "Plugin with name %s and version %s already exists" % (name, version)
+            raise ValueError(msg)
+
+    @staticmethod
+    def validate_name_image(dock_image, name):
+        """
+        Custom method to check if plugin name and docker image are unique together.
+        """
+        try:
+            Plugin.objects.get(meta__name=name, dock_image=dock_image)
+        except Plugin.DoesNotExist:
+            pass
+        else:
+            msg = "Docker image %s already used in a previous version of plugin with " \
+                  "name %s" % (dock_image, name)
+            raise ValueError(msg)
 
     @staticmethod
     def get_plugin_representation_from_store(name, version=None, timeout=30):
