@@ -176,9 +176,9 @@ class PluginInstanceManager(object):
                 self._handle_app_unextpath_parameters(d_unextpath_params)
                 # update the job status and summary
                 self.c_plugin_inst.status = 'started'
-                d_resp = r.json()
-                d_jobStatusSummary = self.get_job_status_summary(d_resp, False, True)
+                d_jobStatusSummary = self.get_job_status_summary()  # initial status
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                d_resp = r.json()
                 self.c_plugin_inst.raw = json_zip2str(d_resp)
             else:
                 logger.error('error response from pfcon: %s', r.text)
@@ -215,11 +215,12 @@ class PluginInstanceManager(object):
             logger.info('Current job remote status = %s', l_status)
             logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
 
-            # save the job status and summary
+            # save the job 'summary' and 'raw', important only update those fields
+            # to avoid concurrency problems with the 'status' field!
             d_jobStatusSummary = self.get_job_status_summary(d_response)
             self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
             self.c_plugin_inst.raw = json_zip2str(d_response)
-            self.c_plugin_inst.save()
+            self.c_plugin_inst.save(update_fields=['summary', 'raw'])
 
             if 'finishedSuccessfully' in l_status:
                 remote_url = remote_url + 'file/'
@@ -233,7 +234,7 @@ class PluginInstanceManager(object):
                 if r.status_code == 200:
                     # only one concurrent async task should get here
                     # data successfully downloaded so update summary
-                    d_jobStatusSummary = self.get_job_status_summary(d_response, True)
+                    d_jobStatusSummary['pullPath']['status'] = True
                     self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
 
                     logger.info("Registering output files from remote with CUBE")
@@ -249,7 +250,7 @@ class PluginInstanceManager(object):
                                 self.c_plugin_inst.end_date)
                     self.c_plugin_inst.save()
 
-            if 'finishedWithError' in l_status:
+            elif 'finishedWithError' in l_status:
                 self.c_plugin_inst.status = 'finishedWithError'
                 logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
                 self.c_plugin_inst.end_date = timezone.now()
@@ -378,7 +379,7 @@ class PluginInstanceManager(object):
                 logger.info('-->%s<-- already registered', obj_name)
 
     @staticmethod
-    def get_job_status_summary(d_response, pulled_data=False, initial=False):
+    def get_job_status_summary(d_response=None):
         """
         Get a job status summary dictionary from pfcon response.
         """
@@ -386,14 +387,14 @@ class PluginInstanceManager(object):
 
         d_jobStatusSummary = {
             'pushPath': {
-                'status': False
+                'status': True
             },
             'pullPath': {
                 'status': False
             },
             'compute': {
                 'submit': {
-                    'status': False
+                    'status': True
                 },
                 'return': {
                     'status': False,
@@ -402,14 +403,8 @@ class PluginInstanceManager(object):
                 }
             },
         }
-        d_c = d_response['compute']
-        if initial:
-            d_jobStatusSummary['pushPath']['status'] = d_response['pushData']['status']
-            d_jobStatusSummary['compute']['submit']['status'] = d_c['status']
-        else:
-            d_jobStatusSummary['pushPath']['status'] = True
-            d_jobStatusSummary['pullPath']['status'] = pulled_data
-            d_jobStatusSummary['compute']['submit']['status'] = True
+        if d_response is not None:
+            d_c = d_response['compute']
             d_jobStatusSummary['compute']['return']['status'] = d_c['status']
             d_jobStatusSummary['compute']['return']['l_status'] = d_c['d_ret']['l_status']
             d_jobStatusSummary['compute']['return']['l_logs'] = d_c['d_ret']['l_logs']
