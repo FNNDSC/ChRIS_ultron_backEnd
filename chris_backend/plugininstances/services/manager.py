@@ -129,7 +129,7 @@ class PluginInstanceManager(object):
         Run the plugin instance's app via a call to a remote service provider.
         """
         if self.c_plugin_inst.status == 'cancelled':
-            return self.c_plugin_inst.status
+            return
 
         str_cmd, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd()
         if self.c_plugin_inst.previous:
@@ -191,14 +191,10 @@ class PluginInstanceManager(object):
         service to determine job status and if finished without error then
         downloads and unpacks zip file and registers output files.
         """
-        if self.c_plugin_inst.status == 'cancelled':
-            return self.c_plugin_inst.status
-
         if self.c_plugin_inst.status == 'started':
             remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
             remote_url = remote_url + self.str_job_id + '/'
             logger.info('sent GET status to pfcon service url -->%s<--', remote_url)
-
             try:
                 r = requests.get(remote_url, timeout=30)
             except (Timeout, RequestException) as e:
@@ -249,7 +245,6 @@ class PluginInstanceManager(object):
                     logger.info("Saving job DB end_date as '%s'",
                                 self.c_plugin_inst.end_date)
                     self.c_plugin_inst.save()
-
             elif 'finishedWithError' in l_status:
                 self.c_plugin_inst.status = 'finishedWithError'
                 logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
