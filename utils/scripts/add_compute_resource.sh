@@ -8,7 +8,7 @@ G_SYNOPSIS="
 
  SYNOPSIS
 
-	add_compute_resource.sh NAME DESCRIPTION
+	add_compute_resource.sh NAME URL [--description DESCRIPTION]
 
  ARGS
 
@@ -16,7 +16,11 @@ G_SYNOPSIS="
 
 	    Compute resource's name.
 
-    DESCRIPTION
+    URL
+
+	    Compute resource's (pfcon) url.
+
+	  --description DESCRIPTION
 
 	    Compute resource's description.
 
@@ -26,18 +30,19 @@ G_SYNOPSIS="
 
 "
 
-if [[ "$#" -lt 2 ]] || [[ "$#" -gt 2 ]]; then
+if [[ "$#" -lt 3 ]] || [[ "$#" -gt 3 ]]; then
     echo "$G_SYNOPSIS"
     exit 1
 fi
 
 NAME=$1
-DESCRIPTION=$2
+URL=$2
+DESCRIPTION=$3
 
 set -e  # terminate as soon as any command fails
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 echo " "
     echo "Adding $NAME compute resource..."
-    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add "${NAME}" "${DESCRIPTION}"
+    docker-compose -f "${DIR}/../../docker-compose.yml" exec chris python plugins/services/manager.py add "${NAME}" "${URL}" --description "${DESCRIPTION}"
 echo " "
