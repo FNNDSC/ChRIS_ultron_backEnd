@@ -159,19 +159,19 @@ class PluginInstanceManager(object):
             'execshell': plugin.execshell,
         }
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
-        logger.info('sent POST to pfcon service url -->%s<--', remote_url)
-        logger.info('payload sent: %s', json.dumps(payload, indent=4))
+        logger.info('Sent POST to pfcon service url -->%s<--', remote_url)
+        logger.info('Payload sent: %s', json.dumps(payload, indent=4))
         try:
             r = requests.post(remote_url,
                               files={'data_file': zip_file.getvalue()},
                               data=payload,
-                              timeout=30)
+                              timeout=300)
         except (Timeout, RequestException) as e:
-            logging.error('error in talking to pfcon service, detail: %s', str(e))
+            logger.error('Error in talking to pfcon service, detail: %s', str(e))
             self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
         else:
             if r.status_code == 200:
-                logger.info('successful response from pfcon: %s', r.text)
+                logger.info('Successful response from pfcon: %s', r.text)
                 # handle parameters of type 'unextpath'
                 self._handle_app_unextpath_parameters(d_unextpath_params)
                 # update the job status and summary
@@ -181,7 +181,7 @@ class PluginInstanceManager(object):
                 d_resp = r.json()
                 self.c_plugin_inst.raw = json_zip2str(d_resp)
             else:
-                logger.error('error response from pfcon: %s', r.text)
+                logger.error('Error response from pfcon: %s', r.text)
                 self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
         self.c_plugin_inst.save()
 
@@ -194,18 +194,18 @@ class PluginInstanceManager(object):
         if self.c_plugin_inst.status == 'started':
             remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
             remote_url = remote_url + self.str_job_id + '/'
-            logger.info('sent GET status to pfcon service url -->%s<--', remote_url)
+            logger.info('Sent GET status to pfcon service url -->%s<--', remote_url)
             try:
-                r = requests.get(remote_url, timeout=30)
+                r = requests.get(remote_url, timeout=60)
             except (Timeout, RequestException) as e:
-                logging.error('error in talking to pfcon service, detail: %s', str(e))
+                logger.error('Error in talking to pfcon service, detail: %s', str(e))
                 return self.c_plugin_inst.status  # return here, CUBE will retry later
             if r.status_code != 200:
                 # could not get status (third party pman service inaccessible)
-                logger.error('error response from pfcon: %s', r.text)
+                logger.error('Error response from pfcon: %s', r.text)
                 return self.c_plugin_inst.status  # return here, CUBE will retry later
 
-            logger.info('successful response from pfcon: %s', r.text)
+            logger.info('Successful response from pfcon: %s', r.text)
             d_response = r.json()
             l_status = d_response['compute']['d_ret']['l_status']
             logger.info('Current job remote status = %s', l_status)
@@ -220,11 +220,11 @@ class PluginInstanceManager(object):
 
             if 'finishedSuccessfully' in l_status:
                 remote_url = remote_url + 'file/'
-                logger.info('sent GET zip file to pfcon service url -->%s<--', remote_url)
+                logger.info('Sent GET zip file to pfcon service url -->%s<--', remote_url)
                 try:
-                    r = requests.get(remote_url, timeout=30)  # download zip file
+                    r = requests.get(remote_url, timeout=720)  # download zip file
                 except (Timeout, RequestException) as e:
-                    logging.error('error in talking to pfcon service, detail: %s', str(e))
+                    logger.error('Error in talking to pfcon service, detail: %s', str(e))
                     return self.c_plugin_inst.status  # return here, CUBE will retry later
 
                 if r.status_code == 200:
@@ -236,10 +236,14 @@ class PluginInstanceManager(object):
                     logger.info("Registering output files from remote with CUBE")
                     self.c_plugin_inst.status = 'registeringFiles'
                     self.c_plugin_inst.save()   # inform FE about new instance status
-                    swift_filenames = self.unpack_zip_file(r.content)
-                    self._register_output_files(swift_filenames)
-
-                    self.c_plugin_inst.status = 'finishedSuccessfully'
+                    try:
+                        swift_filenames = self.unpack_zip_file(r.content)
+                    except Exception as e:
+                        logger.error('Got bad zip file from remote, detail: %s', str(e))
+                        self.c_plugin_inst.status = 'cancelled'
+                    else:
+                        self._register_output_files(swift_filenames)
+                        self.c_plugin_inst.status = 'finishedSuccessfully'
                     logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
                     self.c_plugin_inst.end_date = timezone.now()
                     logger.info("Saving job DB end_date as '%s'",
@@ -320,15 +324,17 @@ class PluginInstanceManager(object):
         """
         Unpack job zip file from the remote into swift storage.
         """
-        job_data_zip = zipfile.ZipFile(io.BytesIO(zip_file_content))
-        filenames = job_data_zip.namelist()
-        output_path = self.c_plugin_inst.get_output_path() + '/'
-        swift_filenames = []
-        for fname in filenames:
-            content = job_data_zip.read(fname)
-            swift_fname = output_path + fname.lstrip('/')
-            swift_filenames.append(swift_fname)
-            self.swift_manager.upload_obj(swift_fname, content)
+        memory_zip_file = io.BytesIO(zip_file_content)
+        with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_data_zip:
+            filenames = job_data_zip.namelist()
+            logger.info('Number of files to decompress %s: ', len(filenames))
+            output_path = self.c_plugin_inst.get_output_path() + '/'
+            swift_filenames = []
+            for fname in filenames:
+                content = job_data_zip.read(fname)
+                swift_fname = output_path + fname.lstrip('/')
+                swift_filenames.append(swift_fname)
+                self.swift_manager.upload_obj(swift_fname, content)
         return swift_filenames
 
     def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
