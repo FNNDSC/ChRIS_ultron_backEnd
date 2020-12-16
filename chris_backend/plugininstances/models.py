@@ -198,6 +198,14 @@ class PluginInstanceFilter(FilterSet):
         return filtered_queryset
 
 
+class PluginInstanceLock(models.Model):
+    plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE,
+                                       related_name='lock')
+
+    def __str__(self):
+        return self.plugin_inst.id
+
+
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=1024, unique=True)
