@@ -419,7 +419,6 @@ def main(*args):
     """
     retCode     : int   = 1
     search      = PluginSearch(args[0])
-    d_result    = search.do()
 
     if search.d_args['b_man']:
         print(str_desc)
@@ -428,6 +427,8 @@ def main(*args):
     if search.d_args['b_version']:
         print(str_version)
         sys.exit(0)
+
+    d_result    = search.do()
 
     if search.d_args['b_json']:
         search.dp.qprint(json.dumps(d_result, indent = 4))
