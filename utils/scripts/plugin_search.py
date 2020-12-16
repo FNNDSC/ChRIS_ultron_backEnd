@@ -437,7 +437,8 @@ def main(*args):
         for target in d_result['target']:
             search.dp.qprint('(%s)' % search.d_args['str_using'], end='')
             for hit in target:
-                search.dp.qprint('%10s %-30s' % (hit['name'], hit['value']), end='', syslog=False)
+                search.dp.qprint('%10s %-30s' % (hit['name'], hit['value']),
+                                 end='', syslog=False)
             search.dp.qprint('')
             retCode = 0
 
