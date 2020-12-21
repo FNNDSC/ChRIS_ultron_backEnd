@@ -165,10 +165,11 @@ class PluginInstanceManager(object):
             r = requests.post(remote_url,
                               files={'data_file': zip_file.getvalue()},
                               data=payload,
-                              timeout=300)
+                              timeout=1000)
         except (Timeout, RequestException) as e:
-            logger.error('Error in talking to pfcon service, detail: %s', str(e))
-            self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
+            logger.error('Error in talking to pfcon service for job %s, detail: %s' % (
+                    self.str_job_id, str(e)))
+            self.c_plugin_inst.status = 'cancelled'  # giving up
         else:
             if r.status_code == 200:
                 logger.info('Successful response from pfcon: %s', r.text)
@@ -181,8 +182,10 @@ class PluginInstanceManager(object):
                 d_resp = r.json()
                 self.c_plugin_inst.raw = json_zip2str(d_resp)
             else:
-                logger.error('Error response from pfcon: %s', r.text)
-                self.c_plugin_inst.status = 'waiting'  # CUBE will retry later
+                # error from upstream pman or pfioh service
+                logger.error('Error response from pfcon for job %s: %s' % (
+                    self.str_job_id, r.text))
+                self.c_plugin_inst.status = 'cancelled'  # giving up
         self.c_plugin_inst.save()
 
     def check_plugin_instance_app_exec_status(self):
@@ -196,20 +199,21 @@ class PluginInstanceManager(object):
             remote_url = remote_url + self.str_job_id + '/'
             logger.info('Sent GET status to pfcon service url -->%s<--', remote_url)
             try:
-                r = requests.get(remote_url, timeout=60)
+                r = requests.get(remote_url, timeout=1000)
             except (Timeout, RequestException) as e:
                 logger.error('Error in talking to pfcon service, detail: %s', str(e))
                 return self.c_plugin_inst.status  # return, CUBE will retry later
             if r.status_code != 200:
-                # could not get status (third party pman service inaccessible)
+                # could not get status (error from upstream pman service)
                 logger.error('Error response from pfcon: %s', r.text)
                 return self.c_plugin_inst.status  # return, CUBE will retry later
 
             logger.info('Successful response from pfcon: %s', r.text)
             d_response = r.json()
             l_status = d_response['compute']['d_ret']['l_status']
-            logger.info('Current job remote status = %s', l_status)
-            logger.info('Current job DB status     = %s', self.c_plugin_inst.status)
+            logger.info('Current job %s remote status = %s' % (self.str_job_id, l_status))
+            logger.info('Current job %s DB status = %s' % (
+                self.str_job_id, self.c_plugin_inst.status))
 
             # save the job 'summary' and 'raw', important only update those fields and not
             # the whole instance to avoid concurrency problems with the 'status' field!
@@ -230,40 +234,47 @@ class PluginInstanceManager(object):
                     logger.info('Sent GET zip file to pfcon service url -->%s<--',
                                 remote_url)
                     try:
-                        r = requests.get(remote_url, timeout=720)  # download zip file
+                        r = requests.get(remote_url, timeout=1000)  # download zip file
                     except (Timeout, RequestException) as e:
                         logger.error('Error in talking to pfcon service, detail: %s',
                                      str(e))
-                        plg_inst_lock.delete()  # remove the lock
-                        return self.c_plugin_inst.status  # return, CUBE will retry later
-
-                    if r.status_code == 200:
-                        # data successfully downloaded so update summary
-                        d_jobStatusSummary['pullPath']['status'] = True
-                        self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-                        logger.info("Registering output files from remote with CUBE")
-                        self.c_plugin_inst.status = 'registeringFiles'
-                        self.c_plugin_inst.save()   # inform FE about new instance status
-                        try:
-                            swift_filenames = self.unpack_zip_file(r.content)
-                        except Exception as e:
-                            logger.error('Got bad zip file from remote, detail: %s',
-                                         str(e))
-                            self.c_plugin_inst.status = 'cancelled'
+                        self.c_plugin_inst.status = 'cancelled'  # giving up
+                    else:
+                        if r.status_code == 200:
+                            # data successfully downloaded so update summary
+                            d_jobStatusSummary['pullPath']['status'] = True
+                            self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                            err_msg = 'Registering output files from remote with job %s'
+                            logger.info(err_msg, self.str_job_id)
+                            self.c_plugin_inst.status = 'registeringFiles'
+                            self.c_plugin_inst.save()   # inform FE about status change
+                            try:
+                                swift_filenames = self.unpack_zip_file(r.content)
+                            except Exception as e:
+                                err_msg = 'Received bad zip file from remote, detail: %s'
+                                logger.error(err_msg, str(e))
+                                self.c_plugin_inst.status = 'cancelled'
+                            else:
+                                self._register_output_files(swift_filenames)
+                                self.c_plugin_inst.status = 'finishedSuccessfully'
+                            logger.info("Saving job %s DB status as '%s'" % (
+                                self.str_job_id, self.c_plugin_inst.status))
+                            self.c_plugin_inst.end_date = timezone.now()
+                            logger.info("Saving job %s DB end_date as '%s'" % (
+                                self.str_job_id, self.c_plugin_inst.end_date))
                         else:
-                            self._register_output_files(swift_filenames)
-                            self.c_plugin_inst.status = 'finishedSuccessfully'
-                        logger.info("Saving job DB status as '%s'",
-                                    self.c_plugin_inst.status)
-                        self.c_plugin_inst.end_date = timezone.now()
-                        logger.info("Saving job DB end_date as '%s'",
-                                    self.c_plugin_inst.end_date)
-                        self.c_plugin_inst.save()
+                            # error from upstream pfioh service
+                            logger.error('Error response from pfcon for job %s: %s' % (
+                                self.str_job_id, r.text))
+                            self.c_plugin_inst.status = 'cancelled'  # giving up
+                    self.c_plugin_inst.save()
             elif 'finishedWithError' in l_status:
                 self.c_plugin_inst.status = 'finishedWithError'
-                logger.info("Saving job DB status as '%s'", self.c_plugin_inst.status)
+                logger.info("Saving job %s DB status as '%s'" % (
+                    self.str_job_id, self.c_plugin_inst.status))
                 self.c_plugin_inst.end_date = timezone.now()
-                logger.info("Saving job DB end_date as '%s'", self.c_plugin_inst.end_date)
+                logger.info("Saving job %s DB end_date as '%s'" % (
+                    self.str_job_id, self.c_plugin_inst.end_date))
                 self.c_plugin_inst.save()
         return self.c_plugin_inst.status
 
@@ -372,7 +383,8 @@ class PluginInstanceManager(object):
                         logger.error('Swift storage error, detail: %s' % str(e))
                     else:
                         obj_output_path_list.append(obj_output_path)
-        logger.info("Registering output files not extracted from swift with CUBE")
+        logger.info("Registering output files not extracted from swift with job %s",
+                    self.str_job_id)
         self._register_output_files(obj_output_path_list)
 
     def _register_output_files(self, filenames):
