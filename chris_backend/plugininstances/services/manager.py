@@ -217,7 +217,9 @@ class PluginInstanceManager(object):
                 self.str_job_id, self.c_plugin_inst.status))
 
             summary = self.get_job_status_summary(d_response)
+            self.c_plugin_inst.summary = summary
             raw = json_zip2str(d_response)
+            self.c_plugin_inst.raw = raw
             # only update (atomically) if status='started' to avoid concurrency problems
             PluginInstance.objects.filter(
                 id=self.c_plugin_inst.id,
@@ -373,7 +375,6 @@ class PluginInstanceManager(object):
             else:
                 if r.status_code == 200:
                     # data successfully downloaded so update summary
-                    self.c_plugin_inst.refresh_from_db()  # reload summary and raw
                     d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
                     d_jobStatusSummary['pullPath']['status'] = True
                     self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
