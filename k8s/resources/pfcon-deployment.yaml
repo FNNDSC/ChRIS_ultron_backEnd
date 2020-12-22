@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pfcon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pfcon
+  template:
+    metadata:
+      labels:
+        name: pfcon
+    spec:
+      containers:
+      - name: pfcon
+        image: fnndsc/pfcon:latest
+        ports:
+        - containerPort: 5005
+        args: ["--forever", "--httpResponse", "--verbosity", "1"]

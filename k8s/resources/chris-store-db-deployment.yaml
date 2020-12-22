@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chris-store-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: chris-store-db
+  template:
+    metadata:
+      labels:
+        name: chris-store-db
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:5
+        ports:
+        - containerPort: 3306
+        envFrom:
+        - configMapRef:
+            name: cube-config
+        - secretRef:
+            name: cube-secrets
