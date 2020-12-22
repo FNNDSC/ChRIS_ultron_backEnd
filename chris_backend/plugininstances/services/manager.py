@@ -54,7 +54,7 @@ from django.db.utils import IntegrityError
 
 from core.swiftmanager import SwiftManager, ClientException
 from core.utils import json_zip2str
-from plugininstances.models import PluginInstanceFile, PluginInstanceLock
+from plugininstances.models import PluginInstance, PluginInstanceFile, PluginInstanceLock
 
 if settings.DEBUG:
     import pdb, pudb, rpudb
@@ -170,6 +170,7 @@ class PluginInstanceManager(object):
             logger.error('Error in talking to pfcon service for job %s, detail: %s' % (
                     self.str_job_id, str(e)))
             self.c_plugin_inst.status = 'cancelled'  # giving up
+            self.save_plugin_instance_final_status()
         else:
             if r.status_code == 200:
                 logger.info('Successful response from pfcon: %s', r.text)
@@ -177,16 +178,16 @@ class PluginInstanceManager(object):
                 self._handle_app_unextpath_parameters(d_unextpath_params)
                 # update the job status and summary
                 self.c_plugin_inst.status = 'started'
-                d_jobStatusSummary = self.get_job_status_summary()  # initial status
-                self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                self.c_plugin_inst.summary = self.get_job_status_summary()  # initial stat
                 d_resp = r.json()
                 self.c_plugin_inst.raw = json_zip2str(d_resp)
+                self.c_plugin_inst.save()
             else:
                 # error from upstream pman or pfioh service
                 logger.error('Error response from pfcon for job %s: %s' % (
                     self.str_job_id, r.text))
                 self.c_plugin_inst.status = 'cancelled'  # giving up
-        self.c_plugin_inst.save()
+                self.save_plugin_instance_final_status()
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -215,67 +216,17 @@ class PluginInstanceManager(object):
             logger.info('Current job %s DB status = %s' % (
                 self.str_job_id, self.c_plugin_inst.status))
 
-            # save the job 'summary' and 'raw', important only update those fields and not
-            # the whole instance to avoid concurrency problems with the 'status' field!
-            d_jobStatusSummary = self.get_job_status_summary(d_response)
-            self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-            self.c_plugin_inst.raw = json_zip2str(d_response)
-            self.c_plugin_inst.save(update_fields=['summary', 'raw'])
+            summary = self.get_job_status_summary(d_response)
+            raw = json_zip2str(d_response)
+            # only update (atomically) if status='started' to avoid concurrency problems
+            PluginInstance.objects.filter(
+                id=self.c_plugin_inst.id,
+                status='started').update(summary=summary, raw=raw)
 
             if 'finishedSuccessfully' in l_status:
-                plg_inst_lock = PluginInstanceLock(plugin_inst=self.c_plugin_inst)
-                try:
-                    plg_inst_lock.save()
-                except IntegrityError:  # another async task has already entered here
-                    pass
-                else:
-                    # only one concurrent async task should get here
-                    remote_url = remote_url + 'file/'
-                    logger.info('Sent GET zip file to pfcon service url -->%s<--',
-                                remote_url)
-                    try:
-                        r = requests.get(remote_url, timeout=1000)  # download zip file
-                    except (Timeout, RequestException) as e:
-                        logger.error('Error in talking to pfcon service, detail: %s',
-                                     str(e))
-                        self.c_plugin_inst.status = 'cancelled'  # giving up
-                    else:
-                        if r.status_code == 200:
-                            # data successfully downloaded so update summary
-                            d_jobStatusSummary['pullPath']['status'] = True
-                            self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-                            err_msg = 'Registering output files from remote with job %s'
-                            logger.info(err_msg, self.str_job_id)
-                            self.c_plugin_inst.status = 'registeringFiles'
-                            self.c_plugin_inst.save()   # inform FE about status change
-                            try:
-                                swift_filenames = self.unpack_zip_file(r.content)
-                            except Exception as e:
-                                err_msg = 'Received bad zip file from remote, detail: %s'
-                                logger.error(err_msg, str(e))
-                                self.c_plugin_inst.status = 'cancelled'
-                            else:
-                                self._register_output_files(swift_filenames)
-                                self.c_plugin_inst.status = 'finishedSuccessfully'
-                            logger.info("Saving job %s DB status as '%s'" % (
-                                self.str_job_id, self.c_plugin_inst.status))
-                            self.c_plugin_inst.end_date = timezone.now()
-                            logger.info("Saving job %s DB end_date as '%s'" % (
-                                self.str_job_id, self.c_plugin_inst.end_date))
-                        else:
-                            # error from upstream pfioh service
-                            logger.error('Error response from pfcon for job %s: %s' % (
-                                self.str_job_id, r.text))
-                            self.c_plugin_inst.status = 'cancelled'  # giving up
-                    self.c_plugin_inst.save()
+                self._handle_finished_successfully_status()
             elif 'finishedWithError' in l_status:
-                self.c_plugin_inst.status = 'finishedWithError'
-                logger.info("Saving job %s DB status as '%s'" % (
-                    self.str_job_id, self.c_plugin_inst.status))
-                self.c_plugin_inst.end_date = timezone.now()
-                logger.info("Saving job %s DB end_date as '%s'" % (
-                    self.str_job_id, self.c_plugin_inst.end_date))
-                self.c_plugin_inst.save()
+                self._handle_finished_with_error_status()
         return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):
@@ -358,9 +309,21 @@ class PluginInstanceManager(object):
                 self.swift_manager.upload_obj(swift_fname, content)
         return swift_filenames
 
+    def save_plugin_instance_final_status(self):
+        """
+        Save to the DB and log the final status of the plugin instance.
+        """
+        msg = "Saving job %s DB status as '%s'"
+        logger.info(msg % (self.str_job_id, self.c_plugin_inst.status))
+        msg = "Saving job %s DB end_date as '%s'"
+        self.c_plugin_inst.end_date = timezone.now()
+        logger.info(msg % (self.str_job_id, self.c_plugin_inst.end_date))
+        self.c_plugin_inst.save()
+
     def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
         """
-        Handle parameters of type 'unextpath' passed to the plugin instance app.
+        Internal method to handle parameters of type 'unextpath' passed to the plugin
+        instance app.
         """
         outputdir = self.c_plugin_inst.get_output_path()
         obj_output_path_list = []
@@ -387,10 +350,65 @@ class PluginInstanceManager(object):
                     self.str_job_id)
         self._register_output_files(obj_output_path_list)
 
+    def _handle_finished_successfully_status(self):
+        """
+        Internal method to handle the 'finishedSuccessfully' status returned by the
+        remote compute.
+        """
+        plg_inst_lock = PluginInstanceLock(plugin_inst=self.c_plugin_inst)
+        try:
+            plg_inst_lock.save()
+        except IntegrityError:  # another async task has already entered here
+            pass
+        else:
+            # only one concurrent async task should get here
+            remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
+            remote_url = remote_url + self.str_job_id + '/file/'
+            logger.info('Sent GET zip file to pfcon service url -->%s<--', remote_url)
+            try:
+                r = requests.get(remote_url, timeout=1000)  # download zip file
+            except (Timeout, RequestException) as e:
+                logger.error('Error in talking to pfcon service, detail: %s', str(e))
+                self.c_plugin_inst.status = 'cancelled'  # giving up
+            else:
+                if r.status_code == 200:
+                    # data successfully downloaded so update summary
+                    self.c_plugin_inst.refresh_from_db()  # reload summary and raw
+                    d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
+                    d_jobStatusSummary['pullPath']['status'] = True
+                    self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                    msg = 'Registering output files from remote with job %s'
+                    logger.info(msg, self.str_job_id)
+                    self.c_plugin_inst.status = 'registeringFiles'
+                    self.c_plugin_inst.save()  # inform FE about status change
+                    try:
+                        swift_filenames = self.unpack_zip_file(r.content)
+                    except Exception as e:
+                        err_msg = 'Received bad zip file from remote, detail: %s'
+                        logger.error(err_msg, str(e))
+                        self.c_plugin_inst.status = 'cancelled'  # giving up
+                    else:
+                        self._register_output_files(swift_filenames)
+                        self.c_plugin_inst.status = 'finishedSuccessfully'
+                else:
+                    # error from upstream pfioh service
+                    err_msg = 'Error response from pfcon for job %s: %s'
+                    logger.error(err_msg % (self.str_job_id, r.text))
+                    self.c_plugin_inst.status = 'cancelled'  # giving up
+            self.save_plugin_instance_final_status()
+
+    def _handle_finished_with_error_status(self):
+        """
+        Internal method to handle the 'finishedWithError' status returned by the
+        remote compute.
+        """
+        self.c_plugin_inst.status = 'finishedWithError'
+        self.save_plugin_instance_final_status()
+
     def _register_output_files(self, filenames):
         """
-        Register files generated by the plugin instance object with the REST API.
-        The 'filenames' arg is a list of obj names in object storage.
+        Internal method to register files generated by the plugin instance object with
+        the REST API. The 'filenames' arg is a list of obj names in object storage.
         """
         for obj_name in filenames:
             logger.info('Registering  -->%s<--', obj_name)
@@ -404,7 +422,7 @@ class PluginInstanceManager(object):
     @staticmethod
     def get_job_status_summary(d_response=None):
         """
-        Get a job status summary dictionary from pfcon response.
+        Get a job status summary JSON string from pfcon response.
         """
         # Still WIP about what is best summary...
 
@@ -437,4 +455,4 @@ class PluginInstanceManager(object):
                     d_jobStatusSummary['compute']['return']['l_logs'][0] = logs[-3000:]
             except Exception:
                 logger.info('Compute logs not currently available.')
-        return d_jobStatusSummary
+        return json.dumps(d_jobStatusSummary)

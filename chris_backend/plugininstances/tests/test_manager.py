@@ -108,7 +108,7 @@ class PluginInstanceManagerTests(TestCase):
                 plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
                 plg_inst_manager.run_plugin_instance_app()
                 self.assertEqual(pl_inst.status, 'started')
-                self.assertEqual(pl_inst.summary, json.dumps('summary'))
+                self.assertEqual(pl_inst.summary, 'summary')
                 self.assertEqual(pl_inst.raw, 'raw')
                 post_mock.assert_called_once()
                 json_zip2str_mock.assert_called_once()
