@@ -318,13 +318,13 @@ class PluginManager(object):
         store_client = StoreClient(store_url, None, None, timeout)
         res = store_client.get(url)
         result = store_client.get_data_from_collection(res)
-        if result['data']:
-            plg = result['data'][0]
-            parameters_url = res.items[0].links.get(rel='parameters').href
-        else:
-            raise NameError("Could not find plugin with url '%s'" % url)
-        plg['parameters'] = PluginManager.get_plugin_parameters_from_url(parameters_url,
-                                                                           timeout)
+
+        if 'data' not in result:
+            raise NameError(f"Could not find plugin with url '{url}'")
+
+        plg = result['data'][0]
+        parameters_url = res.items[0].links.get(rel='parameters').href
+        plg['parameters'] = PluginManager.get_plugin_parameters_from_url(parameters_url, timeout)
         return plg
 
     @staticmethod
