@@ -70,59 +70,49 @@ class PluginInstanceManager(object):
 
         self.c_plugin_inst = plugin_instance
 
-        # hardcode mounting points for the input and outputdir in the app's container!
-        self.str_app_container_inputdir = '/share/incoming'
-        self.str_app_container_outputdir = '/share/outgoing'
-
         # some schedulers require a minimum job ID string length
         self.str_job_id = 'chris-jid-' + str(plugin_instance.id)
 
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
 
-    def get_plugin_instance_app_cmd(self):
+    def get_plugin_instance_app_cmd_args(self):
         """
-        Get the plugin instance app's cmd, unextpath and path parameters in a tuple.
+        Get the list of plugin instance app's cmd arguments and unextpath and path
+        parameters dictionaries in a tuple.
+
+        The cmd flag for parameters of type 'unextpath' and 'path' is prepended with
+        the 'path:' keyword to let the remote pfcon service know that the appropriate
+        absolute path in the remote environment must be built for the flag's value.
         """
-        plugin = self.c_plugin_inst.plugin
         app_args = []
         path_parameters_dict = {}
         unextpath_parameters_dict = {}
-
-        # append app's container input dir to app's argument list (only for ds plugins)
-        if plugin.meta.type == 'ds':
-            app_args.append(self.str_app_container_inputdir)
-        # append app's container output dir to app's argument list
-        app_args.append(self.str_app_container_outputdir)
         # append flag to save input meta data (passed options)
         app_args.append('--saveinputmeta')
         # append flag to save output meta data (output description)
         app_args.append('--saveoutputmeta')
-        # append the parameters to app's argument list and identify
-        # parameters of type 'unextpath' and 'path'
+        # append the parameters to app's argument list, for parameters of type
+        # 'unextpath' and 'path' prepend the flag with the 'path:' keyword
         param_instances = self.c_plugin_inst.get_parameter_instances()
         for param_inst in param_instances:
             param = param_inst.plugin_param
             value = param_inst.value
             if param.action == 'store':
-                app_args.append(param.flag)
+                flag = param.flag
                 if param.type == 'unextpath':
                     unextpath_parameters_dict[param.name] = value
-                    value = self.str_app_container_inputdir
+                    flag = 'path:' + flag
                 if param.type == 'path':
                     path_parameters_dict[param.name] = value
-                    value = self.str_app_container_inputdir  # + '/' + value
+                    flag = 'path:' + flag
+                app_args.append(flag)
                 app_args.append(value)
             if param.action == 'store_true' and value:
                 app_args.append(param.flag)
             if param.action == 'store_false' and not value:
                 app_args.append(param.flag)
-
-        str_exec = os.path.join(plugin.selfpath, plugin.selfexec)
-        l_appArgs = [str(s) for s in app_args]  # convert all arguments to string
-        str_allCmdLineArgs = ' '.join(l_appArgs)
-        str_cmd = '%s %s' % (str_exec, str_allCmdLineArgs)
-        return str_cmd, unextpath_parameters_dict, path_parameters_dict
+        return app_args, unextpath_parameters_dict, path_parameters_dict
 
     def run_plugin_instance_app(self):
         """
@@ -130,8 +120,7 @@ class PluginInstanceManager(object):
         """
         if self.c_plugin_inst.status == 'cancelled':
             return
-
-        str_cmd, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd()
+        args, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd_args()
         if self.c_plugin_inst.previous:
             # WARNING: 'ds' plugins can also have 'path' parameters!
             str_inputdir = self.c_plugin_inst.previous.get_output_path()
@@ -145,9 +134,10 @@ class PluginInstanceManager(object):
 
         zip_file = self.create_zip_file([str_inputdir])  # create data file to transmit
         plugin = self.c_plugin_inst.plugin
+        l_cmd_args = [str(s) for s in args]  # convert all arguments to string
         payload = {  # create json payload to transmit
             'jid': self.str_job_id,
-            'cmd': '%s %s' % (plugin.execshell, str_cmd),
+            'cmd_args': ' '.join(l_cmd_args),
             'auid': self.c_plugin_inst.owner.username,
             'number_of_workers': str(self.c_plugin_inst.number_of_workers),
             'cpu_limit': str(self.c_plugin_inst.cpu_limit),
@@ -157,6 +147,7 @@ class PluginInstanceManager(object):
             'selfexec': plugin.selfexec,
             'selfpath': plugin.selfpath,
             'execshell': plugin.execshell,
+            'type': plugin.meta.type
         }
         remote_url = self.c_plugin_inst.compute_resource.compute_url + '/api/v1/'
         logger.info('Sent POST to pfcon service url -->%s<--', remote_url)
