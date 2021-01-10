@@ -101,11 +101,9 @@ class PluginInstanceManager(object):
             if param.action == 'store':
                 flag = param.flag
                 if param.type == 'unextpath':
-                    unextpath_parameters_dict[param.name] = value
-                    flag = 'path:' + flag
+                    unextpath_parameters_dict[flag] = value
                 if param.type == 'path':
-                    path_parameters_dict[param.name] = value
-                    flag = 'path:' + flag
+                    path_parameters_dict[flag] = value
                 app_args.append(flag)
                 app_args.append(value)
             if param.action == 'store_true' and value:
@@ -120,6 +118,7 @@ class PluginInstanceManager(object):
         """
         if self.c_plugin_inst.status == 'cancelled':
             return
+
         args, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd_args()
         if self.c_plugin_inst.previous:
             # WARNING: 'ds' plugins can also have 'path' parameters!
@@ -132,12 +131,17 @@ class PluginInstanceManager(object):
             # No parameter of type 'path' was submitted, input dir is empty
             str_inputdir = self.manage_fsplugin_instance_app_empty_inputdir()
 
-        zip_file = self.create_zip_file([str_inputdir])  # create data file to transmit
+        # create data file to transmit
+        zip_file = self.create_zip_file([str_inputdir])
+
+        # create json payload to transmit
         plugin = self.c_plugin_inst.plugin
         l_cmd_args = [str(s) for s in args]  # convert all arguments to string
-        payload = {  # create json payload to transmit
+        l_cmd_path_flags = list(d_unextpath_params.keys()) + list(d_path_params.keys())
+        payload = {
             'jid': self.str_job_id,
             'cmd_args': ' '.join(l_cmd_args),
+            'cmd_path_flags': ','.join(l_cmd_path_flags),
             'auid': self.c_plugin_inst.owner.username,
             'number_of_workers': str(self.c_plugin_inst.number_of_workers),
             'cpu_limit': str(self.c_plugin_inst.cpu_limit),
@@ -320,9 +324,9 @@ class PluginInstanceManager(object):
         """
         outputdir = self.c_plugin_inst.get_output_path()
         obj_output_path_list = []
-        for param_name in unextpath_parameters_dict:
+        for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
-            path_list = unextpath_parameters_dict[param_name].split(',')
+            path_list = unextpath_parameters_dict[param_flag].split(',')
             for path in path_list:
                 obj_list = []
                 try:
