@@ -3,7 +3,6 @@ import logging
 import os
 import io
 import time
-import json
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -89,30 +88,31 @@ class PluginInstanceManagerTests(TestCase):
         """
         Test whether the manager can run an already registered plugin app.
         """
-        response_mock = mock.Mock()
-        response_mock.status_code = 200
-        with mock.patch.object(manager.requests, 'post',
-                               return_value=response_mock) as post_mock:
-            with mock.patch.object(manager, 'json_zip2str',
-                                   return_value='raw') as json_zip2str_mock:
-                user = User.objects.get(username=self.username)
-                plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-                (pl_inst, tf) = PluginInstance.objects.get_or_create(
-                    plugin=plugin, owner=user, status='scheduled',
-                    compute_resource=plugin.compute_resources.all()[0])
-                pl_param = plugin.parameters.all()[0]
-                PathParameter.objects.get_or_create(plugin_inst=pl_inst,
-                                                    plugin_param=pl_param,
-                                                    value=self.username)
-                plg_inst_manager = manager.PluginInstanceManager(pl_inst)
-                plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
-                plg_inst_manager.run_plugin_instance_app()
-                self.assertEqual(pl_inst.status, 'started')
-                self.assertEqual(pl_inst.summary, 'summary')
-                self.assertEqual(pl_inst.raw, 'raw')
-                post_mock.assert_called_once()
-                json_zip2str_mock.assert_called_once()
-                plg_inst_manager.get_job_status_summary.assert_called_once()
+        with mock.patch.object(manager, 'json_zip2str',
+                               return_value='raw') as json_zip2str_mock:
+            user = User.objects.get(username=self.username)
+            plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+            (pl_inst, tf) = PluginInstance.objects.get_or_create(
+                plugin=plugin, owner=user, status='scheduled',
+                compute_resource=plugin.compute_resources.all()[0])
+            pl_param = plugin.parameters.all()[0]
+            PathParameter.objects.get_or_create(plugin_inst=pl_inst,
+                                                plugin_param=pl_param,
+                                                value=self.username)
+            plg_inst_manager = manager.PluginInstanceManager(pl_inst)
+            plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
+            plg_inst_manager.pfcon_client.submit_job = mock.Mock(
+                return_value='dictionary')
+
+            # call run_plugin_instance_app method
+            plg_inst_manager.run_plugin_instance_app()
+
+            self.assertEqual(pl_inst.status, 'started')
+            self.assertEqual(pl_inst.summary, 'summary')
+            self.assertEqual(pl_inst.raw, 'raw')
+            plg_inst_manager.pfcon_client.submit_job.assert_called_once()
+            plg_inst_manager.get_job_status_summary.assert_called_once()
+            json_zip2str_mock.assert_called_once()
 
     def test_mananger_can_check_plugin_instance_app_exec_status(self):
         """

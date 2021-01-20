@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='computeresource',
             name='compute_url',
-            field=models.URLField(default='http://pfcon.local:5005', max_length=300),
+            field=models.URLField(default='http://pfcon.local:5005/api/v1/', max_length=300),
             preserve_default=False,
         ),
         migrations.AlterField(

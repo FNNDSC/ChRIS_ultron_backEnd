@@ -94,7 +94,7 @@ if [[ "$1" == 'up' ]]; then
         windowBottom
 
         title -d 1 "Adding host compute environment"
-        docker-compose exec chris python plugins/services/manager.py add host "http://pfcon.local:5005" --description "Local compute"
+        docker-compose exec chris python plugins/services/manager.py add host "http://pfcon.local:5005/api/v1/" --description "Local compute"
         windowBottom
 
         title -d 1 "Registering pl-dircopy from store to CUBE"
