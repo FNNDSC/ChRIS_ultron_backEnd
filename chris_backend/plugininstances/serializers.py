@@ -32,6 +32,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
+    output_path = serializers.SerializerMethodField()
     owner_username = serializers.ReadOnlyField(source='owner.username')
     previous = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
                                                    read_only=True)
@@ -54,10 +55,16 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
                   'plugin_id', 'plugin_name', 'plugin_version', 'pipeline_id',
                   'pipeline_name', 'pipeline_inst_id', 'pipeline_inst', 'feed_id',
-                  'start_date', 'end_date', 'status', 'summary', 'raw',
+                  'start_date', 'end_date', 'output_path', 'status', 'summary', 'raw',
                   'owner_username', 'previous', 'feed', 'plugin', 'descendants',
                   'files', 'parameters', 'compute_resource', 'cpu_limit',
                   'memory_limit', 'number_of_workers', 'gpu_limit')
+
+    def get_output_path(self, obj):
+        """
+        Overriden to get the plugin instance's output path.
+        """
+        return obj.get_output_path()
 
     def validate_previous(self, previous_id):
         """
