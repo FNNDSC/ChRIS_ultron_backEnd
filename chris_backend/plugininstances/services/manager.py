@@ -54,6 +54,7 @@ from django.db.utils import IntegrityError
 
 from core.swiftmanager import SwiftManager, ClientException
 from core.utils import json_zip2str
+from core.models import ChrisInstance
 from plugininstances.models import PluginInstance, PluginInstanceFile, PluginInstanceLock
 
 if settings.DEBUG:
@@ -70,21 +71,18 @@ class PluginInstanceManager(object):
 
         self.c_plugin_inst = plugin_instance
 
-        # some schedulers require a minimum job ID string length
-        self.str_job_id = 'chris-jid-' + str(plugin_instance.id)
+        self.str_job_id = ChrisInstance.load().job_id_prefix + str(plugin_instance.id)
 
         self.pfcon_client = pfcon.Client(plugin_instance.compute_resource.compute_url)
+
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
 
     def get_plugin_instance_app_cmd_args(self):
         """
-        Get the list of plugin instance app's cmd arguments and unextpath and path
-        parameters dictionaries in a tuple.
-
-        The cmd flag for parameters of type 'unextpath' and 'path' is prepended with
-        the 'path:' keyword to let the remote pfcon service know that the appropriate
-        absolute path in the remote environment must be built for the flag's value.
+        Get the list of the plugin instance app's cmd arguments and the unextpath and
+        path parameters dictionaries in a tuple. The keys and values in these
+        dictionaries are parameters' flag and value respectively.
         """
         app_args = []
         path_parameters_dict = {}

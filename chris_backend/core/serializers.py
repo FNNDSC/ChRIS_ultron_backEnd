@@ -8,4 +8,5 @@ class ChrisInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ChrisInstance
-        fields = ('url', 'id', 'creation_date', 'name', 'uuid', 'description')
+        fields = ('url', 'id', 'creation_date', 'name', 'uuid', 'job_id_prefix',
+                  'description')

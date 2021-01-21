@@ -11,6 +11,7 @@ class ChrisInstance(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, default="ChRIS instance")
     uuid = models.UUIDField(default=uuid.uuid4)
+    job_id_prefix = models.CharField(max_length=100, blank=True, default='chris-jid-')
     description = models.CharField(max_length=600, blank=True)
 
     class Meta:
@@ -20,11 +21,11 @@ class ChrisInstance(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self):
+    def save(self, *args, **kwargs):
         count = ChrisInstance.objects.all().count()
         if count > 0:
             self.id = 1
-        super(ChrisInstance, self).save()
+        super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
         pass
