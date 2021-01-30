@@ -70,6 +70,8 @@ except Exception as e:
 # CHRIS STORE SERVICE CONFIGURATION
 CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
+# ChRIS JID prefix used by pman's scheduler
+CHRIS_JID_PREFIX = get_secret('CHRIS_JID_PREFIX')
 
 # LOGGING CONFIGURATION
 # See http://docs.djangoproject.com/en/2.2/topics/logging for

@@ -77,7 +77,7 @@ class PluginInstanceManager(object):
         self.str_app_container_outputdir    = '/share/outgoing'
 
         # some schedulers require a minimum job ID string length
-        self.str_job_id = 'chris-jid-' + str(plugin_instance.id)
+        self.str_job_id = settings.CHRIS_JID_PREFIX + str(plugin_instance.id)
 
         # local data dir to store zip files before transmitting to the remote
         self.data_dir = os.path.join(os.path.expanduser("~"), 'data')

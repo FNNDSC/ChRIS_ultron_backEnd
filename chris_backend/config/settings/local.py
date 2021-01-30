@@ -95,6 +95,9 @@ except Exception as e:
 # ChRIS store settings
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
+# ChRIS JID prefix used by pman's scheduler
+CHRIS_JID_PREFIX = 'chris-jid-'
+
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
