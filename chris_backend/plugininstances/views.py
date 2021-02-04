@@ -55,15 +55,19 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
         # collect and validate parameters from the request
         parameter_serializers = []
-        parameters = plugin.parameters.all()
-        for parameter in parameters:
+        for parameter in plugin.parameters.all():
             if parameter.name in request_data:
                 data = {'value': request_data[parameter.name]}
                 param_type = parameter.type
                 if param_type in ('path', 'unextpath'):
                     # these serializers need the user to be passed
-                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data,
-                                                                             user=user)
+                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](
+                        data=data, user=user)
+                elif param_type == 'string' and plugin.meta.type == 'ts':
+                    # these serializers need the param's name, plugin type and previous
+                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](
+                        data=data, param_name=parameter.name, plugin_type='ts',
+                        previous=previous)
                 else:
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data)
                 parameter_serializer.is_valid(raise_exception=True)
@@ -73,10 +77,10 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
         # if no validation errors at this point then save to the DB
         cr_data = serializer.validated_data.get('compute_resource')
-        if not cr_data:
-            compute_resource = plugin.compute_resources.all()[0]
-        else:
+        if cr_data:
             compute_resource = plugin.compute_resources.get(name=cr_data['name'])
+        else:
+            compute_resource = plugin.compute_resources.first()
         plg_inst = serializer.save(owner=user, plugin=plugin, previous=previous,
                                    compute_resource=compute_resource)
         for param, param_serializer in parameter_serializers:

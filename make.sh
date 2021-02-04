@@ -512,7 +512,8 @@ else
                         fnndsc/pl-simplefsapp,                      \
                         fnndsc/pl-simpledsapp,                      \
                         fnndsc/pl-s3retrieve,                       \
-                        fnndsc/pl-dircopy
+                        fnndsc/pl-dircopy,                            \
+                        fnndsc/pl-tsdircopy
     "
 
     STEP=$(expr $STEP + 4 )

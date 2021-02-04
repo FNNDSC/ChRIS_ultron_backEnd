@@ -63,12 +63,13 @@ class PluginInstance(models.Model):
     def save(self, *args, **kwargs):
         """
         Overriden to save a new feed to the DB the first time 'fs' instances are saved.
-        For 'ds' instances the feed of the previous instance is assigned.
+        For 'ds' and 'ts' instances the feed of the previous instance is assigned.
         """
         if not hasattr(self, 'feed'):
-            if self.plugin.meta.type == 'fs':
+            plugin_type = self.plugin.meta.type
+            if plugin_type == 'fs':
                 self.feed = self._save_feed()
-            if self.plugin.meta.type == 'ds':
+            elif plugin_type in ('ds', 'ts'):
                 self.feed = self.previous.feed
         self._set_compute_defaults()
         super(PluginInstance, self).save(*args, **kwargs)
@@ -126,7 +127,7 @@ class PluginInstance(models.Model):
         """
         # 'fs' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
-        # 'ds' plugins will output files to:
+        # 'ds' and 'ts' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
         #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
         current = self

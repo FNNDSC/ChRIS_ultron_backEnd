@@ -17,7 +17,8 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
 TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
          'path': 'path', 'unextpath': 'unextpath'}
 
-PLUGIN_TYPE_CHOICES = [("ds", "Data synthesis"), ("fs", "Feed synthesis")]
+PLUGIN_TYPE_CHOICES = [("ds", "Data synthesis"), ("fs", "Feed synthesis"),
+                       ("ts", "Topology synthesis")]
 
 
 class ComputeResource(models.Model):

@@ -28,6 +28,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
+    plugin_type = serializers.ReadOnlyField(source='plugin.meta.type')
     pipeline_id = serializers.ReadOnlyField(source='pipeline_inst.pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
@@ -53,10 +54,10 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PluginInstance
         fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
-                  'plugin_id', 'plugin_name', 'plugin_version', 'pipeline_id',
-                  'pipeline_name', 'pipeline_inst_id', 'pipeline_inst', 'feed_id',
-                  'start_date', 'end_date', 'output_path', 'status', 'summary', 'raw',
-                  'owner_username', 'previous', 'feed', 'plugin', 'descendants',
+                  'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
+                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'pipeline_inst',
+                  'feed_id', 'start_date', 'end_date', 'output_path', 'status', 'summary',
+                  'raw', 'owner_username', 'previous', 'feed', 'plugin', 'descendants',
                   'files', 'parameters', 'compute_resource', 'cpu_limit',
                   'memory_limit', 'number_of_workers', 'gpu_limit')
 
@@ -69,15 +70,15 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     def validate_previous(self, previous_id):
         """
         Custom method to check that an id is provided for previous instance when
-        corresponding plugin is of type 'ds'. Then check that the provided id exists in
-        the DB and that the user can run plugins within this feed.
+        corresponding plugin is of type 'ds' or 'ts'. Then check that the provided id
+        exists in the DB and that the user can run plugins within this feed.
         """
         # using self.context['view'] in validators prevents calling is_valid when creating
         # a new serializer instance outside the Django view framework. But here is fine
         # as plugin instances are always created through the API
         plugin = self.context['view'].get_object()
         previous = None
-        if plugin.meta.type == 'ds':
+        if plugin.meta.type in ('ds', 'ts'):
             if not previous_id:
                 raise serializers.ValidationError(
                     {'previous_id': ["This field is required."]})
@@ -198,6 +199,39 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         model = StrParameter
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
+
+    def __init__(self, *args, **kwargs):
+        """
+        Overriden to get the plugin parameter as a keyword argument at object creation.
+        """
+        self.param_name = kwargs.pop('param_name', None)
+        self.plugin_type = kwargs.pop('plugin_type', None)
+        self.previous = kwargs.pop('previous', None)
+        super(StrParameterSerializer, self).__init__(*args, **kwargs)
+
+    def validate_value(self, value):
+        """
+        Overriden to check that all the provided plugin instance ids exist in the DB and
+        belong to the same feed for a 'plugininstances' parameter in a 'ts' plugin
+        (value should be a string of plugin instance ids separated by commas).
+        """
+        if value and self.param_name and self.plugin_type and self.previous:
+            if (self.param_name == 'plugininstances') and (self.plugin_type == 'ts'):
+                plg_inst_ids = [inst_id.strip() for inst_id in value.split(',')]
+                for inst_id in plg_inst_ids:
+                    try:
+                        plg_inst = PluginInstance.objects.get(pk=int(inst_id))
+                    except (ValueError, ObjectDoesNotExist):
+                        raise serializers.ValidationError(
+                            [f"Couldn't find any plugin instance with id '{inst_id}'."])
+                    if plg_inst.feed.id != self.previous.feed.id:
+                        raise serializers.ValidationError(
+                            [f"Plugin instance with id '{inst_id}' is not in this feed."])
+                value = ','.join(plg_inst_ids)
+            elif self.param_name == 'filter' and self.plugin_type == 'ts':
+                regexs = [r.strip() for r in value.split(',')]
+                value = ','.join(regexs)
+        return value
 
 
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):

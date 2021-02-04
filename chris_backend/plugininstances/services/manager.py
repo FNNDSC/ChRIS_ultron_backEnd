@@ -42,6 +42,7 @@ NOTE:
 
 import logging
 import os
+import re
 import io
 import json
 import zipfile
@@ -71,45 +72,14 @@ class PluginInstanceManager(object):
 
         self.c_plugin_inst = plugin_instance
 
+        self.l_plugin_inst_param_instances = self.c_plugin_inst.get_parameter_instances()
+
         self.str_job_id = ChrisInstance.load().job_id_prefix + str(plugin_instance.id)
 
         self.pfcon_client = pfcon.Client(plugin_instance.compute_resource.compute_url)
 
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
-
-    def get_plugin_instance_app_cmd_args(self):
-        """
-        Get the list of the plugin instance app's cmd arguments and the unextpath and
-        path parameters dictionaries in a tuple. The keys and values in these
-        dictionaries are parameters' flag and value respectively.
-        """
-        app_args = []
-        path_parameters_dict = {}
-        unextpath_parameters_dict = {}
-        # append flag to save input meta data (passed options)
-        app_args.append('--saveinputmeta')
-        # append flag to save output meta data (output description)
-        app_args.append('--saveoutputmeta')
-        # append the parameters to app's argument list, for parameters of type
-        # 'unextpath' and 'path' prepend the flag with the 'path:' keyword
-        param_instances = self.c_plugin_inst.get_parameter_instances()
-        for param_inst in param_instances:
-            param = param_inst.plugin_param
-            value = param_inst.value
-            if param.action == 'store':
-                flag = param.flag
-                if param.type == 'unextpath':
-                    unextpath_parameters_dict[flag] = value
-                if param.type == 'path':
-                    path_parameters_dict[flag] = value
-                app_args.append(flag)
-                app_args.append(value)
-            if param.action == 'store_true' and value:
-                app_args.append(param.flag)
-            if param.action == 'store_false' and not value:
-                app_args.append(param.flag)
-        return app_args, unextpath_parameters_dict, path_parameters_dict
 
     def run_plugin_instance_app(self):
         """
@@ -118,24 +88,26 @@ class PluginInstanceManager(object):
         if self.c_plugin_inst.status == 'cancelled':
             return
 
-        args, d_unextpath_params, d_path_params = self.get_plugin_instance_app_cmd_args()
-        if self.c_plugin_inst.previous:
-            # WARNING: 'ds' plugins can also have 'path' parameters!
-            str_inputdir = self.c_plugin_inst.previous.get_output_path()
-        elif len(d_path_params):
-            # WARNING: Inputdir assumed to only be one of the 'path' parameters!
-            path_list = next(iter(d_path_params.values())).split(',')
-            str_inputdir = path_list[0].strip('/')
+        plugin = self.c_plugin_inst.plugin
+        plugin_type = plugin.meta.type
+        l_inputdirs = []
+        if plugin_type == 'ds':
+            l_inputdirs.append(self.c_plugin_inst.previous.get_output_path())
         else:
-            # No parameter of type 'path' was submitted, input dir is empty
-            str_inputdir = self.manage_fsplugin_instance_app_empty_inputdir()
+            l_inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
+
+        d_unextpath_params, d_path_params = self.get_plugin_instance_path_parameters()
+        for path_param_value in [param_value for param_value in d_path_params.values()]:
+            # the value of each parameter of type 'path' is a string
+            # representing a comma-separated list of paths in obj storage
+            l_inputdirs = l_inputdirs + path_param_value.split(',')
 
         # create data file to transmit
-        zip_file = self.create_zip_file([str_inputdir])
+        zip_file = self.create_zip_file(l_inputdirs)
 
         # create job description dictionary
-        plugin = self.c_plugin_inst.plugin
-        l_cmd_args = [str(s) for s in args]  # convert all arguments to string
+        cmd_args = self.get_plugin_instance_app_cmd_args()
+        l_cmd_args = [str(s) for s in cmd_args]  # convert all arguments to string
         l_cmd_path_flags = list(d_unextpath_params.keys()) + list(d_path_params.keys())
         job_descriptors = {
             'cmd_args': ' '.join(l_cmd_args),
@@ -149,7 +121,7 @@ class PluginInstanceManager(object):
             'selfexec': plugin.selfexec,
             'selfpath': plugin.selfpath,
             'execshell': plugin.execshell,
-            'type': plugin.meta.type
+            'type': plugin_type
         }
         pfcon_url = self.pfcon_client.url
         logger.info('Submitting job %s to pfcon url -->%s<--, description: %s' % (
@@ -165,8 +137,13 @@ class PluginInstanceManager(object):
         else:
             msg = 'Successfully submitted job %s to pfcon url -->%s<--, response: %s'
             logger.info(msg % (self.str_job_id, pfcon_url, json.dumps(d_resp, indent=4)))
-            # handle parameters of type 'unextpath'
+
+            # handle unextracted paths
             self._handle_app_unextpath_parameters(d_unextpath_params)
+            if plugin_type == 'ts':
+                d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
+                self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
+
             # update the job status and summary
             self.c_plugin_inst.status = 'started'
             self.c_plugin_inst.summary = self.get_job_status_summary()  # initial stat
@@ -219,21 +196,99 @@ class PluginInstanceManager(object):
         """
         pass
 
-    def manage_fsplugin_instance_app_empty_inputdir(self):
+    def get_plugin_instance_app_cmd_args(self):
+        """
+        Get the list of the plugin instance app's cmd arguments.
+        """
+        # append flags to save input meta data (passed options) and
+        # output meta data (output description)
+        app_args = ['--saveinputmeta', '--saveoutputmeta']
+        # append the parameters to app's argument list
+        for param_inst in self.l_plugin_inst_param_instances:
+            param = param_inst.plugin_param
+            value = param_inst.value
+            if param.action == 'store':
+                app_args.append(param.flag)
+                app_args.append(value)
+            elif param.action == 'store_true' and value:
+                app_args.append(param.flag)
+            elif param.action == 'store_false' and not value:
+                app_args.append(param.flag)
+        return app_args
+
+    def get_plugin_instance_path_parameters(self):
+        """
+        Get the unextpath and path parameters dictionaries in a tuple. The keys and
+        values in these dictionaries are parameters' flag and value respectively.
+        """
+        path_parameters_dict = {}
+        unextpath_parameters_dict = {}
+        for param_inst in self.l_plugin_inst_param_instances:
+            param = param_inst.plugin_param
+            value = param_inst.value
+            if param.type == 'unextpath':
+                unextpath_parameters_dict[param.flag] = value
+            if param.type == 'path':
+                path_parameters_dict[param.flag] = value
+        return unextpath_parameters_dict, path_parameters_dict
+
+    def get_ts_plugin_instance_input_objs(self):
+        """
+        Get a dictionary with keys that are the output dir of each input plugin instance
+        to this 'ts' plugin instance. The values of this dictionary are lists of all the
+        objects under the corresponding output dir key that match a filter for each of
+        the provided plugin instances.
+        """
+        # extract the 'ts' plugin's especial parameters from the DB into a dict
+        d_esp_params = {'plugininstances': '', 'filter': ''}
+        if self.c_plugin_inst.plugin.meta.type == 'ts':
+            for param_inst in self.l_plugin_inst_param_instances:
+                param = param_inst.plugin_param
+                if param.name in d_esp_params.keys():
+                    d_esp_params[param.name] = param_inst.value
+
+        plg_inst_ids = []
+        if d_esp_params['plugininstances']:
+            # 'plugininstances' string param represents a comma-separated list of ids
+            plg_inst_ids = d_esp_params['plugininstances'].split(',')
+
+        # 'filter' string param represents a comma-separated list of regular expressions
+        regexs = d_esp_params['filter'].split(',') if d_esp_params['filter'] else []
+
+        d_objs = {}
+        for i, inst_id in enumerate(plg_inst_ids):
+            try:
+                plg_inst = PluginInstance.objects.get(pk=int(inst_id))
+            except PluginInstance.DoesNotExist:
+                logger.error(f"Couldn't find any plugin instance with id {inst_id} "
+                             "while processing input instances to 'ts' plugin instance "
+                             f"with id {self.c_plugin_inst.id}")
+            else:
+                output_path = plg_inst.get_output_path()
+                try:
+                    l_ls = self.swift_manager.ls(output_path)
+                except ClientException as e:
+                    logger.error(f'Listing of swift storage files in {output_path} '
+                                 f'failed, detail: {str(e)}')
+                else:
+                    if (i < len(regexs)) and regexs[i]:
+                        r = re.compile(regexs[i])
+                        d_objs[output_path] = [obj for obj in l_ls if r.search(obj)]
+                    else:
+                        d_objs[output_path] = l_ls
+        return d_objs
+
+    def manage_plugin_instance_app_empty_inputdir(self):
         """
         This method is responsible for managing the 'inputdir' in the case of
-        FS plugins.
-
-        An FS plugin does not have an inputdir spec, since this is only a
-        requirement for DS plugins. Nonetheless, the remote services do
+        FS and TS plugins. FS and TS plugins do not have an inputdir spec, since this
+        is only a requirement for DS plugins. Nonetheless, the remote services do
         require some non-zero inputdir spec in order to operate correctly.
 
         The hack here is to store data somewhere in swift and accessing it as a
-        "pseudo" inputdir for FS plugins. For example, if an FS plugin has no
-        arguments of type 'path', then we create a "dummy" inputdir with a
-        small dummy text file in swift storage. This is then transmitted as an
-        'inputdir' to the compute environment, and can be completely ignored by
-        the plugin.
+        "pseudo" inputdir for FS and TS plugins. We create a "dummy" inputdir with a
+        small dummy text file in swift storage. This is then transmitted as an 'inputdir'
+        to the compute environment and can be completely ignored by the plugin.
         """
         data_dir = os.path.join(os.path.expanduser("~"), 'data')
         str_inputdir = os.path.join(data_dir, 'squashEmptyDir').lstrip('/')
@@ -331,6 +386,27 @@ class PluginInstanceManager(object):
                         obj_output_path_list.append(obj_output_path)
         logger.info("Registering output files not extracted from swift with job %s",
                     self.str_job_id)
+        self._register_output_files(obj_output_path_list)
+
+    def _handle_app_ts_unextracted_input_objs(self, d_ts_input_objs):
+        """
+        Internal method to handle a 'ts' plugin's input instances' filtered objects
+        that are not extracted from object storage.
+        """
+        outputdir = self.c_plugin_inst.get_output_path()
+        obj_output_path_list = []
+        for plg_inst_outputdir in d_ts_input_objs:
+            obj_list = d_ts_input_objs[plg_inst_outputdir]
+            for obj in obj_list:
+                obj_output_path = obj.replace(plg_inst_outputdir, outputdir, 1)
+                try:
+                    self.swift_manager.copy_obj(obj, obj_output_path)
+                except ClientException as e:
+                    logger.error('Swift storage error, detail: %s' % str(e))
+                else:
+                    obj_output_path_list.append(obj_output_path)
+        logger.info("Registering 'ts' plugin's output files not extracted from swift with"
+                    " job %s", self.str_job_id)
         self._register_output_files(obj_output_path_list)
 
     def _handle_finished_successfully_status(self):
