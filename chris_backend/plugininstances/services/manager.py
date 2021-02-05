@@ -124,29 +124,23 @@ class PluginInstanceManager(object):
             'type': plugin_type
         }
         pfcon_url = self.pfcon_client.url
-        logger.info('Submitting job %s to pfcon url -->%s<--, description: %s' % (
-            self.str_job_id, pfcon_url, json.dumps(job_descriptors, indent=4)))
+        job_id = self.str_job_id
+        logger.info(f'Submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
+                    f'description: {json.dumps(job_descriptors, indent=4)}')
         try:
             d_resp = self.pfcon_client.submit_job(self.str_job_id, job_descriptors,
-                                                 zip_file.getvalue(), timeout=1000)
+                                                  zip_file.getvalue(), timeout=1000)
         except PfconRequestException as e:
-            logger.error('Error submitting job %s to pfcon url -->%s<--, detail: %s' % (
-                    self.str_job_id, pfcon_url, str(e)))
+            logger.error(f'Error submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
+                         f'detail: {str(e)}')
             self.c_plugin_inst.status = 'cancelled'  # giving up
             self.save_plugin_instance_final_status()
         else:
-            msg = 'Successfully submitted job %s to pfcon url -->%s<--, response: %s'
-            logger.info(msg % (self.str_job_id, pfcon_url, json.dumps(d_resp, indent=4)))
-
-            # handle unextracted paths
-            self._handle_app_unextpath_parameters(d_unextpath_params)
-            if plugin_type == 'ts':
-                d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
-                self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
-
+            logger.info(f'Successfully submitted job {job_id} to pfcon url '
+                        f'-->{pfcon_url}<--, response: {json.dumps(d_resp, indent=4)}')
             # update the job status and summary
             self.c_plugin_inst.status = 'started'
-            self.c_plugin_inst.summary = self.get_job_status_summary()  # initial stat
+            self.c_plugin_inst.summary = self.get_job_status_summary()  # initial status
             self.c_plugin_inst.raw = json_zip2str(d_resp)
             self.c_plugin_inst.save()
 
@@ -158,21 +152,21 @@ class PluginInstanceManager(object):
         """
         if self.c_plugin_inst.status == 'started':
             pfcon_url = self.pfcon_client.url
-            logger.info('Sending job status request to pfcon url -->%s<-- for job %s' % (
-                pfcon_url, self.str_job_id))
+            job_id = self.str_job_id
+            logger.info(f'Sending job status request to pfcon url -->{pfcon_url}<-- for '
+                        f'job {job_id}')
             try:
-                d_resp = self.pfcon_client.get_job_status(self.str_job_id, timeout=1000)
+                d_resp = self.pfcon_client.get_job_status(job_id, timeout=1000)
             except PfconRequestException as e:
-                msg = 'Error getting status at pfcon url -->%s<-- for job %s, detail: %s'
-                logger.error(msg % (pfcon_url, self.str_job_id, str(e)))
+                logger.error(f'Error getting job status at pfcon url -->{pfcon_url}<-- '
+                             f'for job {job_id}, detail: {str(e)}')
                 return self.c_plugin_inst.status  # return, CUBE will retry later
-            msg = 'Successful job status response from pfcon url -->%s<-- for job %s: %s'
-            logger.info(msg % (pfcon_url, self.str_job_id, json.dumps(d_resp, indent=4)))
 
+            logger.info(f'Successful job status response from pfcon url -->{pfcon_url}<--'
+                        f' for job {job_id}: {json.dumps(d_resp, indent=4)}')
             l_status = d_resp['compute']['d_ret']['l_status']
-            logger.info('Current job %s remote status = %s' % (self.str_job_id, l_status))
-            logger.info('Current job %s DB status = %s' % (
-                self.str_job_id, self.c_plugin_inst.status))
+            logger.info(f'Current job {job_id} remote status = {l_status}')
+            logger.info(f'Current job {job_id} DB status = {self.c_plugin_inst.status}')
 
             summary = self.get_job_status_summary(d_resp)
             self.c_plugin_inst.summary = summary
@@ -239,22 +233,16 @@ class PluginInstanceManager(object):
         objects under the corresponding output dir key that match a filter for each of
         the provided plugin instances.
         """
-        # extract the 'ts' plugin's especial parameters from the DB into a dict
-        d_esp_params = {'plugininstances': '', 'filter': ''}
+        # extract the 'ts' plugin's special parameters from the DB
+        plg_inst_ids = regexs = []
         if self.c_plugin_inst.plugin.meta.type == 'ts':
             for param_inst in self.l_plugin_inst_param_instances:
-                param = param_inst.plugin_param
-                if param.name in d_esp_params.keys():
-                    d_esp_params[param.name] = param_inst.value
-
-        plg_inst_ids = []
-        if d_esp_params['plugininstances']:
-            # 'plugininstances' string param represents a comma-separated list of ids
-            plg_inst_ids = d_esp_params['plugininstances'].split(',')
-
-        # 'filter' string param represents a comma-separated list of regular expressions
-        regexs = d_esp_params['filter'].split(',') if d_esp_params['filter'] else []
-
+                if param_inst.plugin_param.name == 'plugininstances':
+                    # string param that represents a comma-separated list of ids
+                    plg_inst_ids = param_inst.value.split(',') if param_inst.value else []
+                elif param_inst.plugin_param.name == 'filter':
+                    # string param that represents a comma-separated list of regular expr
+                    regexs = param_inst.value.split(',') if param_inst.value else []
         d_objs = {}
         for i, inst_id in enumerate(plg_inst_ids):
             try:
@@ -300,7 +288,7 @@ class PluginInstanceManager(object):
                     self.swift_manager.upload_obj(str_squashFile, f.read(),
                                                   content_type='text/plain')
         except ClientException as e:
-            logger.error('Swift storage error, detail: %s' % str(e))
+            logger.error(f'Swift storage error, detail: {str(e)}')
         return str_inputdir
 
     def create_zip_file(self, swift_paths):
@@ -315,16 +303,15 @@ class PluginInstanceManager(object):
                 try:
                     l_ls = self.swift_manager.ls(swift_path)
                 except ClientException as e:
-                    msg = 'Listing of swift storage files in %s failed, detail: %s' % (
-                    swift_path, str(e))
-                    logger.error(msg)
+                    logger.error(f'Listing of swift storage files in {swift_path} '
+                                 f'failed, detail: {str(e)}')
                 for obj_path in l_ls:
                     try:
                         contents = self.swift_manager.download_obj(obj_path)
                     except ClientException as e:
-                        msg = 'Downloading of file %s from swift storage for %s job ' \
-                              'failed, detail: %s' % (obj_path, self.str_job_id, str(e))
-                        logger.error(msg)
+                        job_id = self.str_job_id
+                        logger.error(f'Downloading of file {obj_path} from swift storage '
+                                     f'for {job_id} job failed, detail: {str(e)}')
                     zip_path = obj_path.replace(swift_path, '', 1).lstrip('/')
                     job_data_zip.writestr(zip_path, contents)
         memory_zip_file.seek(0)
@@ -351,11 +338,10 @@ class PluginInstanceManager(object):
         """
         Save to the DB and log the final status of the plugin instance.
         """
-        msg = "Saving job %s DB status as '%s'"
-        logger.info(msg % (self.str_job_id, self.c_plugin_inst.status))
-        msg = "Saving job %s DB end_date as '%s'"
+        job_id = self.str_job_id
+        logger.info(f"Saving job {job_id} DB status as '{self.c_plugin_inst.status}'")
         self.c_plugin_inst.end_date = timezone.now()
-        logger.info(msg % (self.str_job_id, self.c_plugin_inst.end_date))
+        logger.info(f"Saving job {job_id} DB end_date as '{self.c_plugin_inst.end_date}'")
         self.c_plugin_inst.save()
 
     def _handle_app_unextpath_parameters(self, unextpath_parameters_dict):
@@ -373,7 +359,7 @@ class PluginInstanceManager(object):
                 try:
                     obj_list = self.swift_manager.ls(path)
                 except ClientException as e:
-                    logger.error('Swift storage error, detail: %s' % str(e))
+                    logger.error(f'Swift storage error, detail: {str(e)}')
                 for obj in obj_list:
                     obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
                     if not obj_output_path.startswith(outputdir + '/'):
@@ -381,10 +367,10 @@ class PluginInstanceManager(object):
                     try:
                         self.swift_manager.copy_obj(obj, obj_output_path)
                     except ClientException as e:
-                        logger.error('Swift storage error, detail: %s' % str(e))
+                        logger.error(f'Swift storage error, detail: {str(e)}')
                     else:
                         obj_output_path_list.append(obj_output_path)
-        logger.info("Registering output files not extracted from swift with job %s",
+        logger.info('Registering output files not extracted from swift with job %s',
                     self.str_job_id)
         self._register_output_files(obj_output_path_list)
 
@@ -402,7 +388,7 @@ class PluginInstanceManager(object):
                 try:
                     self.swift_manager.copy_obj(obj, obj_output_path)
                 except ClientException as e:
-                    logger.error('Swift storage error, detail: %s' % str(e))
+                    logger.error(f'Swift storage error, detail: {str(e)}')
                 else:
                     obj_output_path_list.append(obj_output_path)
         logger.info("Registering 'ts' plugin's output files not extracted from swift with"
@@ -417,18 +403,19 @@ class PluginInstanceManager(object):
         plg_inst_lock = PluginInstanceLock(plugin_inst=self.c_plugin_inst)
         try:
             plg_inst_lock.save()
-        except IntegrityError:  # another async task has already entered here
-            pass
+        except IntegrityError:
+            pass  # another async task has already entered here
         else:
             # only one concurrent async task should get here
             pfcon_url = self.pfcon_client.url
-            msg = 'Sending zip file request to pfcon url -->%s<-- for job %s'
-            logger.info(msg % (pfcon_url, self.str_job_id))
+            job_id = self.str_job_id
+            logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
+                        f'for job {job_id}')
             try:
-                zip_content = self.pfcon_client.get_job_zip_data(self.str_job_id, 1000)
+                zip_content = self.pfcon_client.get_job_zip_data(job_id, 1000)
             except PfconRequestException as e:
-                msg = 'Error fetching zip from pfcon url -->%s<-- for job %s, detail: %s'
-                logger.error(msg % (pfcon_url, self.str_job_id, str(e)))
+                logger.error(f'Error fetching zip from pfcon url -->{pfcon_url}<-- '
+                             f'for job {job_id}, detail: {str(e)}')
                 self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
                 # data successfully downloaded so update summary
@@ -436,18 +423,28 @@ class PluginInstanceManager(object):
                 d_jobStatusSummary['pullPath']['status'] = True
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
 
-                msg = 'Registering output files from remote with job %s'
-                logger.info(msg, self.str_job_id)
+                logger.info('Registering output files from remote with job %s', job_id)
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
                 try:
                     swift_filenames = self.unpack_zip_file(zip_content)
                 except Exception as e:
-                    msg = 'Received bad zip file from remote for job %s, detail: %s'
-                    logger.error(msg % (self.str_job_id, str(e)))
+                    logger.error(f'Received bad zip file from remote for job {job_id}, '
+                                 f'detail: {str(e)}')
                     self.c_plugin_inst.status = 'cancelled'  # giving up
                 else:
                     self._register_output_files(swift_filenames)
+
+                    # handle unextracted path parameters
+                    d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
+                    if d_unextpath_params:
+                        self._handle_app_unextpath_parameters(d_unextpath_params)
+
+                    # handle filtered paths from input instances to 'ts' plugin instances
+                    if self.c_plugin_inst.plugin.meta.type == 'ts':
+                        d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
+                        self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
+
                     self.c_plugin_inst.status = 'finishedSuccessfully'
             self.save_plugin_instance_final_status()
 
