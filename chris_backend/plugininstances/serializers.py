@@ -218,6 +218,10 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         if value and self.param_name and self.plugin_type and self.previous:
             if (self.param_name == 'plugininstances') and (self.plugin_type == 'ts'):
                 plg_inst_ids = [inst_id.strip() for inst_id in value.split(',')]
+                if str(self.previous.id) not in plg_inst_ids:
+                    raise serializers.ValidationError(
+                        [f"Previous instance id '{self.previous.id}' must be included in "
+                         f"the 'plugininstances' list for a non-empty list."])
                 for inst_id in plg_inst_ids:
                     try:
                         plg_inst = PluginInstance.objects.get(pk=int(inst_id))

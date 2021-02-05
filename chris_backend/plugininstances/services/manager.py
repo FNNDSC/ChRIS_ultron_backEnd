@@ -440,7 +440,7 @@ class PluginInstanceManager(object):
                     if d_unextpath_params:
                         self._handle_app_unextpath_parameters(d_unextpath_params)
 
-                    # handle filtered paths from input instances to 'ts' plugin instances
+                    # handle filtered paths from input instances for 'ts' plugin instances
                     if self.c_plugin_inst.plugin.meta.type == 'ts':
                         d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
                         self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
