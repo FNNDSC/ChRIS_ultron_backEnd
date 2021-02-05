@@ -513,7 +513,7 @@ else
                         fnndsc/pl-simpledsapp,                      \
                         fnndsc/pl-s3retrieve,                       \
                         fnndsc/pl-dircopy,                            \
-                        fnndsc/pl-tsdircopy
+                        fnndsc/pl-topologicalcopy
     "
 
     STEP=$(expr $STEP + 4 )
