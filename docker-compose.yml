@@ -13,7 +13,7 @@ version: '3.7'
 services:
 
   chris:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris:1.1.0
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -34,7 +34,7 @@ services:
       role: "Production server using Apache's mod_wsgi"
 
   worker:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris:1.1.0
     entrypoint: ''
     command: celery -A core worker -c 4 -l info -Q main
     env_file:
@@ -54,7 +54,7 @@ services:
       role: "Production async worker"
 
   scheduler:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris:1.1.0
     entrypoint: ''
     command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file:
@@ -95,7 +95,7 @@ services:
       role: "Production async task queue"
 
   chris_store:
-    image: ${CHRISREPO}/chris_store
+    image: fnndsc/chris_store:latest
     env_file:
       - ./secrets/.chris_store.env
       - ./secrets/.chris_store_db.env
@@ -128,14 +128,12 @@ services:
       role: "Chris store database"
 
   swift_service:
-    image: fnndsc/docker-swift-onlyone
+    image: fnndsc/docker-swift-onlyone:latest
     init: true
     volumes:
       - swift_storage:/srv
     env_file:
       - ./secrets/.swift_service.env
-    ports:
-      - "8080:8080"
     restart: on-failure
     networks:
       - local
@@ -144,12 +142,10 @@ services:
       role: "swift object storage service"
 
   pfcon_service:
-    image: ${CHRISREPO}/pfcon
+    image: fnndsc/pfcon:2.4.0
     command: ["--forever", "--httpResponse", "--verbosity", "1"]
     env_file:
       - ./secrets/.swift_service.env
-    ports:
-      - "5005:5005"
     depends_on:
       - swift_service
       - pman_service
@@ -164,14 +160,10 @@ services:
       role: "pfcon service"
 
   pfioh_service:
-    # We need to map a physical dir in the HOST to the key store in pfioh.
-    # The keystore is specified by the --storeBase flag.
-    image: ${CHRISREPO}/pfioh
-    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
+    image: fnndsc/pfioh:3.0.2
+    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "0"]
     volumes:
-      - ./FS/remote:/hostFS/storeBase
-    ports:
-      - "5055:5055"
+      - chris-pfioh-remote:/hostFS/storeBase
     restart: on-failure
     networks:
       - local
@@ -180,25 +172,12 @@ services:
       role: "pfioh service"
 
   pman_service:
-    # pman also needs access to the pfioh storeBase folder (and hence the volume)
-    # mapping from the HOST file system space.
-    #
-    # There is however an extra twist. Since pman spins off containers of its
-    # own, it needs to mount this storeBase dir into the spawned container.
-    # However, it can't mount a dir inside itself to the spawned container,
-    # it has to mount an actaul existing directory. This directory is
-    # passed in the SHAREDIRBASE env variable, and will override the base
-    # mapping of SHAREDIR inside pman to the swarm manager. Note that the
-    # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
+    image: fnndsc/pman:2.2.2
     environment:
-      - STOREBASE
-    image: ${CHRISREPO}/pman
-    command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
+      - PMAN_DOCKER_VOLUME=chris-pfioh-remote
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./FS/remote:/hostFS/storeBase
-    ports:
-      - "5010:5010"
+      - chris-pfioh-remote:/hostFS/storeBase
     restart: on-failure
     networks:
       - local
@@ -213,3 +192,5 @@ volumes:
   chris_db_data:
   chris_store_db_data:
   swift_storage:
+  chris-pfioh-remote:
+    name: chris-pfioh-remote

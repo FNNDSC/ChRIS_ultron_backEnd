@@ -12,3 +12,7 @@ FS/
 dc.out
 .vscode
 celerybeat.pid
+
+# created by docker-deploy.sh to indicate CUBE is set up
+.setup
+
