@@ -519,8 +519,8 @@ else
     STEP=$(expr $STEP + 4 )
     title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
                             "(unmutable and available to all users)"
-        S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve.py --version)
-        SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp.py --version)
+        S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve --version)
+        SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp --version)
 
         PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
         printf "%20s${LightBlue}%60s${NC}\n"                            \

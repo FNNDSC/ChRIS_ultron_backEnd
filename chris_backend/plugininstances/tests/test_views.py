@@ -228,8 +228,8 @@ class PluginInstanceListViewTests(TasksViewTests):
                          'version': '0.1',
                          'dock_image': 'fnndsc/pl-simplefsapp',
                          'execshell': 'python3',
-                         'selfpath': '/usr/src/simplefsapp',
-                         'selfexec': 'simplefsapp.py'}
+                         'selfpath': '/usr/local/bin',
+                         'selfexec': 'simplefsapp'}
 
         self.plg_meta_data = {'name': 'simplefsapp',
                               'title': 'Dir plugin',
@@ -355,8 +355,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
                          'version': '0.1',
                          'dock_image': 'fnndsc/pl-simplefsapp',
                          'execshell': 'python3',
-                         'selfpath': '/usr/src/simplefsapp',
-                         'selfexec': 'simplefsapp.py'}
+                         'selfpath': '/usr/local/bin',
+                         'selfexec': 'simplefsapp'}
 
         self.plg_meta_data = {'name': 'simplefsapp',
                               'title': 'Dir plugin',

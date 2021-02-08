@@ -90,7 +90,7 @@ if [[ "$1" == 'up' ]]; then
         windowBottom
 
         title -d 1 "Uploading the plugin fnndsc/pl-dircopy"
-        docker-compose exec chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy.py --json 2> /dev/null)"
+        docker-compose exec chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy --json 2> /dev/null)"
         windowBottom
 
         title -d 1 "Adding host compute environment"

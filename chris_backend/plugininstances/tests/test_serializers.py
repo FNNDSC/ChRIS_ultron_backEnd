@@ -35,8 +35,8 @@ class SerializerTests(TestCase):
                          'version': '0.1',
                          'dock_image': 'fnndsc/pl-simplecopyapp',
                          'execshell': 'python3',
-                         'selfpath': '/usr/src/simplefsapp',
-                         'selfexec': 'simplefsapp.py'}
+                         'selfpath': '/usr/local/bin',
+                         'selfexec': 'simplefsapp'}
 
         self.plg_meta_data = {'name': self.plugin_name,
                               'title': 'Dir plugin',
