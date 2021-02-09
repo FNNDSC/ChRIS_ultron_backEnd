@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = [("created",               "Default initial"),
                   ("waiting",               "Waiting to be scheduled"),
-                  ("scheduled",             "Scheduled to the worker"),
-                  ("started",               "Sent to remote compute"),
+                  ("scheduled",             "Scheduled on worker"),
+                  ("started",               "Started on compute env"),
                   ("registeringFiles",      "Registering output files"),
                   ("finishedSuccessfully",  "Finished successfully"),
                   ("finishedWithError",     "Finished with error"),
@@ -79,7 +79,7 @@ class PluginInstance(models.Model):
         Custom internal method to create and save a new feed to the DB.
         """
         feed = Feed()
-        feed.name = self.plugin.meta.name
+        feed.name = self.title or self.plugin.meta.name
         feed.save()
         feed.owner.set([self.owner])
         feed.save()

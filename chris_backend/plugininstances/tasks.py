@@ -99,10 +99,9 @@ def cancel_waiting_plugin_instances():
     'cancelled' DB status.
     """
     lookup = Q(previous__status='finishedWithError') | Q(previous__status='cancelled')
-    instances = PluginInstance.objects.filter(status='waiting').filter(lookup)
-    for plg_inst in instances:
-        plg_inst.status = 'cancelled'
-        plg_inst.save()
+    PluginInstance.objects.filter(
+        status='waiting'
+    ).filter(lookup).update(status='cancelled')
 
 
 @shared_task  # toy task for testing celery stuff
