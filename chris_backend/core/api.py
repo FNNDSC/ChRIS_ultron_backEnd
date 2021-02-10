@@ -193,6 +193,14 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PluginInstanceDetail.as_view(),
         name='plugininstance-detail'),
 
+    path('v1/plugins/instances/<int:pk>/splits/',
+         plugininstance_views.PluginInstanceSplitList.as_view(),
+         name='plugininstancesplit-list'),
+
+    path('v1/plugins/instances/splits/<int:pk>/',
+         plugininstance_views.PluginInstanceSplitDetail.as_view(),
+         name='plugininstancesplit-detail'),
+
     path('v1/plugins/instances/<int:pk>/descendants/',
         plugininstance_views.PluginInstanceDescendantList.as_view(),
         name='plugininstance-descendant-list'),

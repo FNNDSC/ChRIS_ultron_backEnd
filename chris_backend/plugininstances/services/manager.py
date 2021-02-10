@@ -90,28 +90,27 @@ class PluginInstanceManager(object):
 
         plugin = self.c_plugin_inst.plugin
         plugin_type = plugin.meta.type
-        l_inputdirs = []
+        inputdirs = []
         if plugin_type == 'ds':
-            l_inputdirs.append(self.c_plugin_inst.previous.get_output_path())
+            inputdirs.append(self.c_plugin_inst.previous.get_output_path())
         else:
-            l_inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
+            inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
 
         d_unextpath_params, d_path_params = self.get_plugin_instance_path_parameters()
         for path_param_value in [param_value for param_value in d_path_params.values()]:
             # the value of each parameter of type 'path' is a string
             # representing a comma-separated list of paths in obj storage
-            l_inputdirs = l_inputdirs + path_param_value.split(',')
+            inputdirs = inputdirs + path_param_value.split(',')
 
         # create data file to transmit
-        zip_file = self.create_zip_file(l_inputdirs)
+        zip_file = self.create_zip_file(inputdirs)
 
         # create job description dictionary
         cmd_args = self.get_plugin_instance_app_cmd_args()
-        l_cmd_args = [str(s) for s in cmd_args]  # convert all arguments to string
-        l_cmd_path_flags = list(d_unextpath_params.keys()) + list(d_path_params.keys())
+        cmd_path_flags = list(d_unextpath_params.keys()) + list(d_path_params.keys())
         job_descriptors = {
-            'cmd_args': ' '.join(l_cmd_args),
-            'cmd_path_flags': ','.join(l_cmd_path_flags),
+            'cmd_args': ' '.join(cmd_args),
+            'cmd_path_flags': ','.join(cmd_path_flags),
             'auid': self.c_plugin_inst.owner.username,
             'number_of_workers': str(self.c_plugin_inst.number_of_workers),
             'cpu_limit': str(self.c_plugin_inst.cpu_limit),
@@ -203,7 +202,9 @@ class PluginInstanceManager(object):
             value = param_inst.value
             if param.action == 'store':
                 app_args.append(param.flag)
-                app_args.append(value)
+                if param.type == 'string' and not value:
+                    value = "''"  # handle empty string as a valid value for a flag
+                app_args.append(str(value))  # convert all argument values to string
             elif param.action == 'store_true' and value:
                 app_args.append(param.flag)
             elif param.action == 'store_false' and not value:

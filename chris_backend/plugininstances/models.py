@@ -207,6 +207,20 @@ class PluginInstanceLock(models.Model):
         return self.plugin_inst.id
 
 
+class PluginInstanceSplit(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    filter = models.CharField(max_length=600, blank=True)
+    created_plugin_inst_ids = models.CharField(max_length=600)
+    plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
+                                    related_name='splits')
+
+    class Meta:
+        ordering = ('plugin_inst', '-creation_date',)
+
+    def __str__(self):
+        return self.created_plugin_inst_ids
+
+
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=1024, unique=True)

@@ -9,14 +9,15 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from plugins.models import Plugin
 
-from .models import PluginInstance, PluginInstanceFilter
+from .models import PluginInstance, PluginInstanceFilter, PluginInstanceSplit
 from .models import PluginInstanceFile, PluginInstanceFileFilter
 from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter, UnextpathParameter
 from .serializers import PARAMETER_SERIALIZERS
-from .serializers import GenericParameterSerializer
+from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
-from .permissions import IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly
+from .permissions import (IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly,
+                          IsOwnerOrReadOnly)
 from .tasks import (run_plugin_instance, check_plugin_instance_exec_status,
                     cancel_plugin_instance)
 
@@ -116,11 +117,11 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': "", 'compute_resource_name': "", 'previous_id': "",
-                         'cpu_limit': "", 'memory_limit': "", 'number_of_workers': "",
-                         'gpu_limit': ""}
+        template_data = {'title': '', 'compute_resource_name': '', 'previous_id': '',
+                         'cpu_limit': '', 'memory_limit': '', 'number_of_workers': '',
+                         'gpu_limit': ''}
         for name in param_names:
-            template_data[name] = ""
+            template_data[name] = ''
         return services.append_collection_template(response, template_data)
 
     def get_plugin_instances_queryset(self):
@@ -248,6 +249,99 @@ class PluginInstanceDescendantList(generics.ListAPIView):
         """
         instance = self.get_object()
         return self.filter_queryset(instance.get_descendant_instances())
+
+
+class PluginInstanceSplitList(generics.ListCreateAPIView):
+    """
+    A view for the collection of splits for a plugin instance.
+    """
+    serializer_class = PluginInstanceSplitSerializer
+    queryset = PluginInstance.objects.all()
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrReadOnly,)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate a plugin instance and a list of newly created
+        'pl-topologicalcopy' plugin instance ids with the newly created split before
+        first saving to the DB.
+        """
+        user = self.request.user
+        instance = self.get_object()
+        plg_topologcopy = Plugin.objects.filter(meta__name='pl-topologicalcopy').first()
+
+        cr_name = serializer.validated_data.pop('compute_resource_name', '')
+        if cr_name:
+            compute_resource = plg_topologcopy.compute_resources.get(name=cr_name)
+        else:
+            compute_resource = instance.compute_resource
+
+        plg_filter_param = plg_topologcopy.parameters.get(name='filter')
+        plg_plugininstances_param = plg_topologcopy.parameters.get(name='plugininstances')
+
+        created_plg_inst_ids = []
+        filter_list = serializer.validated_data.get('filter', '').split(',')
+        for f in filter_list:
+            plg_inst = PluginInstance.objects.create(
+                plugin=plg_topologcopy, owner=user, previous=instance,
+                compute_resource=compute_resource
+            )
+            StrParameter.objects.create(plugin_inst=plg_inst,
+                                        plugin_param=plg_plugininstances_param,
+                                        value=str(instance.id))
+            if f:
+                StrParameter.objects.create(plugin_inst=plg_inst,
+                                            plugin_param=plg_filter_param,
+                                            value=f)
+            if instance.status == 'finishedSuccessfully':
+                # schedule the plugin's app to run
+                plg_inst.status = 'scheduled'  # status changes to 'scheduled' right away
+                plg_inst.save()
+                run_plugin_instance.delay(plg_inst.id)  # call async task
+            elif instance.status in ('created', 'waiting', 'scheduled',
+                                     'registeringFiles', 'started'):
+                plg_inst.status = 'waiting'
+                plg_inst.save()
+            elif instance.status in ('finishedWithError', 'cancelled'):
+                plg_inst.status = 'cancelled'
+                plg_inst.save()
+            created_plg_inst_ids.append(str(plg_inst.id))
+
+        serializer.save(
+            plugin_inst=instance, created_plugin_inst_ids=','.join(created_plg_inst_ids)
+        )
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return the list of splits for the queried plugin instance.
+        A document-level link relation and a collection+json template are also added
+        to the response.
+        """
+        queryset = self.get_splits_queryset()
+        response = services.get_list_response(self, queryset)
+        instance = self.get_object()
+        # append document-level link relations
+        links = {'plugin_inst': reverse('plugininstance-detail', request=request,
+                                        kwargs={"pk": instance.id})}
+        response = services.append_collection_links(response, links)
+        # append write template
+        template_data = {'filter': '', 'compute_resource_name': ''}
+        return services.append_collection_template(response, template_data)
+
+    def get_splits_queryset(self):
+        """
+        Custom method to get the actual splits queryset.
+        """
+        instance = self.get_object()
+        return self.filter_queryset(instance.splits.all())
+
+
+class PluginInstanceSplitDetail(generics.RetrieveAPIView):
+    """
+    A view for a plugin instance split.
+    """
+    queryset = PluginInstanceSplit.objects.all()
+    serializer_class = PluginInstanceSplitSerializer
+    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginInstanceFileList(generics.ListAPIView):
