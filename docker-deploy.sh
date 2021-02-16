@@ -54,7 +54,6 @@ if [[ "$1" == 'up' ]]; then
     "fnndsc/pfcon"
     "fnndsc/pfioh"
     "fnndsc/pman"
-    "fnndsc/swarm"
     "fnndsc/pfdcm"
     "fnndsc/docker-swift-onlyone"
     )
@@ -93,12 +92,20 @@ if [[ "$1" == 'up' ]]; then
         docker-compose exec chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy --json 2> /dev/null)"
         windowBottom
 
+        title -d 1 "Uploading the plugin fnndsc/pl-topologicalcopy"
+        docker-compose exec chris_store python plugins/services/manager.py add pl-topologicalcopy chris https://github.com/FNNDSC/pl-topologicalcopy fnndsc/pl-topologicalcopy --descriptorstring "$(docker run --rm fnndsc/pl-topologicalcopy topologicalcopy --json 2> /dev/null)"
+        windowBottom
+
         title -d 1 "Adding host compute environment"
         docker-compose exec chris python plugins/services/manager.py add host "http://pfcon.local:5005/api/v1/" --description "Local compute"
         windowBottom
 
         title -d 1 "Registering pl-dircopy from store to CUBE"
         docker-compose exec chris python plugins/services/manager.py register host --pluginname pl-dircopy
+        windowBottom
+
+        title -d 1 "Registering pl-topologicalcopy from store to CUBE"
+        docker-compose exec chris python plugins/services/manager.py register host --pluginname pl-topologicalcopy
         windowBottom
 
         touch FS/.setup

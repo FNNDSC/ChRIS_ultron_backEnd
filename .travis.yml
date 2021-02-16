@@ -24,7 +24,6 @@ before_install:
 install:
   # pull required docker images
   - docker pull fnndsc/pfdcm
-  - docker pull fnndsc/swarm
   - travis_wait docker build -t fnndsc/chris:dev -f Dockerfile_dev .
 
 before_script:

@@ -193,7 +193,6 @@ declare -a A_CONTAINER=(
     "fnndsc/pfcon${TAG}^PFCONREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
-    "fnndsc/swarm^SWARMREPO"
     "fnndsc/pfdcm${TAG}^PFDCMREPO"
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
 )
@@ -274,8 +273,7 @@ else
             cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             if [[   $CONTAINER != "chris:dev"            && \
                     $CONTAINER != "chris_store"          && \
-                    $CONTAINER != "docker-swift-onlyone" && \
-                    $CONTAINER != "swarm" ]] ; then
+                    $CONTAINER != "docker-swift-onlyone"  ]] ; then
                 windowBottom
                 CMD="docker run ${REPO}/$CONTAINER --version"
                 Ver=$(echo $CMD | sh | grep Version)
@@ -579,33 +577,13 @@ else
    windowBottom
 
     if (( ! b_skipIntegrationTests && ! b_pause )) ; then
-        title -d 1 "Automatic restart of satellite services pfcon/pfioh/pman" \
+        title -d 1 "Automatic restart of pfioh service" \
                    "to clear any lingering traces of integration tests..."
         echo ""                                                     | ./boxes.sh
-        tcprint White "Clearing internal database... " Cyan "pman" 40 -40
-        windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml          \
-            exec pman_service pman_do --op DBclean >& dc.out >/dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
-        tcprint White "Restarting service... " Cyan "pman" 40 -40
-        docker-compose --no-ansi -f docker-compose_dev.yml          \
-            restart pman_service >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
         tcprint White "Restarting service... " Cyan "pfioh" 40 -40
         windowBottom
         docker-compose --no-ansi -f docker-compose_dev.yml          \
             restart pfioh_service >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-
-        tcprint White "Restarting service... " Cyan "pfcon" 40 -40
-        windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml          \
-            restart pfcon_service >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
     fi

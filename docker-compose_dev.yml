@@ -177,7 +177,7 @@ services:
       - pfioh_service
     environment:
       - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
-      - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/cmd
+      - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/
       - DATA_SERVICE_URL=http://pfioh_service:5055/api/v1/cmd
     networks:
       local:
@@ -204,28 +204,17 @@ services:
       role: "pfioh service"
 
   pman_service:
-    # pman also needs access to the pfioh storeBase folder (and hence the volume)
-    # mapping from the HOST file system space.
-    #
-    # There is however an extra twist. Since pman spins off containers of its
-    # own, it needs to mount this storeBase dir into the spawned container.
-    # However, it can't mount a dir inside itself to the spawned container,
-    # it has to mount an actual "real" existing directory. This "real" directory 
-    # is passed in the SHAREDIRBASE env variable, and will override the base
-    # mapping of SHAREDIR inside pman to the swarm manager. Note that the
-    # full path to the spawned container should be ${SHAREDIRBASE} + keyStore!
-    #
-    # So, in short, if pman detects the SHAREDIRBASE, it will map SHAREDIRBASE to
-    # the swarm manager.
-    #
-    # Ugh. Sorry if the above is confusing.
+    # Since pman spins off containers of its own it needs to mount storeBase dir (where
+    # pfioh shares the data) into the spawned container. However, it can't mount a dir
+    # inside itself to the spawned container, it has to mount an actual existing
+    # directory in the host. This directory is passed in the STOREBASE env variable.
     environment:
       - STOREBASE
+      - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+      - CONTAINER_ENV=swarm
     image: ${PMANREPO}/pman${TAG}
-    command: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:z
-      - ./FS/remote:/hostFS/storeBase:z
     ports:
       - "5010:5010"
     networks:
