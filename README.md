@@ -8,6 +8,28 @@ The core backend service for the ChRIS distributed software platform, also known
 
 ## ChRIS development, testing and deployment
 
+### TL;DR
+
+If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and 
+running with no mess, no fuss:
+
+```bash
+git clone https://github.com/FNNDSC/ChRIS_ultron_backend
+cd ChRIS_ultron_backend
+# Run full CUBE instantiation with tests:
+./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
+
+# Skip unit and integration tests and the intro:
+./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
+```
+
+Once the system is "up", you can add more compute plugins to the ecosystem:
+
+```bash
+./postscript.sh
+```
+
+The resulting instance uses the default Django development server and therefore is not suitable for production.
 
 ### Abstract
 
@@ -26,21 +48,6 @@ Currently tested platforms:
 #### On a Linux machine make sure to add your computer user to the ``docker`` group
 
 
-### TL;DR
-
-If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and 
-running with no mess, no fuss:
-
-```bash
-git clone https://github.com/FNNDSC/ChRIS_ultron_backend
-cd ChRIS_ultron_backend
-# Run full CUBE instantiation with tests:
-./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
-
-# Skip unit and integration tests and the intro:
-./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
-```
-The resulting instance uses the default Django development server and therefore is not suitable for production.
 
 
 ### Single-machine production deployment
