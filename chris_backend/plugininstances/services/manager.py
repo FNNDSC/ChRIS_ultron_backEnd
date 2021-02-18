@@ -44,6 +44,7 @@ import logging
 import os
 import re
 import io
+import time
 import json
 import zipfile
 from pfconclient import client as pfcon
@@ -299,6 +300,7 @@ class PluginInstanceManager(object):
         Create job zip file ready for transmission to the remote from a list of swift
         storage paths (prefixes).
         """
+        job_id = self.str_job_id
         memory_zip_file = io.BytesIO()
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for swift_path in swift_paths:
@@ -306,15 +308,14 @@ class PluginInstanceManager(object):
                 try:
                     l_ls = self.swift_manager.ls(swift_path)
                 except ClientException as e:
-                    logger.error(f'Listing of swift storage files in {swift_path} '
-                                 f'failed, detail: {str(e)}')
+                    logger.error(f'Error while listing swift storage files in '
+                                 f'{swift_path}, detail: {str(e)}')
                 for obj_path in l_ls:
                     try:
                         contents = self.swift_manager.download_obj(obj_path)
                     except ClientException as e:
-                        job_id = self.str_job_id
-                        logger.error(f'Downloading of file {obj_path} from swift storage '
-                                     f'for {job_id} job failed, detail: {str(e)}')
+                        logger.error(f'Error while downloading file {obj_path} from '
+                                     f'swift storage for {job_id} job, detail: {str(e)}')
                     zip_path = obj_path.replace(swift_path, '', 1).lstrip('/')
                     job_data_zip.writestr(zip_path, contents)
         memory_zip_file.seek(0)
@@ -324,17 +325,22 @@ class PluginInstanceManager(object):
         """
         Unpack job zip file from the remote into swift storage.
         """
+        job_id = self.str_job_id
+        swift_filenames = []
         memory_zip_file = io.BytesIO(zip_file_content)
         with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_data_zip:
             filenames = job_data_zip.namelist()
             logger.info('Number of files to decompress %s: ', len(filenames))
             output_path = self.c_plugin_inst.get_output_path() + '/'
-            swift_filenames = []
             for fname in filenames:
                 content = job_data_zip.read(fname)
                 swift_fname = output_path + fname.lstrip('/')
                 swift_filenames.append(swift_fname)
-                self.swift_manager.upload_obj(swift_fname, content)
+                try:
+                    self.swift_manager.upload_obj(swift_fname, content)
+                except ClientException as e:
+                    logger.error(f'Error while uploading file {swift_fname} to swift '
+                                 f'storage for {job_id} job, detail: {str(e)}')
         return swift_filenames
 
     def save_plugin_instance_final_status(self):
