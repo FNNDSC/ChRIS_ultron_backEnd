@@ -514,5 +514,5 @@ class PluginInstanceManager(object):
             logs = d_jobStatusSummary['compute']['return']['job_logs'] = d_c['logs']
 
             if len(logs) > 3000:
-                d_jobStatusSummary['compute']['return']['job_logs'][0] = logs[-3000:]
+                d_jobStatusSummary['compute']['return']['job_logs'] = logs[-3000:]
         return json.dumps(d_jobStatusSummary)
