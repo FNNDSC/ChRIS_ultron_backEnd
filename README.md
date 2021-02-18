@@ -47,7 +47,7 @@ Currently tested platforms:
 
 #### On a Linux machine make sure to add your computer user to the ``docker`` group
 
-
+Consult this page https://docs.docker.com/engine/install/linux-postinstall/
 
 
 ### Single-machine production deployment
