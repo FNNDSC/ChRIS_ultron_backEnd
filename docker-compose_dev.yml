@@ -194,7 +194,7 @@ services:
     image: ${PFIOHREPO}/pfioh${TAG}
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
-      - ./FS/remote:/hostFS/storeBase:z
+      - ${STOREBASE}:/hostFS/storeBase:z
     ports:
       - "5055:5055"
     networks:
