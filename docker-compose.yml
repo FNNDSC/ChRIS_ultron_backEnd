@@ -168,7 +168,7 @@ services:
     image: ${CHRISREPO}/pfioh
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
-      - ./FS/remote:/hostFS/storeBase
+      - ${STOREBASE}:/hostFS/storeBase
     ports:
       - "5055:5055"
     restart: on-failure

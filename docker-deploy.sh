@@ -113,6 +113,9 @@ if [[ "$1" == 'up' ]]; then
 fi
 
 if [[ "$1" == 'down' ]]; then
+
+    export STOREBASE=${STOREBASE}
+
     title -d 1 "Destroying containerized production environment" "from ./docker-compose.yml"
     echo
     printf "Do you want to also remove persistent volumes?"

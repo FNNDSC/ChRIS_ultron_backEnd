@@ -4,6 +4,8 @@ source ./decorate.sh
 
 declare -i STEP=0
 
+export STOREBASE=${STOREBASE}
+
 title -d 1 "Destroying containerized development environment" "from  ./docker-compose_dev.yml"
     echo "Do you want to also remove persistent volumes? [y/n]"             | ./boxes.sh
     windowBottom
