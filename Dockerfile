@@ -19,7 +19,7 @@
 #   docker run -ti --entrypoint /bin/bash local/chris
 #
 
-FROM fnndsc/ubuntu-python3:latest
+FROM fnndsc/ubuntu-python3:ubuntu20.04-python3.8.5
 MAINTAINER fnndsc "dev@babymri.org"
 
 # Pass a UID on build command line (see above) to set internal UID
