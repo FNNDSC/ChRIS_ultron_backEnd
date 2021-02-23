@@ -319,7 +319,7 @@ class PluginManager(object):
         res = store_client.get(url)
         result = store_client.get_data_from_collection(res)
 
-        if 'data' not in result:
+        if not result['data']:
             raise NameError(f"Could not find plugin with url '{url}'")
 
         plg = result['data'][0]
