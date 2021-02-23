@@ -35,6 +35,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     feed_id = serializers.ReadOnlyField(source='feed.id')
     output_path = serializers.SerializerMethodField()
     owner_username = serializers.ReadOnlyField(source='owner.username')
+    error_code = serializers.ReadOnlyField()
     previous = serializers.HyperlinkedRelatedField(
         view_name='plugininstance-detail', read_only=True
     )
@@ -64,8 +65,9 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'pipeline_inst',
                   'feed_id', 'start_date', 'end_date', 'output_path', 'status', 'summary',
                   'raw', 'owner_username', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit', 'previous', 'feed', 'plugin',
-                  'descendants', 'files', 'parameters', 'compute_resource', 'splits')
+                  'number_of_workers', 'gpu_limit', 'error_code', 'previous', 'feed',
+                  'plugin', 'descendants', 'files', 'parameters', 'compute_resource',
+                  'splits')
 
     def get_output_path(self, obj):
         """
