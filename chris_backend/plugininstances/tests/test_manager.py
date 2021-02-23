@@ -179,7 +179,7 @@ class PluginInstanceManagerTests(TestCase):
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
-        maxLoopTries = 10
+        maxLoopTries = 15
         currentLoop = 1
         b_checkAgain = True
         time.sleep(10)

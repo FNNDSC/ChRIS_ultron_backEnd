@@ -482,6 +482,9 @@ class PluginInstanceManager(object):
         Internal method to handle the 'undefined' status returned by the
         remote compute.
         """
+        job_id = self.str_job_id
+        logger.error(f'[CODE10,{job_id}]: Got undefined status from remote')
+        self.c_plugin_inst.error_code = 'CODE10'
         self.c_plugin_inst.status = 'cancelled'
         self.save_plugin_instance_final_status()
 
