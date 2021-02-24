@@ -23,7 +23,7 @@ FROM fnndsc/ubuntu-python3:ubuntu20.04-python3.8.5
 MAINTAINER fnndsc "dev@babymri.org"
 
 # Pass a UID on build command line (see above) to set internal UID
-ARG UID=1001
+ARG UID=214748364
 ENV UID=$UID DEBIAN_FRONTEND=noninteractive VERSION="0.1"
 
 ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
