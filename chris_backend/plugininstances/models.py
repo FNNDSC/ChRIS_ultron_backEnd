@@ -37,6 +37,7 @@ class PluginInstance(models.Model):
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
     summary = models.CharField(max_length=4000, blank=True, default='')
     raw = models.TextField(blank=True, default='')
+    error_code = models.CharField(max_length=7, blank=True)
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')

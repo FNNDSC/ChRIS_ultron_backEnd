@@ -25,7 +25,7 @@ while max_tries > 0 and db is None:
                      passwd=args.password,
                      host=host)
     except Exception:
-        time.sleep(2)
+        time.sleep(5)
         max_tries -= 1
 
 if db is None:
