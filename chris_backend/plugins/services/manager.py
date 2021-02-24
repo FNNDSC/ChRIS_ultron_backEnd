@@ -316,13 +316,15 @@ class PluginManager(object):
         """
         store_url = settings.CHRIS_STORE_URL
         store_client = StoreClient(store_url, None, None, timeout)
-        result = store_client.get_data_from_collection(store_client.get(url))
-        if result['data']:
-            plg = result['data'][0]
-        else:
-            raise NameError("Could not find plugin with url '%s'" % url)
-        plg['parameters'] = PluginManager.get_plugin_parameters_from_store(plg['id'],
-                                                                           timeout)
+        res = store_client.get(url)
+        result = store_client.get_data_from_collection(res)
+
+        if not result['data']:
+            raise NameError(f"Could not find plugin with url '{url}'")
+
+        plg = result['data'][0]
+        parameters_url = res.items[0].links.get(rel='parameters').href
+        plg['parameters'] = PluginManager.get_plugin_parameters_from_url(parameters_url, timeout)
         return plg
 
     @staticmethod
@@ -354,6 +356,24 @@ class PluginManager(object):
         while True:
             result = store_client.get_plugin_parameters(plg_id, {'limit': limit,
                                                                  'offset': offset})
+            parameters.extend(result['data'])
+            offset += limit
+            if not result['hasNextPage']: break
+        return parameters
+
+    @staticmethod
+    def get_plugin_parameters_from_url(parameters_url, timeout=30):
+        """
+        Get a plugin's parameters representation from a ChRIS store by URL.
+        """
+        store_url = settings.CHRIS_STORE_URL
+        store_client = StoreClient(store_url, None, None, timeout)
+        parameters = []
+        offset = 0
+        limit = 50
+        while True:
+            res = store_client.get(parameters_url, {'limit': limit, 'offset': offset})
+            result = store_client.get_data_from_collection(res)
             parameters.extend(result['data'])
             offset += limit
             if not result['hasNextPage']: break
