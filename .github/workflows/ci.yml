@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t fnndsc/chris .
+      - run: docker build -t fnndsc/chris:dev -f Dockerfile_dev .
       - uses: FNNDSC/cube-integration-action@v3
         with:
           repository: ${{ github.workspace }}
