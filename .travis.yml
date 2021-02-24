@@ -22,8 +22,6 @@ before_install:
   - docker-compose -v
 
 install:
-  # pull required docker images
-  - docker pull fnndsc/pfdcm
   - travis_wait docker build -t fnndsc/chris:dev -f Dockerfile_dev .
 
 before_script:
