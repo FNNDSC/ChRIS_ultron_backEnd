@@ -40,7 +40,7 @@ RUN apt-get update                                               \
   && apt-get install -y libssl-dev libmysqlclient-dev            \
   && apt-get install -y apache2 apache2-dev                      \
   && pip install -r ${REQPATH}/production.txt                    \
-  && useradd -u $UID -ms /bin/bash localuser
+  && useradd -l -u $UID -ms /bin/bash localuser
 
 # Start as user localuser
 USER localuser

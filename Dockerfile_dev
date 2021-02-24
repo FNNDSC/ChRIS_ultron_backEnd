@@ -47,7 +47,7 @@ RUN apt-get update                                                \
   && pip install --upgrade pip                                    \
   && pip install -r ${REQPATH}/local.txt                          \
   && pip3 install https://github.com/msbrogli/rpudb/archive/master.zip \
-  && useradd -u $UID -ms /bin/bash localuser                      \
+  && useradd -l -u $UID -ms /bin/bash localuser                      \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Start as user localuser
