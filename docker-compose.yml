@@ -169,8 +169,6 @@ services:
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
       - ${STOREBASE}:/hostFS/storeBase
-    ports:
-      - "5055:5055"
     restart: on-failure
     networks:
       - remote
@@ -190,8 +188,6 @@ services:
       - ./secrets/.pman_service.env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "5010:5010"
     restart: on-failure
     networks:
       - remote
