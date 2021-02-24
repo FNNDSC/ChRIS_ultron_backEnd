@@ -13,6 +13,7 @@ if __name__ == '__main__':
     import django
     django.setup()
 
+
 from django.conf import settings
 from django.utils import timezone
 
