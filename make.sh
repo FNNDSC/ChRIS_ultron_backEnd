@@ -193,7 +193,6 @@ declare -a A_CONTAINER=(
     "fnndsc/pfcon${TAG}^PFCONREPO"
     "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
-    "fnndsc/pfdcm${TAG}^PFDCMREPO"
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
 )
 

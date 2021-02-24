@@ -54,7 +54,6 @@ if [[ "$1" == 'up' ]]; then
     "fnndsc/pfcon"
     "fnndsc/pfioh"
     "fnndsc/pman"
-    "fnndsc/pfdcm"
     "fnndsc/docker-swift-onlyone"
     )
     echo "Pulling latest version of all service containers..."
