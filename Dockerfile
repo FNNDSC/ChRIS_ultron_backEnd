@@ -23,7 +23,7 @@ FROM fnndsc/ubuntu-python3:ubuntu20.04-python3.8.5
 MAINTAINER fnndsc "dev@babymri.org"
 
 # Pass a UID on build command line (see above) to set internal UID
-ARG UID=1001
+ARG UID=214748364
 ENV UID=$UID DEBIAN_FRONTEND=noninteractive VERSION="0.1"
 
 ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
@@ -40,7 +40,7 @@ RUN apt-get update                                               \
   && apt-get install -y libssl-dev libmysqlclient-dev            \
   && apt-get install -y apache2 apache2-dev                      \
   && pip install -r ${REQPATH}/production.txt                    \
-  && useradd -u $UID -ms /bin/bash localuser
+  && useradd -l -u $UID -ms /bin/bash localuser
 
 # Start as user localuser
 USER localuser
