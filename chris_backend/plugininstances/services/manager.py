@@ -44,6 +44,7 @@ import logging
 import os
 import re
 import io
+import time
 import json
 import zipfile
 from pfconclient import client as pfcon
@@ -91,10 +92,15 @@ class PluginInstanceManager(object):
         plugin = self.c_plugin_inst.plugin
         plugin_type = plugin.meta.type
         inputdirs = []
-        if plugin_type == 'ds':
-            inputdirs.append(self.c_plugin_inst.previous.get_output_path())
-        else:
-            inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
+        try:
+            if plugin_type == 'ds':
+                inputdirs.append(self.get_previous_output_path())
+            else:
+                inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
+        except Exception:
+            self.c_plugin_inst.status = 'cancelled'  # giving up
+            self.save_plugin_instance_final_status()
+            return
 
         d_unextpath_params, d_path_params = self.get_plugin_instance_path_parameters()
         for path_param_value in [param_value for param_value in d_path_params.values()]:
@@ -103,7 +109,12 @@ class PluginInstanceManager(object):
             inputdirs = inputdirs + path_param_value.split(',')
 
         # create data file to transmit
-        zip_file = self.create_zip_file(inputdirs)
+        try:
+            zip_file = self.create_zip_file(inputdirs)
+        except Exception:
+            self.c_plugin_inst.status = 'cancelled'  # giving up
+            self.save_plugin_instance_final_status()
+            return
 
         # create job description dictionary
         cmd_args = self.get_plugin_instance_app_cmd_args()
@@ -192,6 +203,30 @@ class PluginInstanceManager(object):
         """
         pass
 
+    def get_previous_output_path(self):
+        """
+        Get the previous plugin instance output directory. Make sure to deal with
+        the eventual consistency.
+        """
+        job_id = self.str_job_id
+        previous = self.c_plugin_inst.previous
+        output_path = previous.get_output_path()
+        fnames = [f.fname.name for f in previous.files.all()]
+        for i in range(20):  # loop to deal with eventual consistency
+            try:
+                l_ls = self.swift_manager.ls(output_path)
+            except ClientException as e:
+                logger.error(f'[CODE06,{job_id}]: Error while listing swift '
+                             f'storage files in {output_path}, detail: {str(e)}')
+            else:
+                if all(obj in l_ls for obj in fnames):
+                    return output_path
+            time.sleep(3)
+        logger.error(f'[CODE11,{job_id}]: Error while listing swift storage files in '
+                     f'{output_path}, detail: Presumable eventual consistency problem')
+        self.c_plugin_inst.error_code = 'CODE11'
+        raise NameError('Presumable eventual consistency problem.')
+
     def get_plugin_instance_app_cmd_args(self):
         """
         Get the list of the plugin instance app's cmd arguments.
@@ -256,19 +291,21 @@ class PluginInstanceManager(object):
                 logger.error(f"[CODE05,{job_id}]: Couldn't find any plugin instance with "
                              f"id {inst_id} while processing input instances to 'ts' "
                              f"plugin instance with id {self.c_plugin_inst.id}")
+                self.c_plugin_inst.error_code = 'CODE05'
+                raise
+            output_path = plg_inst.get_output_path()
+            try:
+                l_ls = self.swift_manager.ls(output_path)
+            except ClientException as e:
+                logger.error(f'[CODE06,{job_id}]: Error while listing swift '
+                             f'storage files in {output_path}, detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE06'
+                raise
+            if (i < len(regexs)) and regexs[i]:
+                r = re.compile(regexs[i])
+                d_objs[output_path] = [obj for obj in l_ls if r.search(obj)]
             else:
-                output_path = plg_inst.get_output_path()
-                try:
-                    l_ls = self.swift_manager.ls(output_path)
-                except ClientException as e:
-                    logger.error(f'[CODE06,{job_id}]: Error while listing swift '
-                                 f'storage files in {output_path}, detail: {str(e)}')
-                else:
-                    if (i < len(regexs)) and regexs[i]:
-                        r = re.compile(regexs[i])
-                        d_objs[output_path] = [obj for obj in l_ls if r.search(obj)]
-                    else:
-                        d_objs[output_path] = l_ls
+                d_objs[output_path] = l_ls
         return d_objs
 
     def manage_plugin_instance_app_empty_inputdir(self):
@@ -296,6 +333,8 @@ class PluginInstanceManager(object):
         except ClientException as e:
             logger.error(f'[CODE07,{job_id}]: Error while uploading file '
                          f'{str_squashFile} to swift storage, detail: {str(e)}')
+            self.c_plugin_inst.error_code = 'CODE07'
+            raise
         return str_inputdir
 
     def create_zip_file(self, swift_paths):
@@ -307,18 +346,21 @@ class PluginInstanceManager(object):
         memory_zip_file = io.BytesIO()
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for swift_path in swift_paths:
-                l_ls = []
                 try:
                     l_ls = self.swift_manager.ls(swift_path)
                 except ClientException as e:
                     logger.error(f'[CODE06,{job_id}]: Error while listing swift '
                                  f'storage files in {swift_path}, detail: {str(e)}')
+                    self.c_plugin_inst.error_code = 'CODE06'
+                    raise
                 for obj_path in l_ls:
                     try:
                         contents = self.swift_manager.download_obj(obj_path)
                     except ClientException as e:
                         logger.error(f'[CODE08,{job_id}]: Error while downloading file '
                                      f'{obj_path} from swift storage, detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE08'
+                        raise
                     zip_path = obj_path.replace(swift_path, '', 1).lstrip('/')
                     job_data_zip.writestr(zip_path, contents)
         memory_zip_file.seek(0)
@@ -326,25 +368,36 @@ class PluginInstanceManager(object):
 
     def unpack_zip_file(self, zip_file_content):
         """
-        Unpack job zip file from the remote into swift storage.
+        Unpack job zip file from the remote into swift storage and register the
+        extracted files with the DB.
         """
         job_id = self.str_job_id
         swift_filenames = []
-        memory_zip_file = io.BytesIO(zip_file_content)
-        with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_data_zip:
-            filenames = job_data_zip.namelist()
-            logger.info('Number of files to decompress %s: ', len(filenames))
-            output_path = self.c_plugin_inst.get_output_path() + '/'
-            for fname in filenames:
-                content = job_data_zip.read(fname)
-                swift_fname = output_path + fname.lstrip('/')
-                swift_filenames.append(swift_fname)
-                try:
-                    self.swift_manager.upload_obj(swift_fname, content)
-                except ClientException as e:
-                    logger.error(f'[CODE07,{job_id}]: Error while uploading file '
-                                 f'{swift_fname} to swift storage, detail: {str(e)}')
-        return swift_filenames
+        try:
+            memory_zip_file = io.BytesIO(zip_file_content)
+            with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_zip:
+                filenames = job_zip.namelist()
+                logger.info(f'{len(filenames)} files to decompress for job {job_id}')
+                output_path = self.c_plugin_inst.get_output_path() + '/'
+                for fname in filenames:
+                    content = job_zip.read(fname)
+                    swift_fname = output_path + fname.lstrip('/')
+                    try:
+                        self.swift_manager.upload_obj(swift_fname, content)
+                    except ClientException as e:
+                        logger.error(f'[CODE07,{job_id}]: Error while uploading file '
+                                     f'{swift_fname} to swift storage, detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE07'
+                        raise
+                    swift_filenames.append(swift_fname)
+        except ClientException:
+            raise
+        except Exception as e:
+            logger.error(f'[CODE04,{job_id}]: Received bad zip file from remote, '
+                         f'detail: {str(e)}')
+            self.c_plugin_inst.error_code = 'CODE04'
+            raise
+        self._register_output_files(swift_filenames)
 
     def save_plugin_instance_final_status(self):
         """
@@ -368,12 +421,13 @@ class PluginInstanceManager(object):
             # each parameter value is a string of one or more paths separated by comma
             path_list = unextpath_parameters_dict[param_flag].split(',')
             for path in path_list:
-                obj_list = []
                 try:
                     obj_list = self.swift_manager.ls(path)
                 except ClientException as e:
                     logger.error(f'[CODE06,{job_id}]: Error while listing swift '
                                  f'storage files in {path}, detail: {str(e)}')
+                    self.c_plugin_inst.error_code = 'CODE06'
+                    raise
                 for obj in obj_list:
                     obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
                     if not obj_output_path.startswith(outputdir + '/'):
@@ -384,6 +438,8 @@ class PluginInstanceManager(object):
                         logger.error(f'[CODE09,{job_id}]: Error while copying file '
                                      f'from {obj} to {obj_output_path} in swift storage, '
                                      f'detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE09'
+                        raise
                     else:
                         obj_output_path_list.append(obj_output_path)
         logger.info('Registering output files not extracted from swift with job %s',
@@ -408,8 +464,9 @@ class PluginInstanceManager(object):
                     logger.error(f'[CODE09,{job_id}]: Error while copying file '
                                  f'from {obj} to {obj_output_path} in swift storage, '
                                  f'detail: {str(e)}')
-                else:
-                    obj_output_path_list.append(obj_output_path)
+                    self.c_plugin_inst.error_code = 'CODE09'
+                    raise
+                obj_output_path_list.append(obj_output_path)
         logger.info("Registering 'ts' plugin's output files not extracted from swift with"
                     " job %s", self.str_job_id)
         self._register_output_files(obj_output_path_list)
@@ -447,25 +504,20 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
                 try:
-                    swift_filenames = self.unpack_zip_file(zip_content)
-                except Exception as e:
-                    logger.error(f'[CODE04,{job_id}]: Received bad zip file from remote, '
-                                 f'detail: {str(e)}')
-                    self.c_plugin_inst.error_code = 'CODE04'
-                    self.c_plugin_inst.status = 'cancelled'  # giving up
-                else:
-                    self._register_output_files(swift_filenames)
+                    self.unpack_zip_file(zip_content)  # register files from remote
 
-                    # handle unextracted path parameters
+                    # register files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
                         self._handle_app_unextpath_parameters(d_unextpath_params)
 
-                    # handle filtered paths from input instances for 'ts' plugin instances
+                    # register files from filtered input instance paths for 'ts' plugins
                     if self.c_plugin_inst.plugin.meta.type == 'ts':
                         d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
                         self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
-
+                except Exception:
+                    self.c_plugin_inst.status = 'cancelled'  # giving up
+                else:
                     self.c_plugin_inst.status = 'finishedSuccessfully'
             self.save_plugin_instance_final_status()
 
@@ -493,14 +545,15 @@ class PluginInstanceManager(object):
         Internal method to register files generated by the plugin instance object with
         the REST API. The 'filenames' arg is a list of obj names in object storage.
         """
+        job_id = self.str_job_id
         for obj_name in filenames:
-            logger.info('Registering  -->%s<--', obj_name)
+            logger.info(f'Registering file -->{obj_name}<-- for job {job_id}')
             plg_inst_file = PluginInstanceFile(plugin_inst=self.c_plugin_inst)
             plg_inst_file.fname.name = obj_name
             try:
                 plg_inst_file.save()
             except IntegrityError:  # avoid re-register a file already registered
-                logger.info('-->%s<-- already registered', obj_name)
+                logger.info(f'File -->{obj_name}<-- already registered for job {job_id}')
 
     @staticmethod
     def get_job_status_summary(d_response=None):

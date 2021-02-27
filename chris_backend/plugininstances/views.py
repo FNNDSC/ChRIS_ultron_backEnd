@@ -189,8 +189,6 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         serializer validation.
         """
         data = self.request.data
-        data.pop('summary', None)
-        data.pop('raw', None)
         data.pop('gpu_limit', None)
         data.pop('number_of_workers', None)
         data.pop('cpu_limit', None)
