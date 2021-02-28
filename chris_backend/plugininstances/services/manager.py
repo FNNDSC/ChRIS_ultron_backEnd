@@ -139,7 +139,7 @@ class PluginInstanceManager(object):
                     f'description: {json.dumps(job_descriptors, indent=4)}')
         try:
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors,
-                                                  zip_file.getvalue(), timeout=1000)
+                                                  zip_file.getvalue(), timeout=9000)
         except PfconRequestException as e:
             logger.error(f'[CODE01,{job_id}]: Error submitting job to pfcon url '
                          f'-->{pfcon_url}<--, detail: {str(e)}')
@@ -167,7 +167,7 @@ class PluginInstanceManager(object):
             logger.info(f'Sending job status request to pfcon url -->{pfcon_url}<-- for '
                         f'job {job_id}')
             try:
-                d_resp = self.pfcon_client.get_job_status(job_id, timeout=1000)
+                d_resp = self.pfcon_client.get_job_status(job_id, timeout=200)
             except PfconRequestException as e:
                 logger.error(f'[CODE02,{job_id}]: Error getting job status at pfcon '
                              f'url -->{pfcon_url}<--, detail: {str(e)}')
@@ -488,7 +488,7 @@ class PluginInstanceManager(object):
             logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
                         f'for job {job_id}')
             try:
-                zip_content = self.pfcon_client.get_job_zip_data(job_id, 1000)
+                zip_content = self.pfcon_client.get_job_zip_data(job_id, timeout=9000)
             except PfconRequestException as e:
                 logger.error(f'[CODE03,{job_id}]: Error fetching zip from pfcon url '
                              f'-->{pfcon_url}<--, detail: {str(e)}')

@@ -38,9 +38,9 @@ app.conf.update(task_routes=task_routes)
 
 # setup periodic tasks
 app.conf.beat_schedule = {
-    'schedule-waiting-plugin-instances-every-10-seconds': {
+    'schedule-waiting-plugin-instances-every-20-seconds': {
         'task': 'plugininstances.tasks.schedule_waiting_plugin_instances',
-        'schedule': 10.0,
+        'schedule': 20.0,
     },
     'check-started-plugin-instances-exec-status-every-10-seconds': {
         'task': 'plugininstances.tasks.check_started_plugin_instances_exec_status',

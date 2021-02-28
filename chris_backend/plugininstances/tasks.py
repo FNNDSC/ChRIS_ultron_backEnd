@@ -23,6 +23,10 @@ def skip_if_running(f):
     @wraps(f)
     def wrapped(self, *args, **kwargs):
         workers = self.app.control.inspect().active()
+        if workers is None:
+            logger.info('could not find worker for task %s (%s, %s), skipping',
+                        task_name, args, kwargs)
+            return None
         for worker, tasks in workers.items():
             for task in tasks:
                 if (task_name == task['name'] and tuple(args) == tuple(task['args']) and
