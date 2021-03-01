@@ -27,10 +27,10 @@ class ServiceFile(models.Model):
 
 
 class ServiceFileFilter(FilterSet):
-    min_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     service_identifier = django_filters.CharFilter(field_name='service__identifier',

@@ -100,10 +100,10 @@ class PluginMetaFilter(FilterSet):
     """
     Filter class for the PluginMeta model.
     """
-    min_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
@@ -199,10 +199,10 @@ class PluginFilter(FilterSet):
     """
     Filter class for the Plugin model.
     """
-    min_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='lte')
     name = django_filters.CharFilter(field_name='meta__name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='meta__name', lookup_expr='exact')
     title = django_filters.CharFilter(field_name='meta__title', lookup_expr='icontains')

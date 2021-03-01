@@ -51,10 +51,10 @@ class Feed(models.Model):
 class FeedFilter(FilterSet):
     min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')
     max_id = django_filters.NumberFilter(field_name="id", lookup_expr='lte')
-    min_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='lte')
 
     class Meta:
         model = Feed

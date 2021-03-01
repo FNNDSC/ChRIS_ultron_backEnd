@@ -197,16 +197,17 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         """
-        Overriden to cancel this plugin instance and all its descendants' execution .
+        Overriden to cancel this plugin instance and all its descendants' execution.
         """
         if 'status' in self.request.data:
             instance = self.get_object()
-            descendants = instance.get_descendant_instances()
-            if instance.status == 'started':
-                cancel_plugin_instance.delay(instance.id)  # call async task
-            for plg_inst in descendants:
-                plg_inst.status = 'cancelled'
-                plg_inst.save()
+            if instance.status != 'cancelled':
+                descendants = instance.get_descendant_instances()
+                if instance.status == 'started':
+                    cancel_plugin_instance.delay(instance.id)  # call async task
+                for plg_inst in descendants:
+                    plg_inst.status = 'cancelled'
+                    plg_inst.save()
 
         super(PluginInstanceDetail, self).perform_update(serializer)
 
@@ -220,8 +221,10 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         if instance.status == 'started':
             cancel_plugin_instance.delay(instance.id)  # call async task
         for plg_inst in descendants:
-            plg_inst.status = 'cancelled'
-            plg_inst.save()
+            if plg_inst.status not in ('finishedSuccessfully', 'finishedWithError',
+                                       'cancelled'):
+                plg_inst.status = 'cancelled'
+                plg_inst.save()
         return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
 
 

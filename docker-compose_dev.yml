@@ -26,7 +26,6 @@ services:
       - swift_service
       - queue
       - chris_store
-      - pfcon_service
     networks:
       - local
     labels:
@@ -38,20 +37,11 @@ services:
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     entrypoint: ''
-    command: celery -A core worker -l DEBUG -Q main
+    command: celery -A core worker -c 2 -l DEBUG -Q main
     environment:
       - CELERY_RDB_HOST=0.0.0.0
     ports:
       - "6900:6900"
-      - "6901:6901"
-      - "6902:6902"
-      - "6903:6903"
-      - "6904:6904"
-      - "6905:6905"
-      - "6906:6906"
-      - "6907:6907"
-      - "7901:7901"
-      - "7902:7902"
     depends_on:
       - chris_dev_db
       - swift_service
@@ -60,8 +50,28 @@ services:
     networks:
       - local
     labels:
-      name: "ChRIS_ultron_backEnd Asynchronous Worker"
-      role: "Backend development async worker"
+      name: "ChRIS_ultron_backEnd Asynchronous Tasks Worker"
+      role: "Backend development async task worker"
+
+  worker_periodic:
+    image: ${CHRISREPO}/chris:dev
+    volumes:
+      - ./chris_backend:/home/localuser/chris_backend:z
+    entrypoint: ''
+    command: celery -A core worker -c 2 -l DEBUG -Q periodic
+    environment:
+      - CELERY_RDB_HOST=0.0.0.0
+    ports:
+      - "7900:6900"
+    depends_on:
+      - chris_dev_db
+      - swift_service
+      - queue
+    networks:
+      - local
+    labels:
+      name: "ChRIS_ultron_backEnd Periodic Task Worker"
+      role: "Backend development periodic task worker"
 
   scheduler:
     image: ${CHRISREPO}/chris:dev

@@ -156,10 +156,14 @@ class PluginInstance(models.Model):
 
 
 class PluginInstanceFilter(FilterSet):
-    min_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='gte')
-    max_start_date = django_filters.DateFilter(field_name='start_date', lookup_expr='lte')
-    min_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='gte')
-    max_end_date = django_filters.DateFilter(field_name='end_date', lookup_expr='lte')
+    min_start_date = django_filters.IsoDateTimeFilter(field_name='start_date',
+                                                      lookup_expr='gte')
+    max_start_date = django_filters.IsoDateTimeFilter(field_name='start_date',
+                                                      lookup_expr='lte')
+    min_end_date = django_filters.IsoDateTimeFilter(field_name='end_date',
+                                                    lookup_expr='gte')
+    max_end_date = django_filters.IsoDateTimeFilter(field_name='end_date',
+                                                    lookup_expr='lte')
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
@@ -236,10 +240,10 @@ class PluginInstanceFile(models.Model):
 
 
 class PluginInstanceFileFilter(FilterSet):
-    min_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
     plugin_inst_id = django_filters.CharFilter(field_name='plugin_inst_id',
                                                lookup_expr='exact')
     feed_id = django_filters.CharFilter(field_name='plugin_inst__feed_id',
