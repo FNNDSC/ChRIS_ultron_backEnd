@@ -25,7 +25,6 @@ services:
       - swift_service
       - queue
       - chris_store
-      - pfcon_service
     restart: on-failure
     networks:
       - local
@@ -50,8 +49,27 @@ services:
     networks:
       - local
     labels:
-      name: "ChRIS_ultron_backEnd Asynchronous Worker"
-      role: "Production async worker"
+      name: "ChRIS_ultron_backEnd Asynchronous Task Worker"
+      role: "Production async task worker"
+
+  worker_periodic:
+    image: ${CHRISREPO}/chris
+    entrypoint: ''
+    command: celery -A core worker -c 4 -l info -Q periodic
+    env_file:
+      - ./secrets/.chris.env
+      - ./secrets/.chris_db.env
+      - ./secrets/.swift_service.env
+    depends_on:
+      - chris_db
+      - swift_service
+      - queue
+    restart: on-failure
+    networks:
+      - local
+    labels:
+      name: "ChRIS_ultron_backEnd Periodic Task Worker"
+      role: "Production periodic task worker"
 
   scheduler:
     image: ${CHRISREPO}/chris

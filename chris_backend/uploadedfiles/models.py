@@ -23,10 +23,10 @@ class UploadedFile(models.Model):
 
 
 class UploadedFileFilter(FilterSet):
-    min_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name='creation_date',
-                                                 lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     owner_username = django_filters.CharFilter(field_name='owner__username',

@@ -88,10 +88,10 @@ class Pipeline(models.Model):
 
 
 class PipelineFilter(FilterSet):
-    min_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='gte')
-    max_creation_date = django_filters.DateFilter(field_name="creation_date",
-                                                  lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
+                                                         lookup_expr='lte')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
