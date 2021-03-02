@@ -120,10 +120,14 @@ CELERY_BROKER_URL = get_secret('CELERY_BROKER_URL')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+# Worker settings
+# messages to prefetch at a time multiplied by the number of concurrent processes
+# default is 4 (four messages for each process)
+CELERYD_PREFETCH_MULTIPLIER = 2
+
 
 # REVERSE PROXY
 # ------------------------------------------------------------------------------
 SECURE_PROXY_SSL_HEADER = get_secret('DJANGO_SECURE_PROXY_SSL_HEADER', env.list)
 SECURE_PROXY_SSL_HEADER = tuple(SECURE_PROXY_SSL_HEADER) if SECURE_PROXY_SSL_HEADER else None
 USE_X_FORWARDED_HOST = get_secret('DJANGO_USE_X_FORWARDED_HOST', env.bool)
-

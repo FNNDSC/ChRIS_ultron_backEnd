@@ -173,12 +173,8 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overriden to check a plugin's instance status.
+        Overriden to add a collection+json template to the response.
         """
-        plg_inst = self.get_object()
-        if plg_inst.status == 'started':
-            # check execution status of plugin's app
-            check_plugin_instance_exec_status.delay(plg_inst.id)  # call async task
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)

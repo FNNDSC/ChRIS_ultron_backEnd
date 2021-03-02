@@ -37,7 +37,7 @@ services:
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     entrypoint: ''
-    command: celery -A core worker -c 2 -l DEBUG -Q main
+    command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     environment:
       - CELERY_RDB_HOST=0.0.0.0
     ports:
@@ -58,7 +58,7 @@ services:
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     entrypoint: ''
-    command: celery -A core worker -c 2 -l DEBUG -Q periodic
+    command: celery -A core worker -c 1 -l DEBUG -Q periodic
     environment:
       - CELERY_RDB_HOST=0.0.0.0
     ports:

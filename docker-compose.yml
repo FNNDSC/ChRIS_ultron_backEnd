@@ -35,7 +35,7 @@ services:
   worker:
     image: ${CHRISREPO}/chris
     entrypoint: ''
-    command: celery -A core worker -c 4 -l info -Q main
+    command: celery -A core worker -c 4 -l info -Q main1,main2
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -55,7 +55,7 @@ services:
   worker_periodic:
     image: ${CHRISREPO}/chris
     entrypoint: ''
-    command: celery -A core worker -c 4 -l info -Q periodic
+    command: celery -A core worker -c 2 -l info -Q periodic
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
