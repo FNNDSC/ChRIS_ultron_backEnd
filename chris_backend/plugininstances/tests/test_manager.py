@@ -172,6 +172,8 @@ class PluginInstanceManagerTests(TestCase):
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
+
+        # run the plugin instance
         plg_inst_manager = manager.PluginInstanceManager(pl_inst)
         plg_inst_manager.run_plugin_instance_app()
         self.assertEqual(pl_inst.status, 'started')

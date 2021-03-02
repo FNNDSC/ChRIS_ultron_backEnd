@@ -333,15 +333,20 @@ class PluginInstanceDetailViewTests(TasksViewTests):
     def test_plugin_instance_detail_success(self):
         self.pl_inst.status = 'started'
         self.pl_inst.save()
-        with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
-                               return_value=None) as delay_mock:
-            # make API request
-            self.client.login(username=self.username, password=self.password)
-            response = self.client.get(self.read_update_delete_url)
-            self.assertContains(response, "pacspull")
-            self.assertEqual(response.data['status'], 'started')
-            # check that the check_plugin_instance_exec_status task was called with appropriate args
-            delay_mock.assert_called_with(self.pl_inst.id)
+        # make API request
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, "pacspull")
+        self.assertEqual(response.data['status'], 'started')
+        # with mock.patch.object(views.check_plugin_instance_exec_status, 'delay',
+        #                        return_value=None) as delay_mock:
+        #     # make API request
+        #     self.client.login(username=self.username, password=self.password)
+        #     response = self.client.get(self.read_update_delete_url)
+        #     self.assertContains(response, "pacspull")
+        #     self.assertEqual(response.data['status'], 'started')
+        #     # check that the check_plugin_instance_exec_status task was called with appropriate args
+        #     delay_mock.assert_called_with(self.pl_inst.id)
 
     @tag('integration', 'error-pman')
     def test_integration_plugin_instance_detail_success(self):
@@ -418,6 +423,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         b_checkAgain = True
         time.sleep(10)
         while b_checkAgain:
+            plg_inst_manager.check_plugin_instance_app_exec_status()
             response = self.client.get(read_update_delete_url)
             str_responseStatus = response.data['status']
             if str_responseStatus == 'finishedSuccessfully':

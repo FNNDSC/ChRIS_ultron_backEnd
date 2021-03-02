@@ -23,10 +23,10 @@ app.autodiscover_tasks()
 # define the the queue for each task
 # the default 'celery' queue is exclusively used for the automated tests
 task_routes = {
-    'plugininstances.tasks.sum': {'queue': 'main'},
-    'plugininstances.tasks.run_plugin_instance': {'queue': 'main'},
-    'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main'},
-    'plugininstances.tasks.cancel_plugin_instance': {'queue': 'main'},
+    'plugininstances.tasks.sum': {'queue': 'main1'},
+    'plugininstances.tasks.run_plugin_instance': {'queue': 'main1'},
+    'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main2'},
+    'plugininstances.tasks.cancel_plugin_instance': {'queue': 'main2'},
     'plugininstances.tasks.schedule_waiting_plugin_instances':
         {'queue': 'periodic'},
     'plugininstances.tasks.check_started_plugin_instances_exec_status':
@@ -38,13 +38,13 @@ app.conf.update(task_routes=task_routes)
 
 # setup periodic tasks
 app.conf.beat_schedule = {
-    'schedule-waiting-plugin-instances-every-30-seconds': {
+    'schedule-waiting-plugin-instances-every-45-seconds': {
         'task': 'plugininstances.tasks.schedule_waiting_plugin_instances',
-        'schedule': 30.0,
+        'schedule': 45.0,
     },
-    'check-started-plugin-instances-exec-status-every-20-seconds': {
+    'check-started-plugin-instances-exec-status-every-30-seconds': {
         'task': 'plugininstances.tasks.check_started_plugin_instances_exec_status',
-        'schedule': 20.0,
+        'schedule': 30.0,
     },
     'cancel-waiting-plugin-instances-every-30-seconds': {
         'task': 'plugininstances.tasks.cancel_waiting_plugin_instances',
