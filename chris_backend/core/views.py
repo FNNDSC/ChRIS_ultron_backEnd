@@ -12,3 +12,9 @@ class ChrisInstanceDetail(generics.RetrieveAPIView):
     serializer_class = ChrisInstanceSerializer
     queryset = ChrisInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
+
+    def get_object(self):
+        """
+        Overriden to return the ChrisInstance singleton.
+        """
+        return ChrisInstance.load()

@@ -19,6 +19,10 @@ services:
     image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DJANGO_DB_MIGRATE=on
+      - DJANGO_COLLECTSTATIC=off
     ports:
       - "8000:8000"
     depends_on:
@@ -36,10 +40,12 @@ services:
     image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-    entrypoint: ''
-    command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
       - CELERY_RDB_HOST=0.0.0.0
+    command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     ports:
       - "6900:6900"
     depends_on:
@@ -57,15 +63,16 @@ services:
     image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-    entrypoint: ''
-    command: celery -A core worker -c 1 -l DEBUG -Q periodic
     environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
       - CELERY_RDB_HOST=0.0.0.0
+    command: celery -A core worker -c 1 -l DEBUG -Q periodic
     ports:
       - "7900:6900"
     depends_on:
       - chris_dev_db
-      - swift_service
       - queue
     networks:
       - local
@@ -77,11 +84,13 @@ services:
     image: ${CHRISREPO}/chris:dev
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-    entrypoint: ''
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
     command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       - chris_dev_db
-      - swift_service
       - queue
     # restart until Django DB migrations are ready
     restart: on-failure
@@ -118,6 +127,7 @@ services:
     image: ${STOREREPO}/chris_store
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_DB_MIGRATE=on
       - DJANGO_ALLOWED_HOSTS=*
       - DJANGO_SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
       - DJANGO_CORS_ORIGIN_ALLOW_ALL=true
