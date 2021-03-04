@@ -39,6 +39,7 @@ RUN apt-get update                                               \
   && dpkg-reconfigure locales                                    \
   && apt-get install -y libssl-dev libmysqlclient-dev            \
   && apt-get install -y apache2 apache2-dev                      \
+  && pip install --upgrade pip                                    \
   && pip install -r ${REQPATH}/production.txt                    \
   && useradd -l -u $UID -ms /bin/bash localuser
 

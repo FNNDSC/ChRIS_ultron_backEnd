@@ -14,6 +14,9 @@ services:
 
   chris:
     image: ${CHRISREPO}/chris
+    environment:
+      - DJANGO_DB_MIGRATE=on
+      - DJANGO_COLLECTSTATIC=on
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -34,7 +37,9 @@ services:
 
   worker:
     image: ${CHRISREPO}/chris
-    entrypoint: ''
+    environment:
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
     command: celery -A core worker -c 4 -l info -Q main1,main2
     env_file:
       - ./secrets/.chris.env
@@ -54,7 +59,9 @@ services:
 
   worker_periodic:
     image: ${CHRISREPO}/chris
-    entrypoint: ''
+    environment:
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
     command: celery -A core worker -c 2 -l info -Q periodic
     env_file:
       - ./secrets/.chris.env
@@ -62,7 +69,6 @@ services:
       - ./secrets/.swift_service.env
     depends_on:
       - chris_db
-      - swift_service
       - queue
     restart: on-failure
     networks:
@@ -73,7 +79,9 @@ services:
 
   scheduler:
     image: ${CHRISREPO}/chris
-    entrypoint: ''
+    environment:
+      - DJANGO_DB_MIGRATE=off
+      - DJANGO_COLLECTSTATIC=off
     command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file:
       - ./secrets/.chris.env
@@ -81,7 +89,6 @@ services:
       - ./secrets/.swift_service.env
     depends_on:
       - chris_db
-      - swift_service
       - queue
     restart: on-failure
     networks:
@@ -114,6 +121,8 @@ services:
 
   chris_store:
     image: ${CHRISREPO}/chris_store
+    environment:
+      - DJANGO_DB_MIGRATE=on
     env_file:
       - ./secrets/.chris_store.env
       - ./secrets/.chris_store_db.env

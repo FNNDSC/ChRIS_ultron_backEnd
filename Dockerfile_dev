@@ -32,7 +32,7 @@ ENV UID=$UID DEBIAN_FRONTEND=noninteractive VERSION="0.1"
 
 ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
 COPY ["./requirements", "${REQPATH}"]
-COPY ["./docker-entrypoint_dev.sh", "/usr/src"]
+COPY ["./docker-entrypoint.sh", "/usr/src"]
 
 RUN apt-get update                                                \
   && apt-get install -y locales                                   \
@@ -54,7 +54,7 @@ RUN apt-get update                                                \
 USER localuser
 
 WORKDIR $APPROOT
-ENTRYPOINT ["/usr/src/docker-entrypoint_dev.sh"]
+ENTRYPOINT ["/usr/src/docker-entrypoint.sh"]
 EXPOSE 8000
 
 # Start ChRIS development server
