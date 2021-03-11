@@ -34,7 +34,7 @@ jobs:
         env:
           git_tag: ${{ steps.git_info.outputs.tag }}
         run: |
-          repo="${GITHUB_REPOSITORY,,}"  # to lower case
+          repo=fnndsc/chris
           tag="${git_tag:-latest}"  # if build triggered by tag, use tag name
           echo "::set-output name=repo::$repo"
           echo "::set-output name=tag::$tag"
