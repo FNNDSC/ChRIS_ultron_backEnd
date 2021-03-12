@@ -32,6 +32,7 @@ services:
       - chris_store
     networks:
       - local
+      - remote  # bc special automated tests worker runs within CUBE, not needed in prod
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
@@ -52,9 +53,10 @@ services:
       - chris_dev_db
       - swift_service
       - queue
-      - pfcon_service
+      # service also depends on pfcon_service defined in docker-compose_remote.yml
     networks:
       - local
+      - remote
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Tasks Worker"
       role: "Backend development async task worker"
@@ -93,7 +95,9 @@ services:
       - chris_dev_db
       - queue
     # restart until Django DB migrations are ready
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
       - local
     labels:
@@ -117,6 +121,9 @@ services:
 
   queue:
     image: rabbitmq:3
+    hostname: 'queue'
+    volumes:
+      - queue_data:/var/lib/rabbitmq:z
     networks:
       - local
     labels:
@@ -188,66 +195,14 @@ services:
       name: "Swift"
       role: "Swift object storage service"
 
-  pfcon_service:
-    image: ${PFCONREPO}/pfcon${TAG}
-    ports:
-      - "5005:5005"
-    depends_on:
-      - pman_service
-      - pfioh_service
-    environment:
-      - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
-      - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/
-      - DATA_SERVICE_URL=http://pfioh_service:5055/api/v1/cmd
-    networks:
-      local:
-        aliases:
-          - pfcon.local
-      remote:
-    labels:
-      name: "pfcon"
-      role: "pfcon service"
-
-  pfioh_service:
-    # We need to map a physical dir in the HOST to the key store in pfioh.
-    # The keystore is specified by the --storeBase flag.
-    image: ${PFIOHREPO}/pfioh${TAG}
-    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
-    volumes:
-      - ${STOREBASE}:/hostFS/storeBase:z
-    ports:
-      - "5055:5055"
-    networks:
-      - remote
-    labels:
-      name: "pfioh"
-      role: "pfioh service"
-
-  pman_service:
-    # Since pman spins off containers of its own it needs to mount storeBase dir (where
-    # pfioh shares the data) into the spawned container. However, it can't mount a dir
-    # inside itself to the spawned container, it has to mount an actual existing
-    # directory in the host. This directory is passed in the STOREBASE env variable.
-    environment:
-      - STOREBASE
-      - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
-      - CONTAINER_ENV=swarm
-    image: ${PMANREPO}/pman${TAG}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:z
-    ports:
-      - "5010:5010"
-    networks:
-      - remote
-    labels:
-      name: "pman"
-      role: "pman service"
 
 networks:
   local:
   remote:
+    external: true
 
 volumes:
   chris_dev_db_data:
   chris_store_db_data:
+  queue_data:
   swift_storage_dev:

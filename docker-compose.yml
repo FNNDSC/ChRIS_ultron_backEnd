@@ -13,7 +13,7 @@ version: '3.7'
 services:
 
   chris:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris
     environment:
       - DJANGO_DB_MIGRATE=on
       - DJANGO_COLLECTSTATIC=on
@@ -28,15 +28,17 @@ services:
       - swift_service
       - queue
       - chris_store
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Production server using Apache's mod_wsgi"
 
   worker:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
@@ -50,15 +52,18 @@ services:
       - swift_service
       - queue
       - pfcon_service
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
+      - remote
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Task Worker"
       role: "Production async task worker"
 
   worker_periodic:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
@@ -70,15 +75,17 @@ services:
     depends_on:
       - chris_db
       - queue
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_ultron_backEnd Periodic Task Worker"
       role: "Production periodic task worker"
 
   scheduler:
-    image: ${CHRISREPO}/chris
+    image: fnndsc/chris
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
@@ -90,9 +97,11 @@ services:
     depends_on:
       - chris_db
       - queue
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_ultron_backEnd Periodic Tasks Scheduler"
       role: "Production periodic tasks scheduler"
@@ -103,24 +112,31 @@ services:
       - chris_db_data:/var/lib/mysql
     env_file:
       - ./secrets/.chris_db.env
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_ultron_backEnd MySQL Database"
       role: "Production MySQL database"
 
   queue:
     image: rabbitmq:3
-    restart: on-failure
+    hostname: 'queue'
+    volumes:
+      - queue_data:/var/lib/rabbitmq
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Task Queue"
       role: "Production async task queue"
 
   chris_store:
-    image: ${CHRISREPO}/chris_store
+    image: fnndsc/chris_store
     environment:
       - DJANGO_DB_MIGRATE=on
     env_file:
@@ -132,9 +148,11 @@ services:
     depends_on:
       - chris_store_db
       - swift_service
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      local:
+      local1:
         aliases:
           - chris-store.local
     labels:
@@ -147,9 +165,11 @@ services:
       - chris_store_db_data:/var/lib/mysql
     env_file:
       - ./secrets/.chris_store_db.env
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "ChRIS_store MySQL Database"
       role: "Chris store database"
@@ -163,15 +183,17 @@ services:
       - ./secrets/.swift_service.env
     ports:
       - "8080:8080"
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - local
+      - local1
     labels:
       name: "swift"
       role: "swift object storage service"
 
   pfcon_service:
-    image: ${CHRISREPO}/pfcon
+    image: fnndsc/pfcon
     env_file:
       - ./secrets/.pfcon_service.env
     ports:
@@ -179,54 +201,63 @@ services:
     depends_on:
       - pman_service
       - pfioh_service
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      local:
-        aliases:
-          - pfcon.local
+      local2:
       remote:
+        aliases:
+          - pfcon.remote
     labels:
       name: "pfcon"
       role: "pfcon service"
 
   pfioh_service:
-    # We need to map a physical dir in the HOST to the key store in pfioh.
-    # The keystore is specified by the --storeBase flag.
-    image: ${CHRISREPO}/pfioh
+    # We need to mount a physical dir in the HOST onto the key store in pfioh. This dir
+    # is given by the STOREBASE env variable. The keystore is specified by the
+    # --storeBase flag.
+    image: fnndsc/pfioh
     command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
     volumes:
-      - ${STOREBASE}:/hostFS/storeBase
-    restart: on-failure
+      - ${STOREBASE:?}:/hostFS/storeBase
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - remote
+      - local2
     labels:
       name: "pfioh"
       role: "pfioh service"
 
   pman_service:
     # Since pman spins off containers of its own it needs to mount storeBase dir (where
-    # pfioh shares the data) into the spawned container. However, it can't mount a dir
-    # inside itself to the spawned container, it has to mount an actual existing
-    # directory in the host. This directory is passed in the STOREBASE env variable.
+    # pfioh shares the data) into the spawned container. This directory is passed in the
+    # STOREBASE env variable.
     environment:
       - STOREBASE
-    image: ${CHRISREPO}/pman
+    image: fnndsc/pman
     env_file:
       - ./secrets/.pman_service.env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
-      - remote
+      - local2
     labels:
       name: "pman"
       role: "pman service"
 
+
 networks:
-  local:
+  local1:
+  local2:
   remote:
 
 volumes:
   chris_db_data:
   chris_store_db_data:
+  queue_data:
   swift_storage:

@@ -79,9 +79,7 @@
 #
 #   -r <service>
 #
-#       Restart <service> in interactive mode. This is mainly for debugging
-#       and is typically used to restart the 'pfcon', 'pfioh', and 'pman'
-#       services.
+#       Restart <service> in interactive mode. This is mainly for debugging services.
 #
 #   -e <computeEnv>
 #
@@ -297,7 +295,7 @@ else
             docker swarm init --advertise-addr 127.0.0.1                |\
                 sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g' | ./boxes.sh
         fi
-        echo "Swarm started"                                            | ./boxes.sh
+        echo "swarm started"                                            | ./boxes.sh
     windowBottom
 
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
@@ -354,6 +352,24 @@ else
         fi
         printf "${LightCyan}%40s${LightGreen}%40s\n"                    \
                     "Tree state" "[ OK ]"                               | ./boxes.sh
+    windowBottom
+
+    title -d 1  "Creating overlay network: remote"
+        echo "docker network create -d overlay --attachable remote"   | ./boxes.sh ${LightCyan}
+        windowBottom
+        docker network create -d overlay --attachable remote  >& dc.out > /dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
+    windowBottom
+
+    title -d 1  "Starting pfcon_stack containerized environment on swarm using "            \
+                "./docker-compose_remote.yml"
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+        echo "docker stack deploy -c docker-compose_remote.yml pfcon_stack"   | ./boxes.sh ${LightCyan}
+        windowBottom
+        docker stack deploy -c docker-compose_remote.yml pfcon_stack  >& dc.out > /dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
     windowBottom
 
     title -d 1  "Starting CUBE containerized development environment using "            \
@@ -578,18 +594,6 @@ else
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
    windowBottom
-
-    if (( ! b_skipIntegrationTests && ! b_pause )) ; then
-        title -d 1 "Automatic restart of pfioh service" \
-                   "to clear any lingering traces of integration tests..."
-        echo ""                                                     | ./boxes.sh
-        tcprint White "Restarting service... " Cyan "pfioh" 40 -40
-        windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml          \
-            restart pfioh_service >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | ./boxes.sh
-    fi
 
     if (( b_pause )) ; then
         title -d 1  "Pause for manual restart of services?"             \
