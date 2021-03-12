@@ -6,7 +6,17 @@ declare -i STEP=0
 
 export STOREBASE=${STOREBASE}
 
-title -d 1 "Destroying containerized development environment" "from  ./docker-compose_dev.yml"
+title -d 1 "Destroying pfcon_stack on swarm" "from  ./docker-compose_remote.yml"
+    windowBottom
+    echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
+    windowBottom
+    docker network rm remote
+    docker stack rm pfcon_stack >& dc.out >/dev/null
+    echo -en "\033[2A\033[2K"
+    cat dc.out | ./boxes.sh
+windowBottom
+
+title -d 1 "Destroying CUBE containerized development environment" "from  ./docker-compose_dev.yml"
     echo "Do you want to also remove persistent volumes? [y/n]"             | ./boxes.sh
     windowBottom
     old_stty_cfg=$(stty -g)

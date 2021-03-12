@@ -275,7 +275,7 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         computeDescription="${ENV} description"
         docker-compose -f ${DOCKER_COMPOSE_FILE}                    \
             exec ${CHRIS} python plugins/services/manager.py        \
-            add "$ENV" "http://pfcon.local:5005/api/v1/"                    \
+            add "$ENV" "http://pfcon.remote:5005/api/v1/"                    \
             --description "$ENV Description" >& dc.out >/dev/null
         status=$?
         echo -en "\033[3A\033[2K"
