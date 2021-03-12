@@ -119,21 +119,20 @@ if [[ "$1" == 'down' ]]; then
 
     title -d 1 "Destroying chris_stack single-machine production deployment on swarm" "from ./docker-compose.yml"
     echo
+    docker stack rm chris_stack
+    docker swarm leave --force
+    echo
     printf "Do you want to also remove persistent volumes?"
     read -p  " [y/n] " -n 1 -r
     echo
     echo
     if [[ $REPLY =~ ^[Yy]$ ]] ; then
-        docker stack rm chris_stack
-        docker swarm leave --force
         docker volume rm chris_stack_chris_db_data
         docker volume rm chris_stack_chris_store_db_data
         docker volume rm chris_stack_queue_data
         docker volume rm chris_stack_swift_storage
         echo "Removing ./FS tree"
         rm -fr ./FS
-    else
-        docker stack rm chris_stack
     fi
     windowBottom
 fi
