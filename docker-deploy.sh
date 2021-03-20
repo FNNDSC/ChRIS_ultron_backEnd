@@ -52,7 +52,6 @@ if [[ "$1" == 'up' ]]; then
     "mysql:5"
     "rabbitmq:3"
     "fnndsc/pfcon"
-    "fnndsc/pfioh"
     "fnndsc/pman"
     "fnndsc/docker-swift-onlyone"
     )
@@ -114,8 +113,6 @@ if [[ "$1" == 'up' ]]; then
 fi
 
 if [[ "$1" == 'down' ]]; then
-
-    export STOREBASE=${STOREBASE}
 
     title -d 1 "Destroying chris_stack single-machine production deployment on swarm" "from ./docker-compose.yml"
     echo

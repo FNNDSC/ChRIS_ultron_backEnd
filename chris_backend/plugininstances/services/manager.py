@@ -157,9 +157,10 @@ class PluginInstanceManager(object):
 
     def check_plugin_instance_app_exec_status(self):
         """
-        Check a plugin instance's app execution status. It connects to the remote
-        service to determine job status and if finished without error then
-        downloads and unpacks zip file and registers output files.
+        Check a plugin instance's app execution status. It connects to the remote pfcon
+        service to determine job status and if finished without error then downloads
+        and unpacks job's zip file and registers output files with the DB. Finally it
+        sends a request to delete the job's data from the remote environment.
         """
         if self.c_plugin_inst.status == 'started':
             pfcon_url = self.pfcon_client.url
@@ -188,12 +189,24 @@ class PluginInstanceManager(object):
                 id=self.c_plugin_inst.id,
                 status='started').update(summary=summary, raw=raw)
 
-            if status == 'finishedSuccessfully':
-                self._handle_finished_successfully_status()
-            elif status == 'finishedWithError':
-                self._handle_finished_with_error_status()
-            elif status == 'undefined':
-                self._handle_undefined_status()
+            if status in ('finishedSuccessfully', 'finishedWithError', 'undefined'):
+                if status == 'finishedSuccessfully':
+                    self._handle_finished_successfully_status()
+                elif status == 'finishedWithError':
+                    self._handle_finished_with_error_status()
+                else:
+                    self._handle_undefined_status()
+
+                logger.info(f'Deleting job {job_id} data from pfcon at url '
+                            f'-->{pfcon_url}<--')
+                try:
+                    self.pfcon_client.delete_job_data(job_id, timeout=500)
+                except PfconRequestException as e:
+                    logger.error(f'[CODE12,{job_id}]: Error deleting job data from '
+                                 f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
+                else:
+                    logger.info(f'Successfully deleted job {job_id} data from pfcon at '
+                                f'url -->{pfcon_url}<--')
         return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):

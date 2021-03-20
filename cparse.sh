@@ -92,7 +92,7 @@ function cparse {
         # because above we might have implicitly filled the repo as "fnndsc"
         
         # cparse is also (mis-)used in make.sh to parse `A_CONTAINER`
-        # the services pman, pfioh, pfcon might not have CMD
+        # the services pman, pfcon might not have CMD
         # so the else block sets str_mmn to "ERR_NO_CMD"
         local str_mmn=$(docker image inspect --format \
                 '{{with .Config.Cmd}}{{(index . 0)}}{{else}}ERR_NO_CMD{{end}}' \

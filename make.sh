@@ -126,8 +126,7 @@
 #
 #       The 'local' family are containers that are assumed built on the local
 #       machine and assumed to exist. The 'local' containers are used when
-#       the 'pfcon/pman/pfioh' services are being locally
-#       developed/debugged.
+#       the 'pfcon/pman' services are being locally developed/debugged.
 #
 #
 
@@ -189,7 +188,6 @@ declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
     "fnndsc/pfcon${TAG}^PFCONREPO"
-    "fnndsc/pfioh${TAG}^PFIOHREPO"
     "fnndsc/pman${TAG}^PMANREPO"
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
 )
@@ -213,7 +211,7 @@ if (( b_restart )) ; then
 
     tcprint LightCyan "stopping... " LightGreen ${RESTART} 40 -40
     windowBottom
-    docker-compose --no-ansi -f docker-compose_dev.yml                  \
+    docker-compose -f docker-compose_dev.yml                  \
         stop ${RESTART}  >& dc.out > /dev/null
     echo -en "\033[2A\033[2K"
     cat dc.out | ./boxes.sh
@@ -221,7 +219,7 @@ if (( b_restart )) ; then
 
     tcprint LightCyan "removing... " LightGreen ${RESTART} 40 -40
     windowBottom
-    docker-compose --no-ansi -f docker-compose_dev.yml                  \
+    docker-compose -f docker-compose_dev.yml                  \
         rm -f ${RESTART} >& dc.out > /dev/null
     echo -en "\033[2A\033[2K"
     cat dc.out | ./boxes.sh
@@ -301,10 +299,10 @@ else
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
         echo "This might take a few minutes... please be patient."              | ./boxes.sh ${Yellow}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml stop >& dc.out > /dev/null
+        docker-compose -f docker-compose_dev.yml stop >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightBlue}
-        docker-compose --no-ansi -f docker-compose_dev.yml rm -vf >& dc.out > /dev/null
+        docker-compose -f docker-compose_dev.yml rm -vf >& dc.out > /dev/null
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                                  | ./boxes.sh ${LightCyan}
         for CORE in ${A_CONTAINER[@]} ; do
             cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
@@ -377,7 +375,7 @@ else
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         echo "docker-compose -f docker-compose_dev.yml up -d"           | ./boxes.sh ${LightCyan}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml up -d        >& dc.out > /dev/null
+        docker-compose -f docker-compose_dev.yml up -d        >& dc.out > /dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
     windowBottom
@@ -396,14 +394,11 @@ else
         boxcenter "To log 'pfcon' in realtime, in a separate terminal, do..."
         boxcenter "./make.sh -s -r pfcon_service"                           ${LightCyan}
         boxcenter ""
-        boxcenter "To log 'pfioh' in realtime, in a separate terminal, do..."
-        boxcenter "./make.sh -s -r pfioh_service"                           ${LightCyan}
-        boxcenter ""
         boxcenter "To log 'pman' in realtime, in a separate terminal, do..."
         boxcenter "./make.sh -s -r pman_service"                            ${LightCyan}
         boxcenter ""
         boxcenter "NOTE: Restart services in this order:"                   ${LightGreen}
-        boxcenter "worker, pfcon, pfioh, pman"                              ${LightGreen}
+        boxcenter "worker, pfcon, pman"                                     ${LightGreen}
         boxcenter ""
         boxcenter "Pausing... hit *ANY* key to continue"                    ${Yellow}
         windowBottom
@@ -433,7 +428,7 @@ else
     title -d 1 "Waiting until CUBE is ready to accept connections..."
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml        \
+        docker-compose -f docker-compose_dev.yml        \
             exec chris_dev sh -c                        \
             'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
         echo -en "\033[2A\033[2K"
@@ -617,14 +612,11 @@ else
         boxcenter "To log 'pfcon' in realtime, in a separate terminal, do..."
         boxcenter "./make.sh -s -r pfcon_service"                           ${LightCyan}
         boxcenter ""
-        boxcenter "To log 'pfioh' in realtime, in a separate terminal, do..."
-        boxcenter "./make.sh -s -r pfioh_service"                           ${LightCyan}
-        boxcenter ""
         boxcenter "To log 'pman' in realtime, in a separate terminal, do..."
         boxcenter "./make.sh -s -r pman_service"                            ${LightCyan}
         boxcenter ""
         boxcenter "NOTE: Restart services in this order:"                   ${LightGreen}
-        boxcenter "worker, pfcon, pfioh, pman"                              ${LightGreen}
+        boxcenter "worker, pfcon, pman"                                     ${LightGreen}
         boxcenter ""
         boxcenter "Pausing... hit *ANY* key to continue"                    ${Yellow}
         windowBottom
@@ -641,14 +633,14 @@ else
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "Stopping" "chris_dev"                          | ./boxes.sh
             windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml stop chris_dev >& dc.out >/dev/null
+            docker-compose -f docker-compose_dev.yml stop chris_dev >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 
             printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                         "rm -f" "chris_dev"                             | ./boxes.sh
             windowBottom
-            docker-compose --no-ansi -f docker-compose_dev.yml rm -f chris_dev >& dc.out >/dev/null
+            docker-compose -f docker-compose_dev.yml rm -f chris_dev >& dc.out >/dev/null
             echo -en "\033[2A\033[2K"
             cat dc.out | ./boxes.sh
 

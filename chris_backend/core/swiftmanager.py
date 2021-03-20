@@ -196,5 +196,5 @@ class SwiftManager(object):
                 swift_path = os.path.join(swift_base, filename)
                 if not self.obj_exists(swift_path):
                     local_file_path = os.path.join(root, filename)
-                    with open(local_file_path, 'r') as f:
+                    with open(local_file_path, 'rb') as f:
                         self.upload_obj(swift_path, f.read(), **kwargs)

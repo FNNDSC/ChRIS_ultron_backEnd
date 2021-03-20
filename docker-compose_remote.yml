@@ -17,15 +17,17 @@ services:
 
   pfcon_service:
     image: fnndsc/pfcon
+    # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
+    # is given by the STOREBASE env variable.
+    volumes:
+      - ${STOREBASE:?}:/home/localuser/storeBase
     ports:
       - "5005:5005"
     depends_on:
       - pman_service
-      - pfioh_service
     environment:
       - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
       - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/
-      - DATA_SERVICE_URL=http://pfioh_service:5055/api/v1/cmd
     networks:
       local:
       remote:
@@ -35,25 +37,9 @@ services:
       name: "pfcon"
       role: "pfcon service"
 
-  pfioh_service:
-    # We need to mount a physical dir in the HOST onto the key store in pfioh. This dir
-    # is given by the STOREBASE env variable. The keystore is specified by the
-    # --storeBase flag.
-    image: fnndsc/pfioh
-    command: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]
-    volumes:
-      - ${STOREBASE:?}:/hostFS/storeBase:z
-    ports:
-      - "5055:5055"
-    networks:
-      - local
-    labels:
-      name: "pfioh"
-      role: "pfioh service"
-
   pman_service:
     # Since pman spins off containers of its own it needs to mount storeBase dir (where
-    # pfioh shares the data) into the spawned container. This directory is passed in the
+    # pfcon shares the data) into the spawned container. This directory is passed in the
     # STOREBASE env variable.
     environment:
       - STOREBASE
