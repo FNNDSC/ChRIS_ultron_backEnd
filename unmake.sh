@@ -27,7 +27,7 @@ title -d 1 "Destroying CUBE containerized development environment" "from  ./dock
         printf "Removing persistent volumes...\n"                           | ./boxes.sh ${Yellow}
         echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml down -v >& dc.out >/dev/null
+        docker-compose -f docker-compose_dev.yml down -v >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
         echo "Removing ./FS tree"                                           | ./boxes.sh
@@ -36,7 +36,7 @@ title -d 1 "Destroying CUBE containerized development environment" "from  ./dock
         printf "Keeping persistent volumes...\n"                            | ./boxes.sh ${Yellow}
         echo "This might take a few minutes... please be patient."          | ./boxes.sh ${Yellow}
         windowBottom
-        docker-compose --no-ansi -f docker-compose_dev.yml down >& dc.out >/dev/null
+        docker-compose -f docker-compose_dev.yml down >& dc.out >/dev/null
         echo -en "\033[2A\033[2K"
         cat dc.out | ./boxes.sh
     fi

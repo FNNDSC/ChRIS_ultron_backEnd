@@ -3,7 +3,7 @@
 [![Build](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml)![License][license-badge]
 ![Last Commit][last-commit-badge]
 
-The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon``, ``pman``, and ``pfioh`` collection of coordinating, managing, and file transfer services.
+The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
 
 
 ## ChRIS development, testing and deployment
@@ -143,35 +143,35 @@ After running this script all the automated tests should have successfully run a
 
 #### Rerun automated tests after modifying source code
 
-Open another terminal and run 
+Open another terminal and find out the id of the container running the Django server in interactive mode:
 ```bash
-docker ps
+chris=$(docker ps -f ancestor=fnndsc/chris:dev -f name=chris_dev -q)
 ```
-Find out from the previous output the name of the container running the Django server in interactive mode (usually *chrisultronbackend_chris_dev_run_1*) and run the Unit tests and Integration tests within that container. 
+and run the Unit and Integration tests within that container. 
 
 To run only the Unit tests:
 
 ```bash
-docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test --exclude-tag integration
+docker exec -it $chris python manage.py test --exclude-tag integration
 ```
 
 To run only the Integration tests:
 
 ```bash
-docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test --tag integration
+docker exec -it $chris python manage.py test --tag integration
 ```
 
 To run only the Integration tests if the environment has not been restarted in interactive mode (usual for debugging when the make script has been passed a ``-i``:
 
 ```bash
-docker exec -it chrisultronbackend_chris_dev_1 python manage.py test --tag integration
+docker exec -it $chris python manage.py test --tag integration
 ```
 
 
 To run all the tests:
 
 ```bash
-docker exec -it chrisultronbackend_chris_dev_run_1 python manage.py test 
+docker exec -it $chris python manage.py test 
 ```
 
 After running the Integration tests the ``./FS/remote`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
@@ -181,8 +181,8 @@ After running the Integration tests the ``./FS/remote`` directory **must** be em
 Make sure the ``chris_backend/`` dir is world writable. Then type:
 
 ```bash
-docker exec -it chrisultronbackend_chris_dev_run_1 coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
-docker exec -it chrisultronbackend_chris_dev_run_1 coverage report
+docker exec -it $chris coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
+docker exec -it $chris coverage report
 ```
 
 #### Using [HTTPie](https://httpie.org/) client to play with the REST API 

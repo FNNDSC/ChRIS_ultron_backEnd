@@ -9,5 +9,5 @@ celery==4.4.2
 django-celery-beat==2.0.0
 mod-wsgi==4.7.1
 python-chrisstoreclient==1.0.0
-python-pfconclient==2.0.0
+python-pfconclient==2.1.0
 environs==7.4.0
