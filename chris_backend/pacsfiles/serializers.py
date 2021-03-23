@@ -25,12 +25,13 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
     file_resource = ItemLinkField('get_file_link')
     path = serializers.CharField(write_only=True)
     fname = serializers.FileField(use_url=False, required=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
     pacs_name = serializers.CharField(write_only=True)
 
     class Meta:
         model = PACSFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'path', 'PatientID',
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'path', 'PatientID',
                   'PatientName', 'PatientBirthDate', 'PatientAge', 'PatientSex',
                   'Modality', 'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
                   'SeriesDescription', 'pacs_identifier', 'pacs_name', 'file_resource')

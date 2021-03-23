@@ -11,12 +11,13 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
     file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
     upload_path = serializers.CharField(write_only=True)
 
     class Meta:
         model = UploadedFile
-        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'file_resource',
-                  'owner')
+        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize',
+                  'file_resource', 'owner')
 
     def get_file_link(self, obj):
         """

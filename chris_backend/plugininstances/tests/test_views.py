@@ -661,12 +661,27 @@ class PluginInstanceFileViewTests(ViewTests):
     """
 
     def setUp(self):
-        super(PluginInstanceFileViewTests, self).setUp()
+        super().setUp()
         # create a plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name="pacspull")
         (self.plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        # create a plugin instance file associated to the plugin instance
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        # upload file to Swift storage
+        self.path = 'tests/file1.txt'
+        with io.StringIO("test file") as file1:
+            self.swift_manager.upload_obj(self.path, file1.read(),
+                                          content_type='text/plain')
+        (self.plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(
+            plugin_inst=self.plg_inst
+        )
+        self.plg_inst_file.fname.name = self.path
+        self.plg_inst_file.save()
+
         # create test directory where files are created
         # self.test_dir = settings.MEDIA_ROOT + '/test'
         # settings.MEDIA_ROOT = self.test_dir
@@ -674,7 +689,10 @@ class PluginInstanceFileViewTests(ViewTests):
         #     os.makedirs(self.test_dir)
 
     def tearDown(self):
-        super(PluginInstanceFileViewTests, self).tearDown()
+        # delete file from Swift storage
+        self.swift_manager.delete_obj(self.path)
+        super().tearDown()
+
         # remove test directory
         # shutil.rmtree(self.test_dir)
         # settings.MEDIA_ROOT = os.path.dirname(self.test_dir)
@@ -688,13 +706,7 @@ class PluginInstanceFileListViewTests(PluginInstanceFileViewTests):
     def setUp(self):
         super(PluginInstanceFileListViewTests, self).setUp()
 
-        # create a plugin instance file associated to the plugin instance
-        plg_inst = self.plg_inst
-        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'test_file.txt'
-        plg_inst_file.save()
-
-        self.list_url = reverse("plugininstancefile-list", kwargs={"pk": plg_inst.id})
+        self.list_url = reverse("plugininstancefile-list", kwargs={"pk": self.plg_inst.id})
 
     def test_plugin_instance_file_create_failure_post_not_allowed(self):
         self.client.login(username=self.username, password=self.password)
@@ -708,7 +720,7 @@ class PluginInstanceFileListViewTests(PluginInstanceFileViewTests):
     def test_plugin_instance_file_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "test_file.txt")
+        self.assertContains(response, "file1.txt")
 
     def test_plugin_instance_file_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -728,12 +740,6 @@ class AllPluginInstanceFileListViewTests(PluginInstanceFileViewTests):
     def setUp(self):
         super(AllPluginInstanceFileListViewTests, self).setUp()
 
-        # create a plugin instance file associated to the plugin instance
-        plg_inst = self.plg_inst
-        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'test_file.txt'
-        plg_inst_file.save()
-
         self.list_url = reverse("allplugininstancefile-list")
 
     def test_all_plugin_instance_file_create_failure_post_not_allowed(self):
@@ -748,7 +754,7 @@ class AllPluginInstanceFileListViewTests(PluginInstanceFileViewTests):
     def test_all_plugin_instance_file_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, "test_file.txt")
+        self.assertContains(response, "file1.txt")
 
     def test_all_plugin_instance_file_list_from_shared_feed_success(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -757,7 +763,7 @@ class AllPluginInstanceFileListViewTests(PluginInstanceFileViewTests):
         user2 = User.objects.get(username=self.other_username)
         plg_inst.feed.owner.set([user1, user2])
         response = self.client.get(self.list_url)
-        self.assertContains(response, "test_file.txt")
+        self.assertContains(response, "file1.txt")
 
     def test_all_plugin_instance_file_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -766,7 +772,7 @@ class AllPluginInstanceFileListViewTests(PluginInstanceFileViewTests):
     def test_all_plugin_instance_file_list_files_in_not_owned_feeds_inaccessible(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.list_url)
-        self.assertNotContains(response, "test_file.txt")
+        self.assertNotContains(response, "file1.txt")
 
 
 class AllPluginInstanceFileListQuerySearchViewTests(PluginInstanceFileViewTests):
@@ -777,19 +783,13 @@ class AllPluginInstanceFileListQuerySearchViewTests(PluginInstanceFileViewTests)
     def setUp(self):
         super(AllPluginInstanceFileListQuerySearchViewTests, self).setUp()
 
-        # create a plugin instance file associated to the plugin instance
-        plg_inst = self.plg_inst
-        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'test_file.txt'
-        plg_inst_file.save()
-
         self.list_url = reverse("allplugininstancefile-list-query-search") + '?id=' + \
-                        str(plg_inst_file.id)
+                        str(self.plg_inst_file.id)
 
     def test_plugin_instance_query_search_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
-        self.assertContains(response, 'test_file.txt')
+        self.assertContains(response, 'file1.txt')
 
     def test_plugin_instance_query_search_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -804,17 +804,11 @@ class PluginInstanceFileDetailViewTests(PluginInstanceFileViewTests):
     def setUp(self):
         super(PluginInstanceFileDetailViewTests, self).setUp()
         #self.corresponding_feed_url = reverse("feed-detail", kwargs={"pk": feed.id})
-        plg_inst = self.plg_inst
         self.corresponding_plugin_instance_url = reverse("plugininstance-detail",
-                                                         kwargs={"pk": plg_inst.id})
-
-        # create a file in the DB "already uploaded" to the server
-        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'file1.txt'
-        plg_inst_file.save()
+                                                         kwargs={"pk": self.plg_inst.id})
 
         self.read_url = reverse("plugininstancefile-detail",
-                                kwargs={"pk": plg_inst_file.id})
+                                kwargs={"pk": self.plg_inst_file.id})
 
     def test_plugin_instance_file_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -847,17 +841,11 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
 
     def setUp(self):
         super(FileResourceViewTests, self).setUp()
-        plg_inst = self.plg_inst
-        # create a file in the DB "already uploaded" to the server
-        (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(
-            plugin_inst=plg_inst)
-        plg_inst_file.fname.name = '/tests/file1.txt'
-        plg_inst_file.save()
         self.download_url = reverse("plugininstancefile-resource",
-                                    kwargs={"pk": plg_inst_file.id}) + 'file1.txt'
+                                    kwargs={"pk": self.plg_inst_file.id}) + 'file1.txt'
 
     def test_fileresource_get(self):
-        plg_inst_file = PluginInstanceFile.objects.get(fname="/tests/file1.txt")
+        plg_inst_file = PluginInstanceFile.objects.get(fname="tests/file1.txt")
         fileresource_view_inst = mock.Mock()
         fileresource_view_inst.get_object = mock.Mock(return_value=plg_inst_file)
         request_mock = mock.Mock()
@@ -867,20 +855,10 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
 
     @tag('integration')
     def test_integration_fileresource_download_success(self):
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
-        # upload file to Swift storage
-        with io.StringIO("test file") as file1:
-            swift_manager.upload_obj('/tests/file1.txt', file1.read(),
-                                      content_type='text/plain')
-
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(str(response.content, 'utf-8'), "test file")
-
-        # delete file from Swift storage
-        swift_manager.delete_obj('/tests/file1.txt')
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

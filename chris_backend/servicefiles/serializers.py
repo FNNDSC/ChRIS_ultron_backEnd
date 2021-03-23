@@ -26,13 +26,14 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
     file_resource = ItemLinkField('get_file_link')
     path = serializers.CharField(write_only=True)
     fname = serializers.FileField(use_url=False, required=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
     service_identifier = serializers.ReadOnlyField(source='service.identifier')
     service_name = serializers.CharField(write_only=True)
 
     class Meta:
         model = ServiceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'path', 'service_identifier',
-                  'service_name', 'file_resource')
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'path',
+                  'service_identifier', 'service_name', 'file_resource')
 
     def get_file_link(self, obj):
         """

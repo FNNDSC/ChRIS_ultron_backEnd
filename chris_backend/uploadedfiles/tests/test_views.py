@@ -42,11 +42,20 @@ class UploadedFileViewTests(TestCase):
                                  password=self.password)
 
         # create a file in the DB "already uploaded" to the server)
-        self.uploadedfile = UploadedFile(owner=user)
-        self.uploadedfile.fname.name = '{}/uploads/file1.txt'.format(user)
-        self.uploadedfile.save()
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        # upload file to Swift storage
+        self.upload_path = f'{self.username}/uploads/file1.txt'
+        with io.StringIO("test file") as file1:
+            self.swift_manager.upload_obj(self.upload_path, file1.read(),
+                                          content_type='text/plain')
+            self.uploadedfile = UploadedFile(owner=user)
+            self.uploadedfile.fname.name = self.upload_path
+            self.uploadedfile.save()
 
     def tearDown(self):
+        # delete file from Swift storage
+        self.swift_manager.delete_obj(self.upload_path)
         # re-enable logging
         logging.disable(logging.NOTSET)
 
@@ -68,17 +77,15 @@ class UploadedFileListViewTests(UploadedFileViewTests):
 
         # POST request using multipart/form-data to be able to upload file
         self.client.login(username=self.username, password=self.password)
-        upload_path = "{}/uploads/file2.txt".format(self.username)
+        upload_path = f'{self.username}/uploads/file2.txt'
 
         with io.StringIO("test file") as f:
             post = {"fname": f, "upload_path": upload_path}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
         # delete file from Swift storage
-        swift_manager.delete_obj(upload_path)
+        self.swift_manager.delete_obj(upload_path)
 
     def test_uploadedfile_create_failure_unauthenticated(self):
         upload_path = "{}/uploads/file2.txt".format(self.username)
@@ -176,20 +183,10 @@ class UploadedFileResourceViewTests(UploadedFileViewTests):
 
     @tag('integration')
     def test_integration_uploadedfileresource_download_success(self):
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
-        # upload file to Swift storage
-        upload_path = "{}/uploads/file1.txt".format(self.username)
-        with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(upload_path, file1.read(), content_type='text/plain')
-
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(str(response.content, 'utf-8'), "test file")
-
-        # delete file from Swift storage
-        swift_manager.delete_obj(upload_path)
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
