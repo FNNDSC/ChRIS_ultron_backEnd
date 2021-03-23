@@ -224,13 +224,14 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
                                                       read_only=True)
     file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
     feed_id = serializers.ReadOnlyField(source='plugin_inst.feed.id')
     plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
 
     class Meta:
         model = PluginInstanceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'feed_id', 'plugin_inst_id',
-                  'file_resource', 'plugin_inst')
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'feed_id',
+                  'plugin_inst_id', 'file_resource', 'plugin_inst')
 
     def get_file_link(self, obj):
         """

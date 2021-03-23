@@ -42,7 +42,7 @@ This page describes how to quickly get the set of services comprising the ChRIS 
 
 Currently tested platforms:
 * ``Docker 18.06.0+``
-* ``Docker Compose 1.22.0+``
+* ``Docker Compose 1.27.0+``
 * ``Ubuntu 18.04+ and MAC OS X 10.14+``
 
 #### On a Linux machine make sure to add your computer user to the ``docker`` group

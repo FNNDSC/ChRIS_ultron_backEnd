@@ -1,6 +1,7 @@
 
 import logging
 import json
+import io
 
 from django.test import TestCase
 from django.urls import reverse
@@ -11,6 +12,7 @@ from rest_framework import status
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from feeds.models import Note, Tag, Tagging, Feed, Comment
+from core.swiftmanager import SwiftManager
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -834,9 +836,15 @@ class FeedFileListViewTests(ViewTests):
 
         # create two files in the DB "already uploaded" to the server from two different
         # plugin instances that write to the same feed
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
         plg_inst = PluginInstance.objects.all()[0]
+        self.path1 = 'tests/file1.txt'
+        with io.StringIO("test file1") as file1:
+            self.swift_manager.upload_obj(self.path1, file1.read(),
+                                          content_type='text/plain')
         (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'file1.txt'
+        plg_inst_file.fname.name = self.path1
         plg_inst_file.save()
 
         # create a second 'ds' plugin instance in the same feed tree
@@ -845,10 +853,19 @@ class FeedFileListViewTests(ViewTests):
         (plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous_id=plg_inst.id,
             compute_resource=plugin.compute_resources.all()[0])
+        self.path2 = 'tests/file2.txt'
+        with io.StringIO("test file2") as file2:
+            self.swift_manager.upload_obj(self.path2, file2.read(),
+                                          content_type='text/plain')
         (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
-        plg_inst_file.fname.name = 'file2.txt'
+        plg_inst_file.fname.name = self.path2
         plg_inst_file.save()
 
+    def tearDown(self):
+        # delete file from Swift storage
+        self.swift_manager.delete_obj(self.path1)
+        self.swift_manager.delete_obj(self.path2)
+        super().tearDown()
 
     def test_feedfile_list_success(self):
         self.client.login(username=self.username, password=self.password)

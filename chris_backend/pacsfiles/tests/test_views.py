@@ -32,6 +32,13 @@ class PACSFileViewTests(TestCase):
         User.objects.create_user(username=self.username, password=self.password)
 
         # create a PACS file in the DB "already registered" to the server)
+        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                     settings.SWIFT_CONNECTION_PARAMS)
+        # upload file to Swift storage
+        self.path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
+        with io.StringIO("test file") as file1:
+            self.swift_manager.upload_obj(self.path, file1.read(),
+                                          content_type='text/plain')
         pacs = PACS(identifier='MyPACS')
         pacs.save()
         pacs_file = PACSFile(PatientID='123456',
@@ -41,11 +48,12 @@ class PACSFileViewTests(TestCase):
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              SeriesDescription='SAG T1 MPRAGE',
                              pacs=pacs)
-        self.path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         pacs_file.fname.name = self.path
         pacs_file.save()
 
     def tearDown(self):
+        # delete file from Swift storage
+        self.swift_manager.delete_obj(self.path)
         # re-enable logging
         logging.disable(logging.NOTSET)
 
@@ -81,11 +89,9 @@ class PACSFileListViewTests(PACSFileViewTests):
         User.objects.create_user(username=chris_username, password=chris_password)
 
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
+            self.swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
 
         # make the POST request using the chris user
         self.client.login(username=chris_username, password=chris_password)
@@ -94,7 +100,7 @@ class PACSFileListViewTests(PACSFileViewTests):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         # delete file from Swift storage
-        swift_manager.delete_obj(path)
+        self.swift_manager.delete_obj(path)
 
     def test_pacsfile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -180,19 +186,10 @@ class PACSFileResourceViewTests(PACSFileViewTests):
 
     @tag('integration')
     def test_integration_pacsfileresource_download_success(self):
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
-        # upload file to Swift storage
-        with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(self.path, file1.read(), content_type='text/plain')
-
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(str(response.content, 'utf-8'), "test file")
-
-        # delete file from Swift storage
-        swift_manager.delete_obj(self.path)
 
     def test_fileresource_download_failure_unauthenticated(self):
         response = self.client.get(self.download_url)
