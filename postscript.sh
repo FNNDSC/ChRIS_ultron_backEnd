@@ -30,7 +30,11 @@
                     fnndsc/pl-mri10yr06mo01da_normal^moc,           \
                     fnndsc/pl-mgz2lut_report,                       \
                     fnndsc/pl-pfdo_mgz2img,                         \
-                    fnndsc/pl-pfdo_med2img
+                    fnndsc/pl-pfdo_med2img   \
+                    fnndsc/pl-mri10yr06mo01da_normal  \
+                    fnndsc/pl-freesurfer_pp  \
+                    fnndsc/pl-mpcs  \
+                    fnndsc/pl-z2labelmap
 "
 
 #

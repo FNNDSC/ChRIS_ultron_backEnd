@@ -1,29 +1,41 @@
 #
-# Docker file for ChRIS production server
+# Docker file for CUBE image
 #
-# Build with
+# Build production image:
 #
 #   docker build -t <name> .
 #
-# For example if building a local version, you could do:
+# For example if building a local production image:
 #
 #   docker build -t local/chris .
+#
+# Build development image:
+#
+#   docker build --build-arg ENVIRONMENT=local -t <name>:<tag> .
+#
+# For example if building a local development image:
+#
+#   docker build --build-arg ENVIRONMENT=local -t local/chris:dev .
 #
 # In the case of a proxy (located at say proxy.tch.harvard.edu:3128), do:
 #
 #    export PROXY="http://proxy.tch.harvard.edu:3128"
-#    docker build --build-arg http_proxy=${PROXY} --build-arg UID=$UID -t local/chris .
 #
-# To run an interactive shell inside this container, do:
+# then add to any of the previous build commands:
 #
-#   docker run -ti --entrypoint /bin/bash local/chris
+#    --build-arg http_proxy=${PROXY}
+#
+# For example if building a local development image:
+#
+# docker build --build-arg http_proxy=${PROXY} --build-arg ENVIRONMENT=local -t local/chris:dev .
 #
 
 FROM fnndsc/ubuntu-python3:ubuntu20.04-python3.8.5
 MAINTAINER fnndsc "dev@babymri.org"
 
 # Pass a UID on build command line (see above) to set internal UID
-ARG UID=2001
+ARG UID=1001
+ARG ENVIRONMENT=production
 ENV UID=$UID DEBIAN_FRONTEND=noninteractive VERSION="0.1"
 
 ENV APPROOT="/home/localuser/chris_backend" REQPATH="/usr/src/requirements"
@@ -40,7 +52,7 @@ RUN apt-get update                                               \
   && apt-get install -y libssl-dev libmysqlclient-dev            \
   && apt-get install -y apache2 apache2-dev                      \
   && pip install --upgrade pip                                    \
-  && pip install -r ${REQPATH}/production.txt                    \
+  && pip install -r ${REQPATH}/${ENVIRONMENT}.txt                    \
   && useradd -l -u $UID -ms /bin/bash localuser
 
 # Start as user localuser
