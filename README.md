@@ -33,7 +33,7 @@ The resulting instance uses the default Django development server and therefore 
 
 ### Abstract
 
-This page describes how to quickly get the set of services comprising the ChRIS backend up and running for  CUBE development and how to run the automated tests. A single-machine production deployment of the ChRIS backend services is also explained.
+This page describes how to quickly get the set of services comprising the ChRIS backend up and running for CUBE development and how to run the automated tests. A production deployment of the ChRIS backend services is also explained.
 
 
 ### Preconditions
@@ -50,9 +50,11 @@ Currently tested platforms:
 Consult this page https://docs.docker.com/engine/install/linux-postinstall/
 
 
-### Single-machine production deployment
+### Production deployment
 
 #### To get the production system up:
+
+Note: Currently this deployment is based on a Swarm cluster that is able to schedule services on manager nodes (as declared in the compose file `pman` ancillary service is required to be scheduled on a manager node).
 
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
