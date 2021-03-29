@@ -17,12 +17,17 @@ services:
 
   chris_dev:
     image: ${CHRISREPO}/chris:dev
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=on
       - DJANGO_COLLECTSTATIC=off
+    command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     depends_on:
@@ -39,6 +44,10 @@ services:
 
   worker:
     image: ${CHRISREPO}/chris:dev
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
@@ -63,6 +72,10 @@ services:
 
   worker_periodic:
     image: ${CHRISREPO}/chris:dev
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
@@ -84,6 +97,10 @@ services:
 
   scheduler:
     image: ${CHRISREPO}/chris:dev
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
