@@ -247,3 +247,7 @@ Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki).
 
 [license-badge]: https://img.shields.io/github/license/fnndsc/ChRIS_ultron_backEnd.svg
 [last-commit-badge]: https://img.shields.io/github/last-commit/fnndsc/ChRIS_ultron_backEnd.svg
+
+### Learn More
+
+If you are interested in contributing or joining us, Check [here](http://chrisproject.org/join-us).
