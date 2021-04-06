@@ -280,14 +280,17 @@ class PluginInstanceManager(object):
 
     def get_ts_plugin_instance_input_objs(self):
         """
-        Get a dictionary with keys that are the output dir of each input plugin instance
-        to this 'ts' plugin instance. The values of this dictionary are lists of all the
-        objects under the corresponding output dir key that match a filter for each of
-        the provided plugin instances.
+        Get a tuple whose first element is a dictionary with keys that are the ids of
+        each input plugin instance to this 'ts' plugin instance. The values of
+        this dictionary are also dictionaries containing the output dir of the plugin
+        instances and the list of all the objects under the output dir that match a
+        regular expression. The second element of the tuple indicates the value of the
+        'groupByInstance' flag for this 'ts' plugin instance.
         """
         job_id = self.str_job_id
         # extract the 'ts' plugin's special parameters from the DB
         plg_inst_ids = regexs = []
+        group_by_instance = False
         if self.c_plugin_inst.plugin.meta.type == 'ts':
             for param_inst in self.l_plugin_inst_param_instances:
                 if param_inst.plugin_param.name == 'plugininstances':
@@ -296,6 +299,8 @@ class PluginInstanceManager(object):
                 elif param_inst.plugin_param.name == 'filter':
                     # string param that represents a comma-separated list of regular expr
                     regexs = param_inst.value.split(',') if param_inst.value else []
+                elif param_inst.plugin_param.name == 'groupByInstance':
+                    group_by_instance = param_inst.value
         d_objs = {}
         for i, inst_id in enumerate(plg_inst_ids):
             try:
@@ -316,10 +321,12 @@ class PluginInstanceManager(object):
                 raise
             if (i < len(regexs)) and regexs[i]:
                 r = re.compile(regexs[i])
-                d_objs[output_path] = [obj for obj in l_ls if r.search(obj)]
+                d_objs[plg_inst.id] = {'output_path': output_path,
+                                       'objs': [obj for obj in l_ls if r.search(obj)]}
             else:
-                d_objs[output_path] = l_ls
-        return d_objs
+                d_objs[plg_inst.id] = {'output_path': output_path,
+                                       'objs': l_ls}
+        return d_objs, group_by_instance
 
     def manage_plugin_instance_app_empty_inputdir(self):
         """
@@ -446,7 +453,8 @@ class PluginInstanceManager(object):
                     if not obj_output_path.startswith(outputdir + '/'):
                         obj_output_path = outputdir + '/' + obj.split('/')[-1]
                     try:
-                        self.swift_manager.copy_obj(obj, obj_output_path)
+                        if not self.swift_manager.obj_exists(obj_output_path):
+                            self.swift_manager.copy_obj(obj, obj_output_path)
                     except ClientException as e:
                         logger.error(f'[CODE09,{job_id}]: Error while copying file '
                                      f'from {obj} to {obj_output_path} in swift storage, '
@@ -459,20 +467,25 @@ class PluginInstanceManager(object):
                     self.str_job_id)
         self._register_output_files(obj_output_path_list)
 
-    def _handle_app_ts_unextracted_input_objs(self, d_ts_input_objs):
+    def _handle_app_ts_unextracted_input_objs(self, d_ts_input_objs, group_by_instance):
         """
         Internal method to handle a 'ts' plugin's input instances' filtered objects
-        that are not extracted from object storage.
+        (which are not extracted from object storage).
         """
         job_id = self.str_job_id
         outputdir = self.c_plugin_inst.get_output_path()
         obj_output_path_list = []
-        for plg_inst_outputdir in d_ts_input_objs:
-            obj_list = d_ts_input_objs[plg_inst_outputdir]
+        for plg_inst_id in d_ts_input_objs:
+            plg_inst_output_path = d_ts_input_objs[plg_inst_id]['output_path']
+            obj_list = d_ts_input_objs[plg_inst_id]['objs']
+            plg_inst_outputdir = outputdir
+            if group_by_instance:
+                plg_inst_outputdir = os.path.join(outputdir, str(plg_inst_id))
             for obj in obj_list:
-                obj_output_path = obj.replace(plg_inst_outputdir, outputdir, 1)
+                obj_output_path = obj.replace(plg_inst_output_path, plg_inst_outputdir, 1)
                 try:
-                    self.swift_manager.copy_obj(obj, obj_output_path)
+                    if not self.swift_manager.obj_exists(obj_output_path):
+                        self.swift_manager.copy_obj(obj, obj_output_path)
                 except ClientException as e:
                     logger.error(f'[CODE09,{job_id}]: Error while copying file '
                                  f'from {obj} to {obj_output_path} in swift storage, '
@@ -524,10 +537,10 @@ class PluginInstanceManager(object):
                     if d_unextpath_params:
                         self._handle_app_unextpath_parameters(d_unextpath_params)
 
-                    # register files from filtered input instance paths for 'ts' plugins
+                    # register files from filtered input instance paths ('ts' plugins)
                     if self.c_plugin_inst.plugin.meta.type == 'ts':
-                        d_ts_input_objs = self.get_ts_plugin_instance_input_objs()
-                        self._handle_app_ts_unextracted_input_objs(d_ts_input_objs)
+                        d_ts_input_objs, tf = self.get_ts_plugin_instance_input_objs()
+                        self._handle_app_ts_unextracted_input_objs(d_ts_input_objs, tf)
                 except Exception:
                     self.c_plugin_inst.status = 'cancelled'  # giving up
                 else:

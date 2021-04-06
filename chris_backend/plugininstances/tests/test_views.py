@@ -3,6 +3,7 @@ import logging
 import json
 import time
 import io
+import os
 from unittest import mock, skip
 
 from django.test import TestCase, TransactionTestCase, tag
@@ -304,6 +305,117 @@ class PluginInstanceListViewTests(TasksViewTests):
         # delete files from swift storage
         self.swift_manager.delete_obj(self.user_space_path + 'test.txt')
 
+    @tag('integration')
+    def test_integration_ts_plugin_instance_create_success(self):
+        # create an FS plugin instance
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        (fs_plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        # upload FS plugin instace output file to Swift storage
+        path = os.path.join(fs_plg_inst.get_output_path(), 'test.txt')
+        with io.StringIO("test file") as test_file:
+            self.swift_manager.upload_obj(path, test_file.read(),
+                                          content_type='text/plain')
+        (fs_plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=fs_plg_inst)
+        fs_plg_inst_file.fname.name = path
+        fs_plg_inst_file.save()
+        fs_plg_inst.status = 'finishedSuccessfully'
+        fs_plg_inst.save()
+
+        # add a TS plugin to the system
+        plugin_parameters = [{'name': 'plugininstances', 'type': 'string',
+                              'action': 'store', 'optional': True,
+                              'flag': '--plugininstances', 'short_flag': '--plugininstances',
+                              'help': 'test plugin parameter', 'ui_exposed': True},
+
+                             {'name': 'filter', 'type': 'string',
+                              'action': 'store', 'optional': True,
+                              'flag': '--filter',
+                              'short_flag': '-f',
+                              'help': 'test plugin parameter', 'ui_exposed': True}
+                             ]
+        self.plg_data = {'description': 'A toplological copy ts plugin',
+                         'version': '0.1',
+                         'dock_image': 'fnndsc/pl-topologicalcopy',
+                         'execshell': 'python3',
+                         'selfpath': '/usr/local/bin',
+                         'selfexec': 'topologicalcopy'}
+
+        self.plg_meta_data = {'name': 'topologicalcopy',
+                              'title': 'TS copy plugin',
+                              'license': 'MIT',
+                              'type': 'ts',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Utility',
+                              'stars': 0,
+                              'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        self.plugin_repr = self.plg_data.copy()
+        self.plugin_repr.update(self.plg_meta_data)
+        self.plugin_repr['parameters'] = plugin_parameters
+
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
+
+        data = self.plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = self.plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
+        plugin.compute_resources.set([compute_resource])
+        plugin.save()
+
+        # add plugin's parameters
+        parameters = plugin_parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
+
+        # make POST API request to create a ts plugin instance
+        create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        post = json.dumps(
+            {"template": {"data": [{"name": "previous_id", "value": fs_plg_inst.id},
+                                   {"name": "plugininstances", "value": str(fs_plg_inst.id)},
+                                   {"name": "filter", "value": ".txt$"}]}})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # instance must be 'started' before checking its status
+        pl_inst = PluginInstance.objects.get(pk=response.data['id'])
+        for _ in range(10):
+            time.sleep(3)
+            pl_inst.refresh_from_db()
+            if pl_inst.status == 'started': break
+        self.assertEqual(pl_inst.status, 'started')  # instance must be started
+
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 10 second intervals.
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        maxLoopTries = 10
+        currentLoop = 1
+        b_checkAgain = True
+        time.sleep(10)
+        while b_checkAgain:
+            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            elif currentLoop < maxLoopTries:
+                time.sleep(10)
+            if currentLoop == maxLoopTries:
+                b_checkAgain = False
+            currentLoop += 1
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
+        self.assertEqual(pl_inst.files.count(), 3)
+
+        # delete files from swift storage
+        self.swift_manager.delete_obj(path)
+
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
@@ -600,6 +712,74 @@ class PluginInstanceDescendantListViewTests(ViewTests):
 
     def test_plugin_instance_descendant_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PluginInstanceSplitListViewTests(ViewTests):
+    """
+    Test the plugininstancesplit-list view.
+    """
+
+    def setUp(self):
+        super(PluginInstanceSplitListViewTests, self).setUp()
+
+        user = User.objects.get(username=self.username)
+
+        # create an 'fs' plugin instance
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        (self.fs_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        # create a 'ts' plugin
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pl-topologicalcopy', type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+
+        self.create_read_url = reverse("plugininstancesplit-list", kwargs={"pk": self.fs_inst.id})
+
+    def test_plugin_instance_split_create_failure_access_denied(self):
+        post = json.dumps({"template": {"data": [{"name": "filter", "value": ""}]}})
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_instance_split_create_success(self):
+        post = json.dumps({"template": {"data": [{"name": "filter", "value": ""}]}})
+
+        # add parameters to the plugin before the POST request
+        plugin = Plugin.objects.get(meta__name="pl-topologicalcopy")
+        PluginParameter.objects.get_or_create(plugin=plugin, name='filter', type='string')
+        PluginParameter.objects.get_or_create(plugin=plugin, name='plugininstances',
+                                              type='string')
+
+        self.client.login(username=self.username, password=self.password)
+
+        # make API requests
+        response = self.client.post(self.create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.fs_inst.status = 'finishedSuccessfully'
+        self.fs_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+
+            response = self.client.post(self.create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            # check that the run_plugin_instance task was called with appropriate args
+            delay_mock.assert_called_once()
+
+    def test_plugin_instance_split_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        # response should contain all the instances in the tree
+        self.assertContains(response, "filter")
+
+    def test_plugin_instance_split_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
