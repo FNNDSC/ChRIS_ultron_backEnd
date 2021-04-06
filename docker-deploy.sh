@@ -45,7 +45,7 @@ if [[ "$1" == 'up' ]]; then
     export STOREBASE=$(pwd)/FS/remote
     windowBottom
 
-    title -d 1 "Starting chris_stack single-machine production deployment on swarm using " " ./docker-compose.yml"
+    title -d 1 "Starting chris_stack production deployment on swarm using " " ./docker-compose.yml"
     declare -a A_CONTAINER=(
     "fnndsc/chris"
     "fnndsc/chris_store"
@@ -114,7 +114,7 @@ fi
 
 if [[ "$1" == 'down' ]]; then
 
-    title -d 1 "Destroying chris_stack single-machine production deployment on swarm" "from ./docker-compose.yml"
+    title -d 1 "Destroying chris_stack production deployment on swarm" "from ./docker-compose.yml"
     echo
     docker stack rm chris_stack
     docker swarm leave --force
