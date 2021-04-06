@@ -270,7 +270,7 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
         if cr_name:
             compute_resource = plg_topologcopy.compute_resources.get(name=cr_name)
         else:
-            compute_resource = instance.compute_resource
+            compute_resource = plg_topologcopy.compute_resources.first()
 
         plg_filter_param = plg_topologcopy.parameters.get(name='filter')
         plg_plugininstances_param = plg_topologcopy.parameters.get(name='plugininstances')
