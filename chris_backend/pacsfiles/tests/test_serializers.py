@@ -89,6 +89,7 @@ class PACSFileSerializerTests(TestCase):
         """
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         data = {'PatientID': '123456', 'PatientName': 'crazy',
+                'StudyDate': '2020-07-15',
                 'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
                 'StudyDescription': 'brain_crazy_study',
                 'SeriesDescription': 'SAG T1 MPRAGE',
@@ -105,6 +106,7 @@ class PACSFileSerializerTests(TestCase):
         """
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
         data = {'PatientID': '123456', 'PatientName': 'crazy',
+                'StudyDate': '2020-07-15',
                 'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
                 'StudyDescription': 'brain_crazy_study',
                 'SeriesDescription': 'SAG T1 MPRAGE',
@@ -113,6 +115,7 @@ class PACSFileSerializerTests(TestCase):
         pacs = PACS(identifier='MyPACS')
         pacs.save()
         pacs_file = PACSFile(PatientID='123456',
+                             StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              pacs=pacs)

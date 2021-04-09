@@ -20,10 +20,12 @@ class PACSFile(models.Model):
     PatientAge = models.IntegerField(blank=True, null=True)
     PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')],
                                   blank=True)
+    StudyDate = models.DateField(db_index=True)
     Modality = models.CharField(max_length=15, blank=True)
-    StudyInstanceUID = models.CharField(max_length=150, db_index=True)
+    ProtocolName = models.CharField(max_length=64, blank=True)
+    StudyInstanceUID = models.CharField(max_length=150)
     StudyDescription = models.CharField(max_length=500, blank=True)
-    SeriesInstanceUID = models.CharField(max_length=150, db_index=True)
+    SeriesInstanceUID = models.CharField(max_length=150)
     SeriesDescription = models.CharField(max_length=500, blank=True)
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
 
@@ -43,6 +45,8 @@ class PACSFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     PatientName = django_filters.CharFilter(field_name='PatientName',
                                             lookup_expr='icontains')
+    ProtocolName = django_filters.CharFilter(field_name='ProtocolName',
+                                             lookup_expr='icontains')
     StudyDescription = django_filters.CharFilter(field_name='StudyDescription',
                                                  lookup_expr='icontains')
     SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
@@ -58,6 +62,6 @@ class PACSFileFilter(FilterSet):
         model = PACSFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
                   'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
-                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate',
-                  'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
-                  'SeriesDescription', 'pacs_identifier']
+                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
+                  'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
+                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']
