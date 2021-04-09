@@ -43,6 +43,7 @@ class PACSFileViewTests(TestCase):
         pacs.save()
         pacs_file = PACSFile(PatientID='123456',
                              PatientName='crazy',
+                             StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              StudyDescription='brain_crazy_study',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
@@ -71,6 +72,7 @@ class PACSFileListViewTests(PACSFileViewTests):
             {"template": {"data": [{"name": "path", "value": path},
                                    {"name": "PatientID", "value": "123456"},
                                    {"name": "PatientName", "value": "crazy"},
+                                   {"name": "StudyDate", "value": '2020-07-15'},
                                    {"name": "StudyInstanceUID",
                                     "value": '1.1.3432.54.6545674765.765434'},
                                    {"name": "StudyDescription", "value": "brain_crazy_study"},
@@ -115,6 +117,7 @@ class PACSFileListViewTests(PACSFileViewTests):
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
         pacs = PACS.objects.get(identifier='MyPACS')
         pacs_file = PACSFile(PatientID='123456',
+                             StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              pacs=pacs)
