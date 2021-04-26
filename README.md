@@ -8,10 +8,34 @@ The core backend service for the ChRIS distributed software platform, also known
 
 ## ChRIS development, testing and deployment
 
+### Abstract
+
+This page describes how to quickly get the set of services comprising the ChRIS backend up and running for CUBE development and how to run the automated tests. A production deployment of the ChRIS backend services is also explained.
+
+### Preconditions
+
+#### Install latest Docker and Docker Compose. 
+
+Currently tested platforms:
+* ``Docker 18.06.0+``
+* ``Docker Compose 1.27.0+``
+* ``Ubuntu 18.04+ and MAC OS X 10.14+``
+
+#### On a Linux machine make sure to add your computer user to the ``docker`` group
+
+Consult this page https://docs.docker.com/engine/install/linux-postinstall/
+
 ### TL;DR
 
-If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and 
-running with no mess, no fuss:
+#### If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and running with no mess, no fuss:
+
+Start a local Docker Swarm cluster if not already started:
+
+```bash
+docker swarm init --advertise-addr 127.0.0.1
+```
+
+Start CUBE backend containers:
 
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
@@ -31,39 +55,31 @@ Once the system is "up", you can add more compute plugins to the ecosystem:
 
 The resulting instance uses the default Django development server and therefore is not suitable for production.
 
-### Abstract
-
-This page describes how to quickly get the set of services comprising the ChRIS backend up and running for CUBE development and how to run the automated tests. A production deployment of the ChRIS backend services is also explained.
-
-
-### Preconditions
-
-#### Install latest Docker and Docker Compose. 
-
-Currently tested platforms:
-* ``Docker 18.06.0+``
-* ``Docker Compose 1.27.0+``
-* ``Ubuntu 18.04+ and MAC OS X 10.14+``
-
-#### On a Linux machine make sure to add your computer user to the ``docker`` group
-
-Consult this page https://docs.docker.com/engine/install/linux-postinstall/
-
-
 ### Production deployment
 
 #### To get the production system up:
 
 Note: Currently this deployment is based on a Swarm cluster that is able to schedule services on manager nodes (as declared in the compose file `pman` ancillary service is required to be scheduled on a manager node).
 
+Start a local Docker Swarm cluster if not already started:
+
+```bash
+docker swarm init --advertise-addr 127.0.0.1
+```
+
+Fetch source code:
+
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
 mkdir secrets
 ```
+
 Now copy all the required secret configuration files into the secrets directory, please take a look at 
 [this](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-production-services-secret-configuration-files) 
 wiki page to learn more about these files 
+
+Deploy CUBE backend containers:
 
 ```bash
 ./docker-deploy.sh up
@@ -71,11 +87,18 @@ wiki page to learn more about these files
 
 #### To tear down:
 
+Remove CUBE backend containers:
+
 ```bash
 cd ChRIS_ultron_backend
 ./docker-deploy.sh down
 ```
 
+Remove the local Docker Swarm cluster if desired:
+
+```bash
+docker swarm leave --force
+```
 
 ### Development
 
@@ -131,6 +154,12 @@ pip freeze --local
 ````
 
 #### Instantiate CUBE
+
+Start a local Docker Swarm cluster if not already started:
+
+```bash
+docker swarm init --advertise-addr 127.0.0.1
+```
 
 Start CUBE from the repository source directory by running the make bash script
 
@@ -208,10 +237,16 @@ swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list user
 
 #### Tear down CUBE
 
-Stop and remove CUBE services and storage space by running the following bash script from the repository source directory
+Stop and remove CUBE services and storage space by running the following bash script from the repository source directory:
 
 ```bash
 ./unmake.sh
+```
+
+Remove the local Docker Swarm cluster if desired:
+
+```bash
+docker swarm leave --force
 ```
 
 
