@@ -41,8 +41,3 @@ title -d 1 "Destroying CUBE containerized development environment" "from  ./dock
         cat dc.out | ./boxes.sh
     fi
 windowBottom
-
-title -d 1 "Stopping swarm cluster..."
-    docker swarm leave --force >dc.out 2>dc.out
-    cat dc.out                                                              | ./boxes.sh
-windowBottom

@@ -7,7 +7,6 @@
 # SYNPOSIS
 #
 #   make.sh                     [-r <service>]                  \
-#                               [-a <swarm-advertise-adr>]      \
 #                               [-p] [-s] [-i] [-d]             \
 #                               [-U] [-I]                       \
 #                               [-S <storeBaseOverride>]        \
@@ -88,10 +87,6 @@
 #       the <computeEnv> here is just a label, and the actual env is fully
 #       specified by `pfcon`.
 #
-#   -a <swarm-advertise-adr>
-#
-#       If specified, pass <swarm-advertise-adr> to swarm init.
-#
 #   -i
 #
 #       Optional do not restart final chris_dev in interactive mode. If any
@@ -139,10 +134,8 @@ declare -i b_pause=0
 declare -i b_skipIntro=0
 declare -i b_norestartinteractive_chris_dev=0
 declare -i b_debug=0
-declare -i b_swarmAdvertiseAdr=0
 declare -i b_storeBaseOverride=0
 COMPUTEENV="host"
-SWARMADVERTISEADDR=""
 RESTART=""
 HERE=$(pwd)
 LINE="------------------------------------------------"
@@ -156,7 +149,7 @@ if [[ -f .env ]] ; then
     source .env
 fi
 
-while getopts "r:psidUIa:S:e:" opt; do
+while getopts "r:psidUIS:e:" opt; do
     case $opt in
         e) COMPUTEENV=$OPTARG                   ;;
         r) b_restart=1
@@ -164,8 +157,6 @@ while getopts "r:psidUIa:S:e:" opt; do
         p) b_pause=1                            ;;
         s) b_skipIntro=1                        ;;
         i) b_norestartinteractive_chris_dev=1   ;;
-        a) b_swarmAdvertiseAdr=1
-            SWARMADVERTISEADDR=$OPTARG          ;;
         d) b_debug=1                            ;;
         U) b_skipUnitTests=1                    ;;
         I) b_skipIntegrationTests=1             ;;
@@ -201,7 +192,7 @@ title -d 1 "Setting global exports..."
         STOREBASE=$(pwd)
         cd $HERE
     fi
-    echo -e "${STEP}.1 For pman override to swarm containers, exporting\nSTOREBASE=$STOREBASE " | ./boxes.sh
+    echo -e "${STEP}.1 exporting\nSTOREBASE=$STOREBASE " | ./boxes.sh
     export STOREBASE=$STOREBASE
 windowBottom
 
@@ -283,19 +274,6 @@ else
         done
     fi
 
-    title -d 1 "Stopping and restarting the docker swarm... "
-        docker swarm leave --force >dc.out 2>dc.out
-        cat dc.out | ./boxes.sh
-        if (( b_swarmAdvertiseAdr )) ; then
-            docker swarm init --advertise-addr=$SWARMADVERTISEADDR      |\
-                sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g' | ./boxes.sh
-        else
-            docker swarm init --advertise-addr 127.0.0.1                |\
-                sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g' | ./boxes.sh
-        fi
-        echo "swarm started"                                            | ./boxes.sh
-    windowBottom
-
     title -d 1 "Shutting down any running CUBE and CUBE related containers... "
         echo "This might take a few minutes... please be patient."              | ./boxes.sh ${Yellow}
         windowBottom
@@ -354,20 +332,14 @@ else
 
     title -d 1  "Creating overlay network: remote"
         echo "docker network create -d overlay --attachable remote"   | ./boxes.sh ${LightCyan}
-        windowBottom
-        docker network create -d overlay --attachable remote  >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
+        docker network create -d overlay --attachable remote
     windowBottom
 
     title -d 1  "Starting pfcon_stack containerized environment on swarm using "            \
                 "./docker-compose_remote.yml"
         echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
         echo "docker stack deploy -c docker-compose_remote.yml pfcon_stack"   | ./boxes.sh ${LightCyan}
-        windowBottom
-        docker stack deploy -c docker-compose_remote.yml pfcon_stack  >& dc.out > /dev/null
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
+        docker stack deploy -c docker-compose_remote.yml pfcon_stack
     windowBottom
 
     title -d 1  "Starting CUBE containerized development environment using "            \
@@ -627,33 +599,18 @@ else
     fi
     windowBottom
 
+    title -d 1 "Restarting CUBE's Django development server..."
+        printf "${LightCyan}%40s${LightGreen}%40s\n"                \
+                    "Restarting" "chris_dev"                        | ./boxes.sh
+        windowBottom
+        docker-compose -f docker-compose_dev.yml restart chris_dev >& dc.out >/dev/null
+        echo -en "\033[2A\033[2K"
+        cat dc.out | ./boxes.sh
+    windowBottom
+
     if (( !  b_norestartinteractive_chris_dev )) ; then
-        title -d 1 "Restarting CUBE's Django development server"        \
-                            "in interactive mode..."
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "Stopping" "chris_dev"                          | ./boxes.sh
-            windowBottom
-            docker-compose -f docker-compose_dev.yml stop chris_dev >& dc.out >/dev/null
-            echo -en "\033[2A\033[2K"
-            cat dc.out | ./boxes.sh
-
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "rm -f" "chris_dev"                             | ./boxes.sh
-            windowBottom
-            docker-compose -f docker-compose_dev.yml rm -f chris_dev >& dc.out >/dev/null
-            echo -en "\033[2A\033[2K"
-            cat dc.out | ./boxes.sh
-
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "Starting in interactive mode" "chris_dev"      | ./boxes.sh
-            windowBottom
-            docker-compose -f docker-compose_dev.yml run --service-ports chris_dev
-    else
-        title -d 1 "Restarting CUBE's Django development server"        \
-                            "in non-interactive mode..."
-            printf "${LightCyan}%40s${LightGreen}%40s\n"                \
-                        "Restarting" "chris_dev"                        | ./boxes.sh
-            windowBottom
-            docker-compose -f docker-compose_dev.yml restart chris_dev
+        title -d 1 "Attaching interactive terminal (ctrl-c to detach)"
+        chris_dev=$(docker ps -f name=chris_dev_1 -q)
+        docker attach --detach-keys ctrl-c $chris_dev
     fi
 fi

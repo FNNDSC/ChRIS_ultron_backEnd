@@ -21,6 +21,8 @@ services:
       context: .
       args:
         ENVIRONMENT: local
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
