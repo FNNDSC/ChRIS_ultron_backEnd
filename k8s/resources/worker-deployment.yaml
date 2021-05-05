@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: worker
+  template:
+    metadata:
+      labels:
+        name: worker
+    spec:
+      containers:
+      - name: worker
+        image: fnndsc/chris
+        ports:
+        - containerPort: 6900
+        command: ["celery"]
+        args: ["-A", "core", "worker", "-c", "1", "-l", "DEBUG", "-Q", "main"]
+        envFrom:
+        - configMapRef:
+            name: cube-config
+        - secretRef:
+            name: cube-secrets

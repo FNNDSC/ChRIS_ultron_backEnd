@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: scheduler
+  template:
+    metadata:
+      labels:
+        name: scheduler
+    spec:
+      containers:
+      - name: scheduler
+        image: fnndsc/chris:latest
+        command: ["celery"]
+        args: ["-A", "core", "beat", "-l", "info", "--pidfile", "/home/localuser/celerybeat.pid", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+        envFrom:
+        - configMapRef:
+            name: cube-config
+        - secretRef:
+            name: cube-secrets
