@@ -25,10 +25,7 @@ class MemoryInt(int):
                 raise ValueError
         except (IndexError, ValueError, AssertionError):
             raise ValueError("Memory format incorrect. Format is xMi or xGi where x is an integer.")
-        return  super(MemoryInt, cls).__new__(cls, memory_int)
-
-    def __str__(self):
-        return super().__str__() + 'Mi'
+        return super(MemoryInt, cls).__new__(cls, memory_int)
 
 
 class CPUInt(int):
@@ -46,10 +43,7 @@ class CPUInt(int):
             assert cpu_int > 0
         except (IndexError, ValueError, AssertionError):
             raise ValueError("CPU format incorrect. Format is xm where x is an integer in millicores.")
-        return  super(CPUInt, cls).__new__(cls, cpu_int)
-
-    def __str__(self):
-        return super().__str__() + 'm'
+        return super(CPUInt, cls).__new__(cls, cpu_int)
 
 
 class MemoryField(models.Field):
