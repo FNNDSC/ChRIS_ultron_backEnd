@@ -189,24 +189,12 @@ class PluginInstanceManager(object):
                 id=self.c_plugin_inst.id,
                 status='started').update(summary=summary, raw=raw)
 
-            if status in ('finishedSuccessfully', 'finishedWithError', 'undefined'):
-                if status == 'finishedSuccessfully':
-                    self._handle_finished_successfully_status()
-                elif status == 'finishedWithError':
-                    self._handle_finished_with_error_status()
-                else:
-                    self._handle_undefined_status()
-
-                logger.info(f'Deleting job {job_id} from pfcon at url '
-                            f'-->{pfcon_url}<--')
-                try:
-                    self.pfcon_client.delete_job(job_id, timeout=500)
-                except PfconRequestException as e:
-                    logger.error(f'[CODE12,{job_id}]: Error deleting job from '
-                                 f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
-                else:
-                    logger.info(f'Successfully deleted job {job_id} from pfcon at '
-                                f'url -->{pfcon_url}<--')
+            if status == 'finishedSuccessfully':
+                self._handle_finished_successfully_status()
+            elif status == 'finishedWithError':
+                self._handle_finished_with_error_status()
+            elif status == 'undefined':
+                self._handle_undefined_status()
         return self.c_plugin_inst.status
 
     def cancel_plugin_instance_app_exec(self):
@@ -215,6 +203,24 @@ class PluginInstanceManager(object):
         to cancel job.
         """
         pass
+
+    def delete_plugin_instance_job_from_remote(self):
+        """
+        Delete a plugin instance's app job from the remote compute. It connects to the
+        remote service to delete job.
+        """
+        pfcon_url = self.pfcon_client.url
+        job_id = self.str_job_id
+        logger.info(f'Deleting job {job_id} from pfcon at url '
+                    f'-->{pfcon_url}<--')
+        try:
+            self.pfcon_client.delete_job(job_id, timeout=500)
+        except PfconRequestException as e:
+            logger.error(f'[CODE12,{job_id}]: Error deleting job from '
+                         f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
+        else:
+            logger.info(f'Successfully deleted job {job_id} from pfcon at '
+                        f'url -->{pfcon_url}<--')
 
     def get_previous_output_path(self):
         """
@@ -545,6 +551,7 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.status = 'cancelled'  # giving up
                 else:
                     self.c_plugin_inst.status = 'finishedSuccessfully'
+                self.delete_plugin_instance_job_from_remote()
             self.save_plugin_instance_final_status()
 
     def _handle_finished_with_error_status(self):
@@ -553,6 +560,7 @@ class PluginInstanceManager(object):
         remote compute.
         """
         self.c_plugin_inst.status = 'finishedWithError'
+        self.delete_plugin_instance_job_from_remote()
         self.save_plugin_instance_final_status()
 
     def _handle_undefined_status(self):
@@ -564,6 +572,7 @@ class PluginInstanceManager(object):
         logger.error(f'[CODE10,{job_id}]: Got undefined status from remote')
         self.c_plugin_inst.error_code = 'CODE10'
         self.c_plugin_inst.status = 'cancelled'
+        self.delete_plugin_instance_job_from_remote()
         self.save_plugin_instance_final_status()
 
     def _register_output_files(self, filenames):
