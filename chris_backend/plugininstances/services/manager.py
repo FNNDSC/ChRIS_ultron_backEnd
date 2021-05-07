@@ -551,7 +551,7 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.status = 'cancelled'  # giving up
                 else:
                     self.c_plugin_inst.status = 'finishedSuccessfully'
-                self.delete_plugin_instance_job_from_remote()
+            self.delete_plugin_instance_job_from_remote()
             self.save_plugin_instance_final_status()
 
     def _handle_finished_with_error_status(self):
