@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pfcon
+  labels:
+    app: pfcon
+    env: production
+spec:
+  type: NodePort
+  selector:
+    app: pfcon
+    env: production
+  ports:
+    - port: 30005
+      targetPort: 30005
+      nodePort: 30005
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pfcon
+  labels:
+    app: pfcon
+    env: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pfcon
+      env: production
+  template:
+    metadata:
+      name: pfcon
+      labels:
+        app: pfcon
+        env: production
+    spec:
+      initContainers:
+        - name: init-pfcon
+          image: busybox:1.32
+          command: [ 'sh', '-c', "until wget --spider -S -T 2 http://pman:5010/api/v1/ 2>&1 | grep '200 OK'; do echo waiting for pman; sleep 2; done" ]
+      containers:
+        - image: fnndsc/pfcon
+          name: pfcon
+          ports:
+            - containerPort: 30005
+          env:
+            - name: SECRET_KEY
+              value: "w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+            - name: COMPUTE_SERVICE_URL
+              value: http://pman:5010/api/v1/
+          command: ["gunicorn"]
+          args: ["-w", "5", "-b", "0.0.0.0:30005", "-t",  "200", "pfcon.wsgi:application"]
+          volumeMounts:
+            - mountPath: "/home/localuser/storeBase"
+              name: "store-base"
+      # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
+      # is given by the STOREBASE env variable substitution.
+      volumes:
+        - name: "store-base"
+          hostPath:
+            path: ${STOREBASE}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pman
+  labels:
+    app: pman
+    env: production
+spec:
+  selector:
+    app: pman
+    env: production
+  ports:
+    - port: 5010
+      targetPort: 5010
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pman
+  labels:
+    app: pman
+    env: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pman
+      env: production
+  template:
+    metadata:
+      name: pman
+      labels:
+        app: pman
+        env: production
+    spec:
+      containers:
+        - image: fnndsc/pman
+          name: pman
+          ports:
+            - containerPort: 5010
+          # Since pman spins off containers of its own it needs to mount storeBase dir
+          # (where pfcon shares the data) into the spawned container. This directory is
+          # passed in the STOREBASE env variable.
+          env:
+            - name: SECRET_KEY
+              value: "anysu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+            - name: STOREBASE
+              value: ${STOREBASE}
+            - name: CONTAINER_ENV
+              value: kubernetes

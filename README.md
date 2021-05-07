@@ -53,7 +53,8 @@ Once the system is "up", you can add more compute plugins to the ecosystem:
 ./postscript.sh
 ```
 
-The resulting instance uses the default Django development server and therefore is not suitable for production.
+The resulting CUBE instance uses the default Django development server and therefore is not suitable for production.
+
 
 ### Production deployment
 
@@ -82,7 +83,7 @@ wiki page to learn more about these files
 Deploy CUBE backend containers:
 
 ```bash
-./docker-deploy.sh up
+./deploy.sh up
 ```
 
 #### To tear down:
@@ -91,7 +92,7 @@ Remove CUBE backend containers:
 
 ```bash
 cd ChRIS_ultron_backend
-./docker-deploy.sh down
+./deploy.sh down
 ```
 
 Remove the local Docker Swarm cluster if desired:
@@ -104,40 +105,40 @@ docker swarm leave --force
 
 #### Optionally setup a virtual environment
 
-##### Install ``virtualenv`` and ``virtualenvwrapper``
+Install ``virtualenv`` and ``virtualenvwrapper``:
 
 ```bash
 pip install virtualenv virtualenvwrapper
 ```
 
-##### Create a directory for your virtual environments e.g.:
+Create a directory for your virtual environments e.g.:
 ```bash
 mkdir ~/Python_Envs
 ```
 
-##### You might want to add the following two lines to your ``.bashrc`` file:
+You might want to add the following two lines to your ``.bashrc`` file:
 ```bash
 export WORKON_HOME=~/Python_Envs
 source /usr/local/bin/virtualenvwrapper.sh
 ```
 
-##### Then source your ``.bashrc`` and create a new Python3 virtual environment:
+Then source your ``.bashrc`` and create a new Python3 virtual environment:
 
 ```bash
 mkvirtualenv --python=python3 chris_env
 ```
 
-##### To activate chris_env:
+To activate chris_env:
 ```bash
 workon chris_env
 ```
 
-##### To deactivate chris_env:
+To deactivate chris_env:
 ```bash
 deactivate
 ```
 
-##### Install useful python tools in your virtual environment
+Install useful python tools in your virtual environment:
 ```bash
 workon chris_env
 pip install httpie
@@ -153,7 +154,7 @@ To list installed dependencies in chris_env:
 pip freeze --local
 ````
 
-#### Instantiate CUBE
+#### Docker Swarm-based development environment
 
 Start a local Docker Swarm cluster if not already started:
 
@@ -169,40 +170,81 @@ cd ChRIS_ultron_backEnd
 ./make.sh
 ```
 All the steps performed by the above script are properly documented in the script itself. 
-
 After running this script all the automated tests should have successfully run and a Django development server should be running in interactive mode in this terminal.
+
+Later you can stop and remove CUBE services and storage space by running the following bash script from the repository source directory:
+
+```bash
+./unmake.sh
+```
+
+Then remove the local Docker Swarm cluster if desired:
+
+```bash
+docker swarm leave --force
+```
+
+#### Kubernetes-based development environment
+
+Install single-node Kubernetes cluster. 
+On MAC OS Docker Desktop includes a standalone Kubernetes server and client. 
+Consult this page https://docs.docker.com/desktop/kubernetes/
+On Linux there is a simple MicroK8s installation. Consult this page https://microk8s.io
+Then create the required alias:
+
+```bash
+snap alias microk8s.kubectl kubectl
+microk8s.kubectl config view --raw > $HOME/.kube/config
+```
+
+Start the Kubernetes cluster:
+
+```bash
+microk8s start
+```
+
+Start CUBE from the repository source directory by running the make bash script
+
+```bash
+git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
+cd ChRIS_ultron_backEnd
+export HOSTIP=<IP address of this machine>
+./make.sh -O kubernetes
+```
+
+Later you can stop and remove CUBE services and storage space by running the following bash script from the repository source directory:
+
+```bash
+./unmake.sh -O kubernetes
+```
+
+Stop the Kubernetes cluster if desired:
+
+```bash
+microk8s stop
+```
 
 #### Rerun automated tests after modifying source code
 
-Open another terminal and find out the id of the container running the Django server in interactive mode:
-```bash
-chris=$(docker ps -f ancestor=fnndsc/chris:dev -f name=chris_dev -q)
-```
-and run the Unit and Integration tests within that container. 
+Open another terminal and run the Unit and Integration tests within the container running the Django server:
 
 To run only the Unit tests:
 
 ```bash
-docker exec -it $chris python manage.py test --exclude-tag integration
+cd ChRIS_ultron_backEnd
+docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --exclude-tag integration
 ```
 
 To run only the Integration tests:
 
 ```bash
-docker exec -it $chris python manage.py test --tag integration
+docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --tag integration
 ```
-
-To run only the Integration tests if the environment has not been restarted in interactive mode (usual for debugging when the make script has been passed a ``-i``:
-
-```bash
-docker exec -it $chris python manage.py test --tag integration
-```
-
 
 To run all the tests:
 
 ```bash
-docker exec -it $chris python manage.py test 
+docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test 
 ```
 
 After running the Integration tests the ``./FS/remote`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
@@ -212,8 +254,8 @@ After running the Integration tests the ``./FS/remote`` directory **must** be em
 Make sure the ``chris_backend/`` dir is world writable. Then type:
 
 ```bash
-docker exec -it $chris coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
-docker exec -it $chris coverage report
+docker-compose -f docker-compose_dev.yml exec chris_dev coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
+docker-compose -f docker-compose_dev.yml exec chris_dev coverage report
 ```
 
 #### Using [HTTPie](https://httpie.org/) client to play with the REST API 
@@ -233,20 +275,6 @@ http -a cube:cube1234 http://localhost:8000/api/v1/plugins/instances/1/
 #### Using swift client to list files in the users bucket
 ```bash
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
-```
-
-#### Tear down CUBE
-
-Stop and remove CUBE services and storage space by running the following bash script from the repository source directory:
-
-```bash
-./unmake.sh
-```
-
-Remove the local Docker Swarm cluster if desired:
-
-```bash
-docker swarm leave --force
 ```
 
 

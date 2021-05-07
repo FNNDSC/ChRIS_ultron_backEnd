@@ -132,7 +132,7 @@ INSTALLED_APPS += ['django_extensions']
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-COMPUTE_RESOURCE_URL = 'http://pfcon.remote:5005/api/v1/'
+COMPUTE_RESOURCE_URL = 'http://pfcon.remote:30005/api/v1/'
 
 # corsheaders
 # ------------------------------------------------------------------------------

@@ -15,19 +15,20 @@ version: '3.7'
 
 services:
 
-  pfcon_service:
+  pfcon:
     image: fnndsc/pfcon
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
     # is given by the STOREBASE env variable.
     volumes:
       - ${STOREBASE:?}:/home/localuser/storeBase:z
     ports:
-      - "5005:5005"
+      - "30005:30005"
+    command: ["gunicorn", "-w", "5", "-b", "0.0.0.0:30005", "-t",  "200", "pfcon.wsgi:application"]
     depends_on:
-      - pman_service
+      - pman
     environment:
       - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
-      - COMPUTE_SERVICE_URL=http://pman_service:5010/api/v1/
+      - COMPUTE_SERVICE_URL=http://pman:5010/api/v1/
     networks:
       local:
       remote:
@@ -37,7 +38,7 @@ services:
       name: "pfcon"
       role: "pfcon service"
 
-  pman_service:
+  pman:
     # Since pman spins off containers of its own it needs to mount storeBase dir (where
     # pfcon shares the data) into the spawned container. This directory is passed in the
     # STOREBASE env variable.
@@ -48,8 +49,6 @@ services:
     image: fnndsc/pman
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:z
-    ports:
-      - "5010:5010"
     deploy:
       placement:
         constraints:
