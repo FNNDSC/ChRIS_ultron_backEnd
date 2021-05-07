@@ -40,6 +40,8 @@ services:
     networks:
       - local
       - remote  # bc special automated tests worker runs within CUBE, not needed in prod
+    extra_hosts:
+      - "${PFCONDNS:-lhost}:${PFCONIP:-127.0.0.1}"  # used only for kubernetes, not needed in prod
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
@@ -64,10 +66,17 @@ services:
       - chris_dev_db
       - swift_service
       - queue
-      # service also depends on pfcon_service defined in docker-compose_remote.yml
+      # service also depends on pfcon service defined in swarm/docker-compose_remote.yml
     networks:
       - local
       - remote
+    # When the remote ancillary service pfcon is deployed using kubernetes it can not
+    # use (connect to) an external docker overlay network: remote. In that case we
+    # instead use extra_hosts to let the worker know pfcon's IP address. The required
+    # shell variables referenced here must then be set like this: PFCONDNS=pfcon.remote,
+    # PFCONIP=<actual IP address of localhost> and REMOTENETWORK=false
+    extra_hosts:
+      - "${PFCONDNS:-lhost}:${PFCONIP:-127.0.0.1}"
     labels:
       name: "ChRIS_ultron_backEnd Asynchronous Tasks Worker"
       role: "Backend development async task worker"
@@ -218,7 +227,7 @@ services:
 networks:
   local:
   remote:
-    external: true
+    external: ${REMOTENETWORK:-true}
 
 volumes:
   chris_dev_db_data:

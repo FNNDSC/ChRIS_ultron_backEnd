@@ -18,9 +18,9 @@ services:
       - DJANGO_DB_MIGRATE=on
       - DJANGO_COLLECTSTATIC=on
     env_file:
-      - ./secrets/.chris.env
-      - ./secrets/.chris_db.env
-      - ./secrets/.swift_service.env
+      - ../secrets/.chris.env
+      - ../secrets/.chris_db.env
+      - ../secrets/.swift_service.env
     ports:
       - "8000:8000"
     depends_on:
@@ -44,14 +44,14 @@ services:
       - DJANGO_COLLECTSTATIC=off
     command: celery -A core worker -c 4 -l info -Q main1,main2
     env_file:
-      - ./secrets/.chris.env
-      - ./secrets/.chris_db.env
-      - ./secrets/.swift_service.env
+      - ../secrets/.chris.env
+      - ../secrets/.chris_db.env
+      - ../secrets/.swift_service.env
     depends_on:
       - chris_db
       - swift_service
       - queue
-      - pfcon_service
+      - pfcon
     deploy:
       restart_policy:
         condition: on-failure
@@ -69,9 +69,9 @@ services:
       - DJANGO_COLLECTSTATIC=off
     command: celery -A core worker -c 2 -l info -Q periodic
     env_file:
-      - ./secrets/.chris.env
-      - ./secrets/.chris_db.env
-      - ./secrets/.swift_service.env
+      - ../secrets/.chris.env
+      - ../secrets/.chris_db.env
+      - ../secrets/.swift_service.env
     depends_on:
       - chris_db
       - queue
@@ -91,9 +91,9 @@ services:
       - DJANGO_COLLECTSTATIC=off
     command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file:
-      - ./secrets/.chris.env
-      - ./secrets/.chris_db.env
-      - ./secrets/.swift_service.env
+      - ../secrets/.chris.env
+      - ../secrets/.chris_db.env
+      - ../secrets/.swift_service.env
     depends_on:
       - chris_db
       - queue
@@ -111,7 +111,7 @@ services:
     volumes:
       - chris_db_data:/var/lib/mysql
     env_file:
-      - ./secrets/.chris_db.env
+      - ../secrets/.chris_db.env
     deploy:
       restart_policy:
         condition: on-failure
@@ -140,9 +140,9 @@ services:
     environment:
       - DJANGO_DB_MIGRATE=on
     env_file:
-      - ./secrets/.chris_store.env
-      - ./secrets/.chris_store_db.env
-      - ./secrets/.swift_service.env
+      - ../secrets/.chris_store.env
+      - ../secrets/.chris_store_db.env
+      - ../secrets/.swift_service.env
     ports:
       - "8010:8010"
     depends_on:
@@ -164,7 +164,7 @@ services:
     volumes:
       - chris_store_db_data:/var/lib/mysql
     env_file:
-      - ./secrets/.chris_store_db.env
+      - ../secrets/.chris_store_db.env
     deploy:
       restart_policy:
         condition: on-failure
@@ -180,7 +180,7 @@ services:
     volumes:
       - swift_storage:/srv
     env_file:
-      - ./secrets/.swift_service.env
+      - ../secrets/.swift_service.env
     ports:
       - "8080:8080"
     deploy:
@@ -192,10 +192,10 @@ services:
       name: "swift"
       role: "swift object storage service"
 
-  pfcon_service:
+  pfcon:
     image: fnndsc/pfcon
     env_file:
-      - ./secrets/.pfcon_service.env
+      - ../secrets/.pfcon.env
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
     # is given by the STOREBASE env variable.
     volumes:
@@ -203,7 +203,7 @@ services:
     ports:
       - "5005:5005"
     depends_on:
-      - pman_service
+      - pman
     deploy:
       restart_policy:
         condition: on-failure
@@ -216,7 +216,7 @@ services:
       name: "pfcon"
       role: "pfcon service"
 
-  pman_service:
+  pman:
     # Since pman spins off containers of its own it needs to mount storeBase dir (where
     # pfcon shares the data) into the spawned container. This directory is passed in the
     # STOREBASE env variable.
@@ -224,7 +224,7 @@ services:
       - STOREBASE
     image: fnndsc/pman
     env_file:
-      - ./secrets/.pman_service.env
+      - ../secrets/.pman.env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
