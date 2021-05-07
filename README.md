@@ -47,7 +47,7 @@ cd ChRIS_ultron_backend
 ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
 ```
 
-Once the system is "up", you can add more compute plugins to the ecosystem:
+Once the system is "up" you can add more compute plugins to the ecosystem:
 
 ```bash
 ./postscript.sh
