@@ -8,7 +8,7 @@ secrets/
 htmlcov
 .docker
 .idea
-FS/
+CHRIS_REMOTE_FS/
 dc.out
 .vscode
 celerybeat.pid

@@ -6,23 +6,33 @@
 #
 # SYNPOSIS
 #
-#   deploy.sh                   [-O <swarm|kubernetes>] \
+#   deploy.sh                   [-h]
+#                               [-O <swarm|kubernetes>] \
 #                               [-S <storeBase>]        \
 #                               [up|down]
 #
 # DESC
 #
-#   'deploy.sh' script deploy the Chris set of services in production or tear down
-#   the system.
+#   'deploy.sh' script will depending on the argument deploy the ChRIS set
+#    of services in production or tear down the system.
 #
 # TYPICAL CASES:
 #
-#   Run full pman instantiation:
+#   Deploy ChRIS services into a Swarm cluster:
 #
 #       deploy.sh up
 #
+#
+#   Deploy ChRIS services into a Kubernetes cluster:
+#
+#       deploy.sh -O kubernetes up
+#
 # ARGS
 #
+#
+#   -h
+#
+#       Optional print usage help.
 #
 #   -O <swarm|kubernetes>
 #
@@ -30,10 +40,8 @@
 #
 #   -S <storeBase>
 #
-#       Explicitly set the STOREBASE dir to <storeBase>. This is useful
-#       mostly in non-Linux hosts (like macOS) where there might be a mismatch
-#       between the actual STOREBASE path and the text of the path shared between
-#       the macOS host and the docker VM.
+#       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
+#       filesystem where pfcon and plugins share data (usually externally mounted NFS).
 #
 #   [up|down] (optional, default = 'up')
 #
@@ -50,20 +58,21 @@ ORCHESTRATOR=swarm
 HERE=$(pwd)
 
 print_usage () {
-    echo "Usage: ./deploy.sh [-S <storeBase>] [-O <swarm|kubernetes>] [up|down]"
+    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-S <storeBase>] [up|down]"
     exit 1
 }
 
-while getopts ":S:O:" opt; do
+while getopts ":hO:S:" opt; do
     case $opt in
-        S) b_storeBase=1
-           STOREBASE=$OPTARG
+        h) print_usage
            ;;
         O) ORCHESTRATOR=$OPTARG
            if ! [[ "$ORCHESTRATOR" =~ ^(swarm|kubernetes)$ ]]; then
               echo "Invalid value for option -- O"
               print_usage
            fi
+           ;;
+        S) STOREBASE=$OPTARG
            ;;
         \?) echo "Invalid option -- $OPTARG"
             print_usage
@@ -85,26 +94,21 @@ if (( $# == 1 )) ; then
 fi
 
 title -d 1 "Setting global exports..."
-    if (( ! b_storeBase )) ; then
-        if [[ ! -d FS/remote ]] ; then
-            mkdir -p FS/remote
+    if [ -z ${STOREBASE+x} ]; then
+        if [[ ! -d CHRIS_REMOTE_FS ]] ; then
+            mkdir CHRIS_REMOTE_FS
         fi
-        cd FS/remote
-        STOREBASE=$(pwd)
-        cd $HERE
+        STOREBASE=$HERE/CHRIS_REMOTE_FS
+    else
+        if [[ ! -d $STOREBASE ]] ; then
+            mkdir -p $STOREBASE
+        fi
     fi
     echo -e "exporting STOREBASE=$STOREBASE "                      | ./boxes.sh
     export STOREBASE=$STOREBASE
 windowBottom
 
-
 if [[ "$COMMAND" == 'up' ]]; then
-
-    title -d 1 "Checking required FS directory tree for remote services in host filesystem..."
-    mkdir -p FS/remote
-    chmod -R 777 FS
-    export STOREBASE=$(pwd)/FS/remote
-    windowBottom
 
     title -d 1 "Starting ChRIS production deployment on $ORCHESTRATOR"
     if [[ $ORCHESTRATOR == swarm ]]; then
@@ -204,8 +208,8 @@ if [[ "$COMMAND" == 'down' ]]; then
         docker volume rm chris_stack_chris_store_db_data
         docker volume rm chris_stack_queue_data
         docker volume rm chris_stack_swift_storage
-        echo "Removing ./FS tree"
-        rm -fr ./FS
+        echo "Removing STOREBASE tree $STOREBASE"                       | ./boxes.sh
+        rm -fr $STOREBASE
     fi
     windowBottom
 fi

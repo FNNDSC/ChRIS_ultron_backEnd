@@ -35,16 +35,21 @@ Start a local Docker Swarm cluster if not already started:
 docker swarm init --advertise-addr 127.0.0.1
 ```
 
-Start CUBE backend containers:
+Get the source code from CUBE repo: 
 
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
-# Run full CUBE instantiation with tests:
-./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
+```
 
-# Skip unit and integration tests and the intro:
-./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -s
+Run full CUBE instantiation with tests:
+```bash
+./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
+```
+
+Or skip unit and integration tests and the intro:
+```bash
+./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -s
 ```
 
 Once the system is "up" you can add more compute plugins to the ecosystem:
@@ -247,7 +252,7 @@ To run all the tests:
 docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test 
 ```
 
-After running the Integration tests the ``./FS/remote`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
+After running the Integration tests the ``./CHRIS_REMOTE_FS`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
 
 
 #### Check code coverage of the automated tests
