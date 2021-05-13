@@ -6,7 +6,7 @@
 #
 # SYNPOSIS
 #
-#   make.sh                     [-i] [-s] [-U] [-I]             \
+#   make.sh                     [-h] [-i] [-s] [-U] [-I]        \
 #                               [-O <swarm|kubernetes>]         \
 #                               [-p <hostIp>]                   \
 #                               [-S <storeBase>]                \
@@ -14,8 +14,8 @@
 #
 # DESC
 #
-#   'make.sh' is the main entry point for instantiating a
-#   complete backend dev environment.
+#   'make.sh' is the main entry point for instantiating a complete backend dev
+#   environment.
 #
 #   Using appropriate flags, this script can skip various introductory/informational
 #   steps, deploy ancillary pfcon/pman services on Docker Swarm or Kubernetes, toggle
@@ -26,24 +26,23 @@
 #
 #  ┌─────────────────────────────────────┐
 #  │ Most of the time, you will do this: │
-#  ├─────────────────────────────────────┴────────────────────────────┐
-#  │ Skip unit and integration tests and start backend in daemon mode │
-#  │ (the "dev" way when you want to test new plugins etc):           │
-#  │	                                                              │
-#  │      ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -i │
-#  └──────────────────────────────────────────────────────────────────┘
+#  ├─────────────────────────────────────┴───────────────────────────────────────────────┐
+#  │ Skip unit and integration tests and start backend in daemon mode                    │
+#  │ (the "dev" way when you want to test new plugins etc):                              │
+#  │	                                                                                   │
+#  │./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i│
+#  └─────────────────────────────────────────────────────────────────────────────────────┘
 #
 #   Run full CUBE instantiation with tests (the "real-do-only-once" way
-#   to be sure the system actually works on your env):
+#   to be sure the system actually works on your env) on Swarm:
 #
-#       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh
-#
+#       ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
 #
 #   Skip unit and integration tests and skip the intro
 #   (the "quick-n-dirty" way -- when you are deep in dev mode and
 #   restarting the system for the 50th time on a Monday morning):
 #
-#       ./unmake.sh ; sudo rm -fr FS; rm -fr FS; ./make.sh -U -I -i -s
+# ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i -s
 #
 #   NOTE: What's up with the "sudo rm..." followed by "rm ..."?
 #
@@ -60,6 +59,10 @@
 ##
 # ARGS
 #
+#
+#   -h
+#
+#       Optional print usage help.
 #
 #   -O <swarm|kubernetes>
 #
@@ -80,10 +83,8 @@
 #
 #   -S <storeBase>
 #
-#       Explicitly set the STOREBASE dir to <storeBase>. This is useful
-#       mostly in non-Linux hosts (like macOS) where there might be a mismatch
-#       between the actual STOREBASE path and the text of the path shared between
-#       the macOS host and the docker VM.
+#       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
+#       filesystem where pfcon and plugins share data.
 #
 #   -i
 #
@@ -119,7 +120,6 @@ declare -i b_norestartinteractive_chris_dev=0
 declare -i b_skipIntro=0
 declare -i b_skipUnitTests=0
 declare -i b_skipIntegrationTests=0
-declare -i b_storeBase=0
 
 ORCHESTRATOR=swarm
 HERE=$(pwd)
@@ -131,12 +131,14 @@ if [[ -f .env ]] ; then
 fi
 
 print_usage () {
-    echo "Usage: ./make.sh [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-p <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
+    echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-p <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
     exit 1
 }
 
-while getopts ":isUIO:p:S:" opt; do
+while getopts ":hisUIO:p:S:" opt; do
     case $opt in
+        h) print_usage
+           ;;
         i) b_norestartinteractive_chris_dev=1
           ;;
         s) b_skipIntro=1
@@ -153,8 +155,7 @@ while getopts ":isUIO:p:S:" opt; do
            ;;
         p) HOSTIP=$OPTARG
            ;;
-        S) b_storeBase=1
-           STOREBASE=$OPTARG
+        S) STOREBASE=$OPTARG
            ;;
         \?) echo "Invalid option -- $OPTARG"
             print_usage
@@ -201,13 +202,15 @@ title -d 1 "Setting global exports..."
         echo -e "exporting PFCONIP=$HOSTIP "       | ./boxes.sh
         export PFCONIP=$HOSTIP
     fi
-    if (( ! b_storeBase )) ; then
-        if [[ ! -d FS/remote ]] ; then
-            mkdir -p FS/remote
+    if [ -z ${STOREBASE+x} ]; then
+        if [[ ! -d CHRIS_REMOTE_FS ]] ; then
+            mkdir CHRIS_REMOTE_FS
         fi
-        cd FS/remote
-        STOREBASE=$(pwd)
-        cd $HERE
+        STOREBASE=$HERE/CHRIS_REMOTE_FS
+    else
+        if [[ ! -d $STOREBASE ]] ; then
+            mkdir -p $STOREBASE
+        fi
     fi
     echo -e "exporting STOREBASE=$STOREBASE "                      | ./boxes.sh
     export STOREBASE=$STOREBASE
@@ -263,34 +266,33 @@ if (( ! b_skipIntro )) ; then
     done
 fi
 
-title -d 1 "Changing permissions to 755 on" "$(pwd)"
+title -d 1 "Changing permissions to 755 on" "$HERE"
     cd $HERE
-    echo "chmod -R 755 $(pwd)"                                      | ./boxes.sh
-    chmod -R 755 $(pwd)
+    echo "chmod -R 755 $HERE"                                      | ./boxes.sh
+    chmod -R 755 $HERE
 windowBottom
 
-title -d 1 "Checking that FS directory tree is empty..."
-    mkdir -p FS/remote
-    chmod -R 777 FS
+title -d 1 "Checking that STOREBASE directory tree" "$STOREBASE is empty..."
+    chmod -R 777 $STOREBASE
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
-        tree FS                                                     | ./boxes.sh
-        report=$(tree FS | tail -n 1)
-        if [[ "$report" != "1 directory, 0 files" ]] ; then
+        tree $STOREBASE                                                    | ./boxes.sh
+        report=$(tree $STOREBASE | tail -n 1)
+        if [[ "$report" != "0 directories, 0 files" ]] ; then
             b_FSOK=0
         fi
     else
-        report=$(find FS 2>/dev/null)
+        report=$(find $STOREBASE 2>/dev/null)
         lines=$(echo "$report" | wc -l)
-        if (( lines != 2 )) ; then
+        if (( lines != 1 )) ; then
             b_FSOK=0
         fi
         echo "lines is $lines"
     fi
     if (( ! b_FSOK )) ; then
-        printf "There should only be 1 directory and no files in the FS tree!\n"    | ./boxes.sh ${Red}
-        printf "Please manually clean/delete the entire FS tree and re-run.\n"      | ./boxes.sh ${Yellow}
+        printf "The STOREBASE directory $STOREBASE must be empty!\n"    | ./boxes.sh ${Red}
+        printf "Please manually clean it and re-run.\n"      | ./boxes.sh ${Yellow}
         printf "\nThis script will now exit with code '1'.\n\n"                     | ./boxes.sh ${Yellow}
         exit 1
     fi
@@ -395,7 +397,7 @@ if (( ! b_skipUnitTests )) ; then
         exec chris_dev python manage.py         \
         test --exclude-tag integration
     status=$?
-    title -d 1 "CUBE Unit results"
+    title -d 1 "CUBE Unit tests' results"
     if (( $status == 0 )) ; then
         printf "%40s${LightGreen}%40s${NC}\n"                       \
             "CUBE Unit tests" "[ success ]"                         | ./boxes.sh
@@ -414,7 +416,7 @@ if (( ! b_skipIntegrationTests )) ; then
         exec chris_dev python manage.py         \
         test --tag integration
     status=$?
-    title -d 1 "CUBE Integration results"
+    title -d 1 "CUBE Integration tests' results"
     if (( $status == 0 )) ; then
         printf "%40s${LightGreen}%40s${NC}\n"                       \
             "CUBE Integration tests" "[ success ]"                  | ./boxes.sh

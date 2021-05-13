@@ -222,6 +222,7 @@ services:
     # STOREBASE env variable.
     environment:
       - STOREBASE
+      - CONTAINER_ENV=swarm
     image: fnndsc/pman
     env_file:
       - ../secrets/.pman.env
