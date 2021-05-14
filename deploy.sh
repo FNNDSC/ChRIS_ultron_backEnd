@@ -112,8 +112,8 @@ if [[ "$COMMAND" == 'up' ]]; then
 
     title -d 1 "Starting ChRIS production deployment on $ORCHESTRATOR"
     if [[ $ORCHESTRATOR == swarm ]]; then
-        echo "docker stack deploy -c swarm/docker-compose.yml chris_stack"  | ./boxes.sh ${LightCyan}
-        docker stack deploy -c swarm/docker-compose.yml chris_stack
+        echo "docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack"  | ./boxes.sh ${LightCyan}
+        docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
         echo "coming up soon..."
         exit 0
@@ -153,7 +153,7 @@ if [[ "$COMMAND" == 'up' ]]; then
     docker exec $chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
-    if [ ! -f FS/.setup ]; then
+    if [ ! -f $STOREBASE/.setup ]; then
 
         title -d 1 "Creating superuser chris in ChRIS store"
         docker exec -it $chris_store sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
@@ -183,7 +183,7 @@ if [[ "$COMMAND" == 'up' ]]; then
         docker exec $chris python plugins/services/manager.py register host --pluginname pl-topologicalcopy
         windowBottom
 
-        touch FS/.setup
+        touch $STOREBASE/.setup
     fi
 fi
 
