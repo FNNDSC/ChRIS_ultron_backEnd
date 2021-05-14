@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pfioh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pfioh
+  template:
+    metadata:
+      labels:
+        name: pfioh
+    spec:
+      containers:
+      - name: pfioh
+        image: fnndsc/pfioh:latest
+        ports:
+        - containerPort: 5055
+        args: ["--forever", "--httpResponse", "--createDirsAsNeeded", "--storeBase", "/hostFS/storeBase", "--verbosity", "1"]

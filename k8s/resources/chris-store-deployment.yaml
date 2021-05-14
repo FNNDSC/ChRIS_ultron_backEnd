@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chris-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: chris-store
+  template:
+    metadata:
+      labels:
+        name: chris-store
+    spec:
+      containers:
+      - name: chris-store
+        image: fnndsc/chris_store:latest
+        ports:
+        - containerPort: 8010
+        envFrom:
+        - configMapRef:
+            name: cube-config
+        - secretRef:
+            name: cube-secrets

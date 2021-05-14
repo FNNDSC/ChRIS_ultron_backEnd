@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pman
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: pman
+  template:
+    metadata:
+      labels:
+        name: pman
+    spec:
+      containers:
+      - name: pman
+        image: fnndsc/pman:latest
+        ports:
+        - containerPort: 5010
+        args: ["--rawmode", "1", "--http", "--port", "5010", "--listeners", "12", "--verbosity", "1"]
