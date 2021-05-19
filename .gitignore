@@ -3,7 +3,6 @@
 __pycache__
 *.pyc
 docs/build
-secrets/
 .coverage
 htmlcov
 .docker
@@ -12,3 +11,5 @@ CHRIS_REMOTE_FS/
 dc.out
 .vscode
 celerybeat.pid
+swarm/prod_deployments/secrets/
+kubernetes/prod_deployments/secrets/

@@ -1,16 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chris-db
+  labels:
+    name: chris-db
+spec:
+  type: NodePort
+  ports:
+  - port: 3306
+    targetPort: 3306
+    nodePort: 30307
+  selector:
+    name: chris-db
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chris-store-db
+  name: chris-db
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: chris-store-db
+      name: chris-db
   template:
     metadata:
       labels:
-        name: chris-store-db
+        name: chris-db
     spec:
       containers:
       - name: mysql

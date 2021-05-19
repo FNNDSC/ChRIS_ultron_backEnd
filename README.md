@@ -78,10 +78,15 @@ Fetch source code:
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
-mkdir secrets
 ```
 
-Now copy all the required secret configuration files into the secrets directory, please take a look at 
+Create ``secrets`` directory:
+
+```bash
+mkdir swarm/prod_deployments/secrets
+```
+
+Now copy all the required secret configuration files into the ``secrets`` directory, please take a look at 
 [this](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-production-services-secret-configuration-files) 
 wiki page to learn more about these files 
 
