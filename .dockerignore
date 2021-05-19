@@ -2,7 +2,6 @@
 Dockerfile
 .gitignore
 .travis.yml
-secrets.json
 .coverage
 .git
 LICENSE
@@ -11,3 +10,5 @@ utils
 docs
 htmlcov
 CHRIS_REMOTE_FS
+swarm/prod_deployments/secrets
+kubernetes/prod_deployments/secrets

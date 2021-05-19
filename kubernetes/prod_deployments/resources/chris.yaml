@@ -1,3 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chris
+  labels:
+    name: chris
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30800
+  selector:
+    name: chris
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +36,4 @@ spec:
         - containerPort: 8000
         envFrom:
         - configMapRef:
-            name: cube-config
-        - secretRef:
-            name: cube-secrets
+            name: chris-config

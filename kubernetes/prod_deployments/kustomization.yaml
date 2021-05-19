@@ -1,32 +1,25 @@
 kind: Kustomization
 
-configMapGenerator:
-- name: cube-config
-  env: configs/cube.env
+namespace: chris
+commonLabels:
+  env: production
 
-secretGenerator:
-- name: cube-secrets
-  env: configs/secrets.env
+configMapGenerator:
+- name: chris-config
+  envs:
+  - ./secrets/.chris.env
+  - ./secrets/.chris_db.env
+  - ./secrets/.swift_service.env
 
 resources:
-- resources/rabbitmq-deployment.yaml
-- resources/rabbitmq-service.yaml
-- resources/chris-store-db-deployment.yaml
-- resources/chris-store-db-service.yaml
-- resources/chris-db-deployment.yaml
-- resources/chris-db-service.yaml
-- resources/chris-store-deployment.yaml
-- resources/chris-store-service.yaml
-- resources/chris-deployment.yaml
-- resources/chris-service.yaml
-- resources/worker-deployment.yaml
-- resources/worker-service.yaml
-- resources/swift-deployment.yaml
-- resources/swift-service.yaml
-- resources/pfcon-deployment.yaml
-- resources/pfcon-service.yaml
-- resources/pfioh-deployment.yaml
-- resources/pfioh-service.yaml
-- resources/pman-deployment.yaml
-- resources/pman-service.yaml
-- resources/scheduler-deployment.yaml
+- resources/chris.yaml
+- resources/worker.yaml
+- resources/worker-periodic.yaml
+- resources/scheduler.yaml
+- resources/chris-db.yaml
+- resources/chris-store.yaml
+- resources/chris-store-db.yaml
+- resources/rabbitmq.yaml
+- resources/swift.yaml
+- resources/pfcon.yaml
+- resources/pman.yaml

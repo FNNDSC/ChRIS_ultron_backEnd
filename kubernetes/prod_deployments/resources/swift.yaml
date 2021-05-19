@@ -1,3 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: swift
+  labels:
+    name: swift
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    targetPort: 8080
+    nodePort: 30080
+  selector:
+    name: swift
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
