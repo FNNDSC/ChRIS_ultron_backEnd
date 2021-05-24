@@ -29,7 +29,7 @@
 #  ├─────────────────────────────────────┴───────────────────────────────────────────────┐
 #  │ Skip unit and integration tests and start backend in daemon mode                    │
 #  │ (the "dev" way when you want to test new plugins etc):                              │
-#  │	                                                                                   │
+#  │	                                                                                 │
 #  │./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i│
 #  └─────────────────────────────────────────────────────────────────────────────────────┘
 #
