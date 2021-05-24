@@ -1,15 +1,22 @@
 kind: Kustomization
 
-namespace: chris
-commonLabels:
-  env: production
+namespace: ${NAMESPACE}
 
 configMapGenerator:
 - name: chris-config
-  envs:
-  - ./secrets/.chris.env
-  - ./secrets/.chris_db.env
-  - ./secrets/.swift_service.env
+  env: secrets/.chris.env
+- name: chris-db-config
+  env: secrets/.chris_db.env
+- name: chris-store-config
+  env: secrets/.chris_store.env
+- name: chris-store-db-config
+  env: secrets/.chris_store_db.env
+- name: pfcon-config
+  env: secrets/.pfcon.env
+- name: pman-config
+  env: secrets/.pman.env
+- name: swift-config
+  env: secrets/.swift_service.env
 
 resources:
 - resources/chris.yaml

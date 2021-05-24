@@ -17,6 +17,11 @@ services:
     environment:
       - DJANGO_DB_MIGRATE=on
       - DJANGO_COLLECTSTATIC=on
+      - DATABASE_HOST=chris_db
+      - DATABASE_PORT=3306
+      - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
+      - CELERY_BROKER_URL=amqp://queue:5672
     env_file:
       - ./secrets/.chris.env
       - ./secrets/.chris_db.env
@@ -42,6 +47,11 @@ services:
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
+      - DATABASE_HOST=chris_db
+      - DATABASE_PORT=3306
+      - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
+      - CELERY_BROKER_URL=amqp://queue:5672
     command: celery -A core worker -c 4 -l info -Q main1,main2
     env_file:
       - ./secrets/.chris.env
@@ -67,6 +77,11 @@ services:
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
+      - DATABASE_HOST=chris_db
+      - DATABASE_PORT=3306
+      - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
+      - CELERY_BROKER_URL=amqp://queue:5672
     command: celery -A core worker -c 2 -l info -Q periodic
     env_file:
       - ./secrets/.chris.env
@@ -89,6 +104,11 @@ services:
     environment:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
+      - DATABASE_HOST=chris_db
+      - DATABASE_PORT=3306
+      - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
+      - CELERY_BROKER_URL=amqp://queue:5672
     command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file:
       - ./secrets/.chris.env
@@ -139,6 +159,9 @@ services:
     image: fnndsc/chris_store
     environment:
       - DJANGO_DB_MIGRATE=on
+      - DATABASE_HOST=chris_store_db
+      - DATABASE_PORT=3306
+      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
     env_file:
       - ./secrets/.chris_store.env
       - ./secrets/.chris_store_db.env
@@ -194,6 +217,8 @@ services:
 
   pfcon:
     image: fnndsc/pfcon
+    environment:
+      - COMPUTE_SERVICE_URL=http://pman:5010/api/v1/
     env_file:
       - ./secrets/.pfcon.env
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir

@@ -8,6 +8,7 @@
 #
 #   deploy.sh                   [-h]
 #                               [-O <swarm|kubernetes>] \
+#                               [-N <namespace>]        \
 #                               [-S <storeBase>]        \
 #                               [up|down]
 #
@@ -38,6 +39,11 @@
 #
 #       Explicitly set the orchestrator. Default is swarm.
 #
+#   -N <namespace>
+#
+#       Explicitly set the kubernetes namespace to <namespace>. Default is chris.
+#       Not used for swarm.
+#
 #   -S <storeBase>
 #
 #       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
@@ -55,14 +61,15 @@ source ./cparse.sh
 
 declare -i STEP=0
 ORCHESTRATOR=swarm
+NAMESPACE=chris
 HERE=$(pwd)
 
 print_usage () {
-    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-S <storeBase>] [up|down]"
+    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-N <namespace>] [-S <storeBase>] [up|down]"
     exit 1
 }
 
-while getopts ":hO:S:" opt; do
+while getopts ":hO:N:S:" opt; do
     case $opt in
         h) print_usage
            ;;
@@ -71,6 +78,8 @@ while getopts ":hO:S:" opt; do
               echo "Invalid value for option -- O"
               print_usage
            fi
+           ;;
+        N) NAMESPACE=$OPTARG
            ;;
         S) STOREBASE=$OPTARG
            ;;
@@ -106,6 +115,10 @@ title -d 1 "Setting global exports..."
     fi
     echo -e "exporting STOREBASE=$STOREBASE "                      | ./boxes.sh
     export STOREBASE=$STOREBASE
+    if [[ $ORCHESTRATOR == kubernetes ]]; then
+        echo -e "exporting NAMESPACE=$NAMESPACE"                  | ./boxes.sh
+        export NAMESPACE=$NAMESPACE
+    fi
 windowBottom
 
 if [[ "$COMMAND" == 'up' ]]; then
@@ -115,8 +128,15 @@ if [[ "$COMMAND" == 'up' ]]; then
         echo "docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack"  | ./boxes.sh ${LightCyan}
         docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
-        echo "coming up soon..."
-        exit 0
+        echo "kubectl create namespace $NAMESPACE"   | ./boxes.sh ${LightCyan}
+        namespace=$(kubectl get namespaces $NAMESPACE --no-headers -o custom-columns=:metadata.name 2> /dev/null)
+        if [ -z "$namespace" ]; then
+            kubectl create namespace $NAMESPACE
+        else
+            echo "$NAMESPACE namespace already exists, skipping creation"
+        fi
+        echo "kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl apply -f -"  | ./boxes.sh ${LightCyan}
+        kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl apply -f -
     fi
     windowBottom
 
@@ -194,22 +214,8 @@ if [[ "$COMMAND" == 'down' ]]; then
         echo "docker stack rm chris_stack"                               | ./boxes.sh ${LightCyan}
         docker stack rm chris_stack
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
-        echo " coming up soon..."       | ./boxes.sh ${LightCyan}
-    fi
-    sleep 10
-    echo
-    printf "Do you want to also remove persistent volumes?"
-    read -p  " [y/n] " -n 1 -r
-    echo
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]] ; then
-        sleep 10
-        docker volume rm chris_stack_chris_db_data
-        docker volume rm chris_stack_chris_store_db_data
-        docker volume rm chris_stack_queue_data
-        docker volume rm chris_stack_swift_storage
-        echo "Removing STOREBASE tree $STOREBASE"                       | ./boxes.sh
-        rm -fr $STOREBASE
+        echo "kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl delete -f -"  | ./boxes.sh ${LightCyan}
+        kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl delete -f -
     fi
     windowBottom
 fi
