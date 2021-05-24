@@ -29,7 +29,14 @@
                     fnndsc/pl-mri10yr06mo01da_normal,               \
                     fnndsc/pl-mri10yr06mo01da_normal^moc,           \
                     fnndsc/pl-mgz2lut_report,                       \
-                    fnndsc/pl-pfdo_mgz2img
+                    fnndsc/pl-pfdo_mgz2img,                         \
+		    jonocameron/pl-sevstack,                        \
+                    fnndsc/pl-topologicalcopy,                      \
+                    fnndsc/pl-brainmgz,                             \
+                    fnndsc/pl-pfdorun,                              \
+                    fnndsc/pl-mgz2imageslices,                      \
+                    fnndsc/pl-multipass,                            \
+                    fnndsc/pl-heatmap
 "
 
 #
