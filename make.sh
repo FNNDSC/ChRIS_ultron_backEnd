@@ -27,11 +27,16 @@
 #  ┌─────────────────────────────────────┐
 #  │ Most of the time, you will do this: │
 #  ├─────────────────────────────────────┴───────────────────────────────────────────────┐
-#  │ Skip unit and integration tests and start backend in daemon mode                    │
+#  │ Skip unit and integration tests and start backend in daemon mode on a SWARM cluster │
 #  │ (the "dev" way when you want to test new plugins etc):                              │
-#  │	                                                                                 │
-#  │./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i│
 #  └─────────────────────────────────────────────────────────────────────────────────────┘
+#
+#    THIS IS ONLY FOR CASE OF SWARM -- which is a typical dev case:
+#    To totally tear down the cluster and start fresh:
+#
+#    docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&      \
+#    ./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&            \
+#    ./make.sh -U -I -i
 #
 #   Run full CUBE instantiation with tests (the "real-do-only-once" way
 #   to be sure the system actually works on your env) on Swarm:
