@@ -31,7 +31,7 @@
 #  │ (the "dev" way when you want to test new plugins etc):                              │
 #  └─────────────────────────────────────────────────────────────────────────────────────┘
 #
-#    THIS IS ONLY FOR CASE OF SWARM -- which is a typical dev case:
+#    THIS IS ONLY THE CASE FOR A SWARM CLUSTER-- which is a typical dev case:
 #    To totally tear down the cluster and start fresh:
 #
 #    docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&      \
