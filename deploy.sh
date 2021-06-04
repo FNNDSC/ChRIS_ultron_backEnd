@@ -147,7 +147,7 @@ if [[ "$COMMAND" == 'up' ]]; then
         if [[ $ORCHESTRATOR == swarm ]]; then
             chris=$(docker ps -f name=chris.1. -q)
         elif [[ $ORCHESTRATOR == kubernetes ]]; then
-            chris=$(kubectl get pods --selector="app=chris,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
+            chris=$(kubectl get pods --namespace $NAMESPACE --selector="app=chris,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
         fi
         if [ -n "$chris" ]; then
           echo "Success: chris container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
@@ -161,46 +161,79 @@ if [[ "$COMMAND" == 'up' ]]; then
     windowBottom
 
     title -d 1 "Waiting until CUBE is ready to accept connections..."
-    docker exec $chris sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
+    if [[ $ORCHESTRATOR == swarm ]]; then
+        docker exec $chris sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
+    elif [[ $ORCHESTRATOR == kubernetes ]]; then
+        kubectl exec $chris --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
+    fi
     windowBottom
 
     title -d 1 "Waiting until ChRIS store is ready to accept connections..."
     if [[ $ORCHESTRATOR == swarm ]]; then
         chris_store=$(docker ps -f name=chris_store.1. -q)
+        docker exec $chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
         chris_store=$(kubectl get pods --selector="app=chris-store,env=production" --output=jsonpath='{.items[*].metadata.name}')
+        kubectl exec $chris_store --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     fi
-    docker exec $chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
     windowBottom
 
     if [ ! -f $STOREBASE/.setup ]; then
 
         title -d 1 "Creating superuser chris in ChRIS store"
-        docker exec -it $chris_store sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec -it $chris_store sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris_store --namespace $NAMESPACE -- sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        fi
         windowBottom
 
         title -d 1 "Creating superuser chris in CUBE"
-        docker exec -it $chris sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec -it $chris sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris --namespace $NAMESPACE -- sh -c 'python manage.py createsuperuser --username chris --email dev@babymri.org'
+        fi
         windowBottom
 
         title -d 1 "Uploading the plugin fnndsc/pl-dircopy"
-        docker exec $chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy --json 2> /dev/null)"
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec $chris_store python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy --json 2> /dev/null)"
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris_store --namespace $NAMESPACE -- python plugins/services/manager.py add pl-dircopy chris https://github.com/FNNDSC/pl-dircopy fnndsc/pl-dircopy --descriptorstring "$(docker run --rm fnndsc/pl-dircopy dircopy --json 2> /dev/null)"
+        fi
         windowBottom
 
         title -d 1 "Uploading the plugin fnndsc/pl-topologicalcopy"
-        docker exec $chris_store python plugins/services/manager.py add pl-topologicalcopy chris https://github.com/FNNDSC/pl-topologicalcopy fnndsc/pl-topologicalcopy --descriptorstring "$(docker run --rm fnndsc/pl-topologicalcopy topologicalcopy --json 2> /dev/null)"
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec $chris_store python plugins/services/manager.py add pl-topologicalcopy chris https://github.com/FNNDSC/pl-topologicalcopy fnndsc/pl-topologicalcopy --descriptorstring "$(docker run --rm fnndsc/pl-topologicalcopy topologicalcopy --json 2> /dev/null)"
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris_store --namespace $NAMESPACE -- python plugins/services/manager.py add pl-topologicalcopy chris https://github.com/FNNDSC/pl-topologicalcopy fnndsc/pl-topologicalcopy --descriptorstring "$(docker run --rm fnndsc/pl-topologicalcopy topologicalcopy --json 2> /dev/null)"
+        fi
         windowBottom
 
         title -d 1 "Adding host compute environment"
-        docker exec $chris python plugins/services/manager.py add host "http://pfcon.remote:5005/api/v1/" --description "Remote compute"
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec $chris python plugins/services/manager.py add host "http://pfcon.remote:5005/api/v1/" --description "Remote compute"
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris --namespace $NAMESPACE -- python plugins/services/manager.py add host "http://pfcon.remote:5005/api/v1/" --description "Remote compute"
+        fi
         windowBottom
 
         title -d 1 "Registering pl-dircopy from store to CUBE"
-        docker exec $chris python plugins/services/manager.py register host --pluginname pl-dircopy
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec $chris python plugins/services/manager.py register host --pluginname pl-dircopy
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris --namespace $NAMESPACE -- python plugins/services/manager.py register host --pluginname pl-dircopy
+        fi
         windowBottom
 
         title -d 1 "Registering pl-topologicalcopy from store to CUBE"
-        docker exec $chris python plugins/services/manager.py register host --pluginname pl-topologicalcopy
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            docker exec $chris python plugins/services/manager.py register host --pluginname pl-topologicalcopy
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            kubectl exec $chris --namespace $NAMESPACE -- python plugins/services/manager.py register host --pluginname pl-topologicalcopy
+        fi
         windowBottom
 
         touch $STOREBASE/.setup
