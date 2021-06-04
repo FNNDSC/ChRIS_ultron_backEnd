@@ -1,22 +1,72 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler
+  labels:
+    app: scheduler
+    env: production
+spec:
+  selector:
+    app: scheduler
+    env: production
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: scheduler
+  labels:
+    app: scheduler
+    env: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: scheduler
+      app: scheduler
+      env: production
   template:
     metadata:
+      name: scheduler
       labels:
-        name: scheduler
+        app: scheduler
+        env: production
     spec:
       containers:
-      - name: scheduler
-        image: fnndsc/chris:latest
-        command: ["celery"]
-        args: ["-A", "core", "beat", "-l", "info", "--pidfile", "/home/localuser/celerybeat.pid", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
-        envFrom:
-        - configMapRef:
-            name: chris-config
+        - image: fnndsc/chris
+          name: scheduler
+          args: ["celery", "-A", "core", "beat", "-l", "info", "--pidfile", "/home/localuser/celerybeat.pid", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+          env:
+            - name: DJANGO_DB_MIGRATE
+              value: off
+            - name: DJANGO_COLLECTSTATIC
+              value: off
+            - name: DATABASE_HOST
+              value: $(CHRIS_DB_SERVICE_NAME)
+            - name: DATABASE_PORT
+              value: 3306
+            - name: CHRIS_STORE_URL
+              value: http://$(CHRIS_STORE_SERVICE_NAME):8010/api/v1/
+            - name: SWIFT_AUTH_URL
+              value: http://$(SWIFT_SERVICE_NAME):8080/auth/v1.0
+            - name: CELERY_BROKER_URL
+              value: amqp://$(QUEUE_SERVICE_NAME):5672
+          envFrom:
+            - configMapRef:
+                name: chris-config
+            - configMapRef:
+                name: chris-db-config
+            - configMapRef:
+                name: swift-config
+          livenessProbe:
+            exec:
+              # bash is needed to replace the environment variable
+              command: [
+                  "bash",
+                  "-c",
+                  "celery inspect ping -A apps -d celery@$HOSTNAME"
+              ]
+            initialDelaySeconds: 30  # startup takes some time
+            periodSeconds: 60  # default is quite often and celery uses a lot cpu/ram then.
+            timeoutSeconds: 10  # default is too low
+            failureThreshold: 3

@@ -3,15 +3,12 @@ kind: Service
 metadata:
   name: worker-periodic
   labels:
-    name: worker-periodic
+    app: worker-periodic
+    env: production
 spec:
-  type: NodePort
-  ports:
-  - port: 6900
-    targetPort: 6900
-    nodePort: 30900
   selector:
-    name: worker-periodic
+    app: worker-periodic
+    env: production
 
 ---
 
@@ -19,23 +16,57 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker-periodic
+  labels:
+    app: worker-periodic
+    env: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: worker-periodic
+      app: worker-periodic
+      env: production
   template:
     metadata:
+      name: worker-periodic
       labels:
-        name: worker-periodic
+        app: worker-periodic
+        env: production
     spec:
       containers:
-      - name: worker-periodic
-        image: fnndsc/chris
-        ports:
-        - containerPort: 6900
-        command: ["celery"]
-        args: ["-A", "core", "worker", "-c", "1", "-l", "DEBUG", "-Q", "main"]
-        envFrom:
-        - configMapRef:
-            name: chris-config
+        - image: fnndsc/chris
+          name: worker-periodic
+          args: ["celery", "-A", "core", "worker", "-c", "2", "-l", "info", "-Q", "periodic"]
+          env:
+            - name: DJANGO_DB_MIGRATE
+              value: off
+            - name: DJANGO_COLLECTSTATIC
+              value: off
+            - name: DATABASE_HOST
+              value: $(CHRIS_DB_SERVICE_NAME)
+            - name: DATABASE_PORT
+              value: 3306
+            - name: CHRIS_STORE_URL
+              value: http://$(CHRIS_STORE_SERVICE_NAME):8010/api/v1/
+            - name: SWIFT_AUTH_URL
+              value: http://$(SWIFT_SERVICE_NAME):8080/auth/v1.0
+            - name: CELERY_BROKER_URL
+              value: amqp://$(QUEUE_SERVICE_NAME):5672
+          envFrom:
+            - configMapRef:
+                name: chris-config
+            - configMapRef:
+                name: chris-db-config
+            - configMapRef:
+                name: swift-config
+          livenessProbe:
+            exec:
+              # bash is needed to replace the environment variable
+              command: [
+                  "bash",
+                  "-c",
+                  "celery inspect ping -A apps -d celery@$HOSTNAME"
+              ]
+            initialDelaySeconds: 30  # startup takes some time
+            periodSeconds: 60  # default is quite often and celery uses a lot cpu/ram then.
+            timeoutSeconds: 10  # default is too low
+            failureThreshold: 3
