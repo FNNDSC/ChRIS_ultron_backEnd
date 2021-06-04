@@ -15,8 +15,6 @@ services:
   chris:
     image: fnndsc/chris
     environment:
-      - DJANGO_DB_MIGRATE=on
-      - DJANGO_COLLECTSTATIC=on
       - DATABASE_HOST=chris_db
       - DATABASE_PORT=3306
       - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
@@ -158,7 +156,6 @@ services:
   chris_store:
     image: fnndsc/chris_store
     environment:
-      - DJANGO_DB_MIGRATE=on
       - DATABASE_HOST=chris_store_db
       - DATABASE_PORT=3306
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
