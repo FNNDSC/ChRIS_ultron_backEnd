@@ -1,0 +1,10 @@
+kind: Kustomization
+
+namespace: ${NAMESPACE}
+
+bases:
+- ../../base
+
+resources:
+- resources/storebase-pvc.yaml
+- resources/storebase-pv.yaml

@@ -9,6 +9,8 @@
 #   deploy.sh                   [-h]
 #                               [-O <swarm|kubernetes>] \
 #                               [-N <namespace>]        \
+#                               [-T <host|nfs>]         \
+#                               [-P <nfsServerIp>]      \
 #                               [-S <storeBase>]        \
 #                               [up|down]
 #
@@ -19,14 +21,19 @@
 #
 # TYPICAL CASES:
 #
-#   Deploy ChRIS services into a Swarm cluster:
+#   Deploy ChRIS services into a single-machine Swarm cluster:
 #
 #       deploy.sh up
 #
 #
-#   Deploy ChRIS services into a Kubernetes cluster:
+#   Deploy ChRIS services into a single-machine Kubernetes cluster:
 #
 #       deploy.sh -O kubernetes up
+#
+#
+#   Deploy ChRIS services into a multi-machine Kubernetes cluster:
+#
+#       deploy.sh -O kubernetes -T nfs -S <storeBase> -P <nfsServerIp> up
 #
 # ARGS
 #
@@ -43,6 +50,16 @@
 #
 #       Explicitly set the kubernetes namespace to <namespace>. Default is chris.
 #       Not used for swarm.
+#
+#   -T <host|nfs>
+#
+#       Explicitly set the storage type for the STOREBASE dir. Default is host.
+#       Note: The nfs storage type is not implemented for swarm orchestrator yet.
+#
+#   -P <nfsServerIp>
+#
+#       Set the IP address of the NFS server. Required when storage type is set to 'nfs'.
+#       Not used for 'host' storage type.
 #
 #   -S <storeBase>
 #
@@ -62,14 +79,16 @@ source ./cparse.sh
 declare -i STEP=0
 ORCHESTRATOR=swarm
 NAMESPACE=chris
+STORAGE_TYPE=host
 HERE=$(pwd)
 
 print_usage () {
-    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-N <namespace>] [-S <storeBase>] [up|down]"
+    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-N <namespace>] [-T <host|nfs>]
+         [-P <nfsServerIp>] [-S <storeBase>] [up|down]"
     exit 1
 }
 
-while getopts ":hO:N:S:" opt; do
+while getopts ":hO:N:T:P:S:" opt; do
     case $opt in
         h) print_usage
            ;;
@@ -80,6 +99,14 @@ while getopts ":hO:N:S:" opt; do
            fi
            ;;
         N) NAMESPACE=$OPTARG
+           ;;
+        T) STORAGE_TYPE=$OPTARG
+           if ! [[ "$STORAGE_TYPE" =~ ^(host|nfs)$ ]]; then
+              echo "Invalid value for option -- T"
+              print_usage
+           fi
+           ;;
+        P) NFS_SERVER=$OPTARG
            ;;
         S) STOREBASE=$OPTARG
            ;;
@@ -93,6 +120,23 @@ while getopts ":hO:N:S:" opt; do
 done
 shift $(($OPTIND - 1))
 
+if [[ $STORAGE_TYPE == nfs ]]; then
+    if [[ $ORCHESTRATOR == swarm ]]; then
+        echo -e "Sorry, nfs storage type is not supported for swarm orchestrator yet"  | ./boxes.sh
+        exit 1
+    fi
+    if [ -z ${NFS_SERVER+x} ]; then
+        echo "-P <NFS_SERVER> (the NFS server ip address) must be specified or the shell
+             environment variable NFS_SERVER must be set when using nfs storage type"
+        print_usage
+    fi
+    if [ -z ${STOREBASE+x} ]; then
+        echo "-S <storeBase> must be specified or the shell environment variable STOREBASE
+             must be set when using nfs storage type"
+        print_usage
+    fi
+fi
+
 COMMAND=up
 if (( $# == 1 )) ; then
     COMMAND=$1
@@ -103,17 +147,26 @@ if (( $# == 1 )) ; then
 fi
 
 title -d 1 "Setting global exports..."
-    if [ -z ${STOREBASE+x} ]; then
-        if [[ ! -d CHRIS_REMOTE_FS ]] ; then
-            mkdir CHRIS_REMOTE_FS
-        fi
-        STOREBASE=$HERE/CHRIS_REMOTE_FS
-    else
-        if [[ ! -d $STOREBASE ]] ; then
-            mkdir -p $STOREBASE
+    if [[ $STORAGE_TYPE == host ]]; then
+        if [ -z ${STOREBASE+x} ]; then
+            if [[ ! -d CHRIS_REMOTE_FS ]] ; then
+                mkdir CHRIS_REMOTE_FS
+            fi
+            STOREBASE=$HERE/CHRIS_REMOTE_FS
+        else
+            if [[ ! -d $STOREBASE ]] ; then
+                mkdir -p $STOREBASE
+            fi
         fi
     fi
-    echo -e "exporting STOREBASE=$STOREBASE "                      | ./boxes.sh
+    echo -e "ORCHESTRATOR=$ORCHESTRATOR"                          | ./boxes.sh
+    echo -e "exporting STORAGE_TYPE=$STORAGE_TYPE"                | ./boxes.sh
+    export STORAGE_TYPE=$STORAGE_TYPE
+    if [[ $STORAGE_TYPE == nfs ]]; then
+        echo -e "exporting NFS_SERVER=$NFS_SERVER"                | ./boxes.sh
+        export NFS_SERVER=$NFS_SERVER
+    fi
+    echo -e "exporting STOREBASE=$STOREBASE"                      | ./boxes.sh
     export STOREBASE=$STOREBASE
     if [[ $ORCHESTRATOR == kubernetes ]]; then
         echo -e "exporting NAMESPACE=$NAMESPACE"                  | ./boxes.sh
@@ -125,8 +178,8 @@ if [[ "$COMMAND" == 'up' ]]; then
 
     title -d 1 "Starting ChRIS production deployment on $ORCHESTRATOR"
     if [[ $ORCHESTRATOR == swarm ]]; then
-        echo "docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack"  | ./boxes.sh ${LightCyan}
-        docker stack deploy -c swarm/prod_deployments/docker-compose.yml chris_stack
+        echo "docker stack deploy -c swarm/prod/docker-compose.yml chris_stack"  | ./boxes.sh ${LightCyan}
+        docker stack deploy -c swarm/prod/docker-compose.yml chris_stack
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
         echo "kubectl create namespace $NAMESPACE"   | ./boxes.sh ${LightCyan}
         namespace=$(kubectl get namespaces $NAMESPACE --no-headers -o custom-columns=:metadata.name 2> /dev/null)
@@ -135,8 +188,13 @@ if [[ "$COMMAND" == 'up' ]]; then
         else
             echo "$NAMESPACE namespace already exists, skipping creation"
         fi
-        echo "kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl apply -f -"  | ./boxes.sh ${LightCyan}
-        kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl apply -f -
+        if [[ $STORAGE_TYPE == host ]]; then
+            echo "kubectl kustomize kubernetes/prod/overlays/host | envsubst | kubectl apply -f -"  | ./boxes.sh ${LightCyan}
+            kubectl kustomize kubernetes/prod/overlays/host | envsubst | kubectl apply -f -
+        else
+            echo "kubectl kustomize kubernetes/prod/overlays/nfs | envsubst | kubectl apply -f -"  | ./boxes.sh ${LightCyan}
+            kubectl kustomize kubernetes/prod/overlays/nfs | envsubst | kubectl apply -f -
+        fi
     fi
     windowBottom
 
@@ -247,8 +305,13 @@ if [[ "$COMMAND" == 'down' ]]; then
         echo "docker stack rm chris_stack"                               | ./boxes.sh ${LightCyan}
         docker stack rm chris_stack
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
-        echo "kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl delete -f -"  | ./boxes.sh ${LightCyan}
-        kubectl kustomize kubernetes/prod_deployments | envsubst | kubectl delete -f -
+        if [[ $STORAGE_TYPE == host ]]; then
+            echo "kubectl kustomize kubernetes/prod/overlays/host | envsubst | kubectl delete -f -"  | ./boxes.sh ${LightCyan}
+            kubectl kustomize kubernetes/prod/overlays/host | envsubst | kubectl delete -f -
+        else
+            echo "kubectl kustomize kubernetes/prod/overlays/nfs | envsubst | kubectl delete -f -"  | ./boxes.sh ${LightCyan}
+            kubectl kustomize kubernetes/prod/overlays/nfs | envsubst | kubectl delete -f -
+        fi
     fi
     windowBottom
 fi

@@ -10,6 +10,6 @@ utils
 docs
 htmlcov
 CHRIS_REMOTE_FS
-swarm/prod_deployments/secrets
-kubernetes/prod_deployments/secrets
+swarm/prod/secrets
+kubernetes/prod/base/secrets
 dc.out

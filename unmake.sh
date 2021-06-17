@@ -77,6 +77,7 @@ done
 shift $(($OPTIND - 1))
 
 title -d 1 "Setting global exports..."
+    echo -e "ORCHESTRATOR=$ORCHESTRATOR"              | ./boxes.sh
     if [ -z ${STOREBASE+x} ]; then
         STOREBASE=$(pwd)/CHRIS_REMOTE_FS
     fi

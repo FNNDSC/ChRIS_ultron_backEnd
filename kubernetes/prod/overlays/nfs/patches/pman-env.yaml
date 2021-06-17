@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pman
+spec:
+  template:
+    spec:
+      containers:
+        - name: pman
+          # NFS needs additional env variables
+          env:
+            - name: STORAGE_TYPE
+              value: ${STORAGE_TYPE}
+            - name: NFS_SERVER
+              value: ${NFS_SERVER}

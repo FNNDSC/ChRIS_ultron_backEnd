@@ -11,5 +11,5 @@ CHRIS_REMOTE_FS/
 dc.out
 .vscode
 celerybeat.pid
-swarm/prod_deployments/secrets/
-kubernetes/prod_deployments/secrets/
+swarm/prod/secrets/
+kubernetes/prod/base/secrets/
