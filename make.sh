@@ -8,7 +8,7 @@
 #
 #   make.sh                     [-h] [-i] [-s] [-U] [-I]        \
 #                               [-O <swarm|kubernetes>]         \
-#                               [-p <hostIp>]                   \
+#                               [-P <hostIp>]                   \
 #                               [-S <storeBase>]                \
 #                               [local|fnndsc[:dev]]
 #
@@ -73,7 +73,7 @@
 #
 #       Explicitly set the orchestrator. Default is swarm.
 #
-#   -p <hostIp>
+#   -P <hostIp>
 #
 #       Explicitly set the IP address of the machine running this script. This parameter
 #       is required when the -O flag is set to kubernetes. Not used for swarm.
@@ -136,11 +136,11 @@ if [[ -f .env ]] ; then
 fi
 
 print_usage () {
-    echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-p <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
+    echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
     exit 1
 }
 
-while getopts ":hisUIO:p:S:" opt; do
+while getopts ":hisUIO:P:S:" opt; do
     case $opt in
         h) print_usage
            ;;
@@ -158,7 +158,7 @@ while getopts ":hisUIO:p:S:" opt; do
               print_usage
            fi
            ;;
-        p) HOSTIP=$OPTARG
+        P) HOSTIP=$OPTARG
            ;;
         S) STOREBASE=$OPTARG
            ;;
@@ -174,7 +174,7 @@ shift $(($OPTIND - 1))
 
 if [[ $ORCHESTRATOR == kubernetes ]]; then
     if [ -z ${HOSTIP+x} ]; then
-        echo "-p <hostIp> (this machine's ip address) must be specified or the shell
+        echo "-P <hostIp> (this machine's ip address) must be specified or the shell
              environment variable HOSTIP must be set when using kubernetes orchestrator"
         print_usage
     fi
@@ -198,8 +198,9 @@ declare -a A_CONTAINER=(
 )
 
 title -d 1 "Setting global exports..."
+    echo -e "ORCHESTRATOR=$ORCHESTRATOR"           | ./boxes.sh
     if [[ $ORCHESTRATOR == kubernetes ]]; then
-        echo -e "HOSTIP=$HOSTIP "                  | ./boxes.sh
+        echo -e "HOSTIP=$HOSTIP"                   | ./boxes.sh
         echo -e "exporting REMOTENETWORK=false "   | ./boxes.sh
         export REMOTENETWORK=false
         echo -e "exporting PFCONDNS=pfcon.remote " | ./boxes.sh

@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pman
+  labels:
+    app: pman
+    env: production
+spec:
+  selector:
+    app: pman
+    env: production
+  ports:
+    - port: 5010
+      targetPort: 5010
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pman
+  labels:
+    app: pman
+    env: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pman
+      env: production
+  template:
+    metadata:
+      name: pman
+      labels:
+        app: pman
+        env: production
+    spec:
+      containers:
+        - image: fnndsc/pman
+          name: pman
+          ports:
+            - containerPort: 5010
+          # Since pman spins off containers of its own it needs to mount storeBase dir
+          # (where pfcon shares the data) into the spawned container. This directory is
+          # passed in the STOREBASE env variable.
+          env:
+            - name: STOREBASE
+              value: ${STOREBASE}
+            - name: CONTAINER_ENV
+              value: kubernetes
+          envFrom:
+            - configMapRef:
+                name: pman-config

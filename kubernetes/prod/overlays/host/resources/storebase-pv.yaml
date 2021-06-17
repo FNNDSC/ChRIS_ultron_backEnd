@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storebase
+  labels:
+    volume: storebase
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  # Mount a physical dir in the HOST onto the key store in pfcon. This dir
+  # is given by the STOREBASE env variable substitution.
+  hostPath:
+    path: ${STOREBASE}

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pfcon
+  labels:
+    app: pfcon
+    env: production
+spec:
+  selector:
+    app: pfcon
+    env: production
+  ports:
+    - port: 5005
+      targetPort: 5005
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pfcon
+  labels:
+    app: pfcon
+    env: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pfcon
+      env: production
+  template:
+    metadata:
+      name: pfcon
+      labels:
+        app: pfcon
+        env: production
+    spec:
+      initContainers:
+        - name: init-pfcon
+          image: busybox:1.32
+          command: [ 'sh', '-c', "until wget --spider -S -T 2 http://$(PMAN_SERVICE_NAME):5010/api/v1/ 2>&1 | grep '200 OK'; do echo waiting for pman; sleep 2; done" ]
+      containers:
+        - image: fnndsc/pfcon
+          name: pfcon
+          ports:
+            - containerPort: 5005
+          env:
+            - name: COMPUTE_SERVICE_URL
+              value: http://$(PMAN_SERVICE_NAME):5010/api/v1/
+          envFrom:
+            - configMapRef:
+                name: pfcon-config
+          volumeMounts:
+            - mountPath: "/home/localuser/storeBase"
+              name: "store-base"
+      # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
+      # is given by the STOREBASE env variable substitution.
+      volumes:
+        - name: "store-base"
+          hostPath:
+            path: ${STOREBASE}
