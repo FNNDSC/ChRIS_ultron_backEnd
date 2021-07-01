@@ -33,7 +33,7 @@
 #
 #   Deploy ChRIS services into a multi-machine Kubernetes cluster:
 #
-#       deploy.sh -O kubernetes -T nfs -S <storeBase> -P <nfsServerIp> up
+#       deploy.sh -O kubernetes -T nfs -P <nfsServerIp> -S <storeBase> -D <chrisStorageTree> up
 #
 # ARGS
 #
@@ -41,6 +41,11 @@
 #   -h
 #
 #       Optional print usage help.
+#
+#   -i
+#
+#       Optional initialize ChRIS with the chris user account and copy plugins. Useful
+#       to initialize ChRIS the first time the deployment is made.
 #
 #   -O <swarm|kubernetes>
 #
@@ -53,7 +58,7 @@
 #
 #   -T <host|nfs>
 #
-#       Explicitly set the storage type for the STOREBASE dir. Default is host.
+#       Explicitly set the storage type for the STOREBASE dir and DBs. Default is host.
 #       Note: The nfs storage type is not implemented for swarm orchestrator yet.
 #
 #   -P <nfsServerIp>
@@ -65,6 +70,16 @@
 #
 #       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
 #       filesystem where pfcon and plugins share data (usually externally mounted NFS).
+#       Must be specified or the shell environment variable STOREBASE must be set when
+#       using nfs storage type.
+#
+#   -D <chrisStorageTree>
+#
+#       Explicitly set the ChRIS persistent storage directory to <chrisStorageTree>. This
+#       is a directory containing a few subdirectories used to persist ChRIS services'
+#       databases. The subdirectories are 'chrisDB', 'storeDB', 'queueDB' and 'swiftDB'.
+#       Must be specified and the directory tree must exist on the NFS server when using
+#       nfs storage type.
 #
 #   [up|down] (optional, default = 'up')
 #
@@ -77,21 +92,24 @@ source ./decorate.sh
 source ./cparse.sh
 
 declare -i STEP=0
+declare -i b_initializeChris=0
 ORCHESTRATOR=swarm
 NAMESPACE=chris
 STORAGE_TYPE=host
 HERE=$(pwd)
 
 print_usage () {
-    echo "Usage: ./deploy.sh [-h] [-O <swarm|kubernetes>] [-N <namespace>] [-T <host|nfs>]
-         [-P <nfsServerIp>] [-S <storeBase>] [up|down]"
+    echo "Usage: ./deploy.sh [-h] [-i] [-O <swarm|kubernetes>] [-N <namespace>] [-T <host|nfs>]
+         [-P <nfsServerIp>] [-S <storeBase>] [-D <chrisStorageTree>] [up|down]"
     exit 1
 }
 
-while getopts ":hO:N:T:P:S:" opt; do
+while getopts ":hiO:N:T:P:S:" opt; do
     case $opt in
         h) print_usage
            ;;
+        i) b_initializeChris=1
+          ;;
         O) ORCHESTRATOR=$OPTARG
            if ! [[ "$ORCHESTRATOR" =~ ^(swarm|kubernetes)$ ]]; then
               echo "Invalid value for option -- O"
@@ -198,45 +216,45 @@ if [[ "$COMMAND" == 'up' ]]; then
     fi
     windowBottom
 
-    title -d 1 "Waiting for ChRIS containers to start running on $ORCHESTRATOR"
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-    for i in {1..50}; do
-        sleep 5
+    if (( b_initializeChris )); then
+
+        title -d 1 "Waiting for ChRIS containers to start running on $ORCHESTRATOR"
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+        for i in {1..50}; do
+            sleep 5
+            if [[ $ORCHESTRATOR == swarm ]]; then
+                chris=$(docker ps -f name=chris.1. -q)
+            elif [[ $ORCHESTRATOR == kubernetes ]]; then
+                chris=$(kubectl get pods --namespace $NAMESPACE --selector="app=chris,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
+            fi
+            if [ -n "$chris" ]; then
+              echo "Success: chris container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
+              break
+            fi
+        done
+        if [ -z "$chris" ]; then
+            echo "Error: couldn't start chris container on $ORCHESTRATOR"      | ./boxes.sh ${Red}
+            exit 1
+        fi
+        windowBottom
+
+        title -d 1 "Waiting until CUBE is ready to accept connections..."
         if [[ $ORCHESTRATOR == swarm ]]; then
-            chris=$(docker ps -f name=chris.1. -q)
+            docker exec $chris sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
         elif [[ $ORCHESTRATOR == kubernetes ]]; then
-            chris=$(kubectl get pods --namespace $NAMESPACE --selector="app=chris,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
+            kubectl exec $chris --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
         fi
-        if [ -n "$chris" ]; then
-          echo "Success: chris container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
-          break
+        windowBottom
+
+        title -d 1 "Waiting until ChRIS store is ready to accept connections..."
+        if [[ $ORCHESTRATOR == swarm ]]; then
+            chris_store=$(docker ps -f name=chris_store.1. -q)
+            docker exec $chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
+        elif [[ $ORCHESTRATOR == kubernetes ]]; then
+            chris_store=$(kubectl get pods --selector="app=chris-store,env=production" --output=jsonpath='{.items[*].metadata.name}')
+            kubectl exec $chris_store --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
         fi
-    done
-    if [ -z "$chris" ]; then
-        echo "Error: couldn't start chris container on $ORCHESTRATOR"      | ./boxes.sh ${Red}
-        exit 1
-    fi
-    windowBottom
-
-    title -d 1 "Waiting until CUBE is ready to accept connections..."
-    if [[ $ORCHESTRATOR == swarm ]]; then
-        docker exec $chris sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
-    elif [[ $ORCHESTRATOR == kubernetes ]]; then
-        kubectl exec $chris --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;'
-    fi
-    windowBottom
-
-    title -d 1 "Waiting until ChRIS store is ready to accept connections..."
-    if [[ $ORCHESTRATOR == swarm ]]; then
-        chris_store=$(docker ps -f name=chris_store.1. -q)
-        docker exec $chris_store sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
-    elif [[ $ORCHESTRATOR == kubernetes ]]; then
-        chris_store=$(kubectl get pods --selector="app=chris-store,env=production" --output=jsonpath='{.items[*].metadata.name}')
-        kubectl exec $chris_store --namespace $NAMESPACE -- sh -c 'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'
-    fi
-    windowBottom
-
-    if [ ! -f $STOREBASE/.setup ]; then
+        windowBottom
 
         title -d 1 "Creating superuser chris in ChRIS store"
         if [[ $ORCHESTRATOR == swarm ]]; then
@@ -293,8 +311,6 @@ if [[ "$COMMAND" == 'up' ]]; then
             kubectl exec $chris --namespace $NAMESPACE -- python plugins/services/manager.py register host --pluginname pl-topologicalcopy
         fi
         windowBottom
-
-        touch $STOREBASE/.setup
     fi
 fi
 

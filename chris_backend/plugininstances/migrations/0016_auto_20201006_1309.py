@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='plugininstancefile',
             name='fname',
-            field=models.FileField(max_length=1024, unique=True, upload_to=''),
+            field=models.FileField(max_length=768, unique=True, upload_to=''),
         ),
     ]

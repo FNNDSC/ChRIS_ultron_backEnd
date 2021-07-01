@@ -228,7 +228,7 @@ class PluginInstanceSplit(models.Model):
 
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=1024, unique=True)
+    fname = models.FileField(max_length=768, unique=True)
     plugin_inst = models.ForeignKey(PluginInstance, db_index=True,
                                     on_delete=models.CASCADE, related_name='files')
 
@@ -314,7 +314,7 @@ class BoolParameter(models.Model):
 
 
 class PathParameter(models.Model):
-    value = models.CharField(max_length=20000)  # this string can be a list of long paths
+    value = models.CharField(max_length=16000)  # this string can be a list of long paths
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -328,7 +328,7 @@ class PathParameter(models.Model):
 
 
 class UnextpathParameter(models.Model):
-    value = models.CharField(max_length=20000)  # this string can be a list of long paths
+    value = models.CharField(max_length=16000)  # this string can be a list of long paths
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='unextpath_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,

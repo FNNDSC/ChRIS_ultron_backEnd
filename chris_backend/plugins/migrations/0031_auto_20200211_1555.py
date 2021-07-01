@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='defaultpathparameter',
             name='value',
-            field=models.CharField(max_length=20000),
+            field=models.CharField(max_length=1024),
         ),
         migrations.AlterField(
             model_name='defaultstrparameter',

@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='defaultpipingpathparameter',
             name='value',
-            field=models.CharField(max_length=20000, null=True),
+            field=models.CharField(max_length=1024, null=True),
         ),
         migrations.AlterField(
             model_name='defaultpipingstrparameter',

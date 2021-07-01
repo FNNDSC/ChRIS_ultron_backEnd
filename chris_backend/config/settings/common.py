@@ -108,7 +108,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 SILENCED_SYSTEM_CHECKS = ['mysql.E001']
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': 'mysql.connector.django',
     }
 }
 
