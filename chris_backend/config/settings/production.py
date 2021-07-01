@@ -112,7 +112,6 @@ CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)
 
 # Celery settings
 
-#CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
 CELERY_BROKER_URL = get_secret('CELERY_BROKER_URL')
 
 #: Only add pickle to this list if your broker is secured

@@ -125,7 +125,8 @@ services:
       role: "Production periodic tasks scheduler"
 
   chris_db:
-    image: mysql:5
+    image: mysql:8
+    command: --collation-server=utf8mb4_0900_as_cs
     volumes:
       - chris_db_data:/var/lib/mysql
     env_file:
@@ -180,7 +181,8 @@ services:
       role: "Chris store service"
 
   chris_store_db:
-    image: mysql:5
+    image: mysql:8
+    command: --collation-server=utf8mb4_0900_as_cs
     volumes:
       - chris_store_db_data:/var/lib/mysql
     env_file:

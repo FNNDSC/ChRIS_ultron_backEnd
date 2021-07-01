@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='pathparameter',
             name='value',
-            field=models.CharField(max_length=20000),
+            field=models.CharField(max_length=16000),
         ),
         migrations.AlterField(
             model_name='plugininstancefile',

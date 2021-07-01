@@ -226,7 +226,7 @@ title -d 1 "Pulling non-'local/' core containers where needed..."   \
             "and creating appropriate .env for docker-compose"
 printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
             "docker pull" " library/mysql"                          | ./boxes.sh
-docker pull mysql:5                                                 | ./boxes.sh
+docker pull mysql:8                                                 | ./boxes.sh
 echo ""                                                             | ./boxes.sh
 printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
             "docker pull " "library/rabbitmq"                       | ./boxes.sh

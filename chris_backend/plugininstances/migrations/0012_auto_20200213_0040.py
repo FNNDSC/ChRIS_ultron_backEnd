@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             name='UnextpathParameter',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('value', models.CharField(max_length=20000)),
+                ('value', models.CharField(max_length=16000)),
                 ('plugin_inst', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='unextpath_param', to='plugininstances.PluginInstance')),
                 ('plugin_param', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='unextpath_inst', to='plugins.PluginParameter')),
             ],

@@ -100,7 +100,7 @@ CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
-DATABASES['default']['TEST'] = {'CHARSET': 'utf8'}
+DATABASES['default']['TEST'] = {'NAME': 'test_chris_dev'}
 DATABASES['default']['HOST'] = 'chris_dev_db'
 DATABASES['default']['PORT'] = '3306'
 
@@ -141,11 +141,6 @@ CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
 
 
 # Celery settings
-
-# Testing (enable worker to use the temporary Django testing DB)
-INSTALLED_APPS += ['celery.contrib.testing.tasks', 'django_celery_results']
-CELERY_RESULT_BACKEND = 'django-db'  # a result backend is needed for tests
-CELERY_RESULT_SERIALIZER = 'json'
 
 #CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
 CELERY_BROKER_URL = 'amqp://queue:5672'
