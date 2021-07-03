@@ -225,8 +225,8 @@ windowBottom
 title -d 1 "Pulling non-'local/' core containers where needed..."   \
             "and creating appropriate .env for docker-compose"
 printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
-            "docker pull" " library/mysql"                          | ./boxes.sh
-docker pull mysql:8                                                 | ./boxes.sh
+            "docker pull" " library/postgres"                          | ./boxes.sh
+docker pull postgres:13                                                 | ./boxes.sh
 echo ""                                                             | ./boxes.sh
 printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
             "docker pull " "library/rabbitmq"                       | ./boxes.sh
@@ -333,12 +333,16 @@ title -d 1 "Waiting for remote pfcon containers to start running on $ORCHESTRATO
             pfcon=$(kubectl get pods --selector="app=pfcon,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
         fi
         if [ -n "$pfcon" ]; then
+          echo ""                                                          | ./boxes.sh
           echo "Success: pfcon container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
+          echo ""                                                          | ./boxes.sh
           break
         fi
     done
     if [ -z "$pfcon" ]; then
+        echo ""                                                            | ./boxes.sh
         echo "Error: couldn't start pfcon container on $ORCHESTRATOR"      | ./boxes.sh ${Red}
+        echo ""                                                            | ./boxes.sh
         exit 1
     fi
 windowBottom
@@ -358,15 +362,12 @@ title -d 1 "Waiting until ChRIS database server is ready to accept connections..
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev_db sh -c                     \
-        'while ! mysqladmin -uroot -prootp status 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
+        'while ! psql -U chris -d chris_dev -c "select 1" 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
     echo -en "\033[2A\033[2K"
-    sed -E 's/[[:alnum:]]+:/\n&/g' dc.out | ./boxes.sh
-    echo "Granting <chris> user all DB permissions...."             | ./boxes.sh ${LightCyan}
-    echo "This is required for the Django tests."                   | ./boxes.sh ${LightCyan}
-    docker-compose -f docker-compose_dev.yml        \
-        exec chris_dev_db mysql -uroot -prootp -e   \
-        'GRANT ALL PRIVILEGES ON *.* TO "chris"@"%"' >& dc.out > /dev/null
-    cat dc.out                                                      | ./boxes.sh
+    cat dc.out                                                      | ./boxes.sh ${LightGreen}
+    echo ""                                                         | ./boxes.sh
+    echo "ChRIS database is ready to accept connections"            | ./boxes.sh ${LightGreen}
+    echo ""                                                         | ./boxes.sh
 windowBottom
 
 title -d 1 "Waiting until CUBE is ready to accept connections..."
@@ -376,9 +377,9 @@ title -d 1 "Waiting until CUBE is ready to accept connections..."
         exec chris_dev sh -c                        \
         'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
     echo -en "\033[2A\033[2K"
-    cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
+    cat dc.out                                                      | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
-    echo "Ready to accept connections"                              | ./boxes.sh ${LightGreen}
+    echo "CUBE is ready to accept connections"                      | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
 windowBottom
 
@@ -389,9 +390,9 @@ title -d 1 "Waiting until remote pfcon is ready to accept connections..."
         exec chris_dev sh -c                        \
         'while ! curl -sSf http://pfcon.remote:30005/api/v1/ 2> /dev/null; do sleep 5; done;' > dc.out
     echo -en "\033[2A\033[2K"
-    cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
+    cat dc.out                                                      | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
-    echo "Ready to accept connections"                              | ./boxes.sh ${LightGreen}
+    echo "Remote pfcon is ready to accept connections"              | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
 windowBottom
 
@@ -440,9 +441,9 @@ title -d 1 "Waiting until ChRIS store is ready to accept connections..."
         exec chris_store sh -c                   \
         'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
     echo -en "\033[2A\033[2K"
-    cat dc.out | python -m json.tool 2>/dev/null                    | ./boxes.sh ${LightGreen}
+    cat dc.out                                                      | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
-    echo "Ready to accept connections"                              | ./boxes.sh ${LightGreen}
+    echo "ChRIS store is ready to accept connections"               | ./boxes.sh ${LightGreen}
     echo ""                                                         | ./boxes.sh
 windowBottom
 

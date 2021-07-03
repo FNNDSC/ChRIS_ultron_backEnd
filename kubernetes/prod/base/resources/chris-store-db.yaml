@@ -7,8 +7,8 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - port: 3306
-    targetPort: 3306
+  - port: 5432
+    targetPort: 5432
     nodePort: 30306
   selector:
     name: chris-store-db
@@ -30,11 +30,11 @@ spec:
         name: chris-store-db
     spec:
       containers:
-      - name: mysql
-        image: mysql:8
+      - name: postgres
+        image: postgres:13
         args: ['--collation-server=utf8mb4_0900_as_cs']
         ports:
-        - containerPort: 3306
+        - containerPort: 5432
         envFrom:
         - configMapRef:
             name: cube-config

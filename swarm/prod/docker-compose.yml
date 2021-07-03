@@ -16,7 +16,7 @@ services:
     image: fnndsc/chris
     environment:
       - DATABASE_HOST=chris_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
       - CELERY_BROKER_URL=amqp://queue:5672
@@ -46,7 +46,7 @@ services:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
       - DATABASE_HOST=chris_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
       - CELERY_BROKER_URL=amqp://queue:5672
@@ -76,7 +76,7 @@ services:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
       - DATABASE_HOST=chris_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
       - CELERY_BROKER_URL=amqp://queue:5672
@@ -103,7 +103,7 @@ services:
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
       - DATABASE_HOST=chris_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - CHRIS_STORE_URL=http://chris-store.local:8010/api/v1/
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
       - CELERY_BROKER_URL=amqp://queue:5672
@@ -125,10 +125,9 @@ services:
       role: "Production periodic tasks scheduler"
 
   chris_db:
-    image: mysql:8
-    command: --collation-server=utf8mb4_0900_as_cs
+    image: postgres:13
     volumes:
-      - chris_db_data:/var/lib/mysql
+      - chris_db_data:/var/lib/postgresql/data
     env_file:
       - ./secrets/.chris_db.env
     deploy:
@@ -137,8 +136,8 @@ services:
     networks:
       - local1
     labels:
-      name: "ChRIS_ultron_backEnd MySQL Database"
-      role: "Production MySQL database"
+      name: "ChRIS_ultron_backEnd PostgreSQL Database"
+      role: "Production PostgreSQL database"
 
   queue:
     image: rabbitmq:3
@@ -158,7 +157,7 @@ services:
     image: fnndsc/chris_store
     environment:
       - DATABASE_HOST=chris_store_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
     env_file:
       - ./secrets/.chris_store.env
@@ -181,10 +180,9 @@ services:
       role: "Chris store service"
 
   chris_store_db:
-    image: mysql:8
-    command: --collation-server=utf8mb4_0900_as_cs
+    image: postgres:13
     volumes:
-      - chris_store_db_data:/var/lib/mysql
+      - chris_store_db_data:/var/lib/postgresql/data
     env_file:
       - ./secrets/.chris_store_db.env
     deploy:
@@ -193,7 +191,7 @@ services:
     networks:
       - local1
     labels:
-      name: "ChRIS_store MySQL Database"
+      name: "ChRIS_store PostgreSQL Database"
       role: "Chris store database"
 
   swift_service:

@@ -44,9 +44,9 @@ ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # DATABASE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Raises ImproperlyConfigured exception if DATABASE_URL not set
-DATABASES['default']['NAME'] = get_secret('MYSQL_DATABASE')
-DATABASES['default']['USER'] = get_secret('MYSQL_USER')
-DATABASES['default']['PASSWORD'] = get_secret('MYSQL_PASSWORD')
+DATABASES['default']['NAME'] = get_secret('POSTGRES_DB')
+DATABASES['default']['USER'] = get_secret('POSTGRES_USER')
+DATABASES['default']['PASSWORD'] = get_secret('POSTGRES_PASSWORD')
 DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 

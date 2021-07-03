@@ -46,7 +46,7 @@ spec:
             - name: DATABASE_HOST
               value: $(CHRIS_DB_SERVICE_NAME)
             - name: DATABASE_PORT
-              value: 3306
+              value: 5432
             - name: CHRIS_STORE_URL
               value: http://$(CHRIS_STORE_SERVICE_NAME):8010/api/v1/
             - name: SWIFT_AUTH_URL

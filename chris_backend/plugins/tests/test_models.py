@@ -94,7 +94,7 @@ class PluginMetaFilterTests(ModelTests):
         meta2.save()
         meta_filter = PluginMetaFilter()
         queryset = PluginMeta.objects.all()
-        qs = meta_filter.search_name_authors_category(queryset, 'name_authors_category', 'dir')
+        qs = meta_filter.search_name_authors_category(queryset, 'name_authors_category', 'Dir')
         self.assertCountEqual(qs, queryset)
 
 
