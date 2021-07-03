@@ -228,7 +228,7 @@ class PluginInstanceSplit(models.Model):
 
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=768, unique=True)
+    fname = models.FileField(max_length=1024, unique=True)
     plugin_inst = models.ForeignKey(PluginInstance, db_index=True,
                                     on_delete=models.CASCADE, related_name='files')
 

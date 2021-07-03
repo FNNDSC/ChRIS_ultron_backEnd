@@ -228,12 +228,16 @@ if [[ "$COMMAND" == 'up' ]]; then
                 chris=$(kubectl get pods --namespace $NAMESPACE --selector="app=chris,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
             fi
             if [ -n "$chris" ]; then
+              echo ""                                                          | ./boxes.sh
               echo "Success: chris container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
+              echo ""                                                          | ./boxes.sh
               break
             fi
         done
         if [ -z "$chris" ]; then
+            echo ""                                                            | ./boxes.sh
             echo "Error: couldn't start chris container on $ORCHESTRATOR"      | ./boxes.sh ${Red}
+            echo ""                                                            | ./boxes.sh
             exit 1
         fi
         windowBottom

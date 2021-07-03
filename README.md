@@ -3,7 +3,7 @@
 [![Build](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml)![License][license-badge]
 ![Last Commit][last-commit-badge]
 
-The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-MySQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
+The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
 
 
 ## ChRIS development, testing and deployment

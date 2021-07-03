@@ -49,10 +49,10 @@ RUN apt-get update                                               \
   && export LC_ALL=en_US.UTF-8                                   \
   && locale-gen en_US.UTF-8                                      \
   && dpkg-reconfigure locales                                    \
-  && apt-get install -y libssl-dev libmysqlclient-dev            \
+  && apt-get install -y libssl-dev libpq-dev                     \
   && apt-get install -y apache2 apache2-dev                      \
-  && pip install --upgrade pip                                    \
-  && pip install -r ${REQPATH}/${ENVIRONMENT}.txt                    \
+  && pip install --upgrade pip                                   \
+  && pip install -r ${REQPATH}/${ENVIRONMENT}.txt                \
   && useradd -l -u $UID -ms /bin/bash localuser
 
 # Start as user localuser

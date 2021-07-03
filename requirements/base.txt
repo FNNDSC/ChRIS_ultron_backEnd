@@ -2,8 +2,7 @@ Django==2.2.24
 django-filter==2.4.0
 djangorestframework==3.12.4
 django-cors-middleware==1.5.0
-mysqlclient==2.0.3
-mysql-connector-python==8.0.25
+psycopg2==2.8.6
 python-swiftclient==3.12.0
 django-storage-swift==1.2.19
 celery==5.1.2

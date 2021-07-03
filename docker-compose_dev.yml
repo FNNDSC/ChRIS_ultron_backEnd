@@ -131,19 +131,17 @@ services:
       role: "Backend development periodic tasks scheduler"
 
   chris_dev_db:
-    image: mysql:8
-    command: --collation-server=utf8mb4_0900_as_cs
+    image: postgres:13
     volumes:
-      - chris_dev_db_data:/var/lib/mysql:z
+      - chris_dev_db_data:/var/lib/postgresql/data:z
     environment:
-      - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_dev
-      - MYSQL_USER=chris
-      - MYSQL_PASSWORD=Chris1234
+      - POSTGRES_DB=chris_dev
+      - POSTGRES_USER=chris
+      - POSTGRES_PASSWORD=Chris1234
     networks:
       - local
     labels:
-      name: "ChRIS_ultron_backEnd MySQL Database"
+      name: "ChRIS_ultron_backEnd PostgreSQL Database"
       role: "Backend development database"
 
   queue:
@@ -169,12 +167,11 @@ services:
       - DJANGO_SECURE_PROXY_SSL_HEADER=
       - DJANGO_USE_X_FORWARDED_HOST=false
       - DATABASE_HOST=chris_store_db
-      - DATABASE_PORT=3306
+      - DATABASE_PORT=5432
       - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
-      - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_store
-      - MYSQL_USER=chris
-      - MYSQL_PASSWORD=Chris1234
+      - POSTGRES_DB=chris_store
+      - POSTGRES_USER=chris
+      - POSTGRES_PASSWORD=Chris1234
       - SWIFT_USERNAME=chris:chris1234
       - SWIFT_KEY=testing
       - SWIFT_CONTAINER_NAME=store_users
@@ -192,19 +189,17 @@ services:
       role: "Chris store service"
 
   chris_store_db:
-    image: mysql:8
-    command: --collation-server=utf8mb4_0900_as_cs
+    image: postgres:13
     volumes:
-      - chris_store_db_data:/var/lib/mysql:z
+      - chris_store_db_data:/var/lib/postgresql/data:z
     environment:
-      - MYSQL_ROOT_PASSWORD=rootp
-      - MYSQL_DATABASE=chris_store
-      - MYSQL_USER=chris
-      - MYSQL_PASSWORD=Chris1234
+      - POSTGRES_DB=chris_store
+      - POSTGRES_USER=chris
+      - POSTGRES_PASSWORD=Chris1234
     networks:
       - local
     labels:
-      name: "ChRIS_store MySQL Database"
+      name: "ChRIS_store PostgreSQL Database"
       role: "Chris store database"
 
   swift_service:
