@@ -250,11 +250,13 @@ class PluginInstanceFileFilter(FilterSet):
                                                lookup_expr='exact')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    fname_icontains = django_filters.CharFilter(field_name='fname',
+                                                lookup_expr='icontains')
 
     class Meta:
         model = PluginInstanceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'plugin_inst_id',
-                  'feed_id', 'fname', 'fname_exact']
+                  'feed_id', 'fname', 'fname_exact', 'fname_icontains']
 
 
 class StrParameter(models.Model):
