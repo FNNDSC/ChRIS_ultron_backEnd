@@ -43,6 +43,8 @@ class PACSFileFilter(FilterSet):
                                                          lookup_expr='lte')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    fname_icontains = django_filters.CharFilter(field_name='fname',
+                                                lookup_expr='icontains')
     PatientName = django_filters.CharFilter(field_name='PatientName',
                                             lookup_expr='icontains')
     ProtocolName = django_filters.CharFilter(field_name='ProtocolName',
@@ -61,7 +63,7 @@ class PACSFileFilter(FilterSet):
     class Meta:
         model = PACSFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
-                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
-                  'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
+                  'fname_icontains', 'PatientID', 'PatientName', 'PatientSex',
+                  'PatientAge', 'min_PatientAge', 'max_PatientAge', 'PatientBirthDate',
+                  'StudyDate', 'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
                   'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']

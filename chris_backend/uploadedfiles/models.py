@@ -29,10 +29,12 @@ class UploadedFileFilter(FilterSet):
                                                          lookup_expr='lte')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    fname_icontains = django_filters.CharFilter(field_name='fname',
+                                                lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
 
     class Meta:
         model = UploadedFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'owner_username']
+                  'fname_icontains', 'owner_username']

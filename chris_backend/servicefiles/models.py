@@ -33,6 +33,8 @@ class ServiceFileFilter(FilterSet):
                                                          lookup_expr='lte')
     fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    fname_icontains = django_filters.CharFilter(field_name='fname',
+                                                lookup_expr='icontains')
     service_identifier = django_filters.CharFilter(field_name='service__identifier',
                                                    lookup_expr='exact')
     service_id = django_filters.CharFilter(field_name='service_id', lookup_expr='exact')
@@ -40,4 +42,4 @@ class ServiceFileFilter(FilterSet):
     class Meta:
         model = ServiceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'service_identifier', 'service_id']
+                  'fname_icontains', 'service_identifier', 'service_id']
