@@ -30,3 +30,37 @@ def json_zip2str(json_data):
             json.dumps(json_data).encode('utf-8')
         )
     ).decode('ascii')
+
+
+def filter_files_by_n_slashes(queryset, value):
+    """
+    Utility function to return the files that have the queried number of slashes in
+    their fname property. If the queried number ends in 'u' or 'U' then only one
+    file per each last "folder" in the path is returned (useful to efficiently get
+    the list of immediate folders under the path).
+    """
+    value = value.lower()
+    try:
+        if value.endswith('u'):
+            val = int(value[:-1])
+        else:
+            val = int(value)
+    except Exception:
+        return queryset
+    lookup = r'^[^/]+'
+    for i in range(val):
+        lookup += '/[^/]+'
+    lookup += '$'
+    qs = queryset.filter(fname__regex=lookup)
+    if value.endswith('u'):
+        ids = []
+        hash_d = {}
+        for f in qs.all():
+            path = f.fname.name
+            last_slash_ix = path.rindex('/')
+            path = path[:last_slash_ix]
+            if path not in hash_d:
+                ids.append(f.id)
+                hash_d[path] = None
+        return qs.filter(pk__in=ids)
+    return qs

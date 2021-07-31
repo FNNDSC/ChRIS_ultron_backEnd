@@ -3,6 +3,8 @@ from django.db import models
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from core.utils import filter_files_by_n_slashes
+
 
 class PACS(models.Model):
     identifier = models.CharField(max_length=20, unique=True)
@@ -45,6 +47,7 @@ class PACSFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
+    fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
     PatientName = django_filters.CharFilter(field_name='PatientName',
                                             lookup_expr='icontains')
     ProtocolName = django_filters.CharFilter(field_name='ProtocolName',
@@ -63,7 +66,17 @@ class PACSFileFilter(FilterSet):
     class Meta:
         model = PACSFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'PatientID', 'PatientName', 'PatientSex',
-                  'PatientAge', 'min_PatientAge', 'max_PatientAge', 'PatientBirthDate',
-                  'StudyDate', 'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
-                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']
+                  'fname_icontains', 'fname_nslashes', 'PatientID', 'PatientName',
+                  'PatientSex', 'PatientAge', 'min_PatientAge', 'max_PatientAge',
+                  'PatientBirthDate', 'StudyDate', 'ProtocolName', 'StudyInstanceUID',
+                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
+                  'pacs_identifier']
+
+    def filter_by_n_slashes(self, queryset, name, value):
+        """
+        Custom method to return the files that have the queried number of slashes in
+        their fname property. If the queried number ends in 'u' or 'U' then only one
+        file per each last "folder" in the path is returned (useful to efficiently get
+        the list of immediate folders under the path).
+        """
+        return filter_files_by_n_slashes(queryset, value)
