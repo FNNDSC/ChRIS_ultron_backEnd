@@ -8,7 +8,7 @@ from django_filters.rest_framework import FilterSet
 class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
-    name = models.CharField(max_length=100, blank=True, default='')
+    name = models.CharField(max_length=200, blank=True, db_index=True)
     owner = models.ManyToManyField('auth.User', related_name='feed')
 
     class Meta:
@@ -55,18 +55,22 @@ class FeedFilter(FilterSet):
                                                          lookup_expr='gte')
     max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
                                                          lookup_expr='lte')
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
+    name_startswith = django_filters.CharFilter(field_name='name',
+                                                lookup_expr='startswith')
 
     class Meta:
         model = Feed
-        fields = ['id', 'name', 'min_id', 'max_id', 'min_creation_date',
-                  'max_creation_date']
+        fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
+                  'min_creation_date', 'max_creation_date']
 
 
 class Note(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
-    title = models.CharField(max_length=100, blank=True, default='')
-    content = models.TextField(blank=True, default='')
+    title = models.CharField(max_length=100, blank=True)
+    content = models.TextField(blank=True)
     feed = models.OneToOneField(Feed, on_delete=models.CASCADE, related_name='note')
 
     def __str__(self):
@@ -74,7 +78,7 @@ class Note(models.Model):
 
 
 class Tag(models.Model):
-    name = models.CharField(max_length=100, blank=True, default='')
+    name = models.CharField(max_length=100, blank=True)
     color = models.CharField(max_length=20)
     feeds = models.ManyToManyField(Feed, related_name='tags',
                                    through='Tagging')
@@ -108,8 +112,8 @@ class Tagging(models.Model):
 
 class Comment(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    title = models.CharField(max_length=100, blank=True, default='')
-    content = models.TextField(blank=True, default='')
+    title = models.CharField(max_length=100, blank=True)
+    content = models.TextField(blank=True)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name='comments')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
