@@ -29,12 +29,12 @@ class PACSFileList(generics.ListCreateAPIView):
         query_list = [reverse('pacsfile-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
-        template_data = {'path': "", 'PatientID': "", 'PatientName': "",
-                         'PatientBirthDate': "", 'PatientAge': "", 'PatientSex': "",
-                         'StudyDate': "", 'Modality': "", 'ProtocolName': "",
-                         'StudyInstanceUID': "", 'StudyDescription': "",
-                         'SeriesInstanceUID': "", 'SeriesDescription': "",
-                         'pacs_name': ""}
+        template_data = {'path': '', 'PatientID': '', 'PatientName': '',
+                         'PatientBirthDate': '', 'PatientAge': '', 'PatientSex': '',
+                         'StudyDate': '', 'AccessionNumber': '', 'Modality': '',
+                         'ProtocolName': '', 'StudyInstanceUID': '',
+                         'StudyDescription': '', 'SeriesInstanceUID': '',
+                         'SeriesDescription': '', 'pacs_name': ''}
         return services.append_collection_template(response, template_data)
 
     def create(self, request, *args, **kwargs):

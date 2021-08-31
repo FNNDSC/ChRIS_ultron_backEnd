@@ -16,19 +16,20 @@ class PACS(models.Model):
 class PACSFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=512, unique=True)
-    PatientID = models.CharField(max_length=150, db_index=True)
+    PatientID = models.CharField(max_length=100, db_index=True)
     PatientName = models.CharField(max_length=150, blank=True)
     PatientBirthDate = models.DateField(blank=True, null=True)
     PatientAge = models.IntegerField(blank=True, null=True)
     PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')],
                                   blank=True)
     StudyDate = models.DateField(db_index=True)
+    AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
     Modality = models.CharField(max_length=15, blank=True)
     ProtocolName = models.CharField(max_length=64, blank=True)
-    StudyInstanceUID = models.CharField(max_length=150)
-    StudyDescription = models.CharField(max_length=500, blank=True)
-    SeriesInstanceUID = models.CharField(max_length=150)
-    SeriesDescription = models.CharField(max_length=500, blank=True)
+    StudyInstanceUID = models.CharField(max_length=100)
+    StudyDescription = models.CharField(max_length=400, blank=True)
+    SeriesInstanceUID = models.CharField(max_length=100)
+    SeriesDescription = models.CharField(max_length=400, blank=True)
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
 
     class Meta:
@@ -68,9 +69,9 @@ class PACSFileFilter(FilterSet):
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
                   'fname_icontains', 'fname_nslashes', 'PatientID', 'PatientName',
                   'PatientSex', 'PatientAge', 'min_PatientAge', 'max_PatientAge',
-                  'PatientBirthDate', 'StudyDate', 'ProtocolName', 'StudyInstanceUID',
-                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
-                  'pacs_identifier']
+                  'PatientBirthDate', 'StudyDate', 'AccessionNumber', 'ProtocolName',
+                  'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
+                  'SeriesDescription', 'pacs_identifier']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """
