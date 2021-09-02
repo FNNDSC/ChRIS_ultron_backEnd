@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: storedb
+  labels:
+    volume: storedb
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 40Gi
+  # Mount a physical dir in the HOST onto the ChRIS store DB. This dir
+  # is given by the STORAGEBASE env variable substitution.
+  hostPath:
+    path: ${STORAGEBASE}/storeDB

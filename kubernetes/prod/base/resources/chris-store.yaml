@@ -3,15 +3,17 @@ kind: Service
 metadata:
   name: chris-store
   labels:
-    name: chris-store
+    app: chris-store
+    env: production
 spec:
   type: NodePort
-  ports:
-  - port: 8010
-    targetPort: 8010
-    nodePort: 30010
   selector:
-    name: chris-store
+    app: chris-store
+    env: production
+  ports:
+    - port: 8010
+      targetPort: 8010
+      nodePort: 30010
 
 ---
 
@@ -19,23 +21,38 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: chris-store
+  labels:
+    app: chris-store
+    env: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: chris-store
+      app: chris-store
+      env: production
   template:
     metadata:
+      name: chris-store
       labels:
-        name: chris-store
+        app: chris-store
+        env: production
     spec:
       containers:
-      - name: chris-store
-        image: fnndsc/chris_store:latest
-        ports:
-        - containerPort: 8010
-        envFrom:
-        - configMapRef:
-            name: cube-config
-        - secretRef:
-            name: cube-secrets
+        - name: chris-store
+          image: fnndsc/chris_store
+          ports:
+            - containerPort: 8010
+          env:
+            - name: DATABASE_HOST
+              value: $(CHRIS_STORE_DB_SERVICE_NAME)
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: SWIFT_AUTH_URL
+              value: http://$(SWIFT_SERVICE_NAME):8080/auth/v1.0
+          envFrom:
+            - configMapRef:
+                name: chris-store-config
+            - configMapRef:
+                name: chris-store-db-config
+            - configMapRef:
+                name: swift-config

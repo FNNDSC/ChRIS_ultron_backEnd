@@ -3,20 +3,15 @@ kind: Service
 metadata:
   name: queue
   labels:
-    name: queue
+    app: queue
+    env: production
 spec:
-  type: NodePort
-  ports:
-  - port: 5672
-    targetPort: 5672
-    nodePort: 30672
-    name: service-port
-  - port: 15672
-    targetPort: 15672
-    nodePort: 31672
-    name: management-port
   selector:
-    name: queue
+    app: queue
+    env: production
+  ports:
+    - port: 5672
+      targetPort: 5672
 
 ---
 
@@ -24,19 +19,32 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: queue
+  labels:
+    app: queue
+    env: production
 spec:
-  replicas: 1
+  replicas: 1  # stateful service, so only a single replica must be used
   selector:
     matchLabels:
-      name: queue
+      app: queue
+      env: production
   template:
     metadata:
+      name: queue
       labels:
-        name: queue
+        app: queue
+        env: production
     spec:
       containers:
-      - name: rabbitmq
-        image: rabbitmq:3
-        ports:
-        - containerPort: 5672
-        - containerPort: 15672
+        - name: queue
+          image: rabbitmq:3
+          ports:
+            - containerPort: 5672
+          volumeMounts:
+            - name: queuedb
+              mountPath: "/var/lib/rabbitmq"
+      # Mount a persistent volume onto the async queue
+      volumes:
+        - name: queuedb
+          persistentVolumeClaim:
+            claimName: queuedb

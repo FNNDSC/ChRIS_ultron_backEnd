@@ -3,15 +3,15 @@ kind: Service
 metadata:
   name: chris-store-db
   labels:
-    name: chris-store-db
+    app: chris-store-db
+    env: production
 spec:
-  type: NodePort
-  ports:
-  - port: 5432
-    targetPort: 5432
-    nodePort: 30306
   selector:
-    name: chris-store-db
+    app: chris-store-db
+    env: production
+  ports:
+    - port: 5432
+      targetPort: 5432
 
 ---
 
@@ -19,24 +19,35 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: chris-store-db
+  labels:
+    app: chris-store-db
+    env: production
 spec:
-  replicas: 1
+  replicas: 1  # stateful service, so only a single replica must be used
   selector:
     matchLabels:
-      name: chris-store-db
+      app: chris-store-db
+      env: production
   template:
     metadata:
+      name: chris-store-db
       labels:
-        name: chris-store-db
+        app: chris-store-db
+        env: production
     spec:
       containers:
-      - name: postgres
-        image: postgres:13
-        args: ['--collation-server=utf8mb4_0900_as_cs']
-        ports:
-        - containerPort: 5432
-        envFrom:
-        - configMapRef:
-            name: cube-config
-        - secretRef:
-            name: cube-secrets
+        - name: chris-store-db
+          image: postgres:13
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: chris-store-db-config
+          volumeMounts:
+            - name: storedb
+              mountPath: "/var/lib/postgresql/data"
+      # Mount a persistent volume onto ChRIS DB
+      volumes:
+        - name: storedb
+          persistentVolumeClaim:
+            claimName: storedb

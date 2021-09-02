@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: queuedb
+  labels:
+    volume: queuedb
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 20Gi
+  # Mount a physical dir in the HOST onto the ChRIS async queue. This dir
+  # is given by the STORAGEBASE env variable substitution.
+  hostPath:
+    path: ${STORAGEBASE}/queueDB
