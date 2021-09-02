@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: storebase
+  name: queuedb
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   storageClassName: ""
   resources:
     requests:
       storage: 20Gi
   selector:
     matchLabels:
-      volume: storebase
+      volume: queuedb

@@ -8,6 +8,14 @@ bases:
 resources:
 - resources/storebase-pvc.yaml
 - resources/storebase-pv.yaml
+- resources/chrisdb-pvc.yaml
+- resources/chrisdb-pv.yaml
+- resources/queuedb-pvc.yaml
+- resources/queuedb-pv.yaml
+- resources/storedb-pvc.yaml
+- resources/storedb-pv.yaml
+- resources/swiftdb-pvc.yaml
+- resources/swiftdb-pv.yaml
 
 patches:
 - patches/pman-env.yaml

@@ -11,8 +11,8 @@ spec:
     app: chris
     env: production
   ports:
-    - port: 30000
-      targetPort: 30000
+    - port: 8000
+      targetPort: 8000
       nodePort: 30000
 
 ---
@@ -37,16 +37,23 @@ spec:
         app: chris
         env: production
     spec:
+      initContainers:
+        - name: chris-waitfor-swift
+          image: busybox:1.32
+          command: [ "sh", "-c", "until wget --spider -S -T 2 http://$(SWIFT_SERVICE_NAME):8080/info 2>&1 | grep '200 OK'; do echo waiting for Swift storage; sleep2; done" ]
+        - name: chris-waitfor-store
+          image: busybox:1.32
+          command: [ "sh", "-c", "until wget --spider -S -T 2 http://$(CHRIS_STORE_SERVICE_NAME):8010/api/v1/ 2>&1 | grep '200 OK'; do echo waiting for ChRIS store; sleep2; done" ]
       containers:
-        - image: fnndsc/chris
-          name: chris
+        - name: chris
+          image: fnndsc/chris
           ports:
-            - containerPort: 30000
+            - containerPort: 8000
           env:
             - name: DATABASE_HOST
               value: $(CHRIS_DB_SERVICE_NAME)
             - name: DATABASE_PORT
-              value: 5432
+              value: "5432"
             - name: CHRIS_STORE_URL
               value: http://$(CHRIS_STORE_SERVICE_NAME):8010/api/v1/
             - name: SWIFT_AUTH_URL
@@ -60,12 +67,3 @@ spec:
                 name: chris-db-config
             - configMapRef:
                 name: swift-config
-          volumeMounts:
-            - mountPath: "/home/localuser/storeBase"
-              name: "store-base"
-      # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
-      # is given by the STOREBASE env variable substitution.
-      volumes:
-        - name: "store-base"
-          hostPath:
-            path: ${STOREBASE}

@@ -42,6 +42,11 @@ vars:
     kind: Service
     name: chris-store
     apiVersion: v1
+- name: CHRIS_STORE_DB_SERVICE_NAME
+  objref:
+    kind: Service
+    name: chris-store-db
+    apiVersion: v1
 - name: SWIFT_SERVICE_NAME
   objref:
     kind: Service

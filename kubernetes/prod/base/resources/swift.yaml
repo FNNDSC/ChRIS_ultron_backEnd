@@ -3,15 +3,17 @@ kind: Service
 metadata:
   name: swift
   labels:
-    name: swift
+    app: swift
+    env: production
 spec:
   type: NodePort
-  ports:
-  - port: 8080
-    targetPort: 8080
-    nodePort: 30080
   selector:
-    name: swift
+    app: swift
+    env: production
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
 
 ---
 
@@ -19,21 +21,35 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: swift
+  labels:
+    app: swift
+    env: production
 spec:
-  replicas: 1
+  replicas: 1  # stateful service, so only a single replica must be used
   selector:
     matchLabels:
-      name: swift
+      app: swift
+      env: production
   template:
     metadata:
+      name: swift
       labels:
-        name: swift
+        app: swift
+        env: production
     spec:
       containers:
-      - name: swift
-        image: fnndsc/docker-swift-onlyone:latest
-        ports:
-        - containerPort: 8080
-        envFrom:
-        - secretRef:
-            name: cube-secrets
+        - name: swift
+          image: fnndsc/docker-swift-onlyone
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: swift-config
+          volumeMounts:
+            - name: swiftdb
+              mountPath: "/srv"
+      # Mount a persistent volume onto the Swift object storage
+      volumes:
+        - name: swiftdb
+          persistentVolumeClaim:
+            claimName: swiftdb
