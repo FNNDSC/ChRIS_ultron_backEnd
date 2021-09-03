@@ -27,9 +27,9 @@ spec:
           ]
           env:
             - name: DJANGO_DB_MIGRATE
-              value: off
+              value: "off"
             - name: DJANGO_COLLECTSTATIC
-              value: off
+              value: "off"
             - name: DATABASE_HOST
               value: $(CHRIS_DB_SERVICE_NAME)
             - name: DATABASE_PORT

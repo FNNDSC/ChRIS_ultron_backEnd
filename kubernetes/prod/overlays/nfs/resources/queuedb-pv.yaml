@@ -8,7 +8,7 @@ spec:
   accessModes:
   - ReadWriteMany
   capacity:
-    storage: 20Gi
+    storage: 40Gi
   nfs:
     # The ChRIS async queue storage dir becomes a path in the NFS drive
     server: ${NFS_SERVER}
