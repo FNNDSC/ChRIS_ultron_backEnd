@@ -8,7 +8,7 @@ spec:
   storageClassName: ""
   resources:
     requests:
-      storage: 200Gi
+      storage: 400Gi
   selector:
     matchLabels:
       volume: swiftdb

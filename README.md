@@ -61,110 +61,91 @@ Once the system is "up" you can add more compute plugins to the ecosystem:
 The resulting CUBE instance uses the default Django development server and therefore is not suitable for production.
 
 
-### Production deployment
+### Production deployments
 
-#### To get the production system up:
+For convenience a `deploy.sh` bash script is provided as part of the Github repo's source code. 
+Internally the script uses the `docker stack` or `Kustomize` tools to deploy on a Swarm or Kubernetes cluster resoectively.
 
-Note: Currently this deployment is based on a Swarm cluster that is able to schedule services on manager nodes (as declared in the compose file `pman` ancillary service is required to be scheduled on a manager node).
-
-Start a local Docker Swarm cluster if not already started:
-
-```bash
-docker swarm init --advertise-addr 127.0.0.1
-```
-
-Fetch source code:
+#### Fetch the repo's source code:
 
 ```bash
 git clone https://github.com/FNNDSC/ChRIS_ultron_backend
 cd ChRIS_ultron_backend
 ```
 
-Create ``secrets`` directory:
+#### Deploy on a single-machine Docker Swarm cluster:
+
+* Create appropriate ``secrets`` subdirectory:
 
 ```bash
 mkdir swarm/prod/secrets
 ```
 
-Now copy all the required secret configuration files into the ``secrets`` directory, please take a look at 
+* Copy all the required secret configuration files into the ``secrets`` directory, please take a look at 
 [this](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-production-services-secret-configuration-files) 
-wiki page to learn more about these files 
+wiki page to learn more about these files. 
 
-Deploy CUBE backend containers:
+* Deploy CUBE backend containers:
 
 ```bash
 ./deploy.sh up
 ```
 
-#### To tear down:
-
-Remove CUBE backend containers:
+* Tear down and remove CUBE backend containers:
 
 ```bash
 cd ChRIS_ultron_backend
 ./deploy.sh down
 ```
 
-Remove the local Docker Swarm cluster if desired:
+#### Deploy on a Kubernetes cluster:
+
+* Create appropriate ``secrets`` subdirectory:
 
 ```bash
-docker swarm leave --force
+mkdir kubernetes/prod/secrets
 ```
+
+* Copy all the required secret configuration files into the ``secrets`` directory, please take a look at 
+[this](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-production-services-secret-configuration-files) 
+wiki page to learn more about these files.
+
+##### Single-machine deployment:
+
+* Deploy CUBE backend containers:
+
+```bash
+./deploy.sh -O kubernetes up
+```
+
+* Tear down and remove CUBE backend containers:
+
+```bash
+cd ChRIS_ultron_backend
+./deploy.sh -O kubernetes down
+```
+
+##### Multi-machine deployment (with NFS-based persistent storage):
+
+* Deploy CUBE backend containers:
+
+```bash
+./deploy.sh -O kubernetes -T nfs -P <nfs_server_ip> -S <storeBase> -D <storageBase> up
+```
+
+* Both ``storeBase`` and ``storageBase`` are explained in the header documentation of the ``deploy.sh`` script.
+
+* Tear down and remove CUBE backend containers:
+
+```bash
+cd ChRIS_ultron_backend
+./deploy.sh -O kubernetes -T nfs -P <nfs_server_ip> down
+```
+
 
 ### Development
 
-#### Optionally setup a virtual environment
-
-Install ``virtualenv`` and ``virtualenvwrapper``:
-
-```bash
-pip install virtualenv virtualenvwrapper
-```
-
-Create a directory for your virtual environments e.g.:
-```bash
-mkdir ~/Python_Envs
-```
-
-You might want to add the following two lines to your ``.bashrc`` file:
-```bash
-export WORKON_HOME=~/Python_Envs
-source /usr/local/bin/virtualenvwrapper.sh
-```
-
-Then source your ``.bashrc`` and create a new Python3 virtual environment:
-
-```bash
-mkvirtualenv --python=python3 chris_env
-```
-
-To activate chris_env:
-```bash
-workon chris_env
-```
-
-To deactivate chris_env:
-```bash
-deactivate
-```
-
-Install useful python tools in your virtual environment:
-```bash
-workon chris_env
-pip install httpie
-pip install python-swiftclient
-pip install django-storage-swift
-```
-
-Note: You can also install some python libraries (not all of them) specified in the ``requirements/base.txt`` and 
-``requirements/local.txt`` files in the repository source.
-
-To list installed dependencies in chris_env:
-```
-pip freeze --local
-````
-
-#### Docker Swarm-based development environment
+#### Docker Swarm-based development environment:
 
 Start a local Docker Swarm cluster if not already started:
 
@@ -194,12 +175,12 @@ Then remove the local Docker Swarm cluster if desired:
 docker swarm leave --force
 ```
 
-#### Kubernetes-based development environment
+#### Kubernetes-based development environment:
 
 Install single-node Kubernetes cluster. 
 On MAC OS Docker Desktop includes a standalone Kubernetes server and client. 
-Consult this page https://docs.docker.com/desktop/kubernetes/
-On Linux there is a simple MicroK8s installation. Consult this page https://microk8s.io
+Consult this page https://docs.docker.com/desktop/kubernetes/.
+On Linux there is a simple MicroK8s installation. Consult this page https://microk8s.io.
 Then create the required alias:
 
 ```bash

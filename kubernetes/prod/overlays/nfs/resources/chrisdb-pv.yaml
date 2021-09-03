@@ -8,7 +8,7 @@ spec:
   accessModes:
   - ReadWriteMany
   capacity:
-    storage: 100Gi
+    storage: 200Gi
   nfs:
     # The ChRIS DB storage dir becomes a path in the NFS drive
     server: ${NFS_SERVER}
