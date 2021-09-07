@@ -6,8 +6,8 @@ from django.test import TestCase
 from django.conf import settings
 from rest_framework import serializers
 
-from plugins.models import ComputeResource, PluginMeta, Plugin
-from plugins.models import PluginParameter, DefaultStrParameter
+from plugins.models import (ComputeResource, PluginMeta, Plugin, PluginParameter,
+                            DefaultStrParameter)
 from plugins.serializers import (PluginMetaSerializer, PluginSerializer,
                                  PluginParameterSerializer)
 

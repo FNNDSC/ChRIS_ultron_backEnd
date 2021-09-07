@@ -1,6 +1,7 @@
 
 import logging
 import io
+import json
 from unittest import mock
 from unittest.mock import ANY
 
@@ -8,6 +9,9 @@ from django.test import TestCase
 from django import forms
 from django.utils import timezone
 from django.conf import settings
+from django.urls import reverse
+from django.contrib.auth.models import User
+from rest_framework import status
 
 from plugins import admin as pl_admin
 
@@ -207,7 +211,7 @@ class PluginAdminFormTests(TestCase):
         plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
-        plugin_store_url = "http://127.0.0.1:8010/api/v1/1/"
+        plugin_store_url = "http://chris-store.local:8010/api/v1/1/"
         with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
                                return_value=plugin) as register_plugin_by_url_mock:
             plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
@@ -392,7 +396,7 @@ class PluginAdminTests(TestCase):
         ChRIS store that have been specified in a text file.
         """
         plugin_admin = pl_admin.PluginAdmin(pl_admin.Plugin, pl_admin.admin.site)
-        file_content = b'simplefsapp host\n simpledsapp 1.0.6 host\n http://127.0.0.1:8010/api/v1/1/ host\n'
+        file_content = b'simplefsapp host\n simpledsapp 1.0.6 host\n http://chris-store.local:8010/api/v1/1/ host\n'
 
         with mock.patch.object(pl_admin.PluginManager, 'register_plugin',
                                return_value=None) as register_plugin_mock:
@@ -401,13 +405,13 @@ class PluginAdminTests(TestCase):
                                    return_value=None) as register_plugin_by_url_mock:
                 summary = {'success': [{'plugin_name': 'simplefsapp'},
                                        {'plugin_name': 'simpledsapp'},
-                                       {'plugin_name': 'http://127.0.0.1:8010/api/v1/1/'}
+                                       {'plugin_name': 'http://chris-store.local:8010/api/v1/1/'}
                                        ],
                            'error': []}
                 with io.BytesIO(file_content) as f:
                     self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
                     register_plugin_mock.assert_called_with('simpledsapp', '1.0.6', 'host')
-                    register_plugin_by_url_mock.assert_called_with('http://127.0.0.1:8010/api/v1/1/',
+                    register_plugin_by_url_mock.assert_called_with('http://chris-store.local:8010/api/v1/1/',
                                                               'host')
 
             with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
@@ -415,7 +419,119 @@ class PluginAdminTests(TestCase):
                 summary = {'success': [{'plugin_name': 'simplefsapp'},
                                        {'plugin_name': 'simpledsapp'}
                                        ],
-                           'error': [{'plugin_name': 'http://127.0.0.1:8010/api/v1/1/',
+                           'error': [{'plugin_name': 'http://chris-store.local:8010/api/v1/1/',
                                       'code': 'Error'}]}
                 with io.BytesIO(file_content) as f:
                     self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
+
+
+class PluginAdminSerializerTests(PluginAdminFormTests):
+
+    def test_validate_registers_plugin(self):
+        """
+        Test whether overriden validate method registers plugin by url.
+        """
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
+                                                             version=self.plugin_version)
+        # mock manager's register_plugin_by_url method
+        plugin_store_url = "http://chris-store.local:8010/api/v1/1/"
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
+                               return_value=plugin) as register_plugin_by_url_mock:
+            plg_admin_serializer = pl_admin.PluginAdminSerializer(plugin)
+            data = {'plugin_store_url': plugin_store_url,
+                    'compute_name': self.compute_resource.name}
+            data = plg_admin_serializer.validate(data)
+            self.assertNotIn('plugin_store_url', data)
+            self.assertNotIn('compute_name', data)
+            register_plugin_by_url_mock.assert_called_with(plugin_store_url,
+                                                           self.compute_resource.name)
+
+    def test_validate_raises_validation_error_if_cannot_register_plugin(self):
+        """
+        Test whether overriden validate method raises a ValidationError when there
+        is a validation error or it cannot save a new plugin to the DB.
+        """
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
+                                                             version=self.plugin_version)
+        # mock manager's register_plugin method
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
+                               side_effect=Exception) as register_plugin_by_url_mock:
+            plg_admin_serializer = pl_admin.PluginAdminSerializer(plugin)
+            plugin_store_url = "http://chris-store.local:8010/api/v1/1/"
+            data = {'plugin_store_url': plugin_store_url,
+                    'compute_name': self.compute_resource.name}
+            with self.assertRaises(pl_admin.serializers.ValidationError):
+                plg_admin_serializer.validate(data)
+
+
+class PluginAdminListViewTests(PluginAdminFormTests):
+    """
+    Test the admin-plugin-list view.
+    """
+
+    def setUp(self):
+        super(PluginAdminListViewTests, self).setUp()
+
+        self.content_type = 'application/vnd.collection+json'
+        self.create_read_url = reverse("admin-plugin-list")
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "plugin_store_url",
+                                    "value": "http://chris-store.local:8010/api/v1/1/"},
+                                   {"name": "compute_name",
+                                    "value": self.compute_resource.name}
+                                   ]}})
+        self.admin_username = 'admin'
+        self.admin_password = 'adminpass'
+        self.username = 'foo'
+        self.password = 'pass'
+        # create admin user
+        User.objects.create_superuser(username=self.admin_username,
+                                      password=self.admin_password,
+                                      email='admin@babymri.org')
+        # create normal user
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+    def test_plugin_create_success(self):
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
+                                                             version=self.plugin_version)
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
+                               return_value=plugin) as register_plugin_by_url_mock:
+            response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_plugin_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_create_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_list_success(self):
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
+                                                                  type='fs')
+        pl_admin.Plugin.objects.get_or_create(meta=pl_meta, version=self.plugin_version)
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, self.plugin_name)
+
+    def test_plugin_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_list_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
