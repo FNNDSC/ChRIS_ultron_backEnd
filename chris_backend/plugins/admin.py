@@ -7,8 +7,12 @@ from django import forms
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 from django.contrib import messages
+from rest_framework import generics, permissions, serializers
+
+from collectionjson import services
 
 from .models import PluginMeta, Plugin, ComputeResource
+from .serializers import PluginSerializer
 from .services.manager import PluginManager
 
 
@@ -290,6 +294,56 @@ class PluginAdmin(admin.ModelAdmin):
                     else:
                         summary['success'].append({'plugin_name': plg_url})
         return summary
+
+
+class PluginAdminSerializer(PluginSerializer):
+    """
+    A Plugin serializer for the PluginAdminList JSON view.
+    """
+    plugin_store_url = serializers.URLField(write_only=True)
+    compute_name = serializers.CharField(max_length=100, write_only=True)
+    version = serializers.CharField(required=False)
+    dock_image = serializers.CharField(required=False)
+    execshell = serializers.CharField(required=False)
+    selfpath = serializers.CharField(required=False)
+    selfexec = serializers.CharField(required=False)
+
+    class Meta(PluginSerializer.Meta):
+        fields = PluginSerializer.Meta.fields + ('plugin_store_url', 'compute_name')
+
+    def validate(self, data):
+        """
+        Overriden to validate and register a plugin from a ChRIS store with a compute
+        resource associated with this ChRIS instance.
+        """
+        # remove write_only fields that not part of the Plugin model
+        cr_name = data.pop('compute_name')
+        plugin_store_url = data.pop('plugin_store_url')
+        pl_manager = PluginManager()
+        try:
+            self.instance = pl_manager.register_plugin_by_url(plugin_store_url, cr_name)
+        except Exception as e:
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
+        return data
+
+
+class PluginAdminList(generics.ListCreateAPIView):
+    """
+    A JSON view for the collection of plugins that can be used by ChRIS admins to
+    register plugins through a REST API (alternative to the HTML-based admin site).
+    """
+    serializer_class = PluginAdminSerializer
+    queryset = Plugin.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template to the response.
+        """
+        response = super(PluginAdminList, self).list(request, *args, **kwargs)
+        # append write template
+        template_data = {'plugin_store_url': '', 'compute_name': ''}
+        return services.append_collection_template(response, template_data)
 
 
 admin.site.register(ComputeResource, ComputeResourceAdmin)

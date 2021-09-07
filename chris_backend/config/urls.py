@@ -17,9 +17,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 
+from plugins import admin as plugin_admin_views
+
 
 urlpatterns = [
     path('chris-admin/', admin.site.urls),
+    path('chris-admin/api/v1/',
+         plugin_admin_views.PluginAdminList.as_view(), name='admin-plugin-list'),
     path('api/', include('core.api')),
 ]
 

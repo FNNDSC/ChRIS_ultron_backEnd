@@ -20,8 +20,8 @@ class ComputeResourceList(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append document-level link relations and a query list to the
+        response.
         """
         response = super(ComputeResourceList, self).list(request, *args, **kwargs)
         # append query list
@@ -103,7 +103,8 @@ class PluginMetaPluginList(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list of the plugins for the queried  meta.
+        Overriden to return a list of the plugins for the queried meta.
+        Document-level link relations are also added to the response.
         """
         queryset = self.get_plugins_queryset()
         response = services.get_list_response(self, queryset)
@@ -130,8 +131,8 @@ class PluginList(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append document-level link relations and a query list to the
+        response.
         """
         response = super(PluginList, self).list(request, *args, **kwargs)
         # append query list

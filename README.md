@@ -64,7 +64,7 @@ The resulting CUBE instance uses the default Django development server and there
 ### Production deployments
 
 For convenience a `deploy.sh` bash script is provided as part of the Github repo's source code. 
-Internally the script uses the `docker stack` or `Kustomize` tools to deploy on a Swarm or Kubernetes cluster resoectively.
+Internally the script uses the `docker stack` or `Kustomize` tools to deploy on a Swarm or Kubernetes cluster respectively.
 
 #### Fetch the repo's source code:
 

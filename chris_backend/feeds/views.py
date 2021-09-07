@@ -284,6 +284,7 @@ class FeedList(generics.ListAPIView):
         user = self.request.user
         links = {'chrisinstance': reverse('chrisinstance-detail', request=request,
                                           kwargs={"pk": 1}),
+                 'admin': reverse('admin-plugin-list', request=request),
                  'files': reverse('allplugininstancefile-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request),
