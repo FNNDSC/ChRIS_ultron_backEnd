@@ -22,8 +22,15 @@ from plugins import admin as plugin_admin_views
 
 urlpatterns = [
     path('chris-admin/', admin.site.urls),
+
     path('chris-admin/api/v1/',
-         plugin_admin_views.PluginAdminList.as_view(), name='admin-plugin-list'),
+         plugin_admin_views.PluginAdminList.as_view(),
+         name='admin-plugin-list'),
+
+    path('chris-admin/api/v1/computeresources/',
+         plugin_admin_views.ComputeResourceAdminList.as_view(),
+         name='admin-computeresource-list'),
+
     path('api/', include('core.api')),
 ]
 

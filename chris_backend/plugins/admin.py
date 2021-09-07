@@ -8,11 +8,12 @@ from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from rest_framework import generics, permissions, serializers
+from rest_framework.reverse import reverse
 
 from collectionjson import services
 
 from .models import PluginMeta, Plugin, ComputeResource
-from .serializers import PluginSerializer
+from .serializers import ComputeResourceSerializer, PluginSerializer
 from .services.manager import PluginManager
 
 
@@ -296,6 +297,26 @@ class PluginAdmin(admin.ModelAdmin):
         return summary
 
 
+class ComputeResourceAdminList(generics.ListCreateAPIView):
+    """
+    A JSON view for the collection of compute resources that can be used by ChRIS admins
+    to add a new compute resource through a REST API (alternative to the HTML-based admin
+    site).
+    """
+    serializer_class = ComputeResourceSerializer
+    queryset = ComputeResource.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template to the response.
+        """
+        response = super(ComputeResourceAdminList, self).list(request, *args, **kwargs)
+        # append write template
+        template_data = {'name': '', 'compute_url': '', 'description': ''}
+        return services.append_collection_template(response, template_data)
+
+
 class PluginAdminSerializer(PluginSerializer):
     """
     A Plugin serializer for the PluginAdminList JSON view.
@@ -338,9 +359,14 @@ class PluginAdminList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append a collection+json template to the response.
+        Overriden to append document-level link relations and a collection+json template
+        to the response.
         """
         response = super(PluginAdminList, self).list(request, *args, **kwargs)
+        # append document-level link relations
+        links = {'compute_resources': reverse('admin-computeresource-list',
+                                              request=request)}
+        response = services.append_collection_links(response, links)
         # append write template
         template_data = {'plugin_store_url': '', 'compute_name': ''}
         return services.append_collection_template(response, template_data)
