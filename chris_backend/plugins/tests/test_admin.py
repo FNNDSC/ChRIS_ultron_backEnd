@@ -425,6 +425,68 @@ class PluginAdminTests(TestCase):
                     self.assertEqual(plugin_admin.register_plugins_from_file(f), summary)
 
 
+class ComputeResourceAdminListViewTests(PluginAdminFormTests):
+    """
+    Test the admin-computeresource-list.
+    """
+
+    def setUp(self):
+        super(ComputeResourceAdminListViewTests, self).setUp()
+
+        self.content_type = 'application/vnd.collection+json'
+        self.create_read_url = reverse("admin-computeresource-list")
+        self.post = json.dumps(
+            {"template": {"data": [{"name": "name",
+                                    "value": "moc"},
+                                   {"name": "compute_url",
+                                    "value": "http://pfcon.local:30005/api/v1/1/"},
+                                   {"name": "description",
+                                    "value": "moc compute env"}
+                                   ]}})
+        self.admin_username = 'admin'
+        self.admin_password = 'adminpass'
+        self.username = 'foo'
+        self.password = 'pass'
+        # create admin user
+        User.objects.create_superuser(username=self.admin_username,
+                                      password=self.admin_password,
+                                      email='admin@babymri.org')
+        # create normal user
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+    def test_compute_resource_create_success(self):
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_compute_resource_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_compute_resource_create_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_compute_resource_list_success(self):
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, self.compute_resource.name)
+
+    def test_compute_resource_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_compute_resource_list_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class PluginAdminSerializerTests(PluginAdminFormTests):
 
     def test_validate_registers_plugin(self):
