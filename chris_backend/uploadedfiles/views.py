@@ -22,6 +22,7 @@ class UploadedFileList(generics.ListCreateAPIView):
     """
     A view for the collection of uploaded user files.
     """
+    http_method_names = ['get', 'post']
     queryset = UploadedFile.objects.all()
     serializer_class = UploadedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -55,6 +56,7 @@ class UploadedFileListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of uploaded files resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = UploadedFileSerializer
     queryset = UploadedFile.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -65,6 +67,7 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     An uploaded file view.
     """
+    http_method_names = ['get', 'put', 'delete']
     queryset = UploadedFile.objects.all()
     serializer_class = UploadedFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -117,6 +120,7 @@ class UploadedFileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
+    http_method_names = ['get']
     queryset = UploadedFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)

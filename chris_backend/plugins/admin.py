@@ -303,6 +303,7 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
     to add a new compute resource through a REST API (alternative to the HTML-based admin
     site).
     """
+    http_method_names = ['get', 'post']
     serializer_class = ComputeResourceSerializer
     queryset = ComputeResource.objects.all()
     permission_classes = (permissions.IsAdminUser,)
@@ -353,6 +354,7 @@ class PluginAdminList(generics.ListCreateAPIView):
     A JSON view for the collection of plugins that can be used by ChRIS admins to
     register plugins through a REST API (alternative to the HTML-based admin site).
     """
+    http_method_names = ['get', 'post']
     serializer_class = PluginAdminSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAdminUser,)

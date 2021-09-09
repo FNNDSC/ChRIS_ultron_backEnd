@@ -10,6 +10,7 @@ from .permissions import IsUserOrChrisOrReadOnly
 
 
 class UserCreate(generics.ListCreateAPIView):
+    http_method_names = ['get', 'post']
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -23,6 +24,7 @@ class UserCreate(generics.ListCreateAPIView):
 
 
 class UserDetail(generics.RetrieveUpdateAPIView):
+    http_method_names = ['get', 'put']
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated, IsUserOrChrisOrReadOnly)

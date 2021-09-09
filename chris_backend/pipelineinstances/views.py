@@ -22,6 +22,7 @@ class PipelineInstanceList(generics.ListCreateAPIView):
     """
     A view for the collection of pipeline-specific instances.
     """
+    http_method_names = ['get', 'post']
     serializer_class = PipelineInstanceSerializer
     queryset = Pipeline.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -188,6 +189,7 @@ class AllPipelineInstanceList(generics.ListAPIView):
     """
     A view for the collection of all pipeline instances.
     """
+    http_method_names = ['get']
     serializer_class = PipelineInstanceSerializer
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -209,6 +211,7 @@ class AllPipelineInstanceListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of pipeline instances resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = PipelineInstanceSerializer
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -219,6 +222,7 @@ class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A pipeline instance view.
     """
+    http_method_names = ['get', 'put', 'delete']
     serializer_class = PipelineInstanceSerializer
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
@@ -261,6 +265,7 @@ class PipelineInstancePluginInstanceList(generics.ListAPIView):
     """
     A view for the collection of plugin instances that compose the pipeline instance.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PipelineInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)

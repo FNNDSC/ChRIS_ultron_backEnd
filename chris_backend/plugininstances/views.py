@@ -26,6 +26,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
     """
     A view for the collection of plugin instances.
     """
+    http_method_names = ['get', 'post']
     serializer_class = PluginInstanceSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -136,6 +137,7 @@ class AllPluginInstanceList(generics.ListAPIView):
     """
     A view for the collection of all plugin instances.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -157,6 +159,7 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of plugin instances resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -167,6 +170,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A plugin instance view.
     """
+    http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
@@ -229,6 +233,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     A view for the collection of plugin instances that are a descendant of this plugin
     instance.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -252,6 +257,7 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
     """
     A view for the collection of splits for a plugin instance.
     """
+    http_method_names = ['get', 'post']
     serializer_class = PluginInstanceSplitSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrReadOnly,)
@@ -336,6 +342,7 @@ class PluginInstanceSplitDetail(generics.RetrieveAPIView):
     """
     A view for a plugin instance split.
     """
+    http_method_names = ['get']
     queryset = PluginInstanceSplit.objects.all()
     serializer_class = PluginInstanceSplitSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -345,6 +352,7 @@ class PluginInstanceFileList(generics.ListAPIView):
     """
     A view for the collection of files written by a plugin instance.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceFileSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
@@ -377,6 +385,7 @@ class AllPluginInstanceFileList(generics.ListAPIView):
     A view for the collection of all plugin instance files written to all the feeds the
     the authenticated user owns.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -406,6 +415,7 @@ class AllPluginInstanceFileListQuerySearch(generics.ListAPIView):
     A view for the collection of plugin instance files written to all the feeds the
     the authenticated user owns and resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = PluginInstanceFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginInstanceFileFilter
@@ -426,6 +436,7 @@ class PluginInstanceFileDetail(generics.RetrieveAPIView):
     """
     A view for a file written by a plugin instance.
     """
+    http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     serializer_class = PluginInstanceFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
@@ -435,6 +446,7 @@ class FileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource.
     """
+    http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
@@ -451,6 +463,7 @@ class PluginInstanceParameterList(generics.ListAPIView):
     """
     A view for the collection of parameters that the plugin instance was run with.
     """
+    http_method_names = ['get']
     serializer_class = GenericParameterSerializer
     queryset = PluginInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -475,6 +488,7 @@ class StrParameterDetail(generics.RetrieveAPIView):
     """
     A string parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StrParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -484,6 +498,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     """
     An integer parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['integer']
     queryset = IntParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -493,6 +508,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     """
     A float parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = FloatParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -502,6 +518,7 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     """
     A boolean parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -511,6 +528,7 @@ class PathParameterDetail(generics.RetrieveAPIView):
     """
     A path parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['path']
     queryset = PathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -520,6 +538,7 @@ class UnextpathParameterDetail(generics.RetrieveAPIView):
     """
     A unextpath parameter view.
     """
+    http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['unextpath']
     queryset = UnextpathParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)

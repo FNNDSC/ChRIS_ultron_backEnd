@@ -15,6 +15,7 @@ class ServiceFileList(generics.ListCreateAPIView):
     """
     A view for the collection of PACS files.
     """
+    http_method_names = ['get', 'post']
     queryset = ServiceFile.objects.all()
     serializer_class = ServiceFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
@@ -44,6 +45,7 @@ class ServiceFileListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of Service files resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = ServiceFileSerializer
     queryset = ServiceFile.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -54,6 +56,7 @@ class ServiceFileDetail(generics.RetrieveAPIView):
     """
     A Service file view.
     """
+    http_method_names = ['get']
     queryset = ServiceFile.objects.all()
     serializer_class = ServiceFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -63,6 +66,7 @@ class ServiceFileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
+    http_method_names = ['get']
     queryset = ServiceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
