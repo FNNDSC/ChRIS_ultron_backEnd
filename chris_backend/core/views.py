@@ -9,6 +9,7 @@ class ChrisInstanceDetail(generics.RetrieveAPIView):
     """
     A compute resource view.
     """
+    http_method_names = ['get']
     serializer_class = ChrisInstanceSerializer
     queryset = ChrisInstance.objects.all()
     permission_classes = (permissions.IsAuthenticated,)

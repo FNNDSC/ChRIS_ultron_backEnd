@@ -15,6 +15,7 @@ class PACSFileList(generics.ListCreateAPIView):
     """
     A view for the collection of PACS files.
     """
+    http_method_names = ['get', 'post']
     queryset = PACSFile.objects.all()
     serializer_class = PACSFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
@@ -49,6 +50,7 @@ class PACSFileListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of PACS files resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = PACSFileSerializer
     queryset = PACSFile.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -59,6 +61,7 @@ class PACSFileDetail(generics.RetrieveAPIView):
     """
     A PACS file view.
     """
+    http_method_names = ['get']
     queryset = PACSFile.objects.all()
     serializer_class = PACSFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -68,6 +71,7 @@ class PACSFileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
+    http_method_names = ['get']
     queryset = PACSFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)

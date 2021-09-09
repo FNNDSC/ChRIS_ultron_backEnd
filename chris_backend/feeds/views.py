@@ -22,6 +22,7 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
     """
     A note view.
     """
+    http_method_names = ['get', 'put']
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
@@ -39,6 +40,7 @@ class TagList(generics.ListCreateAPIView):
     """
     A view for the collection of user-specific tags.
     """
+    http_method_names = ['get', 'post']
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, )
 
@@ -79,6 +81,7 @@ class TagListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of tags resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = TagSerializer
     queryset = Tag.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
@@ -89,6 +92,7 @@ class TagDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A tag view.
     """
+    http_method_names = ['get', 'put', 'delete']
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -106,6 +110,7 @@ class FeedTagList(generics.ListAPIView):
     """
     A view for a feed-specific collection of user-specific tags.
     """
+    http_method_names = ['get']
     queryset = Feed.objects.all()
     serializer_class = TagSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -135,6 +140,7 @@ class TagFeedList(generics.ListAPIView):
     """
     A view for a tag-specific collection of feeds.
     """
+    http_method_names = ['get']
     queryset = Tag.objects.all()
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -163,6 +169,7 @@ class FeedTaggingList(generics.ListCreateAPIView):
     """
     A view for the collection of feed-specific taggings.
     """
+    http_method_names = ['get', 'post']
     queryset = Feed.objects.all()
     serializer_class = TaggingSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -206,6 +213,7 @@ class TagTaggingList(generics.ListCreateAPIView):
     """
     A view for the collection of tag-specific taggings.
     """
+    http_method_names = ['get', 'post']
     queryset = Tag.objects.all()
     serializer_class = TaggingSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
@@ -249,6 +257,7 @@ class TaggingDetail(generics.RetrieveDestroyAPIView):
     """
     A tagging view.
     """
+    http_method_names = ['get', 'delete']
     queryset = Tagging.objects.all()
     serializer_class = TaggingSerializer
     permission_classes = (permissions.IsAuthenticated, IsRelatedTagOwnerOrChris)
@@ -258,6 +267,7 @@ class FeedList(generics.ListAPIView):
     """
     A view for the collection of feeds.
     """
+    http_method_names = ['get']
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -305,6 +315,7 @@ class FeedListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of feeds resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = FeedFilter
@@ -325,6 +336,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A feed view.
     """
+    http_method_names = ['get', 'put', 'delete']
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
@@ -363,6 +375,7 @@ class CommentList(generics.ListCreateAPIView):
     """
     A view for the collection of comments.
     """
+    http_method_names = ['get', 'post']
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly)
@@ -407,6 +420,7 @@ class CommentListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of feed-specific comments resulting from a query search.
     """
+    http_method_names = ['get']
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = CommentFilter
@@ -424,6 +438,7 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A comment view.
     """
+    http_method_names = ['get', 'put', 'delete']
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
@@ -441,6 +456,7 @@ class FeedFileList(generics.ListAPIView):
     """
     A view for the collection of all files in a feed.
     """
+    http_method_names = ['get']
     queryset = Feed.objects.all()
     serializer_class = PluginInstanceFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
@@ -468,6 +484,7 @@ class FeedPluginInstanceList(generics.ListAPIView):
     """
     A view for the collection of feed-specific plugin instances.
     """
+    http_method_names = ['get']
     queryset = Feed.objects.all()
     serializer_class = PluginInstanceSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
