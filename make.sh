@@ -1,4 +1,11 @@
 #!/bin/bash
+
+# TL:DR
+quick_n_VeryDirtyStart="
+docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
+./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&        \
+./make.sh -U -I -i
+"
 #
 # NAME
 #
@@ -17,37 +24,39 @@
 #   'make.sh' is the main entry point for instantiating a complete backend dev
 #   environment.
 #
-#   Using appropriate flags, this script can skip various introductory/informational
-#   steps, deploy ancillary pfcon/pman services on Docker Swarm or Kubernetes, toggle
-#   unit/integration testing on or off and even not attach an interactive terminal to
-#   the main chris_dev service.
+#   Using appropriate flags, this script can skip various introductory or infor-
+#   mational steps, deploy ancillary pfcon/pman services on Docker Swarm or
+#   Kubernetes, toggle unit/integration testing ON/OFF and/or detach the
+#   interactive terminal from the main chris_dev service.
 #
 # TYPICAL CASES:
 #
 #  ┌─────────────────────────────────────┐
 #  │ Most of the time, you will do this: │
-#  ├─────────────────────────────────────┴───────────────────────────────────────────────┐
-#  │ Skip unit and integration tests and start backend in daemon mode on a SWARM cluster │
-#  │ (the "dev" way when you want to test new plugins etc):                              │
-#  └─────────────────────────────────────────────────────────────────────────────────────┘
+#  ├─────────────────────────────────────┴─────────────────────────────────────┐
+#  │ Skip unit and integration tests and start backend in daemon mode on a     │
+#  │ SWARM clsuter (the "dev" way when you want to test new plugins etc):      │
+#  └───────────────────────────────────────────────────────────────────────────┘
 #
 #    THIS IS ONLY THE CASE FOR A SWARM CLUSTER-- which is a typical dev case:
 #    To totally tear down the cluster and start fresh:
 #
-#    docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&      \
-#    ./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&            \
+#    docker swarm leave --force &&                                             \
+#    docker swarm init --advertise-addr 127.0.0.1 &&                           \
+#    ./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&   \
 #    ./make.sh -U -I -i
 #
 #   Run full CUBE instantiation with tests (the "real-do-only-once" way
 #   to be sure the system actually works on your env) on Swarm:
 #
-#       ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
+#  ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
 #
 #   Skip unit and integration tests and skip the intro
 #   (the "quick-n-dirty" way -- when you are deep in dev mode and
 #   restarting the system for the 50th time on a Monday morning):
 #
-# ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i -s
+#  ./unmake.sh
+#  sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -i -s
 #
 #   NOTE: What's up with the "sudo rm..." followed by "rm ..."?
 #
@@ -75,8 +84,9 @@
 #
 #   -P <hostIp>
 #
-#       Explicitly set the IP address of the machine running this script. This parameter
-#       is required when the -O flag is set to kubernetes. Not used for swarm.
+#       Explicitly set the IP address of the machine running this script. This
+#       parameter is required when the -O flag is set to kubernetes. Not used
+#       for swarm.
 #
 #   -U
 #
@@ -88,12 +98,13 @@
 #
 #   -S <storeBase>
 #
-#       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
-#       filesystem where pfcon and plugins share data.
+#       Explicitly set the STOREBASE dir to <storeBase>. This is the remote
+#       ChRIS filesystem where pfcon and plugins share data.
 #
 #   -i
 #
-#       Optional do not automatically attach interactive terminal to chris_dev container.
+#       Optional do not automatically attach interactive terminal to chris_dev
+#       container.
 #
 #   -s
 #
@@ -134,6 +145,30 @@ TAG=:latest
 if [[ -f .env ]] ; then
     source .env
 fi
+
+dc_check () {
+    STATUS=$1
+    if [[ $STATUS != "0" ]] ; then
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh LightRed
+    else
+        echo -en "\033[2A\033[2K"
+        cat dc.out                                                  | ./boxes.sh White
+    fi
+}
+
+dc_check_code () {
+    STATUS=$1
+    CODE=$2
+    if (( $CODE > 1 )) ; then
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh LightRed
+    else
+        echo -en "\033[2A\033[2K"
+        cat dc.out                                                  | ./boxes.sh White
+    fi
+}
+
 
 print_usage () {
     echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
@@ -197,15 +232,17 @@ declare -a A_CONTAINER=(
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
 )
 
-title -d 1 "Setting global exports..."
-    echo -e "ORCHESTRATOR=$ORCHESTRATOR"           | ./boxes.sh
+title -d 1 "Setting global exports"
+    boxcenter "-= ORCHESTRATOR =-"
+    boxcenter "$ORCHESTRATOR"                                                    LightCyan
+    boxcenter ""
     if [[ $ORCHESTRATOR == kubernetes ]]; then
         echo -e "HOSTIP=$HOSTIP"                   | ./boxes.sh
         echo -e "exporting REMOTENETWORK=false "   | ./boxes.sh
         export REMOTENETWORK=false
         echo -e "exporting PFCONDNS=pfcon.remote " | ./boxes.sh
         export PFCONDNS=pfcon.remote
-        echo -e "exporting PFCONIP=$HOSTIP "       | ./boxes.sh
+        boxcenter "exporting PFCONIP=$HOSTIP "
         export PFCONIP=$HOSTIP
     fi
     if [ -z ${STOREBASE+x} ]; then
@@ -218,72 +255,83 @@ title -d 1 "Setting global exports..."
             mkdir -p $STOREBASE
         fi
     fi
-    echo -e "exporting STOREBASE=$STOREBASE "                      | ./boxes.sh
+    boxcenter "-= STOREBASE =-"
+    echo "$STOREBASE"                                               | ./boxes.sh LightCyan
     export STOREBASE=$STOREBASE
 windowBottom
 
-title -d 1 "Pulling non-'local/' core containers where needed..."   \
+title -d 1 "Pulling non-'local/' core containers where needed"      \
             "and creating appropriate .env for docker-compose"
-printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
-            "docker pull" " library/postgres"                          | ./boxes.sh
-docker pull postgres:13                                                 | ./boxes.sh
-echo ""                                                             | ./boxes.sh
-printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"                   \
-            "docker pull " "library/rabbitmq"                       | ./boxes.sh
-docker pull rabbitmq:3                                              | ./boxes.sh
-if (( ! b_skipIntro )) ; then
-    echo "# Variables declared here are available to"               > .env
-    echo "# docker-compose on execution"                            >>.env
-    for CORE in ${A_CONTAINER[@]} ; do
-        cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
-        echo "${ENV}=${REPO}"                                       >>.env
-        if [[ $REPO != "local" ]] ; then
-            echo ""                                                 | ./boxes.sh
-            CMD="docker pull ${REPO}/$CONTAINER"
-            printf "${LightCyan}%40s${Green}%-40s${Yellow}\n"       \
-                        "docker pull" " ${REPO}/$CONTAINER"         | ./boxes.sh
-            windowBottom
-            sleep 1
-            echo $CMD | sh                                          | ./boxes.sh -c
-        fi
-    done
-    echo "TAG="                                                     >>.env
-fi
+
+    printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
+            "$ docker pull" " library/postgres"                     | ./boxes.sh
+    windowBottom
+    docker pull postgres:13 >& dc.out
+    dc_check $?
+    echo ""                                                         | ./boxes.sh
+    printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
+            "$ docker pull" " library/rabbitmq"                     | ./boxes.sh
+    windowBottom
+    docker pull rabbitmq:3 >& dc.out
+    dc_check $?
+
+    if (( ! b_skipIntro )) ; then
+        echo "# Variables declared here are available to"               > .env
+        echo "# docker-compose on execution"                            >>.env
+        for CORE in ${A_CONTAINER[@]} ; do
+            cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
+            echo "${ENV}=${REPO}"                                       >>.env
+            if [[ $REPO != "local" ]] ; then
+                echo ""                                             | ./boxes.sh
+                CMD="docker pull ${REPO}/$CONTAINER"
+                printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"   \
+                        "$ docker pull" " ${REPO}/$CONTAINER"       | ./boxes.sh
+                windowBottom
+                sleep 1
+                dc_check $?
+            fi
+        done
+        echo "TAG="                                                     >>.env
+    fi
 windowBottom
 
 if (( ! b_skipIntro )) ; then
-    title -d 1 "Will use containers with following version info:"
+    title -d 1 "Ancillary services version info:"
+    boxcenter ""
     for CORE in ${A_CONTAINER[@]} ; do
         cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
         if [[   $CONTAINER != "chris:dev"            && \
                 $CONTAINER != "chris_store"          && \
                 $CONTAINER != "docker-swift-onlyone"  ]] ; then
-            windowBottom
             CMD="docker run --rm ${REPO}/$CONTAINER --version"
             if [[   $CONTAINER == "pfcon"            || \
                     $CONTAINER == "pman"  ]] ; then
               CMD="docker run --rm --entrypoint $CONTAINER ${REPO}/$CONTAINER --version"
             fi
-            Ver=$(echo $CMD | sh | grep Version)
-            echo -en "\033[2A\033[2K"
-            printf "${White}%40s${Green}%-40s${Yellow}\n"            \
-                    "${REPO}/$CONTAINER" " $Ver"                     | ./boxes.sh
+            echo "$ $CMD"                                           | ./boxes.sh LightCyan
+            windowBottom
+            $CMD  >& dc.out
+            dc_check_code $? 1
         fi
     done
 fi
+boxcenter ""
+windowBottom
 
 title -d 1 "Changing permissions to 755 on" "$HERE"
     cd $HERE
-    echo "chmod -R 755 $HERE"                                      | ./boxes.sh
-    chmod -R 755 $HERE
+    echo "$ chmod -R 755 $HERE"                                     | ./boxes.sh LightCyan
+    windowBottom
+    chmod -R 755 $HERE &> dc.out
+    dc_check $?
 windowBottom
 
-title -d 1 "Checking that STOREBASE directory tree" "$STOREBASE is empty..."
+title -d 1 "Checking that STOREBASE directory tree is empty" "$STOREBASE"
     chmod -R 777 $STOREBASE
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
     if (( ! $? )) ; then
-        tree $STOREBASE                                                    | ./boxes.sh
+        tree $STOREBASE                                             | ./boxes.sh
         report=$(tree $STOREBASE | tail -n 1)
         if [[ "$report" != "0 directories, 0 files" ]] ; then
             b_FSOK=0
@@ -294,12 +342,13 @@ title -d 1 "Checking that STOREBASE directory tree" "$STOREBASE is empty..."
         if (( lines != 1 )) ; then
             b_FSOK=0
         fi
-        echo "lines is $lines"
     fi
     if (( ! b_FSOK )) ; then
-        printf "The STOREBASE directory $STOREBASE must be empty!\n"    | ./boxes.sh ${Red}
-        printf "Please manually clean it and re-run.\n"      | ./boxes.sh ${Yellow}
-        printf "\nThis script will now exit with code '1'.\n\n"                     | ./boxes.sh ${Yellow}
+        boxcenter "The STOREBASE directory must be empty!"                      LightRed
+        boxcenter ""
+        boxcenter "Please manually clean it and re-run."                        Yellow
+        boxcenter "This script will now exit with code '1'."                    Yellow
+        windowBottom
         exit 1
     fi
     printf "${LightCyan}%40s${LightGreen}%40s\n"                    \
@@ -308,97 +357,113 @@ windowBottom
 
 if [[ $ORCHESTRATOR == swarm ]]; then
     title -d 1  "Creating overlay network: remote"
-    echo "docker network create -d overlay --attachable remote"   | ./boxes.sh ${LightCyan}
-    docker network create -d overlay --attachable remote
+    echo "$ docker network create -d overlay --attachable remote"   | ./boxes.sh LightCyan
+    windowBottom
+    docker network create -d overlay --attachable remote            >& dc.out
+    dc_check $?
     windowBottom
 fi
 
-title -d 1 "Starting remote pfcon containerized environment on $ORCHESTRATOR"
+title -d 1 "Starting remote pfcon containerized environment on"     \
+                                "-= $ORCHESTRATOR =-"
     if [[ $ORCHESTRATOR == swarm ]]; then
-        echo "docker stack deploy -c swarm/docker-compose_remote.yml pfcon_stack"   | ./boxes.sh ${LightCyan}
-        docker stack deploy -c swarm/docker-compose_remote.yml pfcon_stack
+        echo "$ docker stack deploy -c swarm/docker-compose_remote.yml pfcon_stack"\
+                        | ./boxes.sh LightCyan
+        windowBottom
+        docker stack deploy -c swarm/docker-compose_remote.yml pfcon_stack >& dc.out
     elif [[ $ORCHESTRATOR == kubernetes ]]; then
-      echo "envsubst < kubernetes/pfcon_dev.yaml | kubectl apply -f -"           | ./boxes.sh ${LightCyan}
-      envsubst < kubernetes/remote.yaml | kubectl apply -f -
+      echo "$ envsubst < kubernetes/pfcon_dev.yaml | kubectl apply -f -" \
+                        | ./boxes.sh LightCyan
+      windowBottom
+      envsubst < kubernetes/remote.yaml | kubectl apply -f - >& dc.out
     fi
+    dc_check $?
 windowBottom
 
-title -d 1 "Waiting for remote pfcon containers to start running on $ORCHESTRATOR"
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-    for i in {1..50}; do
+title -d 1 "Waiting for remote pfcon containers to start running on"\
+                                "-= $ORCHESTRATOR =-"
+    echo "Starting pfcon... please be patient."                     | ./boxes.sh Yellow
+    windowBottom
+    for i in {1..10}; do
         sleep 5
         if [[ $ORCHESTRATOR == swarm ]]; then
             pfcon=$(docker ps -f name=pfcon_stack_pfcon.1 -q)
         elif [[ $ORCHESTRATOR == kubernetes ]]; then
-            pfcon=$(kubectl get pods --selector="app=pfcon,env=production" --field-selector=status.phase=Running --output=jsonpath='{.items[*].metadata.name}')
+            pfcon=$(kubectl get pods --selector="app=pfcon,env=production"     \
+                        --field-selector=status.phase=Running --               \
+                        output=jsonpath='{.items[*].metadata.name}')
         fi
+        echo -en "\033[3A\033[2K"
         if [ -n "$pfcon" ]; then
-          echo ""                                                          | ./boxes.sh
-          echo "Success: pfcon container is running on $ORCHESTRATOR"      | ./boxes.sh ${Green}
-          echo ""                                                          | ./boxes.sh
+          boxcenter ""
+          boxcenter "Success: pfcon container is running on $ORCHESTRATOR"      LightGreen
+          boxcenter ""
           break
         fi
     done
     if [ -z "$pfcon" ]; then
-        echo ""                                                            | ./boxes.sh
-        echo "Error: couldn't start pfcon container on $ORCHESTRATOR"      | ./boxes.sh ${Red}
-        echo ""                                                            | ./boxes.sh
-        exit 1
+        boxcenter
+        boxcenter "Error: couldn't start pfcon container on $ORCHESTRATOR" Red
+        boxcenter "This script will now terminate with exit code '2'."     Red
+        boxcenter
+        windowBottom
+        exit 2
     fi
 windowBottom
 
 title -d 1  "Starting CUBE containerized development environment using "            \
-            "./docker-compose_dev.yml"
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-    echo "docker-compose -f docker-compose_dev.yml up -d"           | ./boxes.sh ${LightCyan}
+                        "./docker-compose_dev.yml"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
+    echo "$ docker-compose -f docker-compose_dev.yml up -d"         | ./boxes.sh LightCyan
     windowBottom
-    docker-compose -f docker-compose_dev.yml up -d        >& dc.out > /dev/null
-    echo -en "\033[2A\033[2K"
-    cat dc.out | sed -E 's/(.{80})/\1\n/g'                          | ./boxes.sh ${LightGreen}
+    docker-compose -f docker-compose_dev.yml up -d        >& dc.out
+    dc_check $?
 windowBottom
 
-title -d 1 "Waiting until ChRIS database server is ready to accept connections..."
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+title -d 1 "Waiting until ChRIS database server is ready to accept connections"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev_db sh -c                     \
-        'while ! psql -U chris -d chris_dev -c "select 1" 2> /dev/null; do sleep 5; done;' >& dc.out > /dev/null
-    echo -en "\033[2A\033[2K"
-    cat dc.out                                                      | ./boxes.sh ${LightGreen}
+        'while ! psql -U chris -d chris_dev -c "select 1" 2> /dev/null; do sleep 5; done;' \
+                                >& dc.out
+    dc_check $?
     echo ""                                                         | ./boxes.sh
-    echo "ChRIS database is ready to accept connections"            | ./boxes.sh ${LightGreen}
-    echo ""                                                         | ./boxes.sh
-windowBottom
-
-title -d 1 "Waiting until CUBE is ready to accept connections..."
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
-    windowBottom
-    docker-compose -f docker-compose_dev.yml        \
-        exec chris_dev sh -c                        \
-        'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
-    echo -en "\033[2A\033[2K"
-    cat dc.out                                                      | ./boxes.sh ${LightGreen}
-    echo ""                                                         | ./boxes.sh
-    echo "CUBE is ready to accept connections"                      | ./boxes.sh ${LightGreen}
+    boxcenter "ChRIS database is ready to accept connections"                    LightGreen
     echo ""                                                         | ./boxes.sh
 windowBottom
 
-title -d 1 "Waiting until remote pfcon is ready to accept connections..."
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+title -d 1 "Waiting until CUBE is ready to accept connections"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev sh -c                        \
-        'while ! curl -sSf http://pfcon.remote:30005/api/v1/ 2> /dev/null; do sleep 5; done;' > dc.out
-    echo -en "\033[2A\033[2K"
-    cat dc.out                                                      | ./boxes.sh ${LightGreen}
+        'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' \
+                                > dc.out
+    echo -en "\033[3A\033[2K"
+    cat dc.out                                                      | ./boxes.sh White
     echo ""                                                         | ./boxes.sh
-    echo "Remote pfcon is ready to accept connections"              | ./boxes.sh ${LightGreen}
+    boxcenter "CUBE API is ready to accept connections"                          LightGreen
+    echo ""                                                         | ./boxes.sh
+windowBottom
+
+title -d 1 "Waiting until remote pfcon is ready to accept connections"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
+    windowBottom
+    docker-compose -f docker-compose_dev.yml        \
+        exec chris_dev sh -c                        \
+        'while ! curl -sSf http://pfcon.remote:30005/api/v1/ 2> /dev/null; do sleep 5; done;' \
+                                > dc.out
+    echo -en "\033[3A\033[2K"
+    cat dc.out                                                      | ./boxes.sh White
+    echo ""                                                         | ./boxes.sh
+    boxcenter "Remote pfcon is ready to accept connections"                      LightGreen
     echo ""                                                         | ./boxes.sh
 windowBottom
 
 if (( ! b_skipUnitTests )) ; then
-    title -d 1 "Running CUBE Unit tests..."
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+    title -d 1 "Running CUBE Unit tests"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
@@ -416,8 +481,8 @@ if (( ! b_skipUnitTests )) ; then
 fi
 
 if (( ! b_skipIntegrationTests )) ; then
-    title -d 1 "Running CUBE Integration tests..."
-    echo "This might take more than a few minutes... please be patient."    | ./boxes.sh ${Yellow}
+    title -d 1 "Running CUBE Integration tests"
+    echo "This might take a while... please be patient."            | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
@@ -434,16 +499,17 @@ if (( ! b_skipIntegrationTests )) ; then
     windowBottom
 fi
 
-title -d 1 "Waiting until ChRIS store is ready to accept connections..."
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh ${Yellow}
+title -d 1 "Waiting until ChRIS store is ready to accept connections"
+    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_store sh -c                   \
-        'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;' > dc.out
-    echo -en "\033[2A\033[2K"
-    cat dc.out                                                      | ./boxes.sh ${LightGreen}
+        'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'\
+                > dc.out
+    echo -en "\033[3A\033[2K"
+    cat dc.out                                                      | ./boxes.sh White
     echo ""                                                         | ./boxes.sh
-    echo "ChRIS store is ready to accept connections"               | ./boxes.sh ${LightGreen}
+    boxcenter "ChRIS store is ready to accept connections"                       LightGreen
     echo ""                                                         | ./boxes.sh
 windowBottom
 
@@ -503,10 +569,10 @@ title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
     windowBottom
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
-        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
+        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
+    dc_check $?
 
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    echo -en "\033[2A\033[2K"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     STR4='[{"plugin_name": "pl-simpledsapp", "plugin_version": "'
@@ -517,8 +583,8 @@ title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
     windowBottom
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
-        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock
-    echo -en "\033[2A\033[2K"
+        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
+    dc_check $?
 windowBottom
 
 title -d 1 "Automatically creating a locked pipeline in CUBE"       \
@@ -530,12 +596,13 @@ title -d 1 "Automatically creating a locked pipeline in CUBE"       \
     windowBottom
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
-        python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" >& dc.out >/dev/null
-    echo -en "\033[2A\033[2K"
-    cat dc.out | ./boxes.sh
+        python pipelines/services/manager.py add "${PIPELINE_NAME}" \
+                cube "${PLUGIN_TREE}" >& dc.out
+    dc_check $?
 windowBottom
 
-title -d 1 "Automatically creating an unlocked pipeline in CUBE" "(unmutable and available to all users)"
+title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
+                "(unmutable and available to all users)"
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
@@ -543,18 +610,17 @@ title -d 1 "Automatically creating an unlocked pipeline in CUBE" "(unmutable and
     windowBottom
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
-        python pipelines/services/manager.py add "${PIPELINE_NAME}" cube "${PLUGIN_TREE}" --unlock >& dc.out >/dev/null
-    echo -en "\033[2A\033[2K"
-    cat dc.out | ./boxes.sh
+        python pipelines/services/manager.py add "${PIPELINE_NAME}" \
+        cube "${PLUGIN_TREE}" --unlock >& dc.out
+    dc_check $?
 windowBottom
 
-title -d 1 "Restarting CUBE's Django development server..."
+title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                 "Restarting" "chris_dev"                        | ./boxes.sh
     windowBottom
-    docker-compose -f docker-compose_dev.yml restart chris_dev >& dc.out >/dev/null
-    echo -en "\033[2A\033[2K"
-    cat dc.out | ./boxes.sh
+    docker-compose -f docker-compose_dev.yml restart chris_dev >& dc.out
+    dc_check $?
 windowBottom
 
 if (( !  b_norestartinteractive_chris_dev )) ; then

@@ -68,21 +68,30 @@ LightCyanBG='\033[1;46m'
 LightGrayBG='\033[0;47m'
 WhiteBG='\033[1;47m'
 
-function center {
-  termwidth=80
-  padding="$(printf '%0.1s' ' '{1..500})"
-  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"  \
-            "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"  \
-            "$padding"
+function boxcenter {
+    color=$2
+    flag=$3
+    termwidth=80
+    padding="$(printf '%0.1s' ' '{1..500})"
+    printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"  \
+              "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"  \
+              "$padding"                                      | ./boxes.sh "$3" "$color"
 }
 
-function boxcenter {
-  color=$2
-  termwidth=80
-  padding="$(printf '%0.1s' ' '{1..500})"
-  printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"  \
-            "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"  \
-            "$padding"                                      | ./boxes.sh $color
+function center {
+    if (( ${#2} )) ; then
+        termwidth=$2
+    else
+        termwidth=80
+    fi
+    padding="$(printf '%0.1s' ' '{1..500})"
+    if (( ${#1} < termwidth-2 )) ; then
+        printf '%*.*s %s %*.*s\n' 0 "$(((termwidth-2-${#1})/2))"        \
+                "$padding" "$1" 0 "$(((termwidth-1-${#1})/2))"          \
+                "$padding"
+    else
+        printf "$1"
+    fi
 }
 
 function colorSpec_parse {
@@ -130,8 +139,8 @@ function tcprint {
     eval  leftColor=$(colorSpec_parse $colorLeft)
     eval rightColor=$(colorSpec_parse $colorRight)
 
-    printf "${NC}%q%*s${NC}%q%*s${NC}\n"                           \
-            "$leftColor"  "$leftCol"  "$leftMsg"    \
+    printf "${NC}%q%*s${NC}%q%*s${NC}\n"                \
+            "$leftColor"  "$leftCol"  "$leftMsg"        \
             "$rightColor" "$rightCol" "$rightMsg"   | ./boxes.sh
 
 }
@@ -194,8 +203,35 @@ function title {
     printf "${NC}"
 }
 
-function windowBottom {
-    printf "${Yellow}└─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┘${Brown}▒\n"
-    printf "${Brown} ▒" ; for c in $(seq 1 81); do printf "▒" ; done ; printf "\n"
-    printf "${NC}"
+function windowTop {
+    if ((  ! ${#1} )) ; then
+        printf "${Yellow}┌─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┐${Brown}\n"
+        printf "${NC}"
+    else
+        printf "┌─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┐\n"
+        printf "${NC}"
+    fi
 }
+
+function windowLine {
+    if ((  ! ${#1} )) ; then
+        printf "${Yellow}├─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┤${Brown}▒\n"
+        printf "${NC}"
+    else
+        printf "├─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┤▒\n"
+        printf "${NC}"
+    fi
+}
+
+function windowBottom {
+    if ((  ! ${#1} )) ; then
+        printf "${Yellow}└─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┘${Brown}▒\n"
+        printf "${Brown} ▒" ; for c in $(seq 1 81); do printf "▒" ; done ; printf "\n"
+        printf "${NC}"
+    else
+        printf "└─" ;  for c in $(seq 1 79); do printf "─" ; done ; printf "┘▒\n"
+        printf " ▒" ; for c in $(seq 1 81); do printf "▒" ; done ; printf "\n"
+        printf "${NC}"
+    fi
+}
+
