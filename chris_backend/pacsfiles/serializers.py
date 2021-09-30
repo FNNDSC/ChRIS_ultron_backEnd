@@ -49,10 +49,8 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
         """
         # remove path as it is not part of the model and then compute fname
         path = validated_data.pop('path')
-        pacs_file = super(PACSFileSerializer, self).create(validated_data)
-        pacs_file.fname.name = path
-        pacs_file.save()
-        return pacs_file
+        validated_data['fname'] = path
+        return super(PACSFileSerializer, self).create(validated_data)
 
     def validate_pacs_name(self, pacs_name):
         """
