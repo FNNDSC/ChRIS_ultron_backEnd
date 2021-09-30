@@ -47,10 +47,8 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
         """
         # remove path as it is not part of the model and compute fname
         path = validated_data.pop('path')
-        service_file = super(ServiceFileSerializer, self).create(validated_data)
-        service_file.fname.name = path
-        service_file.save()
-        return service_file
+        validated_data['fname'] = path
+        return super(ServiceFileSerializer, self).create(validated_data)
 
     def validate_service_name(self, service_name):
         """
