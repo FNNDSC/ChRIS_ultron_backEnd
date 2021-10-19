@@ -40,11 +40,23 @@ install -d -o $USER /usr/local/src/ChRIS_ultron_backEnd
 git clone git@github.com:team19hackathon2021/ChRIS_ultron_backEnd.git /usr/local/src/ChRIS_ultron_backEnd
 ```
 
+## Determine the IP Address of your computer that will run the Podman TCP API
+
+```
+ip addr
+...
+2: enp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether e0:d5:5e:23:f7:68 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.13/24 brd 192.168.1.255 scope global noprefixroute dynamic enp1s0
+```
+
+Use the IP address you want to use (example: 192.168.1.13) for the PODMAN_IP_ADDRESS variable in the following ansible-playbook command. 
+
 ## Run the Ansible automation to install the ChRIS system
 
 ```bash
 cd /usr/local/src/ChRIS_ultron_backEnd
-ansible-playbook -K /usr/local/src/ChRIS_ultron_backEnd/ansible/install_all.yml
+ansible-playbook -K /usr/local/src/ChRIS_ultron_backEnd/ansible/install_all.yml -e PODMAN_IP_ADDRESS=192.168.1.13
 ```
 
 # Troubleshooting
