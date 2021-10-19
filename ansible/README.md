@@ -58,3 +58,13 @@ alter user chris superuser;
 alter user chris createdb;
 ```
 
+## Failed to create ChRIS podman network on recent CentOS Stream 8 distro
+
+If you get an error creating the Podman network named "ChRIS" on a very recent Linux distro running podman version 4.0.0, you may need to create the network manually: 
+
+```bash
+sudo podman network create ChRIS
+```
+
+This is because of a bug where podman inspect network doesn't show the network plugins anymore. 
+
