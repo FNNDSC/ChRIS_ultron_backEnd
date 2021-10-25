@@ -8,9 +8,61 @@ sudo yum install -y git python3 python3-pip python3-virtualenv python3-libselinu
 
 ## Install dependencies on MacOSX
 
+Install the ansible via brew
 ```bash
-brew install git python gnu-tar podman
-pip3 install virtualenv
+$ brew install ansible
+```
+
+Install the golang via brew
+```bash
+$ brew install go
+```
+
+Install the qemu via brew
+```bash
+$ brew install qemu
+```
+
+Install the podman via brew
+```bash
+$ brew install podman
+```
+
+If you have podman installed in your machine please, do the upgrade.
+```bash
+$ brew upgrade podman
+```
+
+Now we need to create a machine, to define a specific configuration for the machine.
+```bash
+$ podman machine init --cpus $cpu --memory $memory --disk-size $size
+```
+
+After the machine creation, we shloud be start the machine.
+```bash
+$ podman machine start 
+```
+
+Is necessary to delete the actual network and create a new using the following commands.
+
+To see all networks created in the podman, run the comand.
+```bash
+$ podman network ls
+```
+
+Remove the actual network, run the command:
+```bash
+$ podman network rm podman
+```
+
+Create the new network, run the command:
+```bash
+$ podman network create podman
+```
+
+To test the podman installation we can start a container,n in this example I will use the nginx. Note that I use the superuser command *Sudo* because the container is root by natural.
+```bash
+$ sudo podman run -dt --name nginxserver -p 8080:80 nginx
 ```
 
 ## Install the latest Python and setup a new Python virtualenv
