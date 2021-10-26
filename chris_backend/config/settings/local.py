@@ -8,6 +8,7 @@ Local settings
 - Add django-extensions as app
 """
 
+import os
 from .common import *  # noqa
 from core.swiftmanager import SwiftManager
 
@@ -80,7 +81,7 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pi
 
 # Swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
-SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
+SWIFT_AUTH_URL = 'http://%s:8080/auth/v1.0' % os.getenv('SWIFT_HOSTNAME', 'swift_service')
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
 SWIFT_CONTAINER_NAME = 'users'
@@ -93,7 +94,7 @@ except Exception as e:
     raise ImproperlyConfigured(str(e))
 
 # ChRIS store settings
-CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
+CHRIS_STORE_URL = 'http://%s:8010/api/v1/' % os.getenv('STORE_HOSTNAME', 'chris-store.local')
 
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
@@ -101,7 +102,7 @@ DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
 DATABASES['default']['TEST'] = {'NAME': 'test_chris_dev'}
-DATABASES['default']['HOST'] = 'chris_dev_db'
+DATABASES['default']['HOST'] = os.getenv('DEV_DB_HOSTNAME', 'chris_dev_db')
 DATABASES['default']['PORT'] = '5432'
 
 # Mail settings
@@ -132,7 +133,7 @@ INSTALLED_APPS += ['django_extensions']
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-COMPUTE_RESOURCE_URL = 'http://pfcon.remote:30005/api/v1/'
+COMPUTE_RESOURCE_URL = 'http://%s:30005/api/v1/' % os.getenv('PFCON_HOSTNAME', 'pfcon.remote')
 
 # corsheaders
 # ------------------------------------------------------------------------------
@@ -143,7 +144,7 @@ CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
 # Celery settings
 
 #CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
-CELERY_BROKER_URL = 'amqp://queue:5672'
+CELERY_BROKER_URL = 'amqp://%s:5672' % os.getenv('QUEUE_HOSTNAME', 'queue')
 
 #: Only add pickle to this list if your broker is secured
 #: from unwanted access (see userguide/security.html)
