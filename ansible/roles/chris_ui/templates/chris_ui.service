@@ -1,0 +1,14 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ UI_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ DEV_DB_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ UI_DATA }}:/home/localuser --rm {{ UI_IMAGE }}:{{ UI_VERSION }}
+ExecStop=/usr/bin/podman rm {{ UI_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
