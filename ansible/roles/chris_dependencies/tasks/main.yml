@@ -1,0 +1,70 @@
+---
+# Automate the installation of ChRIS dependencies. 
+- name: "Setup podman Linux virtual machine on MacOS"
+  shell: "podman machine init"
+  when: ansible_pkg_mgr == 'homebrew'
+
+- name: "Start the podman Linux virtual machine on MacOS"
+  shell: "podman machine start"
+  when: ansible_pkg_mgr == 'homebrew'
+
+- name: "Install podman dependency"
+  package:
+    name:
+      - python3
+      - python3-pip
+      - libselinux-python
+      - libsemanage-python
+      - podman
+    state: present
+  become: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+- name: "Install podman dependency"
+  package:
+    name:
+      - python3
+      - python3-pip
+      - python3-libselinux
+      - python3-libsemanage
+      - podman
+    state: present
+  become: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+- name: "Install python pip dependencies"
+  pip:
+    name: psycopg2-binary
+    state: present
+  become: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+- name: "Install podman dependency"
+  package:
+    name:
+      - python3
+      - python3-pip
+      - python3-libselinux
+      - python3-libsemanage
+      - podman
+    state: present
+  become: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+# Allow Podman to run containers as systemd services for better logging, starting, stopping and enabling services. 
+- name: "Set container_manage_cgroup flag on to run podman containers as systemd services and keep it persistent across reboots"
+  ansible.posix.seboolean:
+    name: container_manage_cgroup
+    state: true
+    persistent: true
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
