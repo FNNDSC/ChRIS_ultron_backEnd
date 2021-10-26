@@ -1,0 +1,13 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ SCHEDULER_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ SCHEDULER_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_BACKEND_DATA }}:/home/localuser/chris_backend --rm -e "DJANGO_SETTINGS_MODULE=config.settings.local" -e "DJANGO_DB_MIGRATE=off" -e "DJANGO_COLLECTSTATIC=off" -e "SWIFT_HOSTNAME={{ SWIFT_HOSTNAME }}" -e "STORE_HOSTNAME={{ STORE_HOSTNAME }}" -e "PFCON_HOSTNAME={{ PFCON_HOSTNAME }}" -e "QUEUE_HOSTNAME={{ QUEUE_HOSTNAME }}" -e "DEV_DB_HOSTNAME={{ DEV_DB_HOSTNAME }}" {{ SCHEDULER_IMAGE }}:{{ SCHEDULER_VERSION }} celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
+ExecStop=/usr/bin/podman rm {{ SCHEDULER_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
