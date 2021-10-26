@@ -1,0 +1,24 @@
+---
+# Define the playbook to run locally.
+- name: Install the ChRIS containers locally in podman with Ansible
+  connection: local
+  hosts: localhost
+
+  # Call the all the  ChRIS Ansible roles.
+  roles:
+    - chris_defaults
+    - chris_before
+    - chris_dev_db
+    - chris_pman
+    - chris_pfcon
+    - chris_podman_tcp
+    - chris_queue
+    - chris_scheduler
+    - chris_swift
+    - chris_worker
+    - chris_worker_periodic
+    - chris_dev
+    - chris_ui
+    - chris_store
+    - chris_after
+    - chris_plugins
