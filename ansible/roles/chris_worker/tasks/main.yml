@@ -1,0 +1,20 @@
+---
+# Automate the deployment of ChRIS worker as a Podman container running as a Systemd service. 
+- name: Create the {{ WORKER_NAME }} systemd service {{ WORKER_SYSTEMD }}. 
+  template:
+    src: chris_worker.service
+    dest: "{{ WORKER_SYSTEMD }}"
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Reload the services. 
+  systemd:
+    daemon_reload: true
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Start and enable the {{ WORKER_SERVICE }} service. 
+  service:
+    name: "{{ WORKER_SERVICE }}"
+    enabled: true
+    state: restarted
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
