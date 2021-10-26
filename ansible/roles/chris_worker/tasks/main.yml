@@ -18,4 +18,3 @@
     state: restarted
   become: true
   when: ansible_pkg_mgr != 'homebrew'
-
