@@ -1,0 +1,23 @@
+---
+# Automate the deployment of ChRIS dev as a Podman container running as a Systemd service. 
+
+- name: Create the {{ DEV_NAME }} systemd service {{ DEV_SYSTEMD }}. 
+  template:
+    src: chris_dev.service
+    dest: "{{ DEV_SYSTEMD }}"
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+
+- name: Reload the services. 
+  systemd:
+    daemon_reload: true
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+
+- name: Start and enable the {{ DEV_SERVICE }} service.
+  service:
+    name: "{{ DEV_SERVICE }}"
+    enabled: true
+    state: restarted
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
