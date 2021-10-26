@@ -5,7 +5,7 @@ After=network.service
 [Service]
 Type=simple
 User={{ APP_USER }}
-ExecStart=/usr/bin/podman run --name {{ PFCON_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ PFCON_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_DATA }}:/home/localuser/storeBase:Z -v {{ PFCON_SRC }}:/home/localuser/pfcon --rm -e "SECRET_KEY={{ APP_SECRET_KEY }}" -e "COMPUTE_SERVICE_URL=http://{{ PMAN_HOSTNAME }}:5010/api/v1/" {{ PFCON_IMAGE }}:{{ PFCON_VERSION }} gunicorn -w 5 -b 0.0.0.0:30005 -t 200 pfcon.wsgi:application
+ExecStart=/usr/bin/podman run --name {{ PFCON_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ PFCON_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_DATA }}:/home/localuser/storeBase:Z -v {{ PFCON_SRC }}:/home/localuser/pfcon --rm -e "SECRET_KEY={{ APP_SECRET_KEY }}" -e "COMPUTE_SERVICE_URL=http://{{ PMAN_HOSTNAME }}:{{ PMAN_PORT }}/api/v1/" {{ PFCON_IMAGE }}:{{ PFCON_VERSION }} gunicorn -w 5 -b 0.0.0.0:{{ PFCON_PORT }} -t 200 pfcon.wsgi:application
 ExecStop=/usr/bin/podman rm {{ PFCON_NAME }} -f
 Restart=on-failure
 
