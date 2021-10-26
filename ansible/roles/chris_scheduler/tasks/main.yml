@@ -1,0 +1,20 @@
+---
+# Automate the deployment of ChRIS scheduler as a Podman container running as a Systemd service. 
+- name: Create the {{ SCHEDULER_NAME }} systemd service {{ SCHEDULER_SYSTEMD }}. 
+  template:
+    src: chris_scheduler.service
+    dest: "{{ SCHEDULER_SYSTEMD }}"
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Reload the services. 
+  systemd:
+    daemon_reload: true
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Start and enable the {{ SCHEDULER_SERVICE }} service. 
+  service:
+    name: "{{ SCHEDULER_SERVICE }}"
+    enabled: true
+    state: restarted
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
