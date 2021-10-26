@@ -1,0 +1,10 @@
+---
+# Allow Podman to run containers as systemd services for better logging, starting, stopping and enabling services. 
+- name: Set container_manage_cgroup flag on to run podman containers as systemd services and keep it persistent across reboots
+  ansible.posix.seboolean:
+    name: container_manage_cgroup
+    state: true
+    persistent: true
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
