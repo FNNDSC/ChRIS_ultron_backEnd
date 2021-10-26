@@ -1,0 +1,9 @@
+---
+# Define the playbook to run locally. 
+- name: Install only the ChRIS plugins locally in podman with Ansible
+  connection: local
+  hosts: localhost
+
+  # Run the chris_plugins role to load the main ChRIS plugins. 
+  roles:
+    - chris_plugins
