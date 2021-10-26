@@ -1,0 +1,4 @@
+# Define the worker periodic application variables. 
+WORKER_PERIODIC_NAME: "{{ APP_NAME }}_worker_periodic"
+WORKER_PERIODIC_SERVICE: "{{ WORKER_PERIODIC_NAME }}"
+WORKER_PERIODIC_SYSTEMD: "/usr/lib/systemd/system/{{ WORKER_PERIODIC_SERVICE }}.service"

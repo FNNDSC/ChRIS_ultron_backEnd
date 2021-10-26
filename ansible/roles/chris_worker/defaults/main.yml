@@ -1,0 +1,4 @@
+# Define the worker application variables. 
+WORKER_NAME: "{{ APP_NAME }}_worker"
+WORKER_SERVICE: "{{ WORKER_NAME }}"
+WORKER_SYSTEMD: "/usr/lib/systemd/system/{{ WORKER_SERVICE }}.service"
