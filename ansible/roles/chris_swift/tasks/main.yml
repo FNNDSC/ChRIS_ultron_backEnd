@@ -1,0 +1,39 @@
+---
+# Setup the Swift data directory. 
+- name: Create the {{ APP_NAME }} data directory {{ APP_SWIFT_DATA }}. 
+  file:
+    name: "{{ APP_SWIFT_DATA }}"
+    state: directory
+    owner: "{{ APP_USER }}"
+    mode: 0777
+  become: true
+- name: set SELinux permissions on {{ APP_SWIFT_DATA }}
+  sefcontext:
+    target: "{{ APP_SWIFT_DATA }}(/.*)?"
+    setype: container_file_t
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+- name: reload SELinux policy to ensure that {{ APP_NAME }} is executable
+  command: "restorecon -irv {{ APP_SWIFT_DATA }}"
+  become: true
+
+# Automate the deployment of Swift as a Podman container running as a Systemd service. 
+- name: Create the {{ SWIFT_NAME }} systemd service {{ SWIFT_SYSTEMD }}. 
+  template:
+    src: chris_swift.service
+    dest: "{{ SWIFT_SYSTEMD }}"
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Reload the services. 
+  systemd:
+    daemon_reload: true
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
+- name: Start and enable the {{ SWIFT_SERVICE }} service. 
+  service:
+    name: "{{ SWIFT_SERVICE }}"
+    enabled: true
+    state: restarted
+  become: true
+  when: ansible_pkg_mgr != 'homebrew'
