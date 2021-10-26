@@ -1,0 +1,13 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ DEV_DB_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ DEV_DB_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_DEV_DB_DATA }}:/var/lib/postgresql/data --rm -e "POSTGRES_DB={{ DEV_DB_DATABASE }}" -e "POSTGRES_USER={{ DEV_DB_BECOME_USER }}" -e "POSTGRES_PASSWORD={{ DEV_DB_BECOME_PASSWORD }}" {{ DEV_DB_IMAGE }}:{{ DEV_DB_VERSION }}
+ExecStop=/usr/bin/podman rm {{ DEV_DB_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
