@@ -1,0 +1,66 @@
+---
+# Check the system podman version to determine network settings. 
+- name: Check podman version
+  shell: "podman -v | cut -d ' ' -f3 | cut -d '.' -f1"
+  register: PODMAN_MAJOR_VERSION_SHELL
+
+- name: Set podman major version
+  set_fact:
+    PODMAN_MAJOR_VERSION: "{{ PODMAN_MAJOR_VERSION_SHELL.stdout }}"
+- debug:
+    var: PODMAN_MAJOR_VERSION
+
+- name: Set network vars
+  set_fact:
+    APP_POD_NETWORK: "{{ (APP_NETWORK if (PODMAN_MAJOR_VERSION | int) > 1) | default(omit) }}"
+    APP_CONTAINER_NETWORK: "{{ ('host' if (PODMAN_MAJOR_VERSION | int) <= 1) | default(omit) }}"
+- debug:
+    var: APP_POD_NETWORK
+- debug:
+    var: APP_CONTAINER_NETWORK
+    
+- name: Create a podman network {{ APP_NETWORK }}
+  containers.podman.podman_network:
+    name: "{{ APP_NETWORK }}"
+    state: present
+  become: true
+  when: APP_POD_NETWORK is defined
+  ignore_errors: true
+
+  # Automate the deployment of a shared podman pod for the ChRIS applications on a shared network. 
+- name: Create a podman pod {{ APP_POD }} with network {{ APP_POD_NETWORK }}
+  containers.podman.podman_pod:
+    name: "{{ APP_POD }}"
+    network: "{{ APP_POD_NETWORK }}"
+    publish:
+      - "{{ PFCON_PORT }}:30005"
+      - "{{ PMAN_PORT }}:5010"
+      - "{{ DEV_DB_PORT }}:5432"
+      - "{{ SWIFT_PORT }}:8080"
+      - "{{ DEV_PORT }}:8000"
+      - "{{ STORE_PORT }}:8010"
+      - "{{ UI_PORT }}:3000"
+      - "6900-6905:6900-6905"
+    state: started
+  become: true
+  when: APP_POD_NETWORK is defined
+
+  # Setup the ChRIS data directory. 
+- name: Create the {{ APP_NAME }} data directory {{ APP_DATA }}. 
+  file:
+    name: "{{ APP_DATA }}"
+    state: directory
+    owner: "{{ APP_USER }}"
+    mode: 0777
+  become: true
+
+- name: set SELinux permissions on {{ APP_DATA }}
+  sefcontext:
+    target: "{{ APP_DATA }}(/.*)?"
+    setype: container_file_t
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+- name: reload SELinux policy to ensure that {{ APP_NAME }} is executable
+  command: "restorecon -irv {{ APP_DATA }}"
+  become: true
