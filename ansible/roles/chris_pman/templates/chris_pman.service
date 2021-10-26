@@ -1,0 +1,15 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ PMAN_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ PMAN_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ PMAN_SRC }}:/home/localuser/pman --rm -e "STOREBASE={{ APP_DATA }}" -e "SECRET_KEY={{ APP_SECRET_KEY }}" -e "CONTAINER_ENV=podman" -e 'PODMAN_IP_ADDRESS={{ PODMAN_IP_ADDRESS }}' {{ PMAN_IMAGE }}:{{ PMAN_VERSION }}
+ExecStop=/usr/bin/podman rm {{ PMAN_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+
