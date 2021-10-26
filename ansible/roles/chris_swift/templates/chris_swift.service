@@ -1,0 +1,13 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ SWIFT_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ SWIFT_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_SWIFT_DATA }}:/srv --rm -e "SWIFT_USERNAME={{ SWIFT_USERNAME }}" -e "SWIFT_KEY={{ SWIFT_KEY }}" {{ SWIFT_IMAGE }}:{{ SWIFT_VERSION }}
+ExecStop=/usr/bin/podman rm {{ SWIFT_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
