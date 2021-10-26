@@ -1,0 +1,40 @@
+---
+# Define the main application variables. 
+APP_NAME: ChRIS
+APP_POD: "{{ APP_NAME }}_pod"
+APP_NETWORK: "ChRIS"
+APP_PYTHON: "{{ '/usr/bin/python' if lookup('file', '/usr/bin/python', errors='ignore') else '/usr/bin/python3' }}"
+APP_SRC: "/usr/local/src/ChRIS_ultron_backEnd"
+APP_OPT: "/opt/{{ APP_NAME }}"
+APP_VAR: "/var/{{ APP_NAME }}"
+APP_DATA: "{{ APP_VAR }}/data"
+APP_DEV_DB_DATA: "{{ APP_SRC }}/chris_dev_db_data"
+APP_STORE_DB_DATA: "{{ APP_SRC }}/chris_store_db_data"
+APP_SWIFT_DATA: "{{ APP_SRC }}/swift_storage_dev"
+APP_QUEUE_DATA: "{{ APP_SRC }}/queue_data"
+APP_BACKEND_DATA: "{{ APP_SRC }}/chris_backend"
+APP_CONF: "{{ APP_OPT }}/conf/zoo.cfg"
+APP_REPO: "https://github.com/FNNDSC/ChRIS_ultron_backEnd.git"
+APP_VERSION: 
+APP_TAG: ""
+APP_USER: "root"
+APP_SECRET_KEY: "w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+APP_SUPER_USER_NAME: rudolph
+APP_SUPER_USER_PASSWORD: rudolph1234
+APP_SUPER_USER_EMAIL: rudolph.pienaar@gmail.com
+
+# Define the pfcon application variables. 
+PFCON_NAME: "{{ APP_NAME }}_pfcon"
+PFCON_POD: "{{ APP_NAME }}_pod"
+PFCON_HOSTNAME: "localhost"
+PFCON_IMAGE: "fnndsc/pfcon"
+PFCON_VERSION: "latest"
+PFCON_SERVICE: "{{ PFCON_NAME }}"
+PFCON_SYSTEMD: "/usr/lib/systemd/system/{{ PFCON_SERVICE }}.service"
+PFCON_SRC: "/usr/local/src/pfcon"
+PFCON_REPO: "git@github.com:FNNDSC/pfcon.git"
+PFCON_PORT: "30005"
+
+# Define the pman application variables. 
+PMAN_HOSTNAME: "localhost"
+PMAN_PORT: "5010"
