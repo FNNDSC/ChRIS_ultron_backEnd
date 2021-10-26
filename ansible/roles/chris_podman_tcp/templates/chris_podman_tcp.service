@@ -1,0 +1,18 @@
+Description=Podman TCP API Service
+After=network.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+KillMode=process
+Environment=LOGGING="--log-level=info"
+\{\% if (PODMAN_MAJOR_VERSION | int) > 1 \%\}
+ExecStart=/usr/bin/podman $LOGGING system service tcp:{{ PODMAN_IP_ADDRESS }}:{{ PODMAN_TCP_PORT }} -t 0
+\{\% else \%\}
+ExecStart=/usr/bin/podman varlink tcp:{{ PODMAN_IP_ADDRESS }}:{{ PODMAN_TCP_PORT }} -t 0
+\{\% endif \%\}
+
+[Install]
+WantedBy=multi-user.target
+
+
