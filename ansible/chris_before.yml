@@ -5,5 +5,6 @@
   hosts: localhost
   # Run the chris_defaults role to load the ChRIS related variables. 
   roles:
-    - chris_defaults
+    - chris_dependencies
+    - deploy_chris_container
 

@@ -3,10 +3,12 @@
 - name: "Setup podman Linux virtual machine on MacOS"
   shell: "podman machine init"
   when: ansible_pkg_mgr == 'homebrew'
+
 - name: "Start the podman Linux virtual machine on MacOS"
   shell: "podman machine start"
   when: ansible_pkg_mgr == 'homebrew'
-- name: "install podman dependency"
+
+- name: "Install podman dependency"
   package:
     name:
       - python3
@@ -19,28 +21,8 @@
   when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python'
   vars:
     ansible_python_interpreter: "{{ APP_PYTHON }}"
-- name: "install podman dependency"
-  package:
-    name:
-      - python3
-      - python3-pip
-      - python3-libselinux
-      - python3-libsemanage
-      - podman
-    state: present
-  become: true
-  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
-  vars:
-    ansible_python_interpreter: "{{ APP_PYTHON }}"
-- name: "install python pip dependencies"
-  pip:
-    name: psycopg2-binary
-    state: present
-  become: true
-  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
-  vars:
-    ansible_python_interpreter: "{{ APP_PYTHON }}"
-- name: "install podman dependency"
+
+- name: "Install podman dependency"
   package:
     name:
       - python3
@@ -54,27 +36,35 @@
   vars:
     ansible_python_interpreter: "{{ APP_PYTHON }}"
 
-# Check the system podman version to determine network settings. 
-- name: Check podman version
-  shell: "podman -v | cut -d ' ' -f3 | cut -d '.' -f1"
-  register: PODMAN_MAJOR_VERSION_SHELL
-- name: Set podman major version
-  set_fact:
-    PODMAN_MAJOR_VERSION: "{{ PODMAN_MAJOR_VERSION_SHELL.stdout }}"
-- debug:
-    var: PODMAN_MAJOR_VERSION
-- name: Set network vars
-  set_fact:
-    APP_POD_NETWORK: "{{ (APP_NETWORK if (PODMAN_MAJOR_VERSION | int) > 1) | default(omit) }}"
-    APP_CONTAINER_NETWORK: "{{ ('host' if (PODMAN_MAJOR_VERSION | int) <= 1) | default(omit) }}"
-- debug:
-    var: APP_POD_NETWORK
-- debug:
-    var: APP_CONTAINER_NETWORK
-- name: Create a podman network {{ APP_NETWORK }}
-  containers.podman.podman_network:
-    name: "{{ APP_NETWORK }}"
+- name: "Install python pip dependencies"
+  pip:
+    name: psycopg2-binary
     state: present
   become: true
-  when: APP_POD_NETWORK is defined
-  ignore_errors: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+- name: "Install podman dependency"
+  package:
+    name:
+      - python3
+      - python3-pip
+      - python3-libselinux
+      - python3-libsemanage
+      - podman
+    state: present
+  become: true
+  when: ansible_pkg_mgr != 'homebrew' and APP_PYTHON == '/usr/bin/python3'
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
+
+# Allow Podman to run containers as systemd services for better logging, starting, stopping and enabling services. 
+- name: "Set container_manage_cgroup flag on to run podman containers as systemd services and keep it persistent across reboots"
+  ansible.posix.seboolean:
+    name: container_manage_cgroup
+    state: true
+    persistent: true
+  become: true
+  vars:
+    ansible_python_interpreter: "{{ APP_PYTHON }}"
