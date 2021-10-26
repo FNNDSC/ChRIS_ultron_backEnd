@@ -1,0 +1,12 @@
+---
+# define the playbook to run locally
+- name: Install the ChRIS containers locally in podman with Ansible
+  connection: local
+  hosts: localhost
+
+
+  # Run the chris_defaults role to load the ChRIS related variables.
+  roles:
+    - chris_defaults
+    # Now run the chris_dev_db role to install the dev_db container to podman.
+    - chris_dev_db
