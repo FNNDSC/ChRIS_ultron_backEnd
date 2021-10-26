@@ -7,7 +7,8 @@
   # Call the all the  ChRIS Ansible roles.
   roles:
     - chris_defaults
-    - chris_before
+    - chris_dependencies
+    - chris_deploy_container
     - chris_dev_db
     - chris_pman
     - chris_pfcon
