@@ -1,0 +1,13 @@
+[Unit]
+Description=
+After=network.service
+
+[Service]
+Type=simple
+User={{ APP_USER }}
+ExecStart=/usr/bin/podman run --name {{ QUEUE_NAME }}\{\% if APP_POD_NETWORK is defined \%\} --pod {{ QUEUE_POD }}\{\% endif \%\}\{\% if APP_CONTAINER_NETWORK is defined \%\} --network {{ APP_CONTAINER_NETWORK }}\{\% endif \%\} -v {{ APP_QUEUE_DATA }}:/var/lib/rabbitmq --rm {{ QUEUE_IMAGE }}:{{ QUEUE_VERSION }}
+ExecStop=/usr/bin/podman rm {{ QUEUE_NAME }} -f
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
