@@ -127,7 +127,7 @@ function tcprint {
     #        leftColor   leftMsg     rightColor    rightMsg     leftColW rightColW
     # tcprint Yellow  "left Message" LightGreen "right Message"   "20"     "60"
     #
-    # column width specifiers left/right as optional 3rd and 4th args
+    # column width specifiers left/right as optional 5th and 6th args
 
     colorLeft="$1"
     leftMsg="$2"

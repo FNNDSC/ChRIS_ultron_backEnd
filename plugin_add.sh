@@ -64,7 +64,139 @@ if [[ -f .env ]] ; then
     source .env
 fi
 
-while getopts "f:s:j" opt; do
+status_check () {
+    STATUS=$1
+    RIGHT2=$2
+    if [[ $STATUS == "0" ]] ; then
+        b_statusSuccess=$(( b_statusSuccess+=1 ))
+        a_storePluginOK+=("$plugin")
+        echo -en "\033[3A\033[2K"
+        if (( ! ${#RIGHT2} ))  ; then
+            RIGHT2="success"
+        fi
+        opSolid_feedback "$LEFT1" "$LEFT2"  "$RIGHT1" "$RIGHT2"
+    else
+        b_statusFail=$(( b_statusFail+=1 ))
+        echo -en "\033[3A\033[2K"
+        if (( ! ${#RIGHT2} ))  ; then
+            RIGHT2="fail"
+        fi
+        opFail_feedback "$LEFT1" "$LEFT2"  "$RIGHT1" "$RIGHT2"
+        if [[ -f dc.out ]] ; then
+            cat dc.out |sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+        fi
+    fi
+}
+
+dc_check () {
+    STATUS=$1
+    if [[ $STATUS != "0" ]] ; then
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+    else
+        echo -en "\033[2A\033[2K"
+        cat dc.out                                                          | ./boxes.sh White
+    fi
+}
+
+dc_check_code () {
+    STATUS=$1
+    CODE=$2
+    if (( $CODE > 1 )) ; then
+        echo -en "\033[2A\033[2K"
+        cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+    else
+        echo -en "\033[2A\033[2K"
+        cat dc.out                                                          | ./boxes.sh White
+    fi
+}
+
+function opBlink_feedback {
+    #
+    # ARGS
+    #       $1          left string to print
+    #       $2          some description of op
+    #       $3          current action
+    #       $4          current action state
+    #
+    # Pretty print some operation in a blink state
+    #
+    leftID=$(center "${1:0:18}" 18)
+    op=$2
+    action=$3
+    result=$(center "${4:0:12}" 12)
+
+    # echo -e ''$_{1..8}'\b0123456789'
+    # echo " --> $leftID <---"
+    printf "\
+${LightBlueBG}${White}[%*s]${NC}\
+${LightCyan}%-*s\
+${Yellow}%*s\
+${blink}${LightGreen}[%-*s]\
+${NC}\n" \
+        "18" "${leftID:0:18}"       \
+        "32" "${op:0:32}"           \
+        "14" "${action:0:14}"       \
+        "12" "${result:0:12}"       | ./boxes.sh
+}
+
+function opSolid_feedback {
+    #
+    # ARGS
+    #       $1          left string to print
+    #       $2          some description of op
+    #       $3          current action
+    #       $4          current action state
+    #
+    # Pretty print some operation in a solid state
+    #
+    leftID=$(center "${1:0:18}" 18)
+    op=$2
+    action=$3
+    result=$(center "${4:0:12}" 12)
+
+    # echo -e ''$_{1..8}'\b0123456789'
+    printf "\
+${LightBlueBG}${White}[%*s]${NC}\
+${LightCyan}%-*s\
+${Yellow}%*s\
+${LightGreenBG}${White}[%-*s]\
+${NC}\n" \
+        "18" "${leftID:0:18}"       \
+        "32" "${op:0:32}"           \
+        "14" "${action:0:14}"       \
+        "12" "${result:0:12}"       | ./boxes.sh
+}
+
+function opFail_feedback {
+    #
+    # ARGS
+    #       $1          left string to print
+    #       $2          some description of op
+    #       $3          current action
+    #       $4          current action state
+    #
+    # Pretty print some operation in a failed state
+    #
+    leftID=$(center "${1:0:18}" 18)
+    op=$2
+    action=$3
+    result=$(center "${4:0:12}" 12)
+
+    # echo -e ''$_{1..8}'\b0123456789'
+    printf "\
+${LightBlueBG}${White}[%*s]${NC}\
+${LightCyan}%-*s\
+${Yellow}%*s\
+${LightRedBG}${White}[%-*s]\
+${NC}\n" \
+        "18" "${leftID:0:18}"       \
+        "32" "${op:0:32}"           \
+        "14" "${action:0:14}"       \
+        "12" "${result:0:12}"       | ./boxes.sh
+}
+
+while getopts "t:s:j" opt; do
     case $opt in
         s)  STEP=$OPTARG
             STEP=$(( STEP -1 ))                 ;;
@@ -113,44 +245,35 @@ windowBottom
 
 title -d 1  "Checking on container plugins " \
             "and pulling latest versions where needed..."
-    declare -i b_pullSuccess=0
-    declare -i b_pullFail=0
+    let b_statusSuccess=0
+    let b_statusFail=0
     for plugin in "${a_storePluginUser[@]}" ; do
         cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
-        if [[ $REPO == "fnndsc" ]] ; then
-            printf "${LightBlueBG}${White}[ dockerhub ]${NC}::${LightCyan}%-35s${Yellow}%19s${blink}${LightGreen}%-11s${NC}\n" \
-                "$REPO/$CONTAINER" "latest<--" "[ pulling ]"                        | ./boxes.sh
+        LEFT1=$CONTAINER;       LEFT2="::$REPO (pulling)"
+        RIGHT1="latest<--";     RIGHT2="pulling"
+        if [[ $REPO != "local" ]] ; then
+            opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "pulling"
             windowBottom
             CMD="docker pull $REPO/$CONTAINER"
             echo $CMD | sh >& dc.out >/dev/null
+            RIGHT1="latest-->"; LEFT2="::$REPO (pulled)"
             status=$?
+            status_check $status
             if (( status == 0 )) ; then
-                b_pullSuccess=$(( b_pullSuccess+=1 ))
-                report="[ success ]"
-                reportColor=LightGreen
                 a_storePluginOK+=("$plugin")
-                echo -en "\033[3A\033[2K"
-                printf "${LightBlueBG}${White}[ dockerhub ]${NC}::${LightCyan}%-35s${Yellow}%19s${LightGreenBG}${White}%-11s${NC}\n"     \
-                "$REPO/$CONTAINER" "latest<--" "$report"                            | ./boxes.sh
-            else
-                b_pullFail=$(( b_pullFail+=1 ))
-                report="[ failed  ]"
-                reportColor=LightRed
-                echo -en "\033[3A\033[2K"
-                printf "${LightBlueBG}${White}[ dockerhub ]${NC}::${LightCyan}%-35s${Yellow}%19s${RedBG}${White}%-11s${NC}\n"\
-                "$REPO/$CONTAINER" "latest<--" "$report"                            | ./boxes.sh
             fi
             cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'    | ./boxes.sh
         fi
     done
-    if (( b_pullSuccess > 0 )) ; then
-        printf "${LightCyan}%16s${LightGreen}%-64s${NC}\n"              \
-            "$b_pullSuccess"                                            \
+    if (( b_statusSuccess > 0 )) ; then
+        echo ""                                                         | ./boxes.sh
+        printf "${LightCyan}%27s${LightGreen}%-53s${NC}\n"              \
+            "$b_statusSuccess"                                          \
             " images successfully pulled"                               | ./boxes.sh
         echo ""                                                         | ./boxes.sh
     fi
-    if (( b_pullFail > 0 )) ; then
-        printf "${LightRed}%16s${Brown}%-64s${NC}\n"                    \
+    if (( b_statusFail > 0 )) ; then
+        printf "${LightRed}%27s${Brown}%-53s${NC}\n"                    \
             "$b_pullFail"                                               \
         " images were not successfully pulled."                         | ./boxes.sh
         boxcenter " "
@@ -172,62 +295,72 @@ windowBottom
 
 title -d 1 "Uploading plugin representations to the ChRIS store..."
     declare -i i=1
-    declare -i b_uploadSuccess=0
     declare -i b_already=0
+    let b_statusSuccess=0
+    let b_statusFail=0
+    declare -i b_uploadSuccess=0
     declare -i b_uploadFail=0
-    echo ""                                                         | ./boxes.sh
-    echo ""                                                         | ./boxes.sh
+    declare -i b_noStore=0
+    echo ""                                                                         | ./boxes.sh
+    echo ""                                                                         | ./boxes.sh
     for plugin in "${a_PLUGINRepoEnv[@]}"; do
         echo -en "\033[2A\033[2K"
         cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null"
 
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${blink}${LightGreen}%12s${NC}\n"       \
-        "$i: " "$REPO/$CONTAINER" "JSON representation<--" "[ getting  ]"           | ./boxes.sh
+        str_count=$(printf "%2s" "$i")
+        LEFT1=$CONTAINER;                   LEFT2="${str_count}::JSON<--parse"
+        RIGHT1="<-- <-- <-- <-"             RIGHT2="in progress"
+        opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
+
         PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2>/dev/null)
+        status=$?
+        status_check $status
+        ((b_statusSuccess--))
+        windowBottom
         echo -en "\033[3A\033[2K"
+
         if (( b_json )) ; then
             echo "$PLUGIN_REP" | python -m json.tool                                |\
                 sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'             | ./boxes.sh ${LightGreen}
         fi
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${LightGreen}%12s${NC}\n"               \
-        "$i: " "$REPO/$CONTAINER" "JSON representation<--" "[ acquired ]"           | ./boxes.sh
-        windowBottom
-        echo -en "\033[3A\033[2K"
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${blink}${LightGreen}%12s${NC}\n"       \
-        "$i: " "$REPO/$CONTAINER" "JSON representation<--" "[ pushing  ]"           | ./boxes.sh
 
+        LEFT2="${str_count}::JSON-->Store" ; RIGHT2="in progress"
+        opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
         docker-compose -f ${DOCKER_COMPOSE_FILE}                                    \
             exec chris_store python plugins/services/manager.py add "$CONTAINER"    \
             cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"                  \
-            --descriptorstring "$PLUGIN_REP" >& dc.out >/dev/null
+            --descriptorstring "$PLUGIN_REP" >& dc.out
+        RIGHT1="--> --> --> ->"
         status=$?
-        echo -en "\033[3A\033[2K"
-        # cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'    | ./boxes.sh
-
-        if (( status == 0 )) ; then
-            printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${LightGreenBG}${White}%12s${NC}\n"               \
-            "$i: " "$REPO/$CONTAINER" "JSON in ChRIS store<--" "[ success  ]"  | ./boxes.sh
-            b_uploadSuccess=$(( b_uploadSuccess+=1 ))
-        elif (( status == 1 )) ; then
-            printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${PurpleBG}${White}%12s${NC}\n"            \
-            "$i: " "$REPO/$CONTAINER" "JSON in ChRIS store<--" "[ already  ]"  | ./boxes.sh
-            b_already=$(( b_already+=1 ))
-        elif (( status == 2 )) ; then
-            printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%28s${RedBG}${White}%12s${NC}\n"            \
-            "$i: " "$REPO/$CONTAINER" "JSON in ChRIS store<--" "[  error   ]"  | ./boxes.sh
-            b_uploadFail=$(( b_uploadFail+=1 ))
+        RIGHT2=""
+        let b_NR=$(cat dc.out | grep "not running" | wc -l)
+        let b_exist=$(cat dc.out | grep "already exists" | wc -l)
+        if ((  b_exist )) ; then
+            RIGHT2="already"
+            ((b_already++))
+        fi
+        status_check $status "$RIGHT2"
+        if (( b_NR )) ; then
+            ((b_statusSuccess--))
+            echo -en "\033[1A\033[2K"
+            opFail_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "no store"
+            boxcenter "$(cat dc.out)" LightRed
+            b_uploadFail=1
+            b_noStore=1
+            windowBottom
+            break
         fi
         ((i++))
         windowBottom
     done
     echo -en "\033[2A\033[2K"
     echo ""                                                             | ./boxes.sh
-    if (( b_uploadSuccess > 0 )) ; then
+    if (( b_statusSuccess > 0 )) ; then
         printf "${LightCyan}%16s${LightGreen}%-64s${NC}\n"              \
-            "$b_uploadSuccess"                                          \
+            "$b_statusSuccess"                                          \
             " representation(s) successfully uploaded to ChRIS Store"   | ./boxes.sh
         echo ""                                                         | ./boxes.sh
     fi
@@ -254,67 +387,64 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         boxcenter "did, the plugin might not correctly service the   "  ${LightRed}
         boxcenter "'--json' flag to create a representation.         "  ${LightRed}
         echo ""                                                         | ./boxes.sh
+        boxcenter "Also, check that the ChRIS store is running!      "  ${LightRed}
+        echo ""                                                         | ./boxes.sh
+        boxcenter "This is a critical/unrecoverable failure.         "  ${LightRed}
+        echo ""                                                         | ./boxes.sh
     fi
 windowBottom
-
+if (( b_noStore )) ; then exit 1 ; fi
 
 title -d 1 "Automatically registering some plugins from the ChRIS store" \
            "with associated compute environment in ChRIS..."
     declare -i i=1
-    declare -i b_registerSuccess=0
-    declare -i b_registerFail=0
-    echo ""                                                     | ./boxes.sh
-    echo ""                                                     | ./boxes.sh
+    declare -i b_statusSuccess=0
+    declare -i b_statusFail=0
+    echo ""                                                             | ./boxes.sh
+    echo ""                                                             | ./boxes.sh
     for plugin in "${a_PLUGINRepoEnv[@]}"; do
-        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         echo -en "\033[2A\033[2K"
+        cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
 
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${blink}${LightGreen}%-17s${NC}\n"  \
-        "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[     adding    ]"        | ./boxes.sh
+        str_count=$(printf "%2s" "$i")
+        LEFT1=$CONTAINER;                   LEFT2="${str_count}::Store-->ChRIS (add)"
+        RIGHT1="<-- <-- <-- <-"             RIGHT2="in progress"
+        opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
         computeDescription="${ENV} description"
-        docker-compose -f ${DOCKER_COMPOSE_FILE}                    \
-            exec ${CHRIS} python plugins/services/manager.py        \
-            add "$ENV" "http://pfcon.remote:30005/api/v1/"                    \
-            --description "$ENV Description" >& dc.out >/dev/null
+        docker-compose -f ${DOCKER_COMPOSE_FILE}                        \
+            exec ${CHRIS} python plugins/services/manager.py            \
+            add "$ENV" "http://pfcon.remote:30005/api/v1/"              \
+            --description "$ENV Description" >& dc.out
         status=$?
-        echo -en "\033[3A\033[2K"
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${LightGreen}%-17s${NC}\n"          \
-        "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[ added success ]"        | ./boxes.sh
-        cat dc.out | ./boxes.sh
-        echo -en "\033[1A\033[2K"
-        printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${blink}${LightGreen}%-17s${NC}\n"  \
-        "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[ registering   ]"          | ./boxes.sh
+        status_check $status
         windowBottom
-        docker-compose -f ${DOCKER_COMPOSE_FILE}                    \
-            exec ${CHRIS} python plugins/services/manager.py        \
-            register $ENV --pluginname "$CONTAINER"  >& dc.out >/dev/null
-        status=$?
+
         echo -en "\033[3A\033[2K"
-        if (( $status == 0 )) ; then
-            printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${GreenBG}${White}%-17s${NC}\n"      \
-            "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[ register  OK  ]"    | ./boxes.sh
-            b_registerSuccess=$(( b_registerSuccess+=1 ))
-        else
-            printf "${Yellow}%5s${LightCyan}%-35s${Yellow}%23s${RedBG}${White}%-17s${NC}\n"   \
-            "$i: " "$REPO/$CONTAINER" "[ChRIS]::$ENV<--" "[ register fail ]"    | ./boxes.sh
-            b_registerFail=$(( b_registerFail+=1 ))
-        fi
-        cat dc.out | ./boxes.sh
+        LEFT2="${str_count}::Store-->ChRIS (register)" ; RIGHT2="in progress"
+        opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
+        windowBottom
+        docker-compose -f ${DOCKER_COMPOSE_FILE}                        \
+            exec ${CHRIS} python plugins/services/manager.py            \
+                        register $ENV --pluginname "$CONTAINER"  >& dc.out
+        RIGHT1="--> --> --> ->"
+        status=$?
+        status_check $status
+        windowBottom
+        ((b_statusSuccess--))
         ((i++))
-        windowBottom
     done
     echo -en "\033[2A\033[2K"
     echo ""                                                             | ./boxes.sh
-    if (( b_registerSuccess )) ; then
+    if (( b_statusSuccess >= 0 )) ; then
         printf "${LightCyan}%18s${LightGreen}%-62s${NC}\n"              \
-            "$b_registerSuccess"                                        \
+            "$b_statusSuccess"                                          \
             " plugin(s)+env(s) successfully registered to ChRIS"        | ./boxes.sh
         echo ""                                                         | ./boxes.sh
     fi
-    if (( b_registerFail )) ; then
+    if (( b_statusFail )) ; then
         printf "${Red}%18s${Brown}%-62s${NC}\n"                         \
-            "$b_registerFail"                                           \
+            "$b_statusFail"                                             \
             " plugin(s)+env(s)  failed  to  register  to ChRIS."        | ./boxes.sh
         boxcenter "Plugins that failed to register to ChRIS will not"    ${LightRed}
         boxcenter "be available for use in the system.  Please check"    ${LightRed}

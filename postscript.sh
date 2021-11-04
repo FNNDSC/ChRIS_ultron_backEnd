@@ -30,7 +30,7 @@
                     fnndsc/pl-mri10yr06mo01da_normal^moc,           \
                     fnndsc/pl-mgz2lut_report,                       \
                     fnndsc/pl-pfdo_mgz2img,                         \
-		    jonocameron/pl-sevstack,                        \
+                    jonocameron/pl-sevstack,                        \
                     fnndsc/pl-topologicalcopy,                      \
                     fnndsc/pl-brainmgz,                             \
                     fnndsc/pl-pfdorun,                              \
