@@ -57,6 +57,7 @@ CHRIS=chris_dev
 TARGET=dev
 declare -i STEP=0
 declare -i b_json=0
+declare -i thisStatusCheckOK=0
 HERE=$(pwd)
 LINE="------------------------------------------------"
 
@@ -67,9 +68,10 @@ fi
 status_check () {
     STATUS=$1
     RIGHT2=$2
+    thisStatusCheckOK=0
     if [[ $STATUS == "0" ]] ; then
+        thisStatusCheckOK=1
         b_statusSuccess=$(( b_statusSuccess+=1 ))
-        a_storePluginOK+=("$plugin")
         echo -en "\033[3A\033[2K"
         if (( ! ${#RIGHT2} ))  ; then
             RIGHT2="success"
@@ -255,14 +257,15 @@ title -d 1  "Checking on container plugins " \
             opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "pulling"
             windowBottom
             CMD="docker pull $REPO/$CONTAINER"
-            echo $CMD | sh >& dc.out >/dev/null
             RIGHT1="latest-->"; LEFT2="::$REPO (pulled)"
+            echo $CMD | sh >& dc.out >/dev/null
             status=$?
             status_check $status
             if (( status == 0 )) ; then
                 a_storePluginOK+=("$plugin")
             fi
-            cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'    | ./boxes.sh
+        else
+            a_storePluginOK+=("$plugin")
         fi
     done
     if (( b_statusSuccess > 0 )) ; then
@@ -273,8 +276,9 @@ title -d 1  "Checking on container plugins " \
         echo ""                                                         | ./boxes.sh
     fi
     if (( b_statusFail > 0 )) ; then
+        echo ""                                                         | ./boxes.sh
         printf "${LightRed}%27s${Brown}%-53s${NC}\n"                    \
-            "$b_pullFail"                                               \
+            "$b_statusFail"                                             \
         " images were not successfully pulled."                         | ./boxes.sh
         boxcenter " "
         boxcenter "The attempt to pull some containers resulted in a "  ${LightRed}
@@ -303,7 +307,7 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
     declare -i b_noStore=0
     echo ""                                                                         | ./boxes.sh
     echo ""                                                                         | ./boxes.sh
-    for plugin in "${a_PLUGINRepoEnv[@]}"; do
+    for plugin in "${a_storePluginOK[@]}"; do
         echo -en "\033[2A\033[2K"
         cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
         CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null"
@@ -317,6 +321,10 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2>/dev/null)
         status=$?
         status_check $status
+        if (( !thisStatusCheckOK )) ; then
+            windowBottom
+            continue
+        fi
         ((b_statusSuccess--))
         windowBottom
         echo -en "\033[3A\033[2K"
@@ -402,7 +410,7 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
     declare -i b_statusFail=0
     echo ""                                                             | ./boxes.sh
     echo ""                                                             | ./boxes.sh
-    for plugin in "${a_PLUGINRepoEnv[@]}"; do
+    for plugin in "${a_storePluginOK[@]}"; do
         echo -en "\033[2A\033[2K"
         cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
 
@@ -419,7 +427,6 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         status=$?
         status_check $status
         windowBottom
-
         echo -en "\033[3A\033[2K"
         LEFT2="${str_count}::Store-->ChRIS (register)" ; RIGHT2="in progress"
         opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
