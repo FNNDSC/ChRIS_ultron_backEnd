@@ -307,6 +307,7 @@ class FeedList(generics.ListAPIView):
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),
+                 'filebrowser': reverse('filebrowserpath-list', request=request),
                  'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
         return services.append_collection_links(response, links)
 

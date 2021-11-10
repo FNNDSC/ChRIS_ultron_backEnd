@@ -1,6 +1,5 @@
 
 from django.urls import path, re_path, include
-
 from rest_framework.urlpatterns import format_suffix_patterns
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -13,7 +12,9 @@ from pipelineinstances import views as pipelineinstance_views
 from uploadedfiles import views as uploadedfile_views
 from pacsfiles import views as pacsfile_views
 from servicefiles import views as servicefile_views
+from filebrowser import views as filebrowser_views
 from users import views as user_views
+
 
 # API v1 endpoints
 urlpatterns = format_suffix_patterns([
@@ -324,6 +325,23 @@ urlpatterns = format_suffix_patterns([
     re_path(r'^v1/servicefiles/(?P<pk>[0-9]+)/.*$',
         servicefile_views.ServiceFileResource.as_view(),
         name='servicefile-resource'),
+
+
+    path('v1/filebrowser/',
+         filebrowser_views.FileBrowserPathList.as_view(),
+         name='filebrowserpath-list'),
+
+    path('v1/filebrowser/search/',
+         filebrowser_views.FileBrowserPathListQuerySearch.as_view(),
+         name='filebrowserpath-list-query-search'),
+
+    path('v1/filebrowser/<path:path>/',
+         filebrowser_views.FileBrowserPath.as_view(),
+         name='filebrowserpath'),
+
+    path('v1/filebrowser-files/<path:path>/',
+         filebrowser_views.FileBrowserPathFileList.as_view(),
+         name='filebrowserpathfile-list'),
 
 ])
 
