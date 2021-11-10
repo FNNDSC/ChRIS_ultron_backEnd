@@ -1,11 +1,12 @@
 
 import json
 
-from rest_framework.serializers import HyperlinkedRelatedField, HyperlinkedIdentityField
-from rest_framework.serializers import HyperlinkedModelSerializer, ManyRelatedField
+from rest_framework.serializers import (HyperlinkedRelatedField, HyperlinkedIdentityField,
+                                        HyperlinkedModelSerializer, ManyRelatedField)
 from rest_framework.renderers import JSONRenderer
 
 from .fields import ItemLinkField
+from .serializers import NoModelSerializer
 
 
 class CollectionJsonRenderer(JSONRenderer):
@@ -22,6 +23,8 @@ class CollectionJsonRenderer(JSONRenderer):
     def _get_id_field(self, serializer):
         if isinstance(serializer, HyperlinkedModelSerializer):
             return serializer.url_field_name
+        elif isinstance(serializer, NoModelSerializer):
+            return serializer.get_url_field_name()
         else:
             return None
 

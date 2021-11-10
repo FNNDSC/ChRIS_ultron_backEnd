@@ -53,14 +53,22 @@ def filter_files_by_n_slashes(queryset, value):
     lookup += '$'
     qs = queryset.filter(fname__regex=lookup)
     if value.endswith('u'):
-        ids = []
-        hash_d = {}
-        for f in qs.all():
-            path = f.fname.name
-            last_slash_ix = path.rindex('/')
-            path = path[:last_slash_ix]
-            if path not in hash_d:
-                ids.append(f.id)
-                hash_d[path] = None
-        return qs.filter(pk__in=ids)
+        return unique_files_queryset_by_folder(qs)
     return qs
+
+
+def unique_files_queryset_by_folder(queryset):
+    """
+    Utility function to return only one file per each last "folder" in the path
+    (useful to efficiently get the list of immediate folders under the path).
+    """
+    ids = []
+    hash_set = set()
+    for f in queryset.all():
+        path = f.fname.name
+        last_slash_ix = path.rindex('/')
+        path = path[:last_slash_ix]
+        if path not in hash_set:
+            ids.append(f.id)
+            hash_set.add(path)
+    return queryset.filter(pk__in=ids)

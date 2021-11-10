@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'uploadedfiles',
     'pacsfiles',
     'servicefiles',
+    'filebrowser',
     'users'
 ]
 
