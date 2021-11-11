@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# If you are on macOS, please make sure you have a default `bash` that is
+# newer than the bundled /bin/bash -- that default shell WILL NOT work with
+# this script.
 
 # TL:DR
 quick_n_VeryDirtyStart="
@@ -255,8 +258,13 @@ title -d 1 "Setting global exports"
             mkdir -p $STOREBASE
         fi
     fi
+    if (( ${#STOREBASE} > 80 )) ; then
+        STOREBASEdisp="...${STOREBASE: -77}"
+    else
+        STOREBASEdisp=$STOREBASE
+    fi
     boxcenter "-= STOREBASE =-"
-    echo "$STOREBASE"                                               | ./boxes.sh LightCyan
+    echo "${STOREBASEdisp}"                                               | ./boxes.sh LightCyan
     export STOREBASE=$STOREBASE
 windowBottom
 
@@ -287,7 +295,8 @@ title -d 1 "Pulling non-'local/' core containers where needed"      \
                 printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"   \
                         "$ docker pull" " ${REPO}/$CONTAINER"       | ./boxes.sh
                 windowBottom
-                sleep 1
+                $CMD  >& dc.out
+                # sleep 1
                 dc_check $?
             fi
         done
@@ -326,7 +335,7 @@ title -d 1 "Changing permissions to 755 on" "$HERE"
     dc_check $?
 windowBottom
 
-title -d 1 "Checking that STOREBASE directory tree is empty" "$STOREBASE"
+title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASEdisp: -3}"
     chmod -R 777 $STOREBASE
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
@@ -393,8 +402,8 @@ title -d 1 "Waiting for remote pfcon containers to start running on"\
                         --field-selector=status.phase=Running --               \
                         output=jsonpath='{.items[*].metadata.name}')
         fi
-        echo -en "\033[3A\033[2K"
         if [ -n "$pfcon" ]; then
+          echo -en "\033[3A\033[2K"
           boxcenter ""
           boxcenter "Success: pfcon container is running on $ORCHESTRATOR"      LightGreen
           boxcenter ""
@@ -402,6 +411,7 @@ title -d 1 "Waiting for remote pfcon containers to start running on"\
         fi
     done
     if [ -z "$pfcon" ]; then
+        echo -en "\033[3A\033[2K"
         boxcenter
         boxcenter "Error: couldn't start pfcon container on $ORCHESTRATOR" Red
         boxcenter "This script will now terminate with exit code '2'."     Red

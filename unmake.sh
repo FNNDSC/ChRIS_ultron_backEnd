@@ -95,7 +95,12 @@ title -d 1 "Setting global exports"
         STOREBASE=$(pwd)/CHRIS_REMOTE_FS
     fi
     boxcenter "-= STOREBASE =-"
-    echo "$STOREBASE"                                               | ./boxes.sh LightCyan
+    if (( ${#STOREBASE} > 80 )) ; then
+        STOREBASEdisp="...${STOREBASE: -77}"
+    else
+        STOREBASEdisp=$STOREBASE
+    fi
+    echo "$STOREBASEdisp"                                               | ./boxes.sh LightCyan
     export STOREBASE=$STOREBASE
 
     if [[ $ORCHESTRATOR == kubernetes ]]; then
