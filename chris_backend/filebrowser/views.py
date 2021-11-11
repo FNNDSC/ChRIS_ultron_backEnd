@@ -6,9 +6,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.utils import filter_files_by_n_slashes
-from .serializers import FileBrowserPathListSerializer, FileBrowserPathSerializer
-from .services import (get_path_folders, get_path_file_serializer_class,
-                       get_path_file_queryset)
+from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
+                          FileBrowserPathFileSerializer)
+from .services import get_path_folders, get_path_file_queryset, get_path_file_model_class
 
 
 class FileBrowserPathList(generics.ListAPIView):
@@ -140,4 +140,6 @@ class FileBrowserPathFileList(generics.ListAPIView):
         """
         username = self.request.user.username
         path = self.kwargs.get('path')
-        return get_path_file_serializer_class(path, username)
+        model_class = get_path_file_model_class(path, username)
+        FileBrowserPathFileSerializer.Meta.model = model_class
+        return FileBrowserPathFileSerializer
