@@ -4,6 +4,7 @@ from rest_framework.reverse import reverse
 
 from collectionjson.serializers import NoModelSerializer
 from collectionjson.fields import ItemLinkField
+from core.utils import get_file_resource_link
 
 
 class FileBrowserPathListSerializer(NoModelSerializer):
@@ -40,3 +41,19 @@ class FileBrowserPathSerializer(NoModelSerializer):
         request = self.context['request']
         path = self.context['view'].kwargs.get('path')
         return reverse('filebrowserpathfile-list', request=request, kwargs={"path": path})
+
+
+class FileBrowserPathFileSerializer(serializers.HyperlinkedModelSerializer):
+    fname = serializers.FileField(use_url=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
+    file_resource = ItemLinkField('get_file_link')
+
+    class Meta:
+        model = None
+        fields = ('url', 'creation_date', 'fname', 'fsize', 'file_resource')
+
+    def get_file_link(self, obj):
+        """
+        Custom method to get the hyperlink to the actual file resource.
+        """
+        return get_file_resource_link(self, obj)
