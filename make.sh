@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # If you are on macOS, please make sure you have a default `bash` that is
 # newer than the bundled /bin/bash -- that default shell WILL NOT work with
 # this script.
