@@ -13,7 +13,8 @@ from .services import get_path_folders, get_path_file_queryset, get_path_file_mo
 
 class FileBrowserPathList(generics.ListAPIView):
     """
-    A view for the initial page of the collection of file browser paths.
+    A view for the initial page of the collection of file browser paths. The returned
+    collection only has a single element.
     """
     http_method_names = ['get']
     serializer_class = FileBrowserPathListSerializer
@@ -33,8 +34,8 @@ class FileBrowserPathList(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset that is only comprised by the two initial
-        folders.
+        Overriden to return a custom queryset that is only comprised by the initial
+        path (empty path).
         """
         username = self.request.user.username
         objects = [{'path': '', 'subfolders': f'SERVICES,{username}'}]
@@ -44,6 +45,7 @@ class FileBrowserPathList(generics.ListAPIView):
 class FileBrowserPathListQuerySearch(generics.ListAPIView):
     """
     A view for the collection of file browser paths resulting from a query search.
+    The returned collection only has at most one element.
     """
     http_method_names = ['get']
     permission_classes = (permissions.IsAuthenticated,)
