@@ -37,8 +37,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
         value on creation.
         """
         self.request.data.pop('status', None)
-        self.request.data.pop('summary', None)
-        self.request.data.pop('raw', None)
         return super(PluginInstanceList, self).create(request, *args, **kwargs)
 
     def perform_create(self, serializer):

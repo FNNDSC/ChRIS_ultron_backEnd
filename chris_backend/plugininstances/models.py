@@ -36,8 +36,9 @@ class PluginInstance(models.Model):
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
-    summary = models.CharField(max_length=4000, blank=True, default='')
-    raw = models.TextField(blank=True, default='')
+    summary = models.CharField(max_length=4000, blank=True)
+    raw = models.TextField(blank=True)
+    size = models.IntegerField(default=0)
     error_code = models.CharField(max_length=7, blank=True)
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
