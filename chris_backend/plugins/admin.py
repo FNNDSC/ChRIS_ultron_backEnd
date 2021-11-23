@@ -149,8 +149,8 @@ class PluginAdminForm(forms.ModelForm):
 class PluginAdmin(admin.ModelAdmin):
     form = PluginAdminForm
     list_display = ('meta', 'version', 'id')
-    search_fields = ['meta', 'version']
-    list_filter = ['meta', 'creation_date']
+    search_fields = ['meta__name', 'version']
+    list_filter = ['meta__name', 'creation_date']
     change_form_template = 'admin/plugins/plugin/change_form.html'
     change_list_template = 'admin/plugins/plugin/change_list.html'
 
