@@ -202,7 +202,9 @@ class PluginInstanceManager(object):
         Cancel a plugin instance's app execution. It connects to the remote service
         to cancel job.
         """
-        pass
+        self.c_plugin_inst.status = 'cancelled'
+        self.delete_plugin_instance_job_from_remote()
+        self.save_plugin_instance_final_status()
 
     def delete_plugin_instance_job_from_remote(self):
         """

@@ -18,8 +18,7 @@ from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializ
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import (IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly,
                           IsOwnerOrReadOnly)
-from .tasks import (run_plugin_instance, check_plugin_instance_exec_status,
-                    cancel_plugin_instance)
+from .tasks import run_plugin_instance, cancel_plugin_instance
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -217,7 +216,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         descendants = instance.get_descendant_instances()
         if instance.status == 'started':
-            cancel_plugin_instance.delay(instance.id)  # call async task
+            cancel_plugin_instance(instance.id)
         for plg_inst in descendants:
             if plg_inst.status not in ('finishedSuccessfully', 'finishedWithError',
                                        'cancelled'):
