@@ -76,6 +76,13 @@ class PluginInstanceTasksTests(TasksTests):
             tasks.check_plugin_instance_exec_status(self.plg_inst.id)
             check_exec_status_mock.assert_called_with()
 
+    def test_task_cancel_plugin_instance(self):
+        with mock.patch.object(tasks.PluginInstanceManager,
+                               'cancel_plugin_instance_app_exec',
+                               return_value=None) as cancel_mock:
+            tasks.cancel_plugin_instance(self.plg_inst.id)
+            cancel_mock.assert_called_with()
+
     def test_task_check_started_plugin_instances_exec_status(self):
         with mock.patch.object(tasks.check_plugin_instance_exec_status, 'delay',
                                return_value=None) as delay_mock:
