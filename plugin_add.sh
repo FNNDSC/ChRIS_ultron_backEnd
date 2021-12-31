@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # NAME
 #
@@ -344,8 +344,8 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         RIGHT1="--> --> --> ->"
         status=$?
         RIGHT2=""
-        let b_NR=$(cat dc.out | grep "not running" | wc -l)
-        let b_exist=$(cat dc.out | grep "already exists" | wc -l)
+        b_NR=$(cat dc.out | grep -c "not running")
+        b_exist=$(cat dc.out | grep -c "already exists")
         if ((  b_exist )) ; then
             RIGHT2="already"
             ((b_already++))
