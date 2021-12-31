@@ -43,17 +43,21 @@ class PluginManager(object):
                                 help="compute resource's url")
         parser_add.add_argument('--description', default='',
                                 help="compute resource's description")
+        parser_add.add_argument('--maxjobexecseconds', type=int,
+                                help="compute resource's max job execution time in "
+                                     "seconds")
 
         # create the parser for the "modify" command
         parser_modify = subparsers.add_parser('modify',
                                               help='modify existing compute resource')
         parser_modify.add_argument('computeresource', help="compute resource")
-        parser_modify.add_argument('--name',
-                                help="compute resource's new name")
-        parser_modify.add_argument('--url',
-                                help="compute resource's new url")
+        parser_modify.add_argument('--name', help="compute resource's new name")
+        parser_modify.add_argument('--url', help="compute resource's new url")
         parser_modify.add_argument('--description', default='',
-                                help="compute resource's new description")
+                                   help="compute resource's new description")
+        parser_modify.add_argument('--maxjobexecseconds', type=int,
+                                   help="compute resource's new max job execution time "
+                                        "in seconds")
 
         # create parser for the "register" command
         parser_register = subparsers.add_parser(
@@ -77,7 +81,7 @@ class PluginManager(object):
 
         self.parser = parser
 
-    def add_compute_resource(self, name, url, description):
+    def add_compute_resource(self, name, url, description, maxjobexecsec):
         """
         Add a new compute resource to the system.
         """
@@ -86,12 +90,14 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             data = {'name': name, 'compute_url': url, 'description': description}
+            if maxjobexecsec:
+                data['max_job_exec_seconds'] = maxjobexecsec
             compute_resource_serializer = ComputeResourceSerializer(data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
         return cr
 
-    def modify_compute_resource(self, name, new_name, url, description):
+    def modify_compute_resource(self, name, new_name, url, description, maxjobexecsec):
         """
         Modify an existing compute resource and add the current date as a new
         modification date.
@@ -100,11 +106,14 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             raise NameError("Compute resource '%s' does not exists" % name)
-        if new_name or url or description:
+        if new_name or url or description or maxjobexecsec:
             data = {}
             data['name'] = new_name if new_name else cr.name
             data['compute_url'] = url if url else cr.compute_url
-            data['description'] = description if description else cr.description
+            if description:
+                data['description'] = description
+            if maxjobexecsec:
+                data['max_job_exec_seconds'] = maxjobexecsec
             compute_resource_serializer = ComputeResourceSerializer(cr, data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
@@ -251,14 +260,15 @@ class PluginManager(object):
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
             self.add_compute_resource(options.computeresource, options.url,
-                                      options.description)
+                                      options.description, options.maxjobexecseconds)
         elif options.subparser_name == 'modify':
             self.modify_compute_resource(options.computeresource, options.name,
-                                         options.url, options.description)
+                                         options.url, options.description,
+                                         options.maxjobexecseconds)
         elif options.subparser_name == 'register':
             if options.pluginurl:
                 self.register_plugin_by_url(options.pluginurl, options.computeresource,
-                                       options.storetimeout)
+                                            options.storetimeout)
             elif options.pluginname:
                 self.register_plugin(options.pluginname, options.pluginversion,
                                      options.computeresource, options.storetimeout)
