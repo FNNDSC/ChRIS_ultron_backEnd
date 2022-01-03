@@ -157,14 +157,27 @@ class PluginInstanceManager(object):
 
     def check_plugin_instance_app_exec_status(self):
         """
-        Check a plugin instance's app execution status. It connects to the remote pfcon
-        service to determine job status and if finished without error then downloads
-        and unpacks job's zip file and registers output files with the DB. Finally it
-        sends a request to delete the job from the remote environment.
+        Check a plugin instance's app execution status. If the associated job's
+        execution time exceeds the maximum set for the remote compute environment then
+        the job is cancelled. Otherwise the job's execution status is fetched from the
+        remote and if finished without error then the job's zip file is downloaded and
+        unpacked and the output files registered with the DB. Finally a delete request
+        is made to remove the job from the remote environment.
         """
         if self.c_plugin_inst.status == 'started':
-            pfcon_url = self.pfcon_client.url
             job_id = self.str_job_id
+
+            delta_exec_time = timezone.now() - self.c_plugin_inst.start_date
+            delta_seconds = delta_exec_time.total_seconds()
+            max_exec_seconds = self.c_plugin_inst.compute_resource.max_job_exec_seconds
+            if delta_seconds > max_exec_seconds:
+                logger.error(f'[CODE13,{job_id}]: Error, job exceeded maximum execution '
+                             f'time ({max_exec_seconds} seconds)')
+                self.c_plugin_inst.error_code = 'CODE13'
+                self.cancel_plugin_instance_app_exec()
+                return self.c_plugin_inst.status
+
+            pfcon_url = self.pfcon_client.url
             logger.info(f'Sending job status request to pfcon url -->{pfcon_url}<-- for '
                         f'job {job_id}')
             try:
@@ -573,9 +586,7 @@ class PluginInstanceManager(object):
         job_id = self.str_job_id
         logger.error(f'[CODE10,{job_id}]: Got undefined status from remote')
         self.c_plugin_inst.error_code = 'CODE10'
-        self.c_plugin_inst.status = 'cancelled'
-        self.delete_plugin_instance_job_from_remote()
-        self.save_plugin_instance_final_status()
+        self.cancel_plugin_instance_app_exec()
 
     def _register_output_files(self, filenames):
         """

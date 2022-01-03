@@ -29,17 +29,17 @@ class ComputeResourceAdmin(admin.ModelAdmin):
 
     def add_view(self, request, form_url='', extra_context=None):
         """
-        Overriden to only show the required fields in the add compute resource page.
+        Overriden to only show the read/write fields in the add compute resource page.
         """
-        self.fields = ['name', 'compute_url', 'description']
+        self.fields = ['name', 'compute_url', 'description', 'max_job_exec_seconds']
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """
         Overriden to show all compute resources's fields in the compute resource page.
         """
-        self.fields = ['name', 'compute_url', 'description', 'creation_date',
-                       'modification_date']
+        self.fields = ['name', 'compute_url', 'description', 'max_job_exec_seconds',
+                       'creation_date', 'modification_date']
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 
@@ -314,7 +314,8 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
         """
         response = super(ComputeResourceAdminList, self).list(request, *args, **kwargs)
         # append write template
-        template_data = {'name': '', 'compute_url': '', 'description': ''}
+        template_data = {'name': '', 'compute_url': '', 'description': '',
+                         'max_job_exec_seconds': ''}
         return services.append_collection_template(response, template_data)
 
 
