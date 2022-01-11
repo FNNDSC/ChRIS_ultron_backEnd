@@ -268,7 +268,7 @@ declare -a A_CONTAINER=(
     "fnndsc/docker-swift-onlyone^SWIFTREPO"
 )
 
-title -d 1 "Setting global exports"
+rm -f dc.out ; title -d 1 "Setting global exports"
     boxcenter "-= ORCHESTRATOR =-"
     boxcenter "$ORCHESTRATOR"                                                    LightCyan
     boxcenter ""
@@ -301,7 +301,7 @@ title -d 1 "Setting global exports"
     export STOREBASE=$STOREBASE
 windowBottom
 
-title -d 1 "Pulling non-'local/' core containers where needed"      \
+rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"      \
             "and creating appropriate .env for docker-compose"
 
     printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
@@ -338,7 +338,7 @@ title -d 1 "Pulling non-'local/' core containers where needed"      \
 windowBottom
 
 if (( ! b_skipIntro )) ; then
-    title -d 1 "Ancillary services version info:"
+    rm -f dc.out ; title -d 1 "Ancillary services version info:"
     boxcenter ""
     for CORE in ${A_CONTAINER[@]} ; do
         cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
@@ -360,7 +360,7 @@ fi
 boxcenter ""
 windowBottom
 
-title -d 1 "Changing permissions to 755 on" "$HERE"
+rm -f dc.out ; title -d 1 "Changing permissions to 755 on" "$HERE"
     cd $HERE
     echo "$ chmod -R 755 $HERE"                                     | ./boxes.sh LightCyan
     windowBottom
@@ -368,7 +368,7 @@ title -d 1 "Changing permissions to 755 on" "$HERE"
     dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASE}"
+rm -f dc.out ; title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASE}"
     chmod -R 777 $STOREBASE
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
@@ -398,7 +398,7 @@ title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASE}"
 windowBottom
 
 if [[ $ORCHESTRATOR == swarm ]]; then
-    title -d 1  "Creating overlay network: remote"
+    rm -f dc.out ; title -d 1  "Creating overlay network: remote"
     echo "$ docker network create -d overlay --attachable remote"   | ./boxes.sh LightCyan
     windowBottom
     docker network create -d overlay --attachable remote            >& dc.out
@@ -406,7 +406,7 @@ if [[ $ORCHESTRATOR == swarm ]]; then
     windowBottom
 fi
 
-title -d 1 "Starting remote pfcon containerized environment on"     \
+rm -f dc.out ; title -d 1 "Starting remote pfcon containerized environment on"     \
                                 "-= $ORCHESTRATOR =-"
     if [[ $ORCHESTRATOR == swarm ]]; then
         echo "$ docker stack deploy -c swarm/docker-compose_remote.yml pfcon_stack"\
@@ -422,7 +422,7 @@ title -d 1 "Starting remote pfcon containerized environment on"     \
     dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Waiting for remote pfcon containers to start running on"\
+rm -f dc.out ; title -d 1 "Waiting for remote pfcon containers to start running on"\
                                 "-= $ORCHESTRATOR =-"
     echo "Starting pfcon... please be patient."                     | ./boxes.sh Yellow
     windowBottom
@@ -454,7 +454,7 @@ title -d 1 "Waiting for remote pfcon containers to start running on"\
     fi
 windowBottom
 
-title -d 1  "Starting CUBE containerized development environment using "            \
+rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
                         "./docker-compose_dev.yml"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     echo "$ docker-compose -f docker-compose_dev.yml up -d"         | ./boxes.sh LightCyan
@@ -463,7 +463,7 @@ title -d 1  "Starting CUBE containerized development environment using "        
     dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Waiting until ChRIS database server is ready to accept connections"
+rm -f dc.out ; title -d 1 "Waiting until ChRIS database server is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
@@ -475,7 +475,7 @@ title -d 1 "Waiting until ChRIS database server is ready to accept connections"
     echo ""                                                         | ./boxes.sh
 windowBottom
 
-title -d 1 "Waiting until CUBE is ready to accept connections"
+rm -f dc.out ; title -d 1 "Waiting until CUBE is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
@@ -488,7 +488,7 @@ title -d 1 "Waiting until CUBE is ready to accept connections"
     echo ""                                                         | ./boxes.sh
 windowBottom
 
-title -d 1 "Waiting until remote pfcon is ready to accept connections"
+rm -f dc.out ; title -d 1 "Waiting until remote pfcon is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
@@ -503,14 +503,14 @@ title -d 1 "Waiting until remote pfcon is ready to accept connections"
 windowBottom
 
 if (( ! b_skipUnitTests )) ; then
-    title -d 1 "Running CUBE Unit tests"
+    rm -f dc.out ; title -d 1 "Running CUBE Unit tests"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
         test --exclude-tag integration
     status=$?
-    title -d 1 "CUBE Unit tests' results"
+    rm -f dc.out ; title -d 1 "CUBE Unit tests' results"
     if (( $status == 0 )) ; then
         printf "%40s${LightGreen}%40s${NC}\n"                       \
             "CUBE Unit tests" "[ success ]"                         | ./boxes.sh
@@ -522,14 +522,14 @@ if (( ! b_skipUnitTests )) ; then
 fi
 
 if (( ! b_skipIntegrationTests )) ; then
-    title -d 1 "Running CUBE Integration tests"
+    rm -f dc.out ; title -d 1 "Running CUBE Integration tests"
     echo "This might take a while... please be patient."            | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
         test --tag integration
     status=$?
-    title -d 1 "CUBE Integration tests' results"
+    rm -f dc.out ; title -d 1 "CUBE Integration tests' results"
     if (( $status == 0 )) ; then
         printf "%40s${LightGreen}%40s${NC}\n"                       \
             "CUBE Integration tests" "[ success ]"                  | ./boxes.sh
@@ -540,7 +540,7 @@ if (( ! b_skipIntegrationTests )) ; then
     windowBottom
 fi
 
-title -d 1 "Waiting until ChRIS store is ready to accept connections"
+rm -f dc.out ; title -d 1 "Waiting until ChRIS store is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
@@ -593,7 +593,7 @@ STEP=$(expr $STEP + 1 )
 "
 
 STEP=$(expr $STEP + 4 )
-title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
+rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
                         "(unmutable and available to all users)"
     S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve --version)
     SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp --version)
@@ -627,7 +627,7 @@ title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
     dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Automatically creating a locked pipeline in CUBE"       \
+rm -f dc.out ; title -d 1 "Automatically creating a locked pipeline in CUBE"       \
         "(mutable by the owner and not available to other users)"
     PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}_1"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
@@ -641,7 +641,7 @@ title -d 1 "Automatically creating a locked pipeline in CUBE"       \
     dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
+rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
                 "(unmutable and available to all users)"
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
@@ -655,7 +655,7 @@ title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
     dc_check $? "PRINT"
 windowBottom
 
-# title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
+# rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
 #                 "(unmutable and available to all users)"
 #     PIPELINE_NAME="DICOM_anonymization_and_tag_extractor"
 #     printf "%20s${LightBlue}%60s${NC}\n"                            \
@@ -669,7 +669,7 @@ windowBottom
 #     dc_check $? "PRINT"
 # windowBottom
 
-title -d 1 "Restarting CUBE's Django development server"
+rm -f dc.out ; title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                 "Restarting" "chris_dev"                        | ./boxes.sh
     windowBottom
@@ -678,7 +678,7 @@ title -d 1 "Restarting CUBE's Django development server"
 windowBottom
 
 if (( !  b_norestartinteractive_chris_dev )) ; then
-    title -d 1 "Attaching interactive terminal (ctrl-c to detach)"
+    rm -f dc.out ; title -d 1 "Attaching interactive terminal (ctrl-c to detach)"
     chris_dev=$(docker ps -f name=chris_dev_1 -q)
     docker attach --detach-keys ctrl-c $chris_dev
 fi
