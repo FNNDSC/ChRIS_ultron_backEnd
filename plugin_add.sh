@@ -85,31 +85,66 @@ status_check () {
         fi
         opFail_feedback "$LEFT1" "$LEFT2"  "$RIGHT1" "$RIGHT2"
         if [[ -f dc.out ]] ; then
-            cat dc.out |sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+            cat dc.out                                                      |\
+            sed 's/[[:alnum:]]+:/\n&/g'                                     |\
+            sed -E 's/(.{80})/\1\n/g'                                       | ./boxes.sh LightRed
         fi
+    fi
+}
+
+catw() {
+    FILE=$1
+    COLOR=$2
+    if (( !${#COLOR} )) ; then
+        COLOR=White
+    fi
+    if [[ -f $FILE ]] ; then
+        cat dc.out                                                      |\
+        sed 's/[[:alnum:]]+:/\n&/g'                                     |\
+        sed -E 's/(.{80})/\1\n/g'                                       | ./boxes.sh $COLOR
     fi
 }
 
 dc_check () {
     STATUS=$1
+    DCECHO=$2
+    thisStatusCheckOK=0
     if [[ $STATUS != "0" ]] ; then
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out LightRed
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     else
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                          | ./boxes.sh White
+        thisStatusCheckOK=1
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out White
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     fi
 }
 
 dc_check_code () {
     STATUS=$1
     CODE=$2
+    DCECHO=$3
     if (( $CODE > 1 )) ; then
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed 's/[[:alnum:]]+:/\n&/g' |sed -E 's/(.{80})/\1\n/g' | ./boxes.sh LightRed
+        if [[ ${#DCECHO} ]] ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out LightRed
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     else
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                          | ./boxes.sh White
+        if [[ ${#DCECHO} ]] ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out White
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     fi
 }
 
@@ -319,16 +354,16 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         windowBottom
 
         PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2>/dev/null)
+        strPLUGIN_REP=$(echo "$PLUGIN_REP" | jq tostring)
         status=$?
-        status_check $status
+        dc_check $status
         if (( !thisStatusCheckOK )) ; then
             windowBottom
             continue
         fi
         ((b_statusSuccess--))
-        windowBottom
-        echo -en "\033[3A\033[2K"
-
+        # windowBottom
+        # echo -en "\033[3A\033[2K"
         if (( b_json )) ; then
             echo "$PLUGIN_REP" | python -m json.tool                                |\
                 sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'             | ./boxes.sh ${LightGreen}
@@ -337,12 +372,24 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         LEFT2="${str_count}::JSON-->Store" ; RIGHT2="in progress"
         opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
-        docker-compose -f ${DOCKER_COMPOSE_FILE}                                    \
-            exec chris_store python plugins/services/manager.py add "$CONTAINER"    \
-            cubeadmin https://github.com/FNNDSC "$REPO/$CONTAINER"                  \
-            --descriptorstring "$PLUGIN_REP" >& dc.out
-        RIGHT1="--> --> --> ->"
+        ## HORRID HACK ALERT (Jan 2022)
+        ## There seems no way to capture cleanly the std[out/err] from the
+        ## python call within the "docker-compose exec chris_store"
+        ## One hacky solution is to execute the python manager.py as a
+        ## sh -c within the container and capture str[out/err] *within*
+        ## the container FS. This means that the generated dc.out needs to
+        ## be copied from the chris_store FS which is just many levels of
+        ## horribleness. Maybe a better solution can be found?
+        docker-compose -f $DOCKER_COMPOSE_FILE                                \
+            exec chris_store sh -c                                            \
+            "python plugins/services/manager.py add $CONTAINER                \
+            cubeadmin https://github.com/FNNDSC $REPO/$CONTAINER              \
+            --descriptorstring $strPLUGIN_REP >dc.out 2>&1"
         status=$?
+        # Copy dc.out from the chris_store container to local FS
+        docker cp $(docker ps | grep chris_store | head -n 1                 |\
+                    awk '{print $1}'):/home/localuser/store_backend/dc.out ./
+        RIGHT1="--> --> --> ->"
         RIGHT2=""
         b_NR=$(cat dc.out | grep -c "not running")
         b_exist=$(cat dc.out | grep -c "already exists")
