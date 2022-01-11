@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# If you are on macOS, please make sure you have a default `bash` that is
-# newer than the bundled /bin/bash -- that default shell WILL NOT work with
-# this script.
+# If you are on macOS, please make sure that /usr/bin/env bash is NOT the
+# default /bin/bash! On macOS bash is effectively depricated and this script
+# will not work!
 
 # TL:DR
 quick_n_VeryDirtyStart="
@@ -150,29 +150,61 @@ if [[ -f .env ]] ; then
     source .env
 fi
 
+catw() {
+    FILE=$1
+    COLOR=$2
+    if (( !${#COLOR} )) ; then
+        COLOR=White
+    fi
+    if [[ -f $FILE ]] ; then
+        cat dc.out                                                      |\
+        sed 's/[[:alnum:]]+:/\n&/g'                                     |\
+        sed -E 's/(.{80})/\1\n/g'                                       | ./boxes.sh $COLOR
+    fi
+}
+
 dc_check () {
     STATUS=$1
+    DCECHO=$2
+    thisStatusCheckOK=0
     if [[ $STATUS != "0" ]] ; then
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh LightRed
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out LightRed
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     else
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                  | ./boxes.sh White
+        thisStatusCheckOK=1
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out White
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     fi
 }
 
 dc_check_code () {
     STATUS=$1
     CODE=$2
+    DCECHO=$3
     if (( $CODE > 1 )) ; then
-        echo -en "\033[2A\033[2K"
-        cat dc.out | sed -E 's/(.{80})/\1\n/g'                      | ./boxes.sh LightRed
+        if [[ ${#DCECHO} ]] ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out LightRed
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     else
-        echo -en "\033[2A\033[2K"
-        cat dc.out                                                  | ./boxes.sh White
+        if [[ ${#DCECHO} ]] ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out White
+        else
+            echo -en "\033[3A\033[2K"
+        fi
     fi
 }
-
 
 print_usage () {
     echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
@@ -276,13 +308,13 @@ title -d 1 "Pulling non-'local/' core containers where needed"      \
             "$ docker pull" " library/postgres"                     | ./boxes.sh
     windowBottom
     docker pull postgres:13 >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
             "$ docker pull" " library/rabbitmq"                     | ./boxes.sh
     windowBottom
     docker pull rabbitmq:3 >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 
     if (( ! b_skipIntro )) ; then
         echo "# Variables declared here are available to"               > .env
@@ -298,7 +330,7 @@ title -d 1 "Pulling non-'local/' core containers where needed"      \
                 windowBottom
                 $CMD  >& dc.out
                 # sleep 1
-                dc_check $?
+                dc_check $? "PRINT"
             fi
         done
         echo "TAG="                                                     >>.env
@@ -321,7 +353,7 @@ if (( ! b_skipIntro )) ; then
             echo "$ $CMD"                                           | ./boxes.sh LightCyan
             windowBottom
             $CMD  >& dc.out
-            dc_check_code $? 1
+            dc_check_code $? 1 "PRINT"
         fi
     done
 fi
@@ -333,10 +365,10 @@ title -d 1 "Changing permissions to 755 on" "$HERE"
     echo "$ chmod -R 755 $HERE"                                     | ./boxes.sh LightCyan
     windowBottom
     chmod -R 755 $HERE &> dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
 
-title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASEdisp: -3}"
+title -d 1 "Checking that STOREBASE directory tree is empty" "${STOREBASE}"
     chmod -R 777 $STOREBASE
     b_FSOK=1
     type -all tree >/dev/null 2>/dev/null
@@ -370,7 +402,7 @@ if [[ $ORCHESTRATOR == swarm ]]; then
     echo "$ docker network create -d overlay --attachable remote"   | ./boxes.sh LightCyan
     windowBottom
     docker network create -d overlay --attachable remote            >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
     windowBottom
 fi
 
@@ -387,7 +419,7 @@ title -d 1 "Starting remote pfcon containerized environment on"     \
       windowBottom
       envsubst < kubernetes/remote.yaml | kubectl apply -f - >& dc.out
     fi
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
 
 title -d 1 "Waiting for remote pfcon containers to start running on"\
@@ -428,7 +460,7 @@ title -d 1  "Starting CUBE containerized development environment using "        
     echo "$ docker-compose -f docker-compose_dev.yml up -d"         | ./boxes.sh LightCyan
     windowBottom
     docker-compose -f docker-compose_dev.yml up -d        >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
 
 title -d 1 "Waiting until ChRIS database server is ready to accept connections"
@@ -436,9 +468,8 @@ title -d 1 "Waiting until ChRIS database server is ready to accept connections"
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev_db sh -c                     \
-        'while ! psql -U chris -d chris_dev -c "select 1" 2> /dev/null; do sleep 5; done;' \
-                                >& dc.out
-    dc_check $?
+        'while ! psql -U chris -d chris_dev -c "select 1" > dc.out 2> /dev/null; do sleep 5; done;'
+    dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     boxcenter "ChRIS database is ready to accept connections"                    LightGreen
     echo ""                                                         | ./boxes.sh
@@ -449,10 +480,9 @@ title -d 1 "Waiting until CUBE is ready to accept connections"
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev sh -c                        \
-        'while ! curl -sSf http://localhost:8000/api/v1/users/ 2> /dev/null; do sleep 5; done;' \
-                                > dc.out
-    echo -en "\033[3A\033[2K"
-    cat dc.out                                                      | ./boxes.sh White
+        'while ! curl -sSf http://localhost:8000/api/v1/users/ >/dev/null 2>/dev/null ; do sleep 5; done;' \
+        > dc.out 2>&1
+    dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     boxcenter "CUBE API is ready to accept connections"                          LightGreen
     echo ""                                                         | ./boxes.sh
@@ -465,8 +495,8 @@ title -d 1 "Waiting until remote pfcon is ready to accept connections"
         exec chris_dev sh -c                        \
         'while ! curl -sSf http://pfcon.remote:30005/api/v1/ 2> /dev/null; do sleep 5; done;' \
                                 > dc.out
-    echo -en "\033[3A\033[2K"
-    cat dc.out                                                      | ./boxes.sh White
+    dc_check $? "PRINT"
+    echo ""                                                         | ./boxes.sh
     echo ""                                                         | ./boxes.sh
     boxcenter "Remote pfcon is ready to accept connections"                      LightGreen
     echo ""                                                         | ./boxes.sh
@@ -515,10 +545,9 @@ title -d 1 "Waiting until ChRIS store is ready to accept connections"
     windowBottom
     docker-compose -f docker-compose_dev.yml    \
         exec chris_store sh -c                   \
-        'while ! curl -sSf http://localhost:8010/api/v1/users/ 2> /dev/null; do sleep 5; done;'\
-                > dc.out
-    echo -en "\033[3A\033[2K"
-    cat dc.out                                                      | ./boxes.sh White
+        'while ! curl -sSf http://localhost:8010/api/v1/users/ >/dev/null 2> /dev/null; do sleep 5; done;'\
+                > dc.out 2>&1
+    dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     boxcenter "ChRIS store is ready to accept connections"                       LightGreen
     echo ""                                                         | ./boxes.sh
@@ -581,7 +610,7 @@ title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
         add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
@@ -595,7 +624,7 @@ title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
     docker-compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
         add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
 
 title -d 1 "Automatically creating a locked pipeline in CUBE"       \
@@ -609,7 +638,7 @@ title -d 1 "Automatically creating a locked pipeline in CUBE"       \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
                 cube "${PLUGIN_TREE}" >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
 
 title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
@@ -623,8 +652,22 @@ title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
         cube "${PLUGIN_TREE}" --unlock >& dc.out
-    dc_check $?
+    dc_check $? "PRINT"
 windowBottom
+
+# title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
+#                 "(unmutable and available to all users)"
+#     PIPELINE_NAME="DICOM_anonymization_and_tag_extractor"
+#     printf "%20s${LightBlue}%60s${NC}\n"                            \
+#                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
+#     PLUGIN_TREE="[\n                {\n                    \"plugin_name\":      \"pl-simpledsapp\",\n                    \"plugin_version\":   \"2.0.2\",\n                    \"previous_index\":   null\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\",\n                            \"default\":  \"m:%_nospc|-_ProtocolName.jpg\"\n                            },\n                            {\n                            \"name\":     \"imageScale\",\n                            \"default\":  \"3:none\"\n                            },\n                            {\n                            \"name\":     \"outputFileStem\",\n                            \"default\":  \"PHI-tags\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagsub\",\n                    \"plugin_version\":   \"3.2.3\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"tagInfo\",\n                            \"default\":  \"PatientName,%_name|patientID_PatientName ++ PatientID,%_md5|7_PatientID ++ AccessionNumber,%_md5|8_AccessionNumber ++ PatientBirthDate,%_strmsk|******01_PatientBirthDate ++ re:.*hysician,%_md5|4_#tag ++ re:.*stitution,#tag ++ re:.*ddress,#tag\"\n                            },\n                            {\n                            \"name\":     \"splitKeyValue\",\n                            \"default\":  \",\"\n                            },\n                            {\n                            \"name\":     \"splitToken\",\n                            \"default\":  \"++\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   2,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\"]"
+#     windowBottom
+#     docker-compose -f docker-compose_dev.yml                        \
+#         exec chris_dev                                              \
+#         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
+#         cube "${PLUGIN_TREE}" --unlock >& dc.out
+#     dc_check $? "PRINT"
+# windowBottom
 
 title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
