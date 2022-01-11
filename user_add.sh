@@ -72,6 +72,41 @@ if [[ -f .env ]] ; then
     source .env
 fi
 
+catw() {
+    FILE=$1
+    COLOR=$2
+    if (( !${#COLOR} )) ; then
+        COLOR=White
+    fi
+    if [[ -f $FILE ]] ; then
+        cat dc.out                                                      |\
+        sed 's/[[:alnum:]]+:/\n&/g'                                     |\
+        sed -E 's/(.{80})/\1\n/g'                                       | ./boxes.sh $COLOR
+    fi
+}
+
+dc_check () {
+    STATUS=$1
+    DCECHO=$2
+    thisStatusCheckOK=0
+    if [[ $STATUS != "0" ]] ; then
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out LightRed
+        else
+            echo -en "\033[3A\033[2K"
+        fi
+    else
+        thisStatusCheckOK=1
+        if (( ${#DCECHO} )) ; then
+            echo -en "\033[2A\033[2K"
+            catw dc.out White
+        else
+            echo -en "\033[3A\033[2K"
+        fi
+    fi
+}
+
 while getopts "f:s:US" opt; do
     case $opt in
         s)  STEP=$OPTARG
@@ -134,24 +169,35 @@ fi
                 exec ${CHRIS} /bin/bash -c                                  \
                 "python manage.py createsuperuser --noinput                 \
                         --username $username                                \
-                        --email $email 2> /dev/null;" >& dc.out >/dev/null
+                        --email $email >/tmp/dc.out 2>&1"
             status=$?
-            echo -en "\033[3A\033[2K"
-            cat dc.out | ./boxes.sh
-            CMD='python manage.py shell -c                                  \
+            # Copy dc.out from the chris_store container to local FS
+            docker cp $(docker ps | grep ${CHRIS} | head -n 1               |\
+                        awk '{print $1}'):/tmp/dc.out ./
+            if (( status )) ; then
+                dc_check $status "PRINT"
+            else
+                dc_check $status
+            fi
+            if (( thisStatusCheckOK )) ; then
+                CMD='python manage.py shell -c                              \
                     "from django.contrib.auth.models import User;           \
                     user=User.objects.get(username=\"'$username'\");        \
                     user.set_password(\"'$password'\");                     \
-                    user.save()"'
-            printf "${Yellow}%5s${LightCyan}%-32s${Yellow}%28s${blink}${LightGreen}%14s${NC}\n"       \
-            "$i: " "$username" "$accountType" "[   adding   ]"   | ./boxes.sh
-            windowBottom
-            docker-compose -f ${DOCKER_COMPOSE_FILE}                        \
-                exec ${CHRIS} /bin/bash -c                                  \
-                "$CMD" >& dc.out >/dev/null
-            status=$?
-            echo -en "\033[3A\033[2K"
-            cat dc.out | ./boxes.sh
+                    user.save()" >/tmp/dc.out 2>&1'
+                printf "${Yellow}%5s${LightCyan}%-32s${Yellow}%28s${blink}${LightGreen}%14s${NC}\n"       \
+                "$i: " "$username" "$accountType" "[   adding   ]"   | ./boxes.sh
+                windowBottom
+                docker-compose -f ${DOCKER_COMPOSE_FILE}                     \
+                    exec ${CHRIS} /bin/bash -c                               \
+                    "$CMD"
+                status=$?
+                # Copy dc.out from the chris_store container to local FS
+                rm dc.out
+                docker cp $(docker ps | grep ${CHRIS} | head -n 1           |\
+                            awk '{print $1}'):/tmp/dc.out ./
+                dc_check $status
+            fi
         else
             echo "" | ./boxes.sh
             accountType="Normal user account creation "
@@ -161,7 +207,7 @@ fi
                                             \"password\":\"'$password'\",   \
                                             \"email\":\"'$email'\"});       \
                     us.is_valid();                                          \
-                    us.save()"'
+                    us.save()" >/tmp/dc.out 2>&1'
             printf "${Yellow}%5s${LightCyan}%-32s${Yellow}%28s${blink}${LightGreen}%14s${NC}\n"       \
             "$i: " "$username" "$accountType" "[ generating ]"  | ./boxes.sh
             windowBottom
@@ -169,8 +215,10 @@ fi
                 exec ${CHRIS} /bin/bash -c                                  \
                 "$CMD" >& dc.out >/dev/null
             status=$?
-            echo -en "\033[3A\033[2K"
-            cat dc.out | ./boxes.sh
+            # Copy dc.out from the chris_store container to local FS
+            docker cp $(docker ps | grep ${CHRIS} | head -n 1               |\
+                        awk '{print $1}'):/tmp/dc.out ./
+            dc_check $status
         fi
         if (( status == 0 )) ; then
             printf "${Yellow}%5s${LightCyan}%-32s${Yellow}%28s${LightGreenBG}${White}%14s${NC}\n"       \
