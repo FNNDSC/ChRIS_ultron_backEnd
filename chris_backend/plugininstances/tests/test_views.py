@@ -39,11 +39,14 @@ class ViewTests(TestCase):
         self.password = 'bar'
         self.other_username = 'boo'
         self.other_password = 'far'
+        self.compute_user = 'pfcon'
+        self.compute_password = 'pfcon1234'
 
-        self.content_type='application/vnd.collection+json'
+        self.content_type = 'application/vnd.collection+json'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
+            compute_password=self.compute_password)
 
         # create the chris superuser and two additional users
         User.objects.create_user(username=self.chris_username,
@@ -101,10 +104,13 @@ class TasksViewTests(TransactionTestCase):
         self.password = 'bar'
         self.other_username = 'boo'
         self.other_password = 'far'
+        self.compute_user = 'pfcon'
+        self.compute_password = 'pfcon1234'
         self.content_type = 'application/vnd.collection+json'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
+            compute_password=self.compute_password)
 
         # create the chris superuser and two additional users
         User.objects.create_user(username=self.chris_username,
@@ -246,7 +252,8 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
+            compute_password=self.compute_password)
 
         data = self.plg_meta_data.copy()
         (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
@@ -357,7 +364,8 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
+            compute_password=self.compute_password)
 
         data = self.plg_meta_data.copy()
         (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
@@ -489,7 +497,8 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.plugin_repr['parameters'] = plugin_parameters
 
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
+            compute_password=self.compute_password)
 
         data = self.plg_meta_data.copy()
         (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)

@@ -48,7 +48,8 @@ import time
 import json
 import zipfile
 from pfconclient import client as pfcon
-from pfconclient.exceptions import PfconRequestException
+from pfconclient.exceptions import (PfconRequestException,
+                                    PfconRequestInvalidTokenException)
 
 from django.utils import timezone
 from django.conf import settings
@@ -77,10 +78,22 @@ class PluginInstanceManager(object):
 
         self.str_job_id = ChrisInstance.load().job_id_prefix + str(plugin_instance.id)
 
-        self.pfcon_client = pfcon.Client(plugin_instance.compute_resource.compute_url)
+        cr = self.c_plugin_inst.compute_resource
+        self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
 
         self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
                                           settings.SWIFT_CONNECTION_PARAMS)
+
+    def _refresh_compute_resource_auth_token(self):
+        """
+        Get a new auth token from a remote pfcon service and update the DB.
+        """
+        cr = self.c_plugin_inst.compute_resource
+        token = pfcon.Client.get_auth_token(cr.compute_auth_url, cr.compute_user,
+                                            cr.compute_password)
+        self.pfcon_client.set_auth_token(token)
+        cr.compute_auth_token = token
+        cr.save()
 
     def run_plugin_instance_app(self):
         """
@@ -138,8 +151,7 @@ class PluginInstanceManager(object):
         logger.info(f'Submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
                     f'description: {json.dumps(job_descriptors, indent=4)}')
         try:
-            d_resp = self.pfcon_client.submit_job(job_id, job_descriptors,
-                                                  zip_file.getvalue(), timeout=9000)
+            d_resp = self._submit_job(job_id, job_descriptors, zip_file.getvalue())
         except PfconRequestException as e:
             logger.error(f'[CODE01,{job_id}]: Error submitting job to pfcon url '
                          f'-->{pfcon_url}<--, detail: {str(e)}')
@@ -154,6 +166,19 @@ class PluginInstanceManager(object):
             self.c_plugin_inst.summary = self.get_job_status_summary()  # initial status
             self.c_plugin_inst.raw = json_zip2str(d_resp)
             self.c_plugin_inst.save()
+
+    def _submit_job(self, job_id, job_descriptors, dfile, timeout=9000):
+        """
+        Submit job to a remote pfcon service.
+        """
+        try:
+            d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while submitting job {job_id} to pfcon '
+                        f'url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
+        return d_resp
 
     def check_plugin_instance_app_exec_status(self):
         """
@@ -181,7 +206,7 @@ class PluginInstanceManager(object):
             logger.info(f'Sending job status request to pfcon url -->{pfcon_url}<-- for '
                         f'job {job_id}')
             try:
-                d_resp = self.pfcon_client.get_job_status(job_id, timeout=200)
+                d_resp = self._get_job_status(job_id)
             except PfconRequestException as e:
                 logger.error(f'[CODE02,{job_id}]: Error getting job status at pfcon '
                              f'url -->{pfcon_url}<--, detail: {str(e)}')
@@ -210,6 +235,19 @@ class PluginInstanceManager(object):
                 self._handle_undefined_status()
         return self.c_plugin_inst.status
 
+    def _get_job_status(self, job_id, timeout=200):
+        """
+        Get job status from a remote pfcon service.
+        """
+        try:
+            d_resp = self.pfcon_client.get_job_status(job_id, timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while getting status for job {job_id} '
+                        f'from pfcon url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            d_resp = self.pfcon_client.get_job_status(job_id, timeout)
+        return d_resp
+
     def cancel_plugin_instance_app_exec(self):
         """
         Cancel a plugin instance's app execution. It connects to the remote service
@@ -229,13 +267,25 @@ class PluginInstanceManager(object):
         logger.info(f'Deleting job {job_id} from pfcon at url '
                     f'-->{pfcon_url}<--')
         try:
-            self.pfcon_client.delete_job(job_id, timeout=500)
+            self._delete_job(job_id)
         except PfconRequestException as e:
             logger.error(f'[CODE12,{job_id}]: Error deleting job from '
                          f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
         else:
             logger.info(f'Successfully deleted job {job_id} from pfcon at '
                         f'url -->{pfcon_url}<--')
+
+    def _delete_job(self, job_id, timeout=500):
+        """
+        Delete a job from a remote pfcon service.
+        """
+        try:
+            self.pfcon_client.delete_job(job_id, timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while requesting to delete job {job_id} '
+                        f'from pfcon url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            self.pfcon_client.delete_job(job_id, timeout)
 
     def get_previous_output_path(self):
         """
@@ -535,7 +585,7 @@ class PluginInstanceManager(object):
             logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
                         f'for job {job_id}')
             try:
-                zip_content = self.pfcon_client.get_job_zip_data(job_id, timeout=9000)
+                zip_content = self._get_job_zip_data(job_id)
             except PfconRequestException as e:
                 logger.error(f'[CODE03,{job_id}]: Error fetching zip from pfcon url '
                              f'-->{pfcon_url}<--, detail: {str(e)}')
@@ -568,6 +618,19 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.status = 'finishedSuccessfully'
             self.delete_plugin_instance_job_from_remote()
             self.save_plugin_instance_final_status()
+
+    def _get_job_zip_data(self, job_id, timeout=9000):
+        """
+        Get job zip data from a remote pfcon service.
+        """
+        try:
+            zip_content = self.pfcon_client.get_job_zip_data(job_id, timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while getting zip data for job {job_id} '
+                        f'from pfcon url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            zip_content = self.pfcon_client.get_job_zip_data(job_id, timeout)
+        return zip_content
 
     def _handle_finished_with_error_status(self):
         """

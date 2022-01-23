@@ -493,7 +493,8 @@ rm -f dc.out ; title -d 1 "Waiting until remote pfcon is ready to accept connect
     windowBottom
     docker-compose -f docker-compose_dev.yml        \
         exec chris_dev sh -c                        \
-        'while ! curl -sSf http://pfcon.remote:30005/api/v1/ 2> /dev/null; do sleep 5; done;' \
+        'while ! curl -sSf http://pfcon.remote:30005/api/v1/health/ 2> /dev/null; do
+        sleep 5; done;' \
                                 > dc.out
     dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh

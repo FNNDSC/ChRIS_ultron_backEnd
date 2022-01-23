@@ -10,4 +10,4 @@ django-celery-beat==2.2.0
 mod-wsgi==4.8.0
 environs==9.3.2
 python-chrisstoreclient==1.0.0
-python-pfconclient==2.2.0
+python-pfconclient==3.0.0

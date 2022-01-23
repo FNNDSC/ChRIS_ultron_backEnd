@@ -33,7 +33,8 @@ class ModelTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user='pfcon',
+            compute_password='pfcon1234')
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name,

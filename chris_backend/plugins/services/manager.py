@@ -39,8 +39,12 @@ class PluginManager(object):
         parser_add = subparsers.add_parser('add', help='add a new compute resource')
         parser_add.add_argument('computeresource',
                                 help="compute resource where plugins' instances run")
-        parser_add.add_argument('url',
-                                help="compute resource's url")
+        parser_add.add_argument('url', help="compute resource's url")
+        parser_add.add_argument('--auth_url', help="compute resource's auth url")
+        parser_add.add_argument('--auth_token', help="compute resource's auth token")
+        parser_add.add_argument('--user', default='pfcon', help="compute resource's user")
+        parser_add.add_argument('--password', default='pfcon1234',
+                                help="compute resource's password")
         parser_add.add_argument('--description', default='',
                                 help="compute resource's description")
         parser_add.add_argument('--maxjobexecseconds', type=int,
@@ -53,6 +57,10 @@ class PluginManager(object):
         parser_modify.add_argument('computeresource', help="compute resource")
         parser_modify.add_argument('--name', help="compute resource's new name")
         parser_modify.add_argument('--url', help="compute resource's new url")
+        parser_modify.add_argument('--auth_url', help="compute resource's auth url")
+        parser_modify.add_argument('--auth_token', help="compute resource's auth token")
+        parser_modify.add_argument('--user', help="compute resource's user")
+        parser_modify.add_argument('--password', help="compute resource's password")
         parser_modify.add_argument('--description', default='',
                                    help="compute resource's new description")
         parser_modify.add_argument('--maxjobexecseconds', type=int,
@@ -81,7 +89,8 @@ class PluginManager(object):
 
         self.parser = parser
 
-    def add_compute_resource(self, name, url, description, maxjobexecsec):
+    def add_compute_resource(self, name, url, auth_url, auth_token, user, passw, desc,
+                             maxjobexecsec):
         """
         Add a new compute resource to the system.
         """
@@ -89,7 +98,12 @@ class PluginManager(object):
         try:
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
-            data = {'name': name, 'compute_url': url, 'description': description}
+            data = {'name': name, 'compute_url': url, 'compute_user': user,
+                    'compute_password': passw, 'description': desc}
+            if auth_url:
+                data['compute_auth_url'] = auth_url
+            if auth_token:
+                data['compute_auth_token'] = auth_token
             if maxjobexecsec:
                 data['max_job_exec_seconds'] = maxjobexecsec
             compute_resource_serializer = ComputeResourceSerializer(data=data)
@@ -97,7 +111,8 @@ class PluginManager(object):
             cr = compute_resource_serializer.save()
         return cr
 
-    def modify_compute_resource(self, name, new_name, url, description, maxjobexecsec):
+    def modify_compute_resource(self, name, new_name, url, auth_url, auth_token, user,
+                                passw, desc, maxjobexecsec):
         """
         Modify an existing compute resource and add the current date as a new
         modification date.
@@ -106,14 +121,24 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             raise NameError("Compute resource '%s' does not exists" % name)
-        if new_name or url or description or maxjobexecsec:
-            data = {}
-            data['name'] = new_name if new_name else cr.name
-            data['compute_url'] = url if url else cr.compute_url
-            if description:
-                data['description'] = description
-            if maxjobexecsec:
-                data['max_job_exec_seconds'] = maxjobexecsec
+        data = {}
+        if new_name:
+            data['name'] = new_name
+        if url:
+            data['compute_url'] = url
+        if auth_url:
+            data['compute_auth_url'] = auth_url
+        if auth_token:
+            data['compute_auth_token'] = auth_token
+        if user:
+            data['compute_user'] = user
+        if passw:
+            data['compute_password'] = passw
+        if desc:
+            data['description'] = desc
+        if maxjobexecsec:
+            data['max_job_exec_seconds'] = maxjobexecsec
+        if data:
             compute_resource_serializer = ComputeResourceSerializer(cr, data=data)
             compute_resource_serializer.is_valid(raise_exception=True)
             cr = compute_resource_serializer.save()
@@ -260,10 +285,14 @@ class PluginManager(object):
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
             self.add_compute_resource(options.computeresource, options.url,
-                                      options.description, options.maxjobexecseconds)
+                                      options.auth_url, options.auth_token, options.user,
+                                      options.password, options.description,
+                                      options.maxjobexecseconds)
         elif options.subparser_name == 'modify':
             self.modify_compute_resource(options.computeresource, options.name,
-                                         options.url, options.description,
+                                         options.url, options.auth_url,
+                                         options.auth_token, options.user,
+                                         options.password, options.description,
                                          options.maxjobexecseconds)
         elif options.subparser_name == 'register':
             if options.pluginurl:

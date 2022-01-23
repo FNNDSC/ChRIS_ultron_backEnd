@@ -29,13 +29,26 @@ class ComputeResource(models.Model):
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=100, unique=True)
     compute_url = models.URLField(max_length=300)
+    compute_auth_url = models.URLField(max_length=350, blank=True)
+    compute_user = models.CharField(max_length=32)
+    compute_password = models.CharField(max_length=100)
+    compute_auth_token = models.CharField(max_length=500, blank=True,
+                                          default='initial_token')
     description = models.CharField(max_length=600, blank=True)
     max_job_exec_seconds = models.IntegerField(blank=True, default=86400)  # 24h
 
     def __str__(self):
         return self.name
 
-    def delete(self):
+    def save(self, *args, **kwargs):
+        """
+        Overriden to save a default value for the auth url.
+        """
+        if not self.compute_auth_url:
+            self.compute_auth_url = str(self.compute_url) + 'auth-token/'  # set default
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
         """
         Overriden to only allow the delete if no plugin would be left without a compute
         resource after the operation.
