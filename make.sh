@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # If you are on macOS, please make sure that /usr/bin/env bash is NOT the
-# default /bin/bash! On macOS bash is effectively depricated and this script
+# default /bin/bash! On macOS bash is effectively deprecated and this script
 # will not work!
 
 # TL:DR
