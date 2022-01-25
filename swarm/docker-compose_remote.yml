@@ -27,7 +27,9 @@ services:
     depends_on:
       - pman
     environment:
-      - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
+      - SECRET_KEY="q3kyu^l=@pnsf!5piqz6!!5kdcdpo86y6jebbp+2244yjm*#+k"
+      - PFCON_USER=pfcon
+      - PFCON_PASSWORD=pfcon1234
       - COMPUTE_SERVICE_URL=http://pman:5010/api/v1/
     networks:
       local:

@@ -11,11 +11,18 @@ from .fields import MemoryInt, CPUInt
 
 
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
+    compute_user = serializers.CharField(min_length=4, max_length=32, write_only=True)
+    compute_password = serializers.CharField(min_length=8, max_length=100,
+                                             write_only=True)
+    compute_auth_token = serializers.CharField(max_length=500, write_only=True,
+                                               required=False)
 
     class Meta:
         model = ComputeResource
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
-                  'compute_url', 'description', 'max_job_exec_seconds')
+                  'compute_url', 'compute_auth_url', 'compute_user',
+                  'compute_password', 'compute_auth_token', 'description',
+                  'max_job_exec_seconds')
 
 
 class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):

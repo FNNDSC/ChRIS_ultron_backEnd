@@ -440,6 +440,10 @@ class ComputeResourceAdminListViewTests(PluginAdminFormTests):
                                     "value": "moc"},
                                    {"name": "compute_url",
                                     "value": "http://pfcon.local:30005/api/v1/1/"},
+                                   {"name": "compute_user",
+                                    "value": "mocuser"},
+                                   {"name": "compute_password",
+                                    "value": "mocuser1234"},
                                    {"name": "description",
                                     "value": "moc compute env"}
                                    ]}})

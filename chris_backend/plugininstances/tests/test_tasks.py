@@ -25,7 +25,8 @@ class TasksTests(TestCase):
         self.password = 'bar'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user='pfcon',
+            compute_password='pfcon1234')
 
         # create the chris user
         User.objects.create_user(username=self.username, password=self.password)
