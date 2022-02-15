@@ -133,7 +133,7 @@ services:
   chris_dev_db:
     image: postgres:13
     volumes:
-      - chris_dev_db_data:/var/lib/postgresql/data:z
+      - chris_dev_db_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=chris_dev
       - POSTGRES_USER=chris
@@ -148,7 +148,7 @@ services:
     image: rabbitmq:3
     hostname: 'queue'
     volumes:
-      - queue_data:/var/lib/rabbitmq:z
+      - queue_data:/var/lib/rabbitmq
     networks:
       - local
     labels:
@@ -191,7 +191,7 @@ services:
   chris_store_db:
     image: postgres:13
     volumes:
-      - chris_store_db_data:/var/lib/postgresql/data:z
+      - chris_store_db_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=chris_store
       - POSTGRES_USER=chris
@@ -206,7 +206,7 @@ services:
     image: ${SWIFTREPO}/docker-swift-onlyone
     init: true
     volumes:
-      - swift_storage_dev:/srv:z
+      - swift_storage_dev:/srv
     environment:
       - SWIFT_USERNAME=chris:chris1234
       - SWIFT_KEY=testing
