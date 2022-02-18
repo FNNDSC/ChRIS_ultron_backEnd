@@ -3,17 +3,35 @@
 [![Build](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml)![License][license-badge]
 ![Last Commit][last-commit-badge]
 
-The core backend service for the ChRIS distributed software platform, also known by the anacronym "CUBE". Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
+The core backend service for the ChRIS distributed software platform, also known by the anacronym _CUBE_. Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
 
 
 ## ChRIS development, testing and deployment
 
 ### Abstract
 
-This page describes how to quickly get the set of services comprising the ChRIS backend up and running for CUBE development and how to run the automated tests. A production deployment of the ChRIS backend services is also explained.
+_ChRIS Ultron Back End_ (sometimes also _ChRIS Underlying Back End_) or simply _CUBE_ is the main core of the ChRIS system. _CUBE_ provides the main REST API to the ChRIS system, as well as maintaining an internal database of users, files, pipelines, and plugins. Currently _CUBE_ has two separate compute paradigms depending on deployment context. In the case of _development_ all components of _CUBE_ use `docker` and `docker swarm` technologies. In the case of _production_ technologies such as `openshift` and `kubernetes` are also supported.
+
+Consult this page for instructions on starting _CUBE_ in either _development_ or _production_ contexts. For documentation/overview/background, please see the [documention](https://github.com/FNNDSC/ChRIS_docs).
+
 
 ### Preconditions
 
+#### Operating system support -- please read
+
+##### Linux
+
+Linux is the first class host platform for all things _CUBE_ related. Linux distributions used by various core developers include Ubuntu, Arch, and Fedora. The development team is happy to provide help to folks trying / struggling to run _CUBE_ on most any Linux distribution.
+
+##### macOS
+
+macOS is fully supported as a host platform for _CUBE_. Please note that you **must update/tweak some things first**. Most importantly, macOS is distributed with a deprecated version of the `bash` shell **that will not work with our Makefile**. If you want to host _CUBE_ on macOS, you **must** update `bash` to a current version. Instructions are out of scope of this document, but we recommend [homebrew](https://brew.sh) as your friend here.
+
+##### Windows
+
+In a word, **don't** (ok, that's technically two words). _CUBE_ is ideally meant to be deployed on Linux/*nix systems. **Windows is not officially supported nor recommended as the host environment**. If you insist on trying on Windows you can consult some unmaintained documentation on attempts to deploy _CUBE_ using the Windows Subsystem for Linux (WSL) [here](https://github.com/FNNDSC/CHRIS_docs/blob/master/workflows/ChRIS_on_WSL.asciidoc). This probably will break. Note that currently no one on the core development uses Windows in much of any capacity so interest or knowledge to help questions about Windows support is low. Nonetheless, we would welcome any brave soul though who has the time and inclination to fully investigate _CUBE_ on Windows deployment.
+
+ 
 #### Install latest Docker and Docker Compose. 
 
 Currently tested platforms:
@@ -28,6 +46,24 @@ Consult this page https://docs.docker.com/engine/install/linux-postinstall/
 ### TL;DR
 
 #### If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and running with no mess, no fuss:
+
+##### The real TL;DR
+
+The all in one copy/paste line to drop into your terminal (assuming of course you are in the repo directory and have the preconditions met):
+
+```bash
+docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
+./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&        \
+./make.sh -U -I -i
+```
+
+This will start a **bare bones** _CUBE_. This _CUBE_ will **NOT** have any plugins installed. To install a set of plugins, do
+
+```bash
+./postscript.sh
+```
+
+##### Slightly longer but still short TL;DR
 
 Start a local Docker Swarm cluster if not already started:
 
