@@ -12,7 +12,11 @@
 #
 
 ./plugin_add.sh  "\
-                    fnndsc/pl-dsdircopy,                            \
+		    fnndsc/pl-lung_cnp,			    	    \
+		    fnndsc/pl-med2img,				    \
+		    fnndsc/pl-covidnet,				    \
+		    fnndsc/pl-covidnet-pdfgeneration,		    \
+		    fnndsc/pl-dsdircopy,                            \
                     fnndsc/pl-simplefsapp^moc,                      \
                     fnndsc/pl-simpledsapp^moc,                      \
                     fnndsc/pl-s3push,                               \
