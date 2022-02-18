@@ -394,6 +394,10 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         b_NR=$(cat dc.out | grep -c "not running")
         b_exist=$(cat dc.out | grep -c "already exists")
         if ((  b_exist )) ; then
+            cat dc.out                          |\
+                grep 'already'                  |\
+                awk -F "string="  '{print $2}'  |\
+                awk -F ', code' '{print $1}'    > dc.out
             RIGHT2="already"
             ((b_already++))
         fi
@@ -485,7 +489,7 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         # Copy dc.out from the chris_store container to local FS
         docker cp $(docker ps | grep $CHRIS | head -n 1                       |\
                     awk '{print $1}'):/tmp/dc.out ./
-
+        RIGHT1="--> --> --> ->"
         status_check $status
         windowBottom
         ((b_statusSuccess--))
