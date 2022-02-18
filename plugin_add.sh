@@ -473,10 +473,10 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
             --description "$ENV Description" >& dc.out
         status=$?
         status_check $status
-        windowBottom
-        echo -en "\033[3A\033[2K"
+        echo -en "\033[1A\033[2K"
         LEFT2="${str_count}::Store-->ChRIS (register)" ; RIGHT2="in progress"
         opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
+        windowBottom
         docker-compose -f ${DOCKER_COMPOSE_FILE}                              \
             exec ${CHRIS} sh -c                                               \
             "python plugins/services/manager.py                               \
@@ -486,8 +486,6 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         docker cp $(docker ps | grep $CHRIS | head -n 1                       |\
                     awk '{print $1}'):/tmp/dc.out ./
 
-        RIGHT1="--> --> --> ->"
-        status=$?
         status_check $status
         windowBottom
         ((b_statusSuccess--))
@@ -514,3 +512,4 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
     fi
     echo ""                                                             | ./boxes.sh
     windowBottom
+
