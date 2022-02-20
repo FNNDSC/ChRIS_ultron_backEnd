@@ -345,7 +345,8 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
     for plugin in "${a_storePluginOK[@]}"; do
         echo -en "\033[2A\033[2K"
         cparse $plugin "REPO" "CONTAINER" "MMN" "ENV"
-        CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2> /dev/null"
+        CMD="docker run --rm $REPO/$CONTAINER ${MMN} --json 2>/dev/null > rep.json"
+        CMD2="docker run --rm $REPO/$CONTAINER chris_plugin_info > rep.json"
 
         str_count=$(printf "%2s" "$i")
         LEFT1=$CONTAINER;                   LEFT2="${str_count}::JSON<--parse"
@@ -353,23 +354,28 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
 
-        PLUGIN_REP=$(docker run --rm $REPO/$CONTAINER ${MMN} --json 2>/dev/null)
-        strPLUGIN_REP=$(echo "$PLUGIN_REP" | jq tostring)
+        eval $CMD
         status=$?
-        dc_check $status
+        if (( $status )) ; then
+            eval $CMD2
+        fi
+        PLUGIN_REP=$(cat rep.json)
+        strPLUGIN_REP=$(cat rep.json | jq tostring)
+        status=$?
+        # rm rep.json
+        status_check $status
         if (( !thisStatusCheckOK )) ; then
             windowBottom
             continue
         fi
         ((b_statusSuccess--))
-        # windowBottom
-        # echo -en "\033[3A\033[2K"
         if (( b_json )) ; then
             echo "$PLUGIN_REP" | python -m json.tool                                |\
                 sed 's/[[:alnum:]]+:/\n&/g' | sed -E 's/(.{80})/\1\n/g'             | ./boxes.sh ${LightGreen}
         fi
 
         LEFT2="${str_count}::JSON-->Store" ; RIGHT2="in progress"
+        echo -en "\033[1A\033[2K"
         opBlink_feedback "$LEFT1" "$LEFT2" "$RIGHT1" "$RIGHT2"
         windowBottom
         ## HORRID HACK ALERT (Jan 2022)
@@ -393,12 +399,20 @@ title -d 1 "Uploading plugin representations to the ChRIS store..."
         RIGHT2=""
         b_NR=$(cat dc.out | grep -c "not running")
         b_exist=$(cat dc.out | grep -c "already exists")
-        if ((  b_exist )) ; then
-            cat dc.out                          |\
-                grep 'already'                  |\
-                awk -F "string="  '{print $2}'  |\
+        b_previous=$(cat dc.out | grep -c "already used")
+        if ((  b_exist || b_previous)) ; then
+            cat dc.out                              |\
+                grep 'already'                      |\
+                awk -F "string="  '{print $2}'      |\
                 awk -F ', code' '{print $1}'    > dc.out
-            RIGHT2="already"
+            VER=$(cat dc.out                        |\
+                    awk -F "version" '{print $2}'   |\
+                    awk -F "already" '{print $1}')
+            rm dc.out 
+            RIGHT2="$VER"
+            if (( !${#VER} )) ; then
+                RIGHT2="already"
+            fi
             ((b_already++))
         fi
         status_check $status "$RIGHT2"
@@ -490,7 +504,7 @@ title -d 1 "Automatically registering some plugins from the ChRIS store" \
         docker cp $(docker ps | grep $CHRIS | head -n 1                       |\
                     awk '{print $1}'):/tmp/dc.out ./
         RIGHT1="--> --> --> ->"
-        status_check $status
+        status_check $status $ENV
         windowBottom
         ((b_statusSuccess--))
         ((i++))
