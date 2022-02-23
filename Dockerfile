@@ -31,7 +31,13 @@
 #
 
 FROM fnndsc/ubuntu-python3:ubuntu20.04-python3.8.5
-MAINTAINER fnndsc "dev@babymri.org"
+
+LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
+      org.opencontainers.image.title="ChRIS Ultron Backend" \
+      org.opencontainers.image.description="ChRIS backend" \
+      org.opencontainers.image.url="https://chrisproject.org/" \
+      org.opencontainers.image.source="https://github.com/FNNDSC/ChRIS_ultron_backEnd" \
+      org.opencontainers.image.licenses="MIT"
 
 # Pass a UID on build command line (see above) to set internal UID
 ARG UID=1001
