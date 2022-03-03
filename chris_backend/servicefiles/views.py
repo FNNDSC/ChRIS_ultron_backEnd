@@ -1,7 +1,7 @@
 
+from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
-from rest_framework.response import Response
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -76,4 +76,4 @@ class ServiceFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         service_file = self.get_object()
-        return Response(service_file.fname)
+        return FileResponse(service_file.fname)
