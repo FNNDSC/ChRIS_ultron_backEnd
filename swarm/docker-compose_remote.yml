@@ -20,7 +20,7 @@ services:
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
     # is given by the STOREBASE env variable.
     volumes:
-      - ${STOREBASE:?}:/home/localuser/storeBase:z
+      - ${STOREBASE:?}:/var/local/storeBase:z
     ports:
       - "30005:30005"
     command: ["gunicorn", "-w", "5", "-b", "0.0.0.0:30005", "-t",  "200", "pfcon.wsgi:application"]
