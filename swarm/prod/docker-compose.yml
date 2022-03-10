@@ -221,7 +221,7 @@ services:
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
     # is given by the STOREBASE env variable.
     volumes:
-      - ${STOREBASE:?}:/home/localuser/storeBase
+      - ${STOREBASE:?}:/var/local/storeBase
     ports:
       - "5005:5005"
     depends_on:

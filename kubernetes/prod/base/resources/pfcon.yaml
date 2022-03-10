@@ -54,7 +54,7 @@ spec:
                 name: pfcon-config
           volumeMounts:
             - name: storebase
-              mountPath: "/home/localuser/storeBase"
+              mountPath: "/var/local/storeBase"
       # Mount a persistent volume onto pfcon's key store (shared data volume with plugins)
       volumes:
         - name: storebase
