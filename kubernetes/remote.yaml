@@ -54,7 +54,7 @@ spec:
           command: ["gunicorn"]
           args: ["-w", "5", "-b", "0.0.0.0:30005", "-t",  "200", "pfcon.wsgi:application"]
           volumeMounts:
-            - mountPath: "/home/localuser/storeBase"
+            - mountPath: "/var/local/storeBase"
               name: "store-base"
       # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
       # is given by the STOREBASE env variable substitution.
