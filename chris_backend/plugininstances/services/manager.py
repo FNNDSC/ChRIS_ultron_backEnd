@@ -70,6 +70,8 @@ logger = logging.getLogger(__name__)
 
 class PluginInstanceManager(object):
 
+    __NONASCII = re.compile(r'[^\x00-\x7F]')
+
     def __init__(self, plugin_instance):
 
         self.c_plugin_inst = plugin_instance
@@ -670,8 +672,8 @@ class PluginInstanceManager(object):
                 total_size += plg_inst_file.fname.size
         self.c_plugin_inst.size += total_size
 
-    @staticmethod
-    def get_job_status_summary(d_response=None):
+    @classmethod
+    def get_job_status_summary(cls, d_response=None):
         """
         Get a job status summary JSON string from pfcon response.
         """
@@ -704,5 +706,15 @@ class PluginInstanceManager(object):
             logs = d_jobStatusSummary['compute']['return']['job_logs'] = d_c['logs']
 
             if len(logs) > 3000:
-                d_jobStatusSummary['compute']['return']['job_logs'] = logs[-3000:]
+                # Workaround which fixes https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/364
+                # Better solution discussed in https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/374
+                #
+                # JSON serialization causes string to be longer than you might expect
+                # because of escape sequences, e.g. json.dumps('\n') -> '"\\n"'
+
+                # replace non-ASCII characters, such as emojis and Chinese characters
+                logs_ascii = cls.__NONASCII.sub('?', logs)
+
+                # truncate logs, assuming worst case where every character needs to be escaped
+                d_jobStatusSummary['compute']['return']['job_logs'] = logs_ascii[-1800:]
         return json.dumps(d_jobStatusSummary)
