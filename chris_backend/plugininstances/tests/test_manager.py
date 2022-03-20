@@ -85,6 +85,20 @@ class PluginInstanceManagerTests(TestCase):
         # re-enable logging
         logging.disable(logging.NOTSET)
 
+    def test_assemble_exec(self):
+        self.assertListEqual(
+            ['python', '/usr/local/src/script.py'],
+            manager.PluginInstanceManager._assemble_exec('/usr/local/src', 'script.py', 'python')
+        )
+        self.assertListEqual(
+            ['python', 'script.py'],
+            manager.PluginInstanceManager._assemble_exec(None, 'script.py', 'python')
+        )
+        self.assertListEqual(
+            ['rust_is_better_than_python'],
+            manager.PluginInstanceManager._assemble_exec(None, 'rust_is_better_than_python', None)
+        )
+
     def test_mananger_can_run_registered_plugin_app(self):
         """
         Test whether the manager can run an already registered plugin app.

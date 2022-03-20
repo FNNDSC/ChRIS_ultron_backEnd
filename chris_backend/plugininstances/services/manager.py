@@ -47,6 +47,7 @@ import io
 import time
 import json
 import zipfile
+from typing import List, Optional
 from pfconclient import client as pfcon
 from pfconclient.exceptions import (PfconRequestException,
                                     PfconRequestInvalidTokenException)
@@ -130,20 +131,16 @@ class PluginInstanceManager(object):
             return
 
         # create job description dictionary
-        cmd_args = self.get_plugin_instance_app_cmd_args()
-        cmd_path_flags = list(d_unextpath_params.keys()) + list(d_path_params.keys())
         job_descriptors = {
-            'cmd_args': ' '.join(cmd_args),
-            'cmd_path_flags': ','.join(cmd_path_flags),
+            'entrypoint': self._assemble_exec(plugin.selfpath, plugin.selfexec, plugin.execshell),
+            'args': self.get_plugin_instance_app_cmd_args(),
+            'args_path_flags': [*d_unextpath_params.keys(), *d_path_params.keys()],
             'auid': self.c_plugin_inst.owner.username,
             'number_of_workers': self.c_plugin_inst.number_of_workers,
             'cpu_limit': self.c_plugin_inst.cpu_limit,
             'memory_limit': self.c_plugin_inst.memory_limit,
             'gpu_limit': self.c_plugin_inst.gpu_limit,
             'image': plugin.dock_image,
-            'selfexec': plugin.selfexec,
-            'selfpath': plugin.selfpath,
-            'execshell': plugin.execshell,
             'type': plugin_type
         }
         pfcon_url = self.pfcon_client.url
@@ -166,6 +163,15 @@ class PluginInstanceManager(object):
             self.c_plugin_inst.summary = self.get_job_status_summary()  # initial status
             self.c_plugin_inst.raw = json_zip2str(d_resp)
             self.c_plugin_inst.save()
+
+    @staticmethod
+    def _assemble_exec(selfpath: Optional[str], selfexec: str, execshell: Optional[str]) -> List[str]:
+        entrypoint_path = selfexec
+        if selfpath:
+            entrypoint_path = os.path.join(selfpath, selfexec)
+        if not execshell:
+            return [entrypoint_path]
+        return [execshell, entrypoint_path]
 
     def _submit_job(self, job_id, job_descriptors, dfile, timeout=9000):
         """
@@ -311,10 +317,7 @@ class PluginInstanceManager(object):
         self.c_plugin_inst.error_code = 'CODE11'
         raise NameError('Presumable eventual consistency problem.')
 
-    def get_plugin_instance_app_cmd_args(self):
-        """
-        Get the list of the plugin instance app's cmd arguments.
-        """
+    def get_plugin_instance_app_cmd_args(self) -> List[str]:
         # append flags to save input meta data (passed options) and
         # output meta data (output description)
         app_args = ['--saveinputmeta', '--saveoutputmeta']
