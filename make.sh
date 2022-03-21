@@ -144,7 +144,7 @@ declare -i b_skipIntegrationTests=0
 ORCHESTRATOR=swarm
 HERE=$(pwd)
 CREPO=fnndsc
-TAG=:latest
+TAG=:next
 
 if [[ -f .env ]] ; then
     source .env
@@ -348,7 +348,7 @@ if (( ! b_skipIntro )) ; then
             CMD="docker run --rm ${REPO}/$CONTAINER --version"
             if [[   $CONTAINER == "pfcon"            || \
                     $CONTAINER == "pman"  ]] ; then
-              CMD="docker run --rm --entrypoint $CONTAINER ${REPO}/$CONTAINER --version"
+              CMD="docker inspect -f '{{ (index .Config.Labels \"org.opencontainers.image.version\") }}' $REPO/$CONTAINER"
             fi
             echo "$ $CMD"                                           | ./boxes.sh LightCyan
             windowBottom
