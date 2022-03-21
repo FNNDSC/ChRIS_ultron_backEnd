@@ -16,7 +16,7 @@ version: '3.7'
 services:
 
   pfcon:
-    image: ${PFCON_IMAGE-fnndsc/pfcon}
+    image: ${PFCON_IMAGE-fnndsc/pfcon:next}
     # We need to mount a physical dir in the HOST onto the key store in pfcon. This dir
     # is given by the STOREBASE env variable.
     volumes:
@@ -48,7 +48,7 @@ services:
       - STOREBASE
       - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
       - CONTAINER_ENV=swarm
-    image: ${PMAN_IMAGE-fnndsc/pman}
+    image: ${PMAN_IMAGE-fnndsc/pman:next}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:z
     deploy:

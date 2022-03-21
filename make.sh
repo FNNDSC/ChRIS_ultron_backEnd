@@ -144,7 +144,6 @@ declare -i b_skipIntegrationTests=0
 ORCHESTRATOR=swarm
 HERE=$(pwd)
 CREPO=fnndsc
-TAG=:next
 
 if [[ -f .env ]] ; then
     source .env
@@ -260,6 +259,11 @@ if (( $# == 1 )) ; then
     fi
 fi
 
+if [ -z "$TAG" ]; then
+    TAG=:next
+fi
+
+
 declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
@@ -346,13 +350,13 @@ if (( ! b_skipIntro )) ; then
                 $CONTAINER != "chris_store"          && \
                 $CONTAINER != "docker-swift-onlyone"  ]] ; then
             CMD="docker run --rm ${REPO}/$CONTAINER --version"
-            if [[   $CONTAINER == "pfcon"            || \
-                    $CONTAINER == "pman"  ]] ; then
+            if [[   $CONTAINER == "pfcon:next"            || \
+                    $CONTAINER == "pman:next"  ]] ; then
               CMD="docker inspect -f '{{ (index .Config.Labels \"org.opencontainers.image.version\") }}' $REPO/$CONTAINER"
             fi
             echo "$ $CMD"                                           | ./boxes.sh LightCyan
             windowBottom
-            $CMD  >& dc.out
+            sh -c "$CMD" >& dc.out
             dc_check_code $? 1 "PRINT"
         fi
     done
