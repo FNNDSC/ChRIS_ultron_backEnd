@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [ master ]
-    tags: [ '**' ]
+    tags:
+      - '**'
+      - '!next/**'
   pull_request:
     branches: [ master ]
 

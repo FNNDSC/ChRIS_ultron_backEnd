@@ -1,0 +1,72 @@
+name: next
+
+on:
+  push:
+    branches: [ next ]
+    tags: [ 'next/**' ]
+  pull_request:
+    branches: [ next ]
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: FNNDSC/cube-integration-action@v6
+        with:
+          repository: ${{ github.workspace }}
+          which: all
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get info
+      id: determine
+      shell: python
+      run: |
+        import os
+        import datetime
+        import itertools
+        import subprocess as sp
+
+        short_sha = os.getenv('GITHUB_SHA', 'unknown')[:7]
+        build_version = f'unknown.{short_sha}'
+        git_refs = []
+        if os.getenv('GITHUB_REF', '').startswith('refs/tags/next/v'):
+            version_from_tag = os.getenv('GITHUB_REF')[16:]
+            git_refs.append('next-' + version_from_tag.replace('+', '.'))
+            build_version = version_from_tag
+        registries = ['docker.io']
+        repo = 'fnndsc/cube'
+        tags = ['next', short_sha] + git_refs
+        names = ','.join(''.join(c) for c in itertools.product(
+            (r + '/' for r in registries),
+            [repo],
+            (':' + t for t in tags)
+        ))
+        print(f'::set-output name=tags::{names}')
+        print(f'::set-output name=build_version::{build_version}')
+    - uses: docker/setup-buildx-action@v1
+      id: buildx
+    - name: Cache Docker layers
+      uses: actions/cache@v2
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        build-args: |
+          ENVIRONMENT=production
+          BUILD_VERSION=${{ steps.determine.outputs.build_version }}
+        push: true
+        tags: "${{ steps.determine.outputs.tags }}"
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
+
