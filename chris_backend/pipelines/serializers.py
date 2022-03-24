@@ -27,13 +27,14 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     default_parameters = serializers.HyperlinkedIdentityField(
         view_name='pipeline-defaultparameter-list')
     instances = serializers.HyperlinkedIdentityField(view_name='pipelineinstance-list')
+    workflows = serializers.HyperlinkedIdentityField(view_name='workflow-list')
 
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'locked', 'authors', 'category', 'description',
                   'plugin_tree', 'plugin_inst_id', 'owner_username', 'creation_date',
                   'modification_date', 'plugins', 'plugin_pipings', 'default_parameters',
-                  'instances')
+                  'instances', 'workflows')
 
     def create(self, validated_data):
         """
@@ -118,10 +119,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["Couldn't find any plugin instance with id %s." % plugin_inst_id])
         plg = plg_inst.plugin
-        if plg.meta.type == 'fs':
+        if plg.meta.type != 'ds':
             raise serializers.ValidationError(
-                ["Plugin instance of %s which is of type 'fs' and therefore can not "
-                 "be used as the root of a new pipeline." % plg.meta.name])
+                [f"Plugin instance of %s which is of type {plg.meta.type} and therefore "
+                 f"can not be used as the root of a new pipeline." % plg.meta.name])
         return plg_inst
 
     def validate_plugin_tree(self, plugin_tree):
@@ -313,10 +314,12 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
+    plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(source='plugin.version')
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
     previous_id = serializers.ReadOnlyField(source='previous.id')
     previous = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                 read_only=True)
+                                                   read_only=True)
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
@@ -324,8 +327,8 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginPiping
-        fields = ('url', 'id', 'plugin_id', 'pipeline_id', 'previous_id', 'previous',
-                  'plugin', 'pipeline')
+        fields = ('url', 'id', 'previous_id', 'plugin_id', 'plugin_name',
+                  'plugin_version', 'pipeline_id', 'previous', 'plugin', 'pipeline')
 
 
 class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):

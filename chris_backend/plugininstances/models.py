@@ -353,3 +353,11 @@ class UnextpathParameter(models.Model):
 
     def __str__(self):
         return self.value
+
+
+PARAMETER_MODELS = {'string': StrParameter,
+                    'integer': IntParameter,
+                    'float': FloatParameter,
+                    'boolean': BoolParameter,
+                    'path': PathParameter,
+                    'unextpath': UnextpathParameter}
