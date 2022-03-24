@@ -303,6 +303,7 @@ class FeedList(generics.ListAPIView):
                  'pipelines': reverse('pipeline-list', request=request),
                  'pipeline_instances': reverse('allpipelineinstance-list',
                                                request=request),
+                 'workflows': reverse('allworkflow-list', request=request),
                  'tags': reverse('tag-list', request=request),
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
