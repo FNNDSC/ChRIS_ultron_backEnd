@@ -48,7 +48,7 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, ObjectDoesNotExist):
             raise serializers.ValidationError(
                 {'previous_plugin_inst_id':
-                     ["Couldn't find any 'previous' plugin instance with id %s."]})
+                     [f"Couldn't find any 'previous' plugin instance with id {pk}."]})
         # check that the user can run plugins within this feed
         user = self.context['request'].user
         if user not in previous_plugin_inst.feed.owner.all():
