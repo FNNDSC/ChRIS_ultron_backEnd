@@ -63,6 +63,7 @@ from plugininstances.models import PluginInstance, PluginInstanceFile, PluginIns
 if settings.DEBUG:
     import pdb, pudb, rpudb
     from celery.contrib import rdb
+    from pudb.remote    import set_trace
 
 
 logger = logging.getLogger(__name__)
@@ -435,6 +436,7 @@ class PluginInstanceManager(object):
         """
         job_id = self.str_job_id
         memory_zip_file = io.BytesIO()
+        # set_trace(host = "0.0.0.0", port = 6900, term_size = (252, 72))
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for swift_path in swift_paths:
                 try:
@@ -452,27 +454,65 @@ class PluginInstanceManager(object):
                                      f'{obj_path} from swift storage, detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE08'
                         raise
+                    if 'pl.meta.json' in obj_path: obj_path = obj_path.replace(
+                                                        'pl.meta.json',
+                                                        'pl-parent.meta.json')
                     zip_path = obj_path.replace(swift_path, '', 1).lstrip('/')
                     job_data_zip.writestr(zip_path, contents)
         memory_zip_file.seek(0)
         return memory_zip_file
 
+    def chrisEnvMetaFile_contents(self):
+        '''
+        Generate a "pl.meta.json" meta file, read contents into memory, and
+        return the contents
+        '''
+        bytes                   = None
+        # Meta data to capture...
+        d_metaInfo      : dict  = {
+            'jid'               : self.str_job_id,
+            'previous_id'       : self.c_plugin_inst.previous_id,
+            'id'                : self.c_plugin_inst.id
+        }
+        str_metaFile    : str   = '/tmp/%s.json' % self.str_job_id
+        # First, save to file
+        with open(str_metaFile, 'w') as fw:
+            json.dump(d_metaInfo, fw, indent = 4)
+        fw.close()
+        # then, read the file into bytes
+        fr      = open(str_metaFile, 'rb')
+        if fr:
+            bytes   = fr.read()
+            os.remove(str_metaFile)
+        return(bytes)
+
     def unpack_zip_file(self, zip_file_content):
         """
         Unpack job zip file from the remote into swift storage and register the
         extracted files with the DB.
+
+        Inject at this point into the unpack file payload, a file called "chris.env"
+        that contains some CUBE environmental information. This provides a test
+        mechanism for communicating to a downstream plugin information about its
+        parent, such as the parent's pluginInstanceID.
         """
         job_id = self.str_job_id
         swift_filenames = []
+        # set_trace(host = "0.0.0.0", port = 6900, term_size = (252, 72))
         try:
             memory_zip_file = io.BytesIO(zip_file_content)
             with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_zip:
                 filenames = job_zip.namelist()
+                filenames.append('pl.meta.json')
                 logger.info(f'{len(filenames)} files to decompress for job {job_id}')
                 output_path = self.c_plugin_inst.get_output_path() + '/'
                 for fname in filenames:
-                    content = job_zip.read(fname)
+                    if fname != 'pl.meta.json':
+                        content = job_zip.read(fname)
+                    else:
+                        content = self.chrisEnvMetaFile_contents()
                     swift_fname = output_path + fname.lstrip('/')
+                    # logger.info(f'fname {fname}; swift_fname {swift_fname}')
                     try:
                         self.swift_manager.upload_obj(swift_fname, content)
                     except ClientException as e:
