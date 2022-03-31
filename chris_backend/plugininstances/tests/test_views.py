@@ -419,7 +419,7 @@ class PluginInstanceListViewTests(TasksViewTests):
                 b_checkAgain = False
             currentLoop += 1
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
-        self.assertEqual(pl_inst.files.count(), 3)
+        self.assertEqual(pl_inst.files.count(), 4)
 
         # delete files from swift storage
         self.swift_manager.delete_obj(path)
