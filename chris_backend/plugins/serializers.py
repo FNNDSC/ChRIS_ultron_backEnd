@@ -132,7 +132,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         if not isinstance(version, str):
             raise serializers.ValidationError(["Invalid type for plugin app version "
                                                "field. Must be a string."])
-        if not re.match(r"^[0-9.]+$", version):
+        re_valid_version = re.compile(r"^[0-9.]+$")
+        if not re_valid_version.match(version):
             raise serializers.ValidationError(["Invalid plugin app version number "
                                                "format %s." % version])
         return version
