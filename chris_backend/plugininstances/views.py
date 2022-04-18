@@ -35,6 +35,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
         Overriden to remove descriptors from the request that must take their default
         value on creation.
         """
+        if not isinstance(self.request.data, dict) or not getattr(self.request.data, '_mutable', 1):
+            raise ValidationError("Invalid input supplied, needs JSON string")
         self.request.data.pop('status', None)
         return super(PluginInstanceList, self).create(request, *args, **kwargs)
 
