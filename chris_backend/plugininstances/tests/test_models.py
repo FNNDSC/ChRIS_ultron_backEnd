@@ -213,5 +213,5 @@ class PluginInstanceFilterModelTests(ModelTests):
         filter = PluginInstanceFilter()
         filtered_queryset = filter.filter_by_root_id(queryset, "", value)
         self.assertEqual(len(filtered_queryset), 2)
-        self.assertEqual(filtered_queryset[0], plg_inst1)
-        self.assertEqual(filtered_queryset[1], plg_inst2)
+        self.assertIn(filtered_queryset[0], [plg_inst1, plg_inst2])
+        self.assertIn(filtered_queryset[1], [plg_inst1, plg_inst2])

@@ -193,7 +193,7 @@ class PluginInstanceFilter(FilterSet):
         Custom method to return the plugin instances in a queryset with a common root
         plugin instance.
         """
-        filtered_queryset = []
+        filtered_list = []
         root_queryset = queryset.filter(pk=value)
         # check whether the root id value is in the DB
         if not root_queryset.exists():
@@ -202,8 +202,8 @@ class PluginInstanceFilter(FilterSet):
         while len(queue) > 0:
             visited = queue.pop()
             queue.extend(list(visited.next.all()))
-            filtered_queryset.append(visited)
-        return filtered_queryset
+            filtered_list.append(visited.id)
+        return PluginInstance.objects.filter(pk__in=filtered_list)
 
 
 class PluginInstanceLock(models.Model):
