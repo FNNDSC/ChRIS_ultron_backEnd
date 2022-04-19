@@ -1038,7 +1038,7 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
         fileresource_view_inst = mock.Mock()
         fileresource_view_inst.get_object = mock.Mock(return_value=plg_inst_file)
         request_mock = mock.Mock()
-        with mock.patch('plugininstances.views.Response') as response_mock:
+        with mock.patch('plugininstances.views.FileResponse') as response_mock:
             views.FileResource.get(fileresource_view_inst, request_mock)
             response_mock.assert_called_with(plg_inst_file.fname)
 
@@ -1047,7 +1047,8 @@ class FileResourceViewTests(PluginInstanceFileViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.content, 'utf-8'), "test file")
+        content = [c for c in response.streaming_content][0].decode('utf-8')
+        self.assertEqual(content, "test file")
 
     def test_fileresource_download_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     'pacsfiles',
     'servicefiles',
     'filebrowser',
-    'users'
+    'users',
+    'workflows'
 ]
 
 # Pagination

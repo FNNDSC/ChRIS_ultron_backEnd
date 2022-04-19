@@ -72,7 +72,7 @@ LOGGING = {
 
 for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
             'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users',
-            'filebrowser']:
+            'filebrowser', 'workflows']:
     LOGGING['loggers'][app] = {
             'level': 'DEBUG',
             'handlers': ['console_verbose', 'file'],

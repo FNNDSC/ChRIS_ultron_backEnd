@@ -1,7 +1,7 @@
 
+from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
-from rest_framework.response import Response
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -81,4 +81,4 @@ class PACSFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         pacs_file = self.get_object()
-        return Response(pacs_file.fname)
+        return FileResponse(pacs_file.fname)

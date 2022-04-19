@@ -183,7 +183,7 @@ class PACSFileResourceViewTests(PACSFileViewTests):
         fileresource_view_inst = mock.Mock()
         fileresource_view_inst.get_object = mock.Mock(return_value=pacs_file)
         request_mock = mock.Mock()
-        with mock.patch('pacsfiles.views.Response') as response_mock:
+        with mock.patch('pacsfiles.views.FileResponse') as response_mock:
             views.PACSFileResource.get(fileresource_view_inst, request_mock)
             response_mock.assert_called_with(pacs_file.fname)
 
@@ -192,7 +192,8 @@ class PACSFileResourceViewTests(PACSFileViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.content, 'utf-8'), "test file")
+        content = [c for c in response.streaming_content][0].decode('utf-8')
+        self.assertEqual(content, "test file")
 
     def test_fileresource_download_failure_unauthenticated(self):
         response = self.client.get(self.download_url)

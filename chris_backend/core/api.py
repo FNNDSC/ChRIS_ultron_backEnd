@@ -9,6 +9,7 @@ from plugins import views as plugin_views
 from plugininstances import views as plugininstance_views
 from pipelines import views as pipeline_views
 from pipelineinstances import views as pipelineinstance_views
+from workflows import views as workflow_views
 from uploadedfiles import views as uploadedfile_views
 from pacsfiles import views as pacsfile_views
 from servicefiles import views as servicefile_views
@@ -274,6 +275,23 @@ urlpatterns = format_suffix_patterns([
     path('v1/pipelines/instances/<int:pk>/plugininstances/',
         pipelineinstance_views.PipelineInstancePluginInstanceList.as_view(),
         name='pipelineinstance-plugininstance-list'),
+
+
+    path('v1/pipelines/<int:pk>/workflows/',
+         workflow_views.WorkflowList.as_view(),
+         name='workflow-list'),
+
+    path('v1/pipelines/workflows/',
+         workflow_views.AllWorkflowList.as_view(),
+         name='allworkflow-list'),
+
+    path('v1/pipelines/workflows/search/',
+         workflow_views.AllWorkflowListQuerySearch.as_view(),
+         name='allworkflow-list-query-search'),
+
+    path('v1/pipelines/workflows/<int:pk>/',
+         workflow_views.WorkflowDetail.as_view(),
+         name='workflow-detail'),
 
 
     path('v1/uploadedfiles/',

@@ -703,6 +703,8 @@ class PluginInstanceManager(object):
             d_jobStatusSummary['compute']['return']['job_status'] = d_c['status']
             logs = d_jobStatusSummary['compute']['return']['job_logs'] = d_c['logs']
 
-            if len(logs) > 3000:
-                d_jobStatusSummary['compute']['return']['job_logs'] = logs[-3000:]
-        return json.dumps(d_jobStatusSummary)
+            # truncate logs, assuming worst case where every character needs to be escaped
+            if len(logs) > 1800:
+                d_jobStatusSummary['compute']['return']['job_logs'] = logs[-1800:]
+        # PostgreSQL allows UTF-8, supports emojis, chinese, etc.
+        return json.dumps(d_jobStatusSummary, ensure_ascii=False)

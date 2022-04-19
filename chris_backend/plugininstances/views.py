@@ -1,8 +1,8 @@
 
+from django.http import FileResponse
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.reverse import reverse
-from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from collectionjson import services
@@ -453,7 +453,7 @@ class FileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         plg_inst_file = self.get_object()
-        return Response(plg_inst_file.fname)
+        return FileResponse(plg_inst_file.fname)
 
 
 class PluginInstanceParameterList(generics.ListAPIView):
