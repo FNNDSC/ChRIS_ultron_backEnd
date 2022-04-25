@@ -130,4 +130,6 @@ class UploadedFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         user_file = self.get_object()
-        return FileResponse(user_file.fname)
+        response = FileResponse(user_file.fname)
+        response["Content-Length"] = len(user_file.fname)
+        return response
