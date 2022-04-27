@@ -10,6 +10,9 @@ from .models import (DefaultFloatParameter, DefaultIntParameter, DefaultBoolPara
 from .fields import MemoryInt, CPUInt
 
 
+VALID_VERSION_REGEX = re.compile(r"^[0-9.]+$")
+
+
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
     compute_user = serializers.CharField(min_length=4, max_length=32, write_only=True)
     compute_password = serializers.CharField(min_length=8, max_length=100,
@@ -132,8 +135,7 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         if not isinstance(version, str):
             raise serializers.ValidationError(["Invalid type for plugin app version "
                                                "field. Must be a string."])
-        re_valid_version = re.compile(r"^[0-9.]+$")
-        if not re_valid_version.match(version):
+        if not VALID_VERSION_REGEX.match(version):
             raise serializers.ValidationError(["Invalid plugin app version number "
                                                "format %s." % version])
         return version
