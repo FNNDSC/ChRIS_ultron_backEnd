@@ -507,10 +507,24 @@ class PluginInstanceManager(object):
         """
         Internal method to handle parameters of type 'unextpath' passed to the plugin
         instance app.
+
+        WIP/Test
+        * copying a source "path" results in a subdir in the destination, akin to
+
+                cp /some/path/source /some/path/destination
+
+          results in
+
+                /some/path/destination/<sourceNameMangle>
+
+        * the "subdir" preserves the name location of the origin
+
+        NB: This preservation could exhaust DB string lengths!
         """
-        job_id = self.str_job_id
-        outputdir = self.c_plugin_inst.get_output_path()
-        obj_output_path_list = []
+        str_sourceTraceDir      : str = ''
+        job_id                  : str = self.str_job_id
+        outputdir               : str = self.c_plugin_inst.get_output_path()
+        obj_output_path_list    : list = []
         for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
             path_list = unextpath_parameters_dict[param_flag].split(',')
@@ -523,9 +537,12 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.error_code = 'CODE06'
                     raise
                 for obj in obj_list:
-                    obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
-                    if not obj_output_path.startswith(outputdir + '/'):
-                        obj_output_path = outputdir + '/' + obj.split('/')[-1]
+                    # set_trace(host = "0.0.0.0", port = 6900, term_size = (252, 72))
+                    str_sourceTraceDir = path.rstrip('/').replace('/', '_')
+                    # obj_output_path = obj.replace(path.rstrip('/'), outputdir, 1)
+                    # if not obj_output_path.startswith(outputdir + '/'):
+                    #     obj_output_path = outputdir + '/' + obj.split('/')[-1]
+                    obj_output_path = outputdir + '/' + str_sourceTraceDir + '/' + obj.split('/')[-1]
                     try:
                         if not self.swift_manager.obj_exists(obj_output_path):
                             self.swift_manager.copy_obj(obj, obj_output_path)
