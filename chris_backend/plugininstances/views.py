@@ -19,6 +19,7 @@ from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import (IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly,
                           IsOwnerOrReadOnly)
 from .tasks import run_plugin_instance, cancel_plugin_instance
+from uploadedfiles.views import ContentLengthMixin 
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -439,7 +440,7 @@ class PluginInstanceFileDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
 
 
-class FileResource(generics.GenericAPIView):
+class FileResource(ContentLengthMixin, generics.GenericAPIView):
     """
     A view to enable downloading of a file resource.
     """
@@ -448,12 +449,6 @@ class FileResource(generics.GenericAPIView):
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
 
-    def get(self, request, *args, **kwargs):
-        """
-        Overriden to be able to make a GET request to an actual file resource.
-        """
-        plg_inst_file = self.get_object()
-        return FileResponse(plg_inst_file.fname)
 
 
 class PluginInstanceParameterList(generics.ListAPIView):

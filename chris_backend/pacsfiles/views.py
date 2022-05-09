@@ -9,6 +9,7 @@ from core.renderers import BinaryFileRenderer
 from .models import PACSFile, PACSFileFilter
 from .serializers import PACSFileSerializer
 from .permissions import IsChrisOrReadOnly
+from uploadedfiles.views import ContentLengthMixin
 
 
 class PACSFileList(generics.ListCreateAPIView):
@@ -67,7 +68,7 @@ class PACSFileDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
 
-class PACSFileResource(generics.GenericAPIView):
+class PACSFileResource(ContentLengthMixin, generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
@@ -75,10 +76,3 @@ class PACSFileResource(generics.GenericAPIView):
     queryset = PACSFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
-
-    def get(self, request, *args, **kwargs):
-        """
-        Overriden to be able to make a GET request to an actual file resource.
-        """
-        pacs_file = self.get_object()
-        return FileResponse(pacs_file.fname)

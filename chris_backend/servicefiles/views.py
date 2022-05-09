@@ -9,6 +9,7 @@ from core.renderers import BinaryFileRenderer
 from .models import ServiceFile, ServiceFileFilter
 from .serializers import ServiceFileSerializer
 from .permissions import IsChrisOrReadOnly
+from uploadedfiles.views import ContentLengthMixin
 
 
 class ServiceFileList(generics.ListCreateAPIView):
@@ -62,7 +63,7 @@ class ServiceFileDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
 
-class ServiceFileResource(generics.GenericAPIView):
+class ServiceFileResource(ContentLengthMixin, generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
@@ -71,9 +72,3 @@ class ServiceFileResource(generics.GenericAPIView):
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
 
-    def get(self, request, *args, **kwargs):
-        """
-        Overriden to be able to make a GET request to an actual file resource.
-        """
-        service_file = self.get_object()
-        return FileResponse(service_file.fname)

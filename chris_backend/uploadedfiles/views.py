@@ -115,8 +115,21 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             logger.error('Swift storage error, detail: %s' % str(e))
 
+class ContentLengthMixin(object):
 
-class UploadedFileResource(generics.GenericAPIView):
+     def get(self, request, *args, **kwargs):
+        """
+        making GET request to the actual file resource
+        """
+        file = self.get_object()
+        response = FileResponse(file.fname)
+        response['Content-Length'] = file.fname.size
+        return response
+
+
+    
+
+class UploadedFileResource(ContentLengthMixin, generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
@@ -125,11 +138,4 @@ class UploadedFileResource(generics.GenericAPIView):
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
-    def get(self, request, *args, **kwargs):
-        """
-        Overriden to be able to make a GET request to an actual file resource.
-        """
-        user_file = self.get_object()
-        response = FileResponse(user_file.fname)
-        response["Content-Length"] = len(user_file.fname)
-        return response
+   
