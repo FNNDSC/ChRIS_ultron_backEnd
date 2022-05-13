@@ -11,4 +11,4 @@
 # more.
 #
 
-docker-compose -f docker-compose_dev.yml exec chrisomatic chrisomatic apply postscript.yml
+docker-compose -f docker-compose_dev.yml run --rm chrisomatic chrisomatic apply postscript.yml

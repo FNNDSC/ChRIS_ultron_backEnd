@@ -542,7 +542,7 @@ if (( ! b_skipIntegrationTests )) ; then
 fi
 
 # Setup users and plugins
-docker-compose -f docker-compose_dev.yml exec chrisomatic chrisomatic apply
+docker-compose -f docker-compose_dev.yml run --rm chrisomatic
 
 
 STEP=$(expr $STEP + 4 )
