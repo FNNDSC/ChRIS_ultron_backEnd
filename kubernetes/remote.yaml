@@ -47,6 +47,10 @@ spec:
           ports:
             - containerPort: 30005
           env:
+            - name: PFCON_USER
+              value: "pfcon"
+            - name: PFCON_PASSWORD
+              value: "pfcon1234"  
             - name: SECRET_KEY
               value: "w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
             - name: COMPUTE_SERVICE_URL
