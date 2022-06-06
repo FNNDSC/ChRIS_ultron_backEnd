@@ -179,9 +179,21 @@ class PluginInstanceManager(object):
         """
         try:
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
-        except PfconRequestInvalidTokenException:
-            logger.info(f'Auth token has expired while submitting job {job_id} to pfcon '
-                        f'url -->{self.pfcon_client.url}<--')
+        except PfconRequestException:
+            # FIXME HACK
+            # Under some conditions, the requests library will produce a "Connection Aborted"
+            # error instead of a 401 response. This happens when pfcon responds eagerly
+            # to an invalid token and closes the connection while CUBE is trying to transmit
+            # a large zip file.
+            # The temporary workaround is to catch a wider range of Exceptions here.
+            # Ideally we only want to try again in the event that we know the token is
+            # invalid, PfconRequestInvalidTokenException, however PfconRequestInvalidTokenException
+            # is not correctly raised in all the situations where it should be.
+            #
+            # logger.info(f'Auth token has expired while submitting job {job_id} to pfcon '
+            logger.exception(f'Error while submitting job {job_id} to pfcon '
+                             f'url -->{self.pfcon_client.url}<--')
+            logger.info(f'Will retry to submit job {job_id}')
             self._refresh_compute_resource_auth_token()
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
         return d_resp
