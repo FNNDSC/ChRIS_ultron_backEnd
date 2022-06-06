@@ -545,57 +545,9 @@ if (( ! b_skipIntegrationTests )) ; then
     windowBottom
 fi
 
-rm -f dc.out ; title -d 1 "Waiting until ChRIS store is ready to accept connections"
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
-    windowBottom
-    docker-compose -f docker-compose_dev.yml    \
-        exec chris_store sh -c                   \
-        'while ! curl -sSf http://localhost:8010/api/v1/users/ >/dev/null 2> /dev/null; do sleep 5; done;'\
-                > dc.out 2>&1
-    dc_check $? "PRINT"
-    echo ""                                                         | ./boxes.sh
-    boxcenter "ChRIS store is ready to accept connections"                       LightGreen
-    echo ""                                                         | ./boxes.sh
-windowBottom
+# Setup users and plugins
+docker-compose -f docker-compose_dev.yml run --rm chrisomatic
 
-###
-### Create two ChRIS STORE API users using a helper script
-###
-# Note, emails and user names MUST be unique. Creating a new user
-# with the same email as an existing one will throw an error!
-#
-# Also, '-U' creates a 'superuser' and a '-S' denotes a ChRIS Store
-# user (otherwise a ChRIS/CUBE user is assumed).
-###
-STEP=$(expr $STEP + 1 )
-./user_add.sh -s $STEP -U -S " chris:chris1234:dev@babymri.org,                \
-                            cubeadmin:cubeadmin1234:cubeadmin@babymri.org"
-
-###
-### Create two ChRIS API users using a helper script
-###
-# Note, emails and user names MUST be unique. Creating a new user
-# with the same email as an existing one will throw an error!
-#
-# Also, '-U' creates a 'superuser'
-###
-STEP=$(expr $STEP + 1 )
-./user_add.sh -s $STEP -U 'chris:chris1234:dev@babymri.org'
-STEP=$(expr $STEP + 1 )
-# This creates a 'normaluser' (note there is no '-U').
-./user_add.sh -s $STEP 'cube:cube1234:cube@babymri.org'
-
-###
-### Add plugins to the system using a helper script
-###
-STEP=$(expr $STEP + 1 )
-./plugin_add.sh -s $STEP "\
-                    fnndsc/pl-simplefsapp,                      \
-                    fnndsc/pl-simpledsapp,                      \
-                    fnndsc/pl-s3retrieve,                       \
-                    fnndsc/pl-dircopy,                            \
-                    fnndsc/pl-topologicalcopy
-"
 
 STEP=$(expr $STEP + 4 )
 rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \

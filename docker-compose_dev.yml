@@ -11,10 +11,23 @@
 # Docker needs :z volume mount options to provide a context label.
 # See man docker-run
 
-version: '3.7'
+version: '3.9'
 
 services:
-
+  chrisomatic:
+    image: ghcr.io/fnndsc/chrisomatic:0.2.1
+    volumes:
+      - "./chrisomatic:/etc/chrisomatic:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:rw"
+    working_dir: /etc/chrisomatic
+    userns_mode: host
+    networks:
+      - local
+    depends_on:
+      - chris_dev
+      - chris_store
+    profiles:
+      - tools
   chris_dev:
     image: ${CHRISREPO}/chris:dev
     build:
@@ -38,13 +51,16 @@ services:
       - queue
       - chris_store
     networks:
-      - local
-      - remote  # bc special automated tests worker runs within CUBE, not needed in prod
+      local:
+        aliases:
+          - chrisdev.local
+      remote:  # bc special automated tests worker runs within CUBE, not needed in prod
     extra_hosts:
       - "${PFCONDNS:-lhost}:${PFCONIP:-127.0.0.1}"  # used only for kubernetes, not needed in prod
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
+      org.chrisproject.role: "ChRIS ultron backEnd"
 
   worker:
     image: ${CHRISREPO}/chris:dev
