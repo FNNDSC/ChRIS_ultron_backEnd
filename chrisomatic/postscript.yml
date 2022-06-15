@@ -63,3 +63,4 @@ cube:
     - name: pl-mgz2imageslices
     - name: pl-multipass
     - name: pl-heatmap
+    - name: pl-pfdo_med2img
