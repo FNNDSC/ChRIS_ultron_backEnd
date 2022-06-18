@@ -110,12 +110,17 @@ class WorkflowList(generics.ListCreateAPIView):
             plugin_param = default_param.plugin_param
             param_type = plugin_param.type
             l = [d for d in piping_param_defaults if d.get('name') == plugin_param.name]
+
+            default_value = None
+            if plugin_param.get_default() is not None:
+                default_value = plugin_param.get_default().value
+
             if l:
                 param_default = l[0]['default']
                 PARAMETER_MODELS[param_type].objects.create(plugin_inst=plg_inst,
                                                             plugin_param=plugin_param,
                                                             value=param_default)
-            elif default_param.value != plugin_param.get_default().value:
+            elif default_param.value != default_value:
                 # if default piping parameter value is different from the plugin's
                 # provided default (if any) then also create a new plg inst parameter
                 PARAMETER_MODELS[param_type].objects.create(
