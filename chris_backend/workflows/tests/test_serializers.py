@@ -13,6 +13,7 @@ from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping
+from workflows._types import GivenNodeInfo, ComputeResourceName
 from workflows.models import Workflow
 from workflows.serializers import WorkflowSerializer
 
@@ -166,12 +167,9 @@ class WorkflowSerializerTests(SerializerTests):
         workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
 
         with self.assertRaises(serializers.ValidationError):
-            workflow_serializer.validate_nodes_info('')
-        with self.assertRaises(serializers.ValidationError):
             workflow_serializer.validate_nodes_info(json.dumps({}))
         with self.assertRaises(serializers.ValidationError):
-            workflow_serializer.validate_nodes_info(json.dumps([{"piping_id": self.pips[0].id,
-                                                                "compute_resource_name": "host"}]))
+            workflow_serializer.validate_nodes_info(json.dumps([{"compute_resource_name": "host"}]))
         with self.assertRaises(serializers.ValidationError):
             workflow_serializer.validate_nodes_info(json.dumps([{"piping_id": self.pips[0].id,
                                                                  "compute_resource_name": "unknown"},
@@ -189,3 +187,51 @@ class WorkflowSerializerTests(SerializerTests):
                              "plugin_parameter_defaults": [{"name": "dummyInt", "default": "badInt"}]},
                             {"piping_id": self.pips[1].id,"compute_resource_name": "host"}])
             )
+
+    def test_validate_canonicalizes(self):
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        actual = workflow_serializer.validate_nodes_info(
+            json.dumps([{"piping_id": self.pips[0].id, "compute_resource_name": "host"}])
+        )
+        expected = [
+            GivenNodeInfo(
+                piping_id=self.pips[0].id,
+                compute_resource_name=ComputeResourceName("host"),
+                title="",
+                plugin_parameter_defaults=[]
+            ),
+            GivenNodeInfo(
+                piping_id=self.pips[1].id,
+                compute_resource_name=None,
+                title="",
+                plugin_parameter_defaults=[]
+            )
+        ]
+        self.assertCountEqual(expected, actual)
+
+    def test_no_nodes_info(self):
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        actual = workflow_serializer.validate_nodes_info(None)
+        expected = [
+            GivenNodeInfo(
+                piping_id=self.pips[0].id,
+                compute_resource_name=None,
+                title="",
+                plugin_parameter_defaults=[]
+            ),
+            GivenNodeInfo(
+                piping_id=self.pips[1].id,
+                compute_resource_name=None,
+                title="",
+                plugin_parameter_defaults=[]
+            )
+        ]
+        self.assertCountEqual(expected, actual)

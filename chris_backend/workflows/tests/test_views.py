@@ -1,22 +1,21 @@
 
-import logging
 import json
+import logging
 from unittest import mock
 
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth.models import User
-from django.conf import settings
 from rest_framework import status
 
-from plugins.models import PluginMeta, Plugin
-from plugins.models import ComputeResource
-from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
-from plugininstances.models import PluginInstance
 from pipelines.models import Pipeline, PluginPiping
+from plugininstances.models import PluginInstance
+from plugininstances.utils import run_plugin_instance
+from plugins.models import ComputeResource
+from plugins.models import PluginMeta, Plugin
+from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from workflows.models import Workflow
-from workflows import views
-
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
@@ -129,7 +128,7 @@ class WorkflowListViewTests(ViewTests):
                                            "compute_resource_name": "host"}])}]}})
 
         plg_instances_count = PluginInstance.objects.count()
-        with mock.patch.object(views.run_plugin_instance, 'delay',
+        with mock.patch.object(run_plugin_instance, 'delay',
                                return_value=None) as delay_mock:
             self.client.login(username=self.username, password=self.password)
             response = self.client.post(self.create_read_url, data=post,

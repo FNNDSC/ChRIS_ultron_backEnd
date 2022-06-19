@@ -1,15 +1,14 @@
 
 import json
-from typing import List
+from typing import List, Optional
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
+from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
-from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
-
 from .models import Workflow
 
 
@@ -18,7 +17,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='pipeline.name')
     previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True)
-    nodes_info = serializers.JSONField(write_only=True)
+    nodes_info = serializers.JSONField(write_only=True, default='[]')
     owner_username = serializers.ReadOnlyField(source='owner.username')
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
@@ -38,7 +37,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         del validated_data['nodes_info']
         return super(WorkflowSerializer, self).create(validated_data)
 
-    def validate_previous_plugin_inst_id(self, previous_plugin_inst_id):
+    def validate_previous_plugin_inst_id(self, previous_plugin_inst_id) -> PluginInstance:
         """
         Overriden to check that an integer id is provided for previous plugin instance.
         Then check that the id exists in the DB and that the user can run plugins
@@ -60,45 +59,53 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                                                f'previous instance with id {pk}.'])
         return previous_plugin_inst
 
-    def validate_nodes_info(self, nodes_info: str) -> List[GivenNodeInfo]:
+    def validate_nodes_info(self, nodes_info: Optional[str]) -> List[GivenNodeInfo]:
         """
-        Overriden to validate the runtime data for the workflow. It should be a
+        Overriden to validate the runtime data for the workflow. It should be an optional
         JSON string encoding a list of dictionaries. Each dictionary is a workflow node
-        containing a plugin piping_id, compute_resource_name, title and a list of
-        dictionaries called plugin_parameter_defaults. Each dictionary in this list has
-        name and default keys.
+        containing a plugin piping_id, and optionally: compute_resource_name, title,
+        and/or a list of dictionaries called plugin_parameter_defaults.
+
+        Returned data is made canonical: dictionaries are created for unmentioned pipings,
+        and undefined keys are initialized with ``None``.
         """
+        if nodes_info is None:
+            nodes_info = '[]'
+
         try:
-            node_list: List[GivenNodeInfo] = list(json.loads(nodes_info))
+            node_list: List[GivenNodeInfo] = json.loads(nodes_info)
         except json.decoder.JSONDecodeError:
             # overriden validation methods automatically add the field name to the msg
             raise serializers.ValidationError([f'Invalid JSON string {nodes_info}.'])
-        except Exception:
+        if not isinstance(node_list, list):
             raise serializers.ValidationError([f'Invalid list in {nodes_info}'])
+
+        for d in node_list:
+            self._repair_undefined(d)
 
         pipeline = self.context['view'].get_object()
         pipings = list(pipeline.plugin_pipings.all())
-        if len(node_list) != len(pipings):
-            raise serializers.ValidationError(
-                [f'Invalid length for list in {nodes_info}'])
 
         for piping in pipings:
             d_l = [d for d in node_list if d.get('piping_id') == piping.id]
             try:
                 d = d_l[0]
             except IndexError:
-                raise serializers.ValidationError([f'Missing data for plugin pipping '
-                                                   f'with id {piping.id}'])
+                d = GivenNodeInfo(
+                    piping_id=piping.id,
+                    compute_resource_name=None,
+                    title='',
+                    plugin_parameter_defaults=[]
+                )
+                node_list.append(d)
+
             cr_name = d.get('compute_resource_name')
-            if not cr_name:
-                raise serializers.ValidationError([f'Missing compute_resource_name key in'
-                                                   f' {d}'])
-            if piping.plugin.compute_resources.filter(name=cr_name).count() == 0:
+            if cr_name and piping.plugin.compute_resources.filter(name=cr_name).count() == 0:
                 msg = [f'Plugin for pipping with id {piping.id} has not been registered '
                        f'with a compute resource named {cr_name}']
                 raise serializers.ValidationError(msg)
 
-            title = d.get('title', '')
+            title = d.get('title')
             plg_inst_serializer = PluginInstanceSerializer(data={'title': title})
             try:
                 plg_inst_serializer.is_valid(raise_exception=True)
@@ -106,13 +113,24 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 msg = [f'Invalid title {title} for pipping with id {piping.id}']
                 raise serializers.ValidationError(msg)
 
-            piping_param_defaults = d.get('plugin_parameter_defaults', [])
+            piping_param_defaults = d.get('plugin_parameter_defaults')
             param_sets = (piping.string_param, piping.integer_param, piping.float_param, piping.boolean_param)
             for param_set in param_sets:
                 for default_param in param_set.all():
                     self.validate_piping_params(piping.id, default_param, piping_param_defaults)
 
         return node_list
+
+    @classmethod
+    def _repair_undefined(cls, d: GivenNodeInfo):
+        if 'piping_id' not in d:
+            raise serializers.ValidationError(f'Element does not specify "piping_id": {d}')
+        if 'compute_resource_name' not in d:
+            d['compute_resource_name'] = None
+        if 'title' not in d:
+            d['title'] = ''
+        if 'plugin_parameter_defaults' not in d:
+            d['plugin_parameter_defaults'] = []
 
     @staticmethod
     def validate_piping_params(piping_id: PipingId, default_param, piping_param_defaults: List[GivenWorkflowPluginParameterDefault]):
