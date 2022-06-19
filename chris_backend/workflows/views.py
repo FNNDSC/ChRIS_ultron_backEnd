@@ -5,7 +5,7 @@ from rest_framework.reverse import reverse
 from collectionjson import services
 from pipelines.models import Pipeline
 from plugininstances.models import PluginInstance, PARAMETER_MODELS
-from plugininstances.tasks import run_plugin_instance
+from plugininstances.utils import run_if_ready
 
 from .models import Workflow, WorkflowFilter
 from .serializers import WorkflowSerializer
@@ -127,18 +127,7 @@ class WorkflowList(generics.ListCreateAPIView):
                     plugin_inst=plg_inst, plugin_param=default_param.plugin_param,
                     value=default_param.value
                 )
-        if previous_inst.status == 'finishedSuccessfully':
-            # schedule the plugin's app to run
-            plg_inst.status = 'scheduled'   # status changes to 'scheduled' right away
-            plg_inst.save()
-            run_plugin_instance.delay(plg_inst.id)  # call async task
-        elif previous_inst.status in ('created', 'waiting', 'scheduled',
-                                      'registeringFiles', 'started'):
-            plg_inst.status = 'waiting'
-            plg_inst.save()
-        elif previous_inst.status in ('finishedWithError', 'cancelled'):
-            plg_inst.status = 'cancelled'
-            plg_inst.save()
+        run_if_ready(plg_inst, previous_inst)
         return plg_inst
 
 

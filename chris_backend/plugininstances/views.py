@@ -19,6 +19,7 @@ from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import (IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly,
                           IsOwnerOrReadOnly)
 from .tasks import run_plugin_instance, cancel_plugin_instance
+from .utils import run_if_ready
 
 
 class PluginInstanceList(generics.ListCreateAPIView):
@@ -85,18 +86,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         for param, param_serializer in parameter_serializers:
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
-        if previous is None or previous.status == 'finishedSuccessfully':
-            # schedule the plugin's app to run
-            plg_inst.status = 'scheduled'   # status changes to 'scheduled' right away
-            plg_inst.save()
-            run_plugin_instance.delay(plg_inst.id)  # call async task
-        elif previous.status in ('created', 'waiting', 'scheduled',
-                                 'registeringFiles', 'started'):
-            plg_inst.status = 'waiting'
-            plg_inst.save()
-        elif previous.status in ('finishedWithError', 'cancelled'):
-            plg_inst.status = 'cancelled'
-            plg_inst.save()
+        run_if_ready(plg_inst, previous)
 
     def list(self, request, *args, **kwargs):
         """
@@ -292,18 +282,7 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
                 StrParameter.objects.create(plugin_inst=plg_inst,
                                             plugin_param=plg_filter_param,
                                             value=f)
-            if instance.status == 'finishedSuccessfully':
-                # schedule the plugin's app to run
-                plg_inst.status = 'scheduled'  # status changes to 'scheduled' right away
-                plg_inst.save()
-                run_plugin_instance.delay(plg_inst.id)  # call async task
-            elif instance.status in ('created', 'waiting', 'scheduled',
-                                     'registeringFiles', 'started'):
-                plg_inst.status = 'waiting'
-                plg_inst.save()
-            elif instance.status in ('finishedWithError', 'cancelled'):
-                plg_inst.status = 'cancelled'
-                plg_inst.save()
+            run_if_ready(plg_inst, instance)
             created_plg_inst_ids.append(str(plg_inst.id))
 
         serializer.save(
