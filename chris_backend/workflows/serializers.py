@@ -8,7 +8,7 @@ from rest_framework import serializers
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
-from ._types import GivenNodeInfo
+from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
 
 from .models import Workflow
 
@@ -107,40 +107,36 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(msg)
 
             piping_param_defaults = d.get('plugin_parameter_defaults', [])
-            self.validate_piping_params(piping.id, piping.string_param.all(),
-                                        piping_param_defaults)
-            self.validate_piping_params(piping.id, piping.integer_param.all(),
-                                        piping_param_defaults)
-            self.validate_piping_params(piping.id, piping.float_param.all(),
-                                        piping_param_defaults)
-            self.validate_piping_params(piping.id, piping.boolean_param.all(),
-                                        piping_param_defaults)
+            param_sets = (piping.string_param, piping.integer_param, piping.float_param, piping.boolean_param)
+            for param_set in param_sets:
+                for default_param in param_set.all():
+                    self.validate_piping_params(piping.id, default_param, piping_param_defaults)
+
         return node_list
 
     @staticmethod
-    def validate_piping_params(piping_id, piping_default_params, piping_param_defaults):
+    def validate_piping_params(piping_id: PipingId, default_param, piping_param_defaults: List[GivenWorkflowPluginParameterDefault]):
         """
         Helper method to validate that if a default value doesn't exist in the
         corresponding pipeline for a piping parameter then a default is provided for it
         when creating a new runtime workflow.
         """
-        for default_param in piping_default_params:
-            l = [d for d in piping_param_defaults if
-                 d.get('name') == default_param.plugin_param.name]
-            if default_param.value is None and (not l or l[0].get('default') is None):
-                raise serializers.ValidationError(
-                    [f"Can not run workflow. Parameter "
-                     f"'{default_param.plugin_param.name}' for piping with id "
-                     f"{piping_id} does not have a default value in the pipeline"])
-            if l and l[0].get('default'):
-                param_default = l[0].get('default')
-                param_type = default_param.plugin_param.type
-                default_serializer_cls = DEFAULT_PIPING_PARAMETER_SERIALIZERS[param_type]
-                default_serializer = default_serializer_cls(data={'value': param_default})
-                try:
-                    default_serializer.is_valid(raise_exception=True)
-                except Exception:
-                    msg = [f'Invalid parameter default value {param_default} for '
-                           f"parameter '{default_param.plugin_param.name}' and pipping "
-                           f'with id {piping_id}']
-                    raise serializers.ValidationError(msg)
+        l = [d for d in piping_param_defaults if
+             d.get('name') == default_param.plugin_param.name]
+        if default_param.value is None and (not l or l[0].get('default') is None):
+            raise serializers.ValidationError(
+                [f"Can not run workflow. Parameter "
+                 f"'{default_param.plugin_param.name}' for piping with id "
+                 f"{piping_id} does not have a default value in the pipeline"])
+        if l and l[0].get('default'):
+            param_default = l[0].get('default')
+            param_type = default_param.plugin_param.type
+            default_serializer_cls = DEFAULT_PIPING_PARAMETER_SERIALIZERS[param_type]
+            default_serializer = default_serializer_cls(data={'value': param_default})
+            try:
+                default_serializer.is_valid(raise_exception=True)
+            except Exception:
+                msg = [f'Invalid parameter default value {param_default} for '
+                       f"parameter '{default_param.plugin_param.name}' and pipping "
+                       f'with id {piping_id}']
+                raise serializers.ValidationError(msg)
