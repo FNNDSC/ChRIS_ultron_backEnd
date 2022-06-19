@@ -1,5 +1,6 @@
 
 import json
+from typing import List
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
@@ -7,6 +8,7 @@ from rest_framework import serializers
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
 from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
+from ._types import GivenNodeInfo
 
 from .models import Workflow
 
@@ -58,7 +60,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                                                f'previous instance with id {pk}.'])
         return previous_plugin_inst
 
-    def validate_nodes_info(self, nodes_info):
+    def validate_nodes_info(self, nodes_info: str) -> List[GivenNodeInfo]:
         """
         Overriden to validate the runtime data for the workflow. It should be a
         JSON string encoding a list of dictionaries. Each dictionary is a workflow node
@@ -67,7 +69,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         name and default keys.
         """
         try:
-            node_list = list(json.loads(nodes_info))
+            node_list: List[GivenNodeInfo] = list(json.loads(nodes_info))
         except json.decoder.JSONDecodeError:
             # overriden validation methods automatically add the field name to the msg
             raise serializers.ValidationError([f'Invalid JSON string {nodes_info}.'])

@@ -1,3 +1,4 @@
+from typing import List
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
@@ -6,6 +7,7 @@ from collectionjson import services
 from pipelines.models import Pipeline
 from plugininstances.models import PluginInstance, PARAMETER_MODELS
 from plugininstances.utils import run_if_ready
+from ._types import GivenNodeInfo
 
 from .models import Workflow, WorkflowFilter
 from .serializers import WorkflowSerializer
@@ -28,7 +30,7 @@ class WorkflowList(generics.ListCreateAPIView):
         parsed and properly saved to the DB with the corresponding plugin instances.
         """
         previous_plugin_inst = serializer.validated_data['previous_plugin_inst_id']
-        nodes_info = serializer.validated_data['nodes_info']
+        nodes_info: List[GivenNodeInfo] = serializer.validated_data['nodes_info']
         pipeline = self.get_object()
 
         # create a plugin instance for each piping in the pipeline in the same
@@ -85,7 +87,7 @@ class WorkflowList(generics.ListCreateAPIView):
         pipeline = self.get_object()
         return self.filter_queryset(pipeline.workflows.all())
 
-    def create_plugin_inst(self, piping, previous_inst, nodes_info):
+    def create_plugin_inst(self, piping, previous_inst, nodes_info: List[GivenNodeInfo]):
         """
         Custom method to create a plugin instance and validate its parameters.
         """
