@@ -59,11 +59,16 @@ class FeedFilter(FilterSet):
     name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
     name_startswith = django_filters.CharFilter(field_name='name',
                                                 lookup_expr='startswith')
+    files_fname_icontains = django_filters.CharFilter(
+        field_name='plugin_instances__files__fname',
+        lookup_expr='icontains',
+        distinct=True
+    )
 
     class Meta:
         model = Feed
         fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
-                  'min_creation_date', 'max_creation_date']
+                  'min_creation_date', 'max_creation_date', 'files_fname_icontains']
 
 
 class Note(models.Model):
