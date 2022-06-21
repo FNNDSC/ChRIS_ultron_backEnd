@@ -340,8 +340,6 @@ class PluginInstanceManager(object):
             value = param_inst.value
             if param.action == 'store':
                 app_args.append(param.flag)
-                if param.type == 'string' and not value:
-                    value = "''"  # handle empty string as a valid value for a flag
                 app_args.append(str(value))  # convert all argument values to string
             elif param.action == 'store_true' and value:
                 app_args.append(param.flag)
