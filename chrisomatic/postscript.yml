@@ -64,3 +64,5 @@ cube:
     - name: pl-multipass
     - name: pl-heatmap
     - name: pl-pfdo_med2img
+    - name: pl-covidnet
+    - name: pl-covidnet-pdfgeneration
