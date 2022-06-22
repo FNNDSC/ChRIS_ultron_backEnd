@@ -40,7 +40,8 @@
                     fnndsc/pl-pfdorun,                              \
                     fnndsc/pl-mgz2imageslices,                      \
                     fnndsc/pl-multipass,                            \
-                    fnndsc/pl-heatmap
+                    fnndsc/pl-heatmap,				    \
+		    fnndsc/pl-pfdo_med2img
 "
 
 #
