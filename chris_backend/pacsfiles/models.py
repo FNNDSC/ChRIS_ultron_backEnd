@@ -48,6 +48,8 @@ class PACSFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
+    fname_icontains_topdir_unique = django_filters.CharFilter(
+        method='filter_by_icontains_topdir_unique')
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
     PatientName = django_filters.CharFilter(field_name='PatientName',
                                             lookup_expr='icontains')
@@ -67,11 +69,12 @@ class PACSFileFilter(FilterSet):
     class Meta:
         model = PACSFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_nslashes', 'PatientID', 'PatientName',
-                  'PatientSex', 'PatientAge', 'min_PatientAge', 'max_PatientAge',
-                  'PatientBirthDate', 'StudyDate', 'AccessionNumber', 'ProtocolName',
-                  'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
-                  'SeriesDescription', 'pacs_identifier']
+                  'fname_icontains', 'fname_icontains_topdir_unique', 'fname_nslashes',
+                  'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
+                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
+                  'AccessionNumber', 'ProtocolName', 'StudyInstanceUID',
+                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
+                  'pacs_identifier']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """
@@ -81,3 +84,21 @@ class PACSFileFilter(FilterSet):
         the list of immediate folders under the path).
         """
         return filter_files_by_n_slashes(queryset, value)
+
+    def filter_by_icontains_topdir_unique(self, queryset, name, value):
+        """
+        Custom method to return the files containing the queried string case insensitive
+        anywhere in their fname. But only one file is returned per top level
+        directory under SERVICES/PACS/pacs_name. This is useful to efficiently determine
+        the top level directories containing a file that matches the query.
+        """
+        qs = queryset.filter(fname__icontains=value)
+        ids = []
+        hash_set = set()
+        for f in qs.all():
+            path = f.fname.name
+            top_dir = path.split('/', 4)[3]  # only split 4 times, take elem at pos 3
+            if top_dir not in hash_set:
+                ids.append(f.id)
+                hash_set.add(top_dir)
+        return qs.filter(pk__in=ids)
