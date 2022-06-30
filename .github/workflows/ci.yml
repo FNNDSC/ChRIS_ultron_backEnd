@@ -37,6 +37,12 @@ jobs:
         run: |
           repo=${{ env.repo_name }}
           tag="${git_tag:-latest}"  # if build triggered by tag, use tag name
+
+          # if tag is a version number prefixed by 'v', remove the 'v'
+          if [[ "$tag" =~ ^v[0-9].* ]]; then
+            tag="${tag:1}"
+          fi
+
           echo "::set-output name=repo::$repo"
           echo "::set-output name=tag::$tag"
           echo "::set-output name=dock_image::$repo:$tag"
