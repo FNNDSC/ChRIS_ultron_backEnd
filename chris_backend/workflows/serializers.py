@@ -146,8 +146,13 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 [f"Can not run workflow. Parameter "
                  f"'{default_param.plugin_param.name}' for piping with id "
                  f"{piping_id} does not have a default value in the pipeline"])
-        if l and l[0].get('default'):
+        if l:
             param_default = l[0].get('default')
+            if not param_default:
+                raise serializers.ValidationError(
+                    f"\"default\" not provided for parameter \"{default_param.plugin_param.name}\" "
+                    f"of piping_id={piping_id}"
+                )
             param_type = default_param.plugin_param.type
             default_serializer_cls = DEFAULT_PIPING_PARAMETER_SERIALIZERS[param_type]
             default_serializer = default_serializer_cls(data={'value': param_default})
