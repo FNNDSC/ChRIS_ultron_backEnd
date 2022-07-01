@@ -187,6 +187,11 @@ class WorkflowSerializerTests(SerializerTests):
                              "plugin_parameter_defaults": [{"name": "dummyInt", "default": "badInt"}]},
                             {"piping_id": self.pips[1].id,"compute_resource_name": "host"}])
             )
+        with self.assertRaises(serializers.ValidationError) as e:
+            workflow_serializer.validate_nodes_info(
+                json.dumps([{"piping_id": self.pips[0].id,
+                             "plugin_parameter_defaults": [{"name": "dummyInt"}]}])
+            )
 
     def test_validate_canonicalizes(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
