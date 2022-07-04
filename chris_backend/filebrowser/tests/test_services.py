@@ -3,6 +3,7 @@ import logging
 from unittest import mock, skip
 
 from django.test import TestCase
+from django.contrib.auth.models import User
 
 from servicefiles.models import ServiceFile, Service
 from pacsfiles.models import PACSFile
@@ -20,7 +21,11 @@ class ServiceTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.username = 'foo'
+        self.username = 'testfoo'
+        self.password = 'testfoopass'
+
+        # create a user
+        User.objects.create_user(username=self.username, password=self.password)
 
     def tearDown(self):
         # re-enable logging
@@ -51,7 +56,7 @@ class ServiceTests(TestCase):
 
         path = 'SOR'
         model_class = services.get_path_file_model_class(path, username)
-        self.assertIs(model_class, None)
+        self.assertIs(model_class, PluginInstanceFile)
 
     def test_get_path_file_queryset(self):
         """
@@ -59,16 +64,17 @@ class ServiceTests(TestCase):
         queryset associated to a path or Raises ValueError if the path is not found.
         """
         username = self.username
+        user = User.objects.get(username=self.username)
         path = 'SOR'
         with self.assertRaises(ValueError):
-            services.get_path_file_queryset(path, username)
+            services.get_path_file_queryset(path, user)
 
         path = f'{username}/crazypath1234567890'
         with self.assertRaises(ValueError):
-            services.get_path_file_queryset(path, username)
+            services.get_path_file_queryset(path, user)
 
         path = f'{username}/uploads'
-        qs = services.get_path_file_queryset(path, username)
+        qs = services.get_path_file_queryset(path, user)
         self.assertTrue(qs.count() >= 0)
 
     def test_get_path_folders(self):
@@ -77,9 +83,10 @@ class ServiceTests(TestCase):
         template to its response argument
         """
         username = self.username
+        user = User.objects.get(username=self.username)
 
         path = f'{username}'
-        folders = services.get_path_folders(path, username)
+        folders = services.get_path_folders(path, user)
         self.assertIn('uploads', folders)
 
         path = 'SERVICES'
@@ -95,5 +102,5 @@ class ServiceTests(TestCase):
         f3 = ServiceFile(service=service)
         f3.fname.name = 'SERVICES/lili/c.txt'
         f3.save()
-        folders = services.get_path_folders(path, username)
+        folders = services.get_path_folders(path, user)
         self.assertEqual(sorted(folders), ['PACS', 'lili', 'lolo'])

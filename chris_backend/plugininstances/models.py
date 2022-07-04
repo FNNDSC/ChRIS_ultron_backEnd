@@ -138,8 +138,10 @@ class PluginInstance(models.Model):
         while not current.plugin.meta.type == 'fs':
             current = current.previous
             path = '/{0}_{1}'.format(current.plugin.meta.name, current.id) + path
-        username = self.owner.username
-        output_path = '{0}/feed_{1}'.format(username, current.feed.id) + path
+        feed = current.feed
+        #username = self.owner.username
+        username = feed.get_creator().username  # use creator of the feed for shared feeds
+        output_path = '{0}/feed_{1}'.format(username, feed.id) + path
         return output_path
 
     def get_parameter_instances(self):

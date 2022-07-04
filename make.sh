@@ -635,7 +635,7 @@ rm -f dc.out ; title -d 1 "Restarting CUBE's Django development server"
 windowBottom
 
 if (( !  b_norestartinteractive_chris_dev )) ; then
-    rm -f dc.out ; title -d 1 "Attaching interactive terminal (ctrl-c to detach)"
-    chris_dev=$(docker ps -f name=chris_dev_1 -q)
-    docker attach --detach-keys ctrl-c $chris_dev
+    rm -f dc.out ; title -d 1 "Attaching interactive terminal (ctrl-a to detach)"
+    chris_dev=$(docker ps -f name=chris_dev -f ancestor=fnndsc/chris:dev -q)
+    docker attach --detach-keys ctrl-a $chris_dev
 fi

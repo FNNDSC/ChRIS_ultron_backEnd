@@ -180,6 +180,11 @@ class PluginInstanceManager(object):
         """
         try:
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while submitting job {job_id} to pfcon '
+                        f'url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
         except PfconRequestException:
             # FIXME HACK
             # Under some conditions, the requests library will produce a "Connection Aborted"
@@ -191,10 +196,9 @@ class PluginInstanceManager(object):
             # invalid, PfconRequestInvalidTokenException, however PfconRequestInvalidTokenException
             # is not correctly raised in all the situations where it should be.
             #
-            # logger.info(f'Auth token has expired while submitting job {job_id} to pfcon '
-            logger.exception(f'Error while submitting job {job_id} to pfcon '
-                             f'url -->{self.pfcon_client.url}<--')
-            logger.info(f'Will retry to submit job {job_id}')
+            logger.exception(f'Error while submitting job {job_id} to pfcon url '
+                             f'-->{self.pfcon_client.url}<--, auth token might have '
+                             f'expired, will try refreshing token and resubmitting job')
             self._refresh_compute_resource_auth_token()
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
         return d_resp

@@ -12,6 +12,11 @@ from rest_framework import status
 
 from core.swiftmanager import SwiftManager
 from uploadedfiles.models import UploadedFile
+from plugins.models import PluginMeta, Plugin, ComputeResource
+from plugininstances.models import PluginInstance, PluginInstanceFile
+
+
+COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
 class FileBrowserViewTests(TestCase):
@@ -26,8 +31,10 @@ class FileBrowserViewTests(TestCase):
         self.content_type = 'application/vnd.collection+json'
         self.username = 'test'
         self.password = 'testpass'
+        self.other_username = 'booo'
+        self.other_password = 'booopass'
 
-        # create a user
+        # create user
         User.objects.create_user(username=self.username, password=self.password)
 
     def tearDown(self):
@@ -49,6 +56,31 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, 'path')
         self.assertEqual(response.data['results'][0]['subfolders'], f'SERVICES,{self.username}')
+
+    def test_filebrowserpath_list_success_shared_feed(self):
+        user = User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
+        # create compute resource
+        (compute_resource, tf) = ComputeResource.objects.get_or_create(
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
+
+        # create 'fs' plugin
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin.compute_resources.set([compute_resource])
+        plugin.save()
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, title='test',
+                                                compute_resource=plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.data['results'][0]['subfolders'],
+                         f'SERVICES,{self.username},{self.other_username}')
 
     def test_filebrowserpath_list_failure_unauthenticated(self):
         response = self.client.get(self.read_url)

@@ -97,7 +97,8 @@ class PACSFileFilter(FilterSet):
         hash_set = set()
         for f in qs.all():
             path = f.fname.name
-            top_dir = path.split('/', 4)[3]  # only split 4 times, take elem at pos 3
+            l = path.split('/', 4)  # only split 4 times
+            top_dir = '/'.join(l[:4])
             if top_dir not in hash_set:
                 ids.append(f.id)
                 hash_set.add(top_dir)
