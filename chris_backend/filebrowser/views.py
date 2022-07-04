@@ -8,7 +8,8 @@ from rest_framework.views import APIView
 from core.utils import filter_files_by_n_slashes
 from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
                           FileBrowserPathFileSerializer)
-from .services import get_path_folders, get_path_file_queryset, get_path_file_model_class
+from .services import (get_path_folders, get_path_file_queryset,
+                       get_path_file_model_class, get_shared_feed_creators_set)
 
 
 class FileBrowserPathList(generics.ListAPIView):
@@ -37,8 +38,11 @@ class FileBrowserPathList(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the initial
         path (empty path).
         """
-        username = self.request.user.username
-        objects = [{'path': '', 'subfolders': f'SERVICES,{username}'}]
+        user = self.request.user
+        objects = [{'path': '', 'subfolders': f'SERVICES,{user.username}'}]
+        shared_feed_creators = get_shared_feed_creators_set(user)
+        for creator in shared_feed_creators:
+            objects[0]['subfolders'] += f',{creator.username}'
         return self.filter_queryset(objects)
 
 
@@ -54,14 +58,17 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         """
         Overriden to return a custom queryset.
         """
-        username = self.request.user.username
+        user = self.request.user
         path = self.request.GET.get('path', '')
+        path = path.strip('/')
         if not path:
-            objects = [{'path': '', 'subfolders': f'SERVICES,{username}'}]
+            objects = [{'path': '', 'subfolders': f'SERVICES,{user.username}'}]
+            shared_feed_creators = get_shared_feed_creators_set(user)
+            for creator in shared_feed_creators:
+                objects[0]['subfolders'] += f',{creator.username}'
         else:
-            path = path.strip('/')
             try:
-                subfolders = get_path_folders(path, username)
+                subfolders = get_path_folders(path, user)
             except ValueError:
                 objects = []
             else:
@@ -74,9 +81,10 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         output.
         """
         path = self.request.GET.get('path', '')
+        path = path.strip('/')
         if not path:
             return FileBrowserPathListSerializer
-        self.kwargs['path'] = path.strip('/')
+        self.kwargs['path'] = path
         return FileBrowserPathSerializer
 
 
@@ -91,10 +99,10 @@ class FileBrowserPath(APIView):
         """
         Overriden to be able to make a GET request to an actual file resource.
         """
-        username = request.user.username
+        user = request.user
         path = kwargs.get('path')
         try:
-            subfolders = get_path_folders(path, username)
+            subfolders = get_path_folders(path, user)
         except ValueError:
             raise Http404('Not found.')
         object = {'path': path, 'subfolders': ','.join(subfolders)}
@@ -126,10 +134,10 @@ class FileBrowserPathFileList(generics.ListAPIView):
         """
         Overriden to return a custom queryset.
         """
-        username = self.request.user.username
+        user = self.request.user
         path = self.kwargs.get('path')
         try:
-            qs = get_path_file_queryset(path, username)
+            qs = get_path_file_queryset(path, user)
         except ValueError:
             raise Http404('Not found.')
         n_slashes = path.count('/') + 1
@@ -140,8 +148,8 @@ class FileBrowserPathFileList(generics.ListAPIView):
         Overriden to return the serializer class that should be used for serializing
         output.
         """
-        username = self.request.user.username
+        user = self.request.user
         path = self.kwargs.get('path')
-        model_class = get_path_file_model_class(path, username)
+        model_class = get_path_file_model_class(path, user)
         FileBrowserPathFileSerializer.Meta.model = model_class
         return FileBrowserPathFileSerializer
