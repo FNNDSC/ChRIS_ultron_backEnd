@@ -33,6 +33,8 @@ class UploadedFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
+    fname_icontains_multiple = django_filters.CharFilter(
+        method='filter_by_icontains_multiple')
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
@@ -50,3 +52,17 @@ class UploadedFileFilter(FilterSet):
         the list of immediate folders under the path).
         """
         return filter_files_by_n_slashes(queryset, value)
+
+    def filter_by_icontains_multiple(self, queryset, name, value):
+        """
+        Custom method to return the files containing all the substrings from the queried
+        string (which in turn represents a white-space-separated list of query strings)
+        case insensitive anywhere in their fname.
+        """
+        # assume value is a string representing a white-space-separated list
+        # of query strings
+        value_l = value.split()
+        qs = queryset
+        for val in value_l:
+            qs = qs.filter(fname__icontains=val)
+        return qs
