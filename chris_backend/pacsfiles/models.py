@@ -87,12 +87,18 @@ class PACSFileFilter(FilterSet):
 
     def filter_by_icontains_topdir_unique(self, queryset, name, value):
         """
-        Custom method to return the files containing the queried string case insensitive
-        anywhere in their fname. But only one file is returned per top level
-        directory under SERVICES/PACS/pacs_name. This is useful to efficiently determine
-        the top level directories containing a file that matches the query.
+        Custom method to return the files containing all the substrings from the queried
+        string (which in turn represents a white-space-separated list of query strings)
+        case insensitive anywhere in their fname. But only one file is returned per top
+        level directory under SERVICES/PACS/pacs_name. This is useful to efficiently
+        determine the top level directories containing a file that matches the query.
         """
-        qs = queryset.filter(fname__icontains=value)
+        # assume value is a string representing a white-space-separated list
+        # of query strings
+        value_l = value.split()
+        qs = queryset
+        for val in value_l:
+            qs = qs.filter(fname__icontains=val)
         ids = []
         hash_set = set()
         for f in qs.all():

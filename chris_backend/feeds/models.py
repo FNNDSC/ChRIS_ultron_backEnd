@@ -60,15 +60,26 @@ class FeedFilter(FilterSet):
     name_startswith = django_filters.CharFilter(field_name='name',
                                                 lookup_expr='startswith')
     files_fname_icontains = django_filters.CharFilter(
-        field_name='plugin_instances__files__fname',
-        lookup_expr='icontains',
-        distinct=True
-    )
+        method='filter_by_fname_icontains')
 
     class Meta:
         model = Feed
         fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
                   'min_creation_date', 'max_creation_date', 'files_fname_icontains']
+
+    def filter_by_fname_icontains(self, queryset, name, value):
+        """
+        Custom method to return the feeds that have files containing all the substrings
+        from the queried string (which in turn represents a white-space-separated list of
+        query strings) case insensitive anywhere in their fname.
+        """
+        # assume value is a string representing a white-space-separated list
+        # of query strings
+        value_l = value.split()
+        qs = queryset
+        for val in value_l:
+            qs = qs.filter(plugin_instances__files__fname__icontains=val)
+        return qs.distinct()
 
 
 class Note(models.Model):
