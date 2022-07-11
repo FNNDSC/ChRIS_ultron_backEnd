@@ -101,7 +101,7 @@ def get_path_folders(path, user):
                     folder = folder[:first_slash_ix]
                     if folder not in hash_set:
                         hash_set.add(folder)
-        if not existing_path:
+        if len(qs) and not existing_path:
             raise ValueError('Path not found.')
         subfolders = list(hash_set)
         if path == 'SERVICES':
