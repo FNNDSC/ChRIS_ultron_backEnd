@@ -87,19 +87,22 @@ def get_path_folders(path, user):
             subfolders = [f'feed_{feed.id}' for feed in shared_feeds_qs]
     else:
         hash_set = set()
+        existing_path = False
         for obj in qs:
             name = obj.fname.name
-            if not name.startswith(path + '/'):
-                raise ValueError('Path not found.')
-            folder = name.replace(path + '/', '', 1)
-            try:
-                first_slash_ix = folder.index('/')
-            except ValueError:
-                pass  # no folders under this path (only files)
-            else:
-                folder = folder[:first_slash_ix]
-                if folder not in hash_set:
-                    hash_set.add(folder)
+            if name.startswith(path + '/'):
+                existing_path = True
+                folder = name.replace(path + '/', '', 1)
+                try:
+                    first_slash_ix = folder.index('/')
+                except ValueError:
+                    pass  # no folders under this path (only files)
+                else:
+                    folder = folder[:first_slash_ix]
+                    if folder not in hash_set:
+                        hash_set.add(folder)
+        if len(qs) and not existing_path:
+            raise ValueError('Path not found.')
         subfolders = list(hash_set)
         if path == 'SERVICES':
             subfolders.append('PACS')
