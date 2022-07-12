@@ -76,10 +76,10 @@ class FeedFilter(FilterSet):
         # assume value is a string representing a white-space-separated list
         # of query strings
         value_l = value.split()
-        qs = queryset
+        qs_l = []
         for val in value_l:
-            qs = qs.filter(plugin_instances__files__fname__icontains=val)
-        return qs.distinct()
+            qs_l.append(queryset.filter(plugin_instances__files__fname__icontains=val))
+        return queryset.intersection(*qs_l)
 
 
 class Note(models.Model):
