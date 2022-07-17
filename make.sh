@@ -259,11 +259,6 @@ if (( $# == 1 )) ; then
     fi
 fi
 
-if [ -z "$TAG" ]; then
-    TAG=:next
-fi
-
-
 declare -a A_CONTAINER=(
     "fnndsc/chris:dev^CHRISREPO"
     "fnndsc/chris_store^STOREREPO"
@@ -350,8 +345,8 @@ if (( ! b_skipIntro )) ; then
                 $CONTAINER != "chris_store"          && \
                 $CONTAINER != "docker-swift-onlyone"  ]] ; then
             CMD="docker run --rm ${REPO}/$CONTAINER --version"
-            if [[   $CONTAINER == "pfcon:next"            || \
-                    $CONTAINER == "pman:next"  ]] ; then
+            if [[   $CONTAINER == "pfcon"            || \
+                    $CONTAINER == "pman"  ]] ; then
               CMD="docker inspect -f '{{ (index .Config.Labels \"org.opencontainers.image.version\") }}' $REPO/$CONTAINER"
             fi
             echo "$ $CMD"                                           | ./boxes.sh LightCyan
