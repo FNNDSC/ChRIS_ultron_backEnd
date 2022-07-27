@@ -213,9 +213,9 @@ class PluginInstanceManager(object):
         Check a plugin instance's app execution status. If the associated job's
         execution time exceeds the maximum set for the remote compute environment then
         the job is cancelled. Otherwise the job's execution status is fetched from the
-        remote and if finished without error then the job's zip file is downloaded and
-        unpacked and the output files registered with the DB. Finally a delete request
-        is made to remove the job from the remote environment.
+        remote and if finished (with or without errors) then the job's zip file is
+        downloaded and unpacked and the output files registered with the DB. Finally a
+        delete request is made to remove the job from the remote environment.
         """
         if self.c_plugin_inst.status == 'started':
             job_id = self.str_job_id
@@ -672,9 +672,39 @@ class PluginInstanceManager(object):
         Internal method to handle the 'finishedWithError' status returned by the
         remote compute.
         """
-        self.c_plugin_inst.status = 'finishedWithError'
-        self.delete_plugin_instance_job_from_remote()
-        self.save_plugin_instance_final_status()
+        plg_inst_lock = PluginInstanceLock(plugin_inst=self.c_plugin_inst)
+        try:
+            plg_inst_lock.save()
+        except IntegrityError:
+            pass  # another async task has already entered here
+        else:
+            # only one concurrent async task should get here
+            pfcon_url = self.pfcon_client.url
+            job_id = self.str_job_id
+            logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
+                        f'for job {job_id}')
+            try:
+                zip_content = self._get_job_zip_data(job_id)
+            except PfconRequestException as e:
+                logger.error(f'[CODE03,{job_id}]: Error fetching zip from pfcon url '
+                             f'-->{pfcon_url}<--, detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE03'
+            else:
+                # data successfully downloaded so update summary
+                d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
+                d_jobStatusSummary['pullPath']['status'] = True
+                self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+
+                logger.info('Registering output files from remote with job %s', job_id)
+                self.c_plugin_inst.status = 'registeringFiles'
+                self.c_plugin_inst.save()  # inform FE about status change
+                try:
+                    self.unpack_zip_file(zip_content)  # register files from remote
+                except Exception:
+                    pass  # giving up
+            self.c_plugin_inst.status = 'finishedWithError'
+            self.delete_plugin_instance_job_from_remote()
+            self.save_plugin_instance_final_status()
 
     def _handle_undefined_status(self):
         """
