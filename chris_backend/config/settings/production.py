@@ -4,6 +4,8 @@ Production Configurations
 
 """
 
+import ldap
+from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
 from environs import Env, EnvValidationError
 from core.swiftmanager import SwiftManager
@@ -110,8 +112,8 @@ CORS_ORIGIN_ALLOW_ALL = get_secret('DJANGO_CORS_ORIGIN_ALLOW_ALL', env.bool)
 CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)
 
 
-# Celery settings
-
+# CELERY SETTINGS
+# ------------------------------------------------------------------------------
 CELERY_BROKER_URL = get_secret('CELERY_BROKER_URL')
 
 #: Only add pickle to this list if your broker is secured
@@ -130,3 +132,25 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 SECURE_PROXY_SSL_HEADER = get_secret('DJANGO_SECURE_PROXY_SSL_HEADER', env.list)
 SECURE_PROXY_SSL_HEADER = tuple(SECURE_PROXY_SSL_HEADER) if SECURE_PROXY_SSL_HEADER else None
 USE_X_FORWARDED_HOST = get_secret('DJANGO_USE_X_FORWARDED_HOST', env.bool)
+
+
+# LDAP AUTH CONFIGURATION
+# ------------------------------------------------------------------------------
+AUTH_LDAP = get_secret('AUTH_LDAP', env.bool)
+if AUTH_LDAP:
+    AUTH_LDAP_SERVER_URI = get_secret('AUTH_LDAP_SERVER_URI')
+    AUTH_LDAP_BIND_DN = get_secret('AUTH_LDAP_BIND_DN')
+    AUTH_LDAP_BIND_PASSWORD = get_secret('AUTH_LDAP_BIND_PASSWORD')
+    AUTH_LDAP_USER_SEARCH_ROOT = get_secret('AUTH_LDAP_USER_SEARCH_ROOT')
+
+    AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
+                                       '(uid=%(user)s)')
+    AUTH_LDAP_USER_ATTR_MAP = {
+        'first_name': 'givenName',
+        'last_name': 'sn',
+        'email': 'mail'
+    }
+    AUTHENTICATION_BACKENDS = (
+        'django_auth_ldap.backend.LDAPBackend',
+        'django.contrib.auth.backends.ModelBackend',
+    )

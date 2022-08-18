@@ -55,6 +55,7 @@ RUN apt-get update                                               \
   && export LC_ALL=en_US.UTF-8                                   \
   && locale-gen en_US.UTF-8                                      \
   && dpkg-reconfigure locales                                    \
+  && apt-get install -y build-essential libldap2-dev libsasl2-dev slapd ldap-utils lcov valgrind \
   && apt-get install -y libssl-dev libpq-dev                     \
   && apt-get install -y apache2 apache2-dev                      \
   && pip install --upgrade pip                                   \
