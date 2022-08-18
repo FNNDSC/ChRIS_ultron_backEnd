@@ -220,15 +220,16 @@ class PluginInstanceManager(object):
         if self.c_plugin_inst.status == 'started':
             job_id = self.str_job_id
 
-            delta_exec_time = timezone.now() - self.c_plugin_inst.start_date
-            delta_seconds = delta_exec_time.total_seconds()
-            max_exec_seconds = self.c_plugin_inst.compute_resource.max_job_exec_seconds
-            if delta_seconds > max_exec_seconds:
-                logger.error(f'[CODE13,{job_id}]: Error, job exceeded maximum execution '
-                             f'time ({max_exec_seconds} seconds)')
-                self.c_plugin_inst.error_code = 'CODE13'
-                self.cancel_plugin_instance_app_exec()
-                return self.c_plugin_inst.status
+            max_job_exec_sec = self.c_plugin_inst.compute_resource.max_job_exec_seconds
+            if max_job_exec_sec >= 0:
+                delta_exec_time = timezone.now() - self.c_plugin_inst.start_date
+                delta_seconds = delta_exec_time.total_seconds()
+                if delta_seconds > max_job_exec_sec:
+                    logger.error(f'[CODE13,{job_id}]: Error, job exceeded maximum '
+                                 f'execution time ({max_job_exec_sec} seconds)')
+                    self.c_plugin_inst.error_code = 'CODE13'
+                    self.cancel_plugin_instance_app_exec()
+                    return self.c_plugin_inst.status
 
             pfcon_url = self.pfcon_client.url
             logger.info(f'Sending job status request to pfcon url -->{pfcon_url}<-- for '

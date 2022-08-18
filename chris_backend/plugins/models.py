@@ -35,7 +35,7 @@ class ComputeResource(models.Model):
     compute_auth_token = models.CharField(max_length=500, blank=True,
                                           default='initial_token')
     description = models.CharField(max_length=600, blank=True)
-    max_job_exec_seconds = models.IntegerField(blank=True, default=86400)  # 24h
+    max_job_exec_seconds = models.IntegerField(blank=True, default=-1)  # unlimited
 
     def __str__(self):
         return self.name
