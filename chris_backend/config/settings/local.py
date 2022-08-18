@@ -8,6 +8,8 @@ Local settings
 - Add django-extensions as app
 """
 
+import ldap
+from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
 from core.swiftmanager import SwiftManager
 
@@ -155,3 +157,24 @@ CELERY_TASK_SERIALIZER = 'json'
 # messages to prefetch at a time multiplied by the number of concurrent processes
 # default is 4 (four messages for each process)
 CELERYD_PREFETCH_MULTIPLIER = 2
+
+
+# LDAP auth configuration
+AUTH_LDAP = False
+if AUTH_LDAP:
+    AUTH_LDAP_SERVER_URI = 'ldap://192.168.0.29:389'
+    AUTH_LDAP_BIND_DN = 'cn=admin,dc=fnndsc,dc=org'
+    AUTH_LDAP_BIND_PASSWORD = 'admin1234'
+    AUTH_LDAP_USER_SEARCH_ROOT = 'dc=fnndsc,dc=org'
+
+    AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
+                                       '(uid=%(user)s)')
+    AUTH_LDAP_USER_ATTR_MAP = {
+        'first_name': 'givenName',
+        'last_name': 'sn',
+        'email': 'mail'
+    }
+    AUTHENTICATION_BACKENDS = (
+        'django_auth_ldap.backend.LDAPBackend',
+        'django.contrib.auth.backends.ModelBackend',
+    )
