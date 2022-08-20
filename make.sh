@@ -321,7 +321,7 @@ rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"   
         for CORE in ${A_CONTAINER[@]} ; do
             cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             echo "${ENV}=${REPO}"                                       >>.env
-            if [[ $REPO != "local" ]] ; then
+            if [[ $REPO != "local" && $CONTAINER != "chris:dev" ]] ; then
                 echo ""                                             | ./boxes.sh
                 CMD="docker pull ${REPO}/$CONTAINER"
                 printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"   \
@@ -456,9 +456,9 @@ windowBottom
 rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
                         "./docker-compose_dev.yml"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
-    echo "$ docker-compose -f docker-compose_dev.yml up -d"         | ./boxes.sh LightCyan
+    echo "$ docker-compose -f docker-compose_dev.yml up -d --build" | ./boxes.sh LightCyan
     windowBottom
-    docker-compose -f docker-compose_dev.yml up -d        >& dc.out
+    docker-compose -f docker-compose_dev.yml up -d --build  >& dc.out
     dc_check $? "PRINT"
 windowBottom
 
