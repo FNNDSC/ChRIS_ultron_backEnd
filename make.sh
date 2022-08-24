@@ -431,8 +431,8 @@ rm -f dc.out ; title -d 1 "Waiting for remote pfcon containers to start running 
             pfcon=$(docker ps -f name=pfcon_stack_pfcon.1 -q)
         elif [[ $ORCHESTRATOR == kubernetes ]]; then
             pfcon=$(kubectl get pods --selector="app=pfcon,env=production"     \
-                        --field-selector=status.phase=Running --               \
-                        output=jsonpath='{.items[*].metadata.name}')
+                        --field-selector=status.phase=Running                  \
+                        --output=jsonpath='{.items[*].metadata.name}')
         fi
         if [ -n "$pfcon" ]; then
           echo -en "\033[3A\033[2K"
