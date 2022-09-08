@@ -178,8 +178,8 @@ services:
       - DJANGO_DB_MIGRATE=on
       - DJANGO_ALLOWED_HOSTS=*
       - DJANGO_SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
-      - DJANGO_CORS_ORIGIN_ALLOW_ALL=true
-      - DJANGO_CORS_ORIGIN_WHITELIST=babymri.org
+      - DJANGO_CORS_ALLOW_ALL_ORIGINS=true
+      - DJANGO_CORS_ALLOWED_ORIGINS=https://babymri.org
       - DJANGO_SECURE_PROXY_SSL_HEADER=
       - DJANGO_USE_X_FORWARDED_HOST=false
       - DATABASE_HOST=chris_store_db
