@@ -369,6 +369,7 @@ class PluginAdminTests(TestCase):
                                             'has_permission': ANY,
                                             'available_apps': ANY,
                                             'is_popup': ANY,
+                                            'is_nav_sidebar_enabled': ANY,
                                             'opts': ANY,
                                             'file_form': ANY})
 
@@ -387,6 +388,7 @@ class PluginAdminTests(TestCase):
                                                 'has_permission': ANY,
                                                 'available_apps': ANY,
                                                 'is_popup': ANY,
+                                                'is_nav_sidebar_enabled': ANY,
                                                 'opts': ANY,
                                                 'summary': summary})
 

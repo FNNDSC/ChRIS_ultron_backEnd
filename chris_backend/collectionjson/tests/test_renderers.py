@@ -2,7 +2,7 @@
 import logging
 import json
 
-from django.conf.urls import url, include
+from django.urls import path, include
 from django.test.utils import override_settings
 from django.test import TestCase
 
@@ -178,12 +178,11 @@ router.register('moron', views.MoronReadOnlyModelViewSet)
 router.register('idiot', views.IdiotReadOnlyModelViewSet)
 router.register('normal-model', views.SimpleViewSet)
 urlpatterns = [
-    url(r'^rest-api/', include(router.urls)),
-    url(r'^rest-api/no-serializer/', views.NoSerializerView.as_view()),
-    url(r'^rest-api/paginated/', views.PaginatedDataView.as_view()),
-    url(r'^rest-api/none-paginated/', views.NonePaginatedDataView.as_view()),
-    url(r'^rest-api/parse-error/', views.ParseErrorView.as_view()),
-    url(r'^rest-api/url-rewrite/', views.UrlRewriteView.as_view()),
-    url(r'^rest-api/empty/', views.EmptyView.as_view()),
+    path('rest-api/', include(router.urls)),
+    path('rest-api/no-serializer/', views.NoSerializerView.as_view()),
+    path('rest-api/paginated/', views.PaginatedDataView.as_view()),
+    path('rest-api/none-paginated/', views.NonePaginatedDataView.as_view()),
+    path('rest-api/parse-error/', views.ParseErrorView.as_view()),
+    path('rest-api/url-rewrite/', views.UrlRewriteView.as_view()),
+    path('rest-api/empty/', views.EmptyView.as_view()),
 ]
-
