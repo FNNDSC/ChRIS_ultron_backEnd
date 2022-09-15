@@ -30,15 +30,15 @@ def get_secret(setting, secret_type=env):
 
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/2.2/ref/settings/#secret-key
-# Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not set
+# See: https://docs.djangoproject.com/en/4.0/ref/settings/#secret-key
+# Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not in os.environ
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
 
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/2.2/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/4.0/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
@@ -74,7 +74,7 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # LOGGING CONFIGURATION
-# See http://docs.djangoproject.com/en/2.2/topics/logging for
+# See https://docs.djangoproject.com/en/4.0/topics/logging/ for
 # more details on how to customize your logging configuration.
 ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
 LOGGING = {
@@ -102,14 +102,14 @@ LOGGING = {
 
 
 # STATIC FILES (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.2/howto/static-files/
+# https://docs.djangoproject.com/en/4.0/howto/static-files/
 STATIC_ROOT = get_secret('STATIC_ROOT')
 
 
 # CORSHEADERS
 # ------------------------------------------------------------------------------
-CORS_ORIGIN_ALLOW_ALL = get_secret('DJANGO_CORS_ORIGIN_ALLOW_ALL', env.bool)
-CORS_ORIGIN_WHITELIST = get_secret('DJANGO_CORS_ORIGIN_WHITELIST', env.list)
+CORS_ALLOW_ALL_ORIGINS = get_secret('DJANGO_CORS_ALLOW_ALL_ORIGINS', env.bool)
+CORS_ALLOWED_ORIGINS = get_secret('DJANGO_CORS_ALLOWED_ORIGINS', env.list)
 
 
 # CELERY SETTINGS

@@ -18,20 +18,20 @@ from core.swiftmanager import SwiftManager
 from django.core.exceptions import ImproperlyConfigured
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/2.2/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/4.0/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 # LOGGING CONFIGURATION
-# See http://docs.djangoproject.com/en/2.2/topics/logging for
+# See https://docs.djangoproject.com/en/4.0/topics/logging/ for
 # more details on how to customize your logging configuration.
 LOGGING = {
     'version': 1,
@@ -99,7 +99,7 @@ except Exception as e:
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
 # Database
-# https://docs.djangoproject.com/en/2.2/ref/settings/#databases
+# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
@@ -139,7 +139,7 @@ COMPUTE_RESOURCE_URL = 'http://pfcon.remote:30005/api/v1/'
 
 # corsheaders
 # ------------------------------------------------------------------------------
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
 
 
