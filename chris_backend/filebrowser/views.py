@@ -1,4 +1,6 @@
 
+import json
+
 from django.http import Http404
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
@@ -39,10 +41,11 @@ class FileBrowserPathList(generics.ListAPIView):
         path (empty path).
         """
         user = self.request.user
-        objects = [{'path': '', 'subfolders': f'SERVICES,{user.username}'}]
+        subfolders = ['SERVICES', user.username]
         shared_feed_creators = get_shared_feed_creators_set(user)
         for creator in shared_feed_creators:
-            objects[0]['subfolders'] += f',{creator.username}'
+            subfolders.append(creator.username)
+        objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
         return self.filter_queryset(objects)
 
 
@@ -62,17 +65,18 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         path = self.request.GET.get('path', '')
         path = path.strip('/')
         if not path:
-            objects = [{'path': '', 'subfolders': f'SERVICES,{user.username}'}]
+            subfolders = ['SERVICES', user.username]
             shared_feed_creators = get_shared_feed_creators_set(user)
             for creator in shared_feed_creators:
-                objects[0]['subfolders'] += f',{creator.username}'
+                subfolders.append(creator.username)
+            objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
         else:
             try:
-                subfolders = get_path_folders(path, user)
+                subfolders = get_path_folders(path, user)  # already sorted
             except ValueError:
                 objects = []
             else:
-                objects = [{'path': path, 'subfolders': ','.join(subfolders)}]
+                objects = [{'path': path, 'subfolders': json.dumps(subfolders)}]
         return self.filter_queryset(objects)
 
     def get_serializer_class(self, *args, **kwargs):
@@ -102,10 +106,10 @@ class FileBrowserPath(APIView):
         user = request.user
         path = kwargs.get('path')
         try:
-            subfolders = get_path_folders(path, user)
+            subfolders = get_path_folders(path, user)  # already sorted
         except ValueError:
             raise Http404('Not found.')
-        object = {'path': path, 'subfolders': ','.join(subfolders)}
+        object = {'path': path, 'subfolders': json.dumps(subfolders)}
         serializer = self.get_serializer(object)
         return Response(serializer.data)
 

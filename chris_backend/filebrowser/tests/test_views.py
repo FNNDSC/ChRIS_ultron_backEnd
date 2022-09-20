@@ -1,6 +1,7 @@
 
 import logging
 import io
+import json
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -55,7 +56,8 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, 'path')
-        self.assertEqual(response.data['results'][0]['subfolders'], f'SERVICES,{self.username}')
+        self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
+                         sorted(['SERVICES', self.username]))
 
     def test_filebrowserpath_list_success_shared_feed(self):
         user = User.objects.create_user(username=self.other_username,
@@ -79,8 +81,8 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
-        self.assertEqual(response.data['results'][0]['subfolders'],
-                         f'SERVICES,{self.username},{self.other_username}')
+        self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
+                         sorted(['SERVICES', self.username, self.other_username]))
 
     def test_filebrowserpath_list_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
@@ -107,7 +109,7 @@ class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, f'{self.username}/uploads')
-        self.assertIn('myfolder', response.data['results'][0]['subfolders'].split(','))
+        self.assertIn('myfolder', json.loads(response.data['results'][0]['subfolders']))
 
     def test_filebrowserpath_list_query_search_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
@@ -135,7 +137,7 @@ class FileBrowserPathViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertContains(response, f'{self.username}/uploads')
-        self.assertIn('myfolder', response.data['subfolders'].split(','))
+        self.assertIn('myfolder', json.loads(response.data['subfolders']))
 
     def test_filebrowserpath_failure_not_found(self):
         self.client.login(username=self.username, password=self.password)
