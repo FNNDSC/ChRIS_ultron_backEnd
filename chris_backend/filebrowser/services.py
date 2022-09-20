@@ -84,7 +84,7 @@ def get_path_folders(path, user):
     if model_class == PluginInstanceFile and path.split('/', 1)[0] == path and path != \
             username and username != 'chris':  # handle chris special case
             shared_feeds_qs = Feed.objects.filter(owner=user).filter(owner__username=path)
-            subfolders = [f'feed_{feed.id}' for feed in shared_feeds_qs]
+            subfolders = sorted([f'feed_{feed.id}' for feed in shared_feeds_qs])
     else:
         hash_set = set()
         existing_path = False
@@ -99,15 +99,14 @@ def get_path_folders(path, user):
                     pass  # no folders under this path (only files)
                 else:
                     folder = folder[:first_slash_ix]
-                    if folder not in hash_set:
-                        hash_set.add(folder)
+                    hash_set.add(folder)
         if len(qs) and not existing_path:
             raise ValueError('Path not found.')
-        subfolders = list(hash_set)
         if path == 'SERVICES':
-            subfolders.append('PACS')
+            hash_set.add('PACS')
         if path == username:
-            subfolders.append('uploads')
+            hash_set.add('uploads')
+        subfolders = sorted(hash_set)
     return subfolders
 
 
