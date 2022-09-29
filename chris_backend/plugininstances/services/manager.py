@@ -78,7 +78,8 @@ class PluginInstanceManager(object):
 
         self.l_plugin_inst_param_instances = self.c_plugin_inst.get_parameter_instances()
 
-        self.str_job_id = ChrisInstance.load().job_id_prefix + str(plugin_instance.id)
+        self.str_job_id_prefix = ChrisInstance.load().job_id_prefix
+        self.str_job_id = self.str_job_id_prefix + str(plugin_instance.id)
 
         cr = self.c_plugin_inst.compute_resource
         self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
@@ -131,6 +132,14 @@ class PluginInstanceManager(object):
             self.save_plugin_instance_final_status()
             return
 
+        # env variables to be injected into remote plugin's container
+        job_id = self.str_job_id
+        env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={self.c_plugin_inst.id}']
+        if plugin_type != 'fs':
+            prev_id = self.c_plugin_inst.previous.id
+            env.append(f'CHRIS_PREV_PLG_INST_ID={prev_id}')
+            env.append(f'CHRIS_PREV_JID={self.str_job_id_prefix + str(prev_id)}')
+
         # create job description dictionary
         job_descriptors = {
             'entrypoint': self._assemble_exec(plugin.selfpath, plugin.selfexec, plugin.execshell),
@@ -142,10 +151,10 @@ class PluginInstanceManager(object):
             'memory_limit': self.c_plugin_inst.memory_limit,
             'gpu_limit': self.c_plugin_inst.gpu_limit,
             'image': plugin.dock_image,
-            'type': plugin_type
+            'type': plugin_type,
+            'env': env
         }
         pfcon_url = self.pfcon_client.url
-        job_id = self.str_job_id
         logger.info(f'Submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
                     f'description: {json.dumps(job_descriptors, indent=4)}')
         try:
