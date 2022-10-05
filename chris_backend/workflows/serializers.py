@@ -71,7 +71,6 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         """
         if nodes_info is None:
             nodes_info = '[]'
-
         try:
             node_list: List[GivenNodeInfo] = json.loads(nodes_info)
         except json.decoder.JSONDecodeError:
@@ -81,20 +80,36 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError([f'Invalid list in {nodes_info}'])
 
         for d in node_list:
-            self._repair_undefined(d)
+            if 'piping_id' not in d:
+                raise serializers.ValidationError(
+                    f'Element does not specify "piping_id": {d}')
 
         pipeline = self.context['view'].get_object()
         pipings = list(pipeline.plugin_pipings.all())
 
         for piping in pipings:
             d_l = [d for d in node_list if d.get('piping_id') == piping.id]
-            try:
+            if d_l:
                 d = d_l[0]
-            except IndexError:
+                if 'title' in d:
+                    title = d['title']
+                    plg_inst_serializer = PluginInstanceSerializer(data={'title': title})
+                    try:
+                        plg_inst_serializer.is_valid(raise_exception=True)
+                    except Exception:
+                        msg = [f'Invalid title {title} for pipping with id {piping.id}']
+                        raise serializers.ValidationError(msg)
+                else:
+                    d['title'] = piping.title
+                if 'compute_resource_name' not in d:
+                    d['compute_resource_name'] = None
+                if 'plugin_parameter_defaults' not in d:
+                    d['plugin_parameter_defaults'] = []
+            else:
                 d = GivenNodeInfo(
                     piping_id=piping.id,
                     compute_resource_name=None,
-                    title='',
+                    title=piping.title,
                     plugin_parameter_defaults=[]
                 )
                 node_list.append(d)
@@ -105,32 +120,12 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                        f'with a compute resource named {cr_name}']
                 raise serializers.ValidationError(msg)
 
-            title = d.get('title')
-            plg_inst_serializer = PluginInstanceSerializer(data={'title': title})
-            try:
-                plg_inst_serializer.is_valid(raise_exception=True)
-            except Exception:
-                msg = [f'Invalid title {title} for pipping with id {piping.id}']
-                raise serializers.ValidationError(msg)
-
             piping_param_defaults = d.get('plugin_parameter_defaults')
             param_sets = (piping.string_param, piping.integer_param, piping.float_param, piping.boolean_param)
             for param_set in param_sets:
                 for default_param in param_set.all():
                     self.validate_piping_params(piping.id, default_param, piping_param_defaults)
-
         return node_list
-
-    @classmethod
-    def _repair_undefined(cls, d: GivenNodeInfo):
-        if 'piping_id' not in d:
-            raise serializers.ValidationError(f'Element does not specify "piping_id": {d}')
-        if 'compute_resource_name' not in d:
-            d['compute_resource_name'] = None
-        if 'title' not in d:
-            d['title'] = ''
-        if 'plugin_parameter_defaults' not in d:
-            d['plugin_parameter_defaults'] = []
 
     @staticmethod
     def validate_piping_params(piping_id: PipingId, default_param, piping_param_defaults: List[GivenWorkflowPluginParameterDefault]):

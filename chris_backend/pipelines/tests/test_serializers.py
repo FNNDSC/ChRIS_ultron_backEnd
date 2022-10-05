@@ -226,6 +226,7 @@ class PipelineSerializerTests(SerializerTests):
             with self.assertRaises(serializers.ValidationError):
                 pipeline_serializer.validate_plugin_tree(tree)
             get_tree_mock.assert_called_with([{"plugin_id": plugin_ds.id,
+                                               "title": plugin_ds.meta.name,
                                                "plugin_parameter_defaults": [],
                                                "previous_index": None}])
 
@@ -241,6 +242,23 @@ class PipelineSerializerTests(SerializerTests):
         tree_dict = {'root_index': 0, 'tree': [{"plugin_id": plugin_ds.id, "child_indices": []}]}
         with mock.patch('pipelines.serializers.PipelineSerializer.validate_tree') as validate_tree_mock:
             validate_tree_mock.side_effect = ValueError
+            with self.assertRaises(serializers.ValidationError):
+                pipeline_serializer.validate_plugin_tree(tree)
+                validate_tree_mock.assert_called_with(tree_dict)
+
+    def test_validate_plugin_tree_raises_validation_error_if_title_too_long(self):
+        """
+        Test whether overriden validate_plugin_tree method raises ValidationError if
+        internal call to validate_tree method raises ValueError exception.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        title = 200 * 's'
+        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "title": ' + title + ', previous_index": null}]'
+        tree_dict = {'root_index': 0, 'tree': [{"plugin_id": plugin_ds.id, "title": title, "child_indices": []}]}
+        with mock.patch('pipelines.serializers.PipelineSerializer.validate_tree') as validate_tree_mock:
+            validate_tree_mock.return_value = None
             with self.assertRaises(serializers.ValidationError):
                 pipeline_serializer.validate_plugin_tree(tree)
                 validate_tree_mock.assert_called_with(tree_dict)
@@ -295,22 +313,28 @@ class PipelineSerializerTests(SerializerTests):
         plugin_ds2.save()
 
         tree_list = [{"plugin_id": plugin_ds1.id,
+                      "title": plugin_ds1.meta.name,
                       "plugin_parameter_defaults": [],
                       "previous_index": None},
                 {"plugin_id": plugin_ds2.id,
+                 "title": plugin_ds2.meta.name,
                  "plugin_parameter_defaults": [],
                  "previous_index": 0},
                 {"plugin_id": plugin_ds1.id,
+                 "title": "piping1",
                  "plugin_parameter_defaults": [],
                  "previous_index": 1}]
 
         tree = [{"plugin_id": plugin_ds1.id,
+                 "title": plugin_ds1.meta.name,
                  "plugin_parameter_defaults": [],
                  "child_indices": [1]},
                 {"plugin_id": plugin_ds2.id,
+                 "title": plugin_ds2.meta.name,
                  "plugin_parameter_defaults": [],
                  "child_indices": [2]},
                 {"plugin_id": plugin_ds1.id,
+                 "title": "piping1",
                  "plugin_parameter_defaults": [],
                  "child_indices": []}]
         expected_tree_dict = {'root_index': 0, 'tree': tree}
@@ -353,24 +377,30 @@ class PipelineSerializerTests(SerializerTests):
         plugin_ds2.save()
 
         tree_list = [{"plugin_id": plugin_ds1.id,
+                      "title": plugin_ds1.meta.name,
                       "plugin_parameter_defaults": [],
                       "previous_index": None},
                      {"plugin_id": plugin_ds2.id,
+                      "title": plugin_ds2.meta.name,
                       "plugin_parameter_defaults": [],
                       "previous_index": 0},
                      {"plugin_id": plugin_ds1.id,
+                      "title": "piping1",
                       "plugin_parameter_defaults": [],
                       "previous_index": None}]
         with self.assertRaises(ValueError):
             pipeline_serializer.get_tree(tree_list)
 
         tree_list = [{"plugin_id": plugin_ds1.id,
+                      "title": plugin_ds1.meta.name,
                       "plugin_parameter_defaults": [],
                       "previous_index": None},
                      {"plugin_id": plugin_ds2.id,
+                      "title": plugin_ds2.meta.name,
                       "plugin_parameter_defaults": [],
                       "previous_index": 3},
                      {"plugin_id": plugin_ds1.id,
+                      "title": "piping1",
                       "plugin_parameter_defaults": [],
                       "previous_index": 1}]
         with self.assertRaises(ValueError):
@@ -412,12 +442,15 @@ class PipelineSerializerTests(SerializerTests):
         plugin_ds2.save()
 
         tree = [{"plugin_id": plugin_ds1.id,
+                 "title": plugin_ds1.meta.name,
                  "plugin_parameter_defaults": [],
                  "child_indices": [1]},
                 {"plugin_id": plugin_ds2.id,
+                 "title": "piping2",
                  "plugin_parameter_defaults": [],
                  "child_indices": [2]},
                 {"plugin_id": plugin_ds1.id,
+                 "title": "piping1",
                  "plugin_parameter_defaults": [],
                  "child_indices": []}]
         tree_dict = {'root_index': 0, 'tree': tree}

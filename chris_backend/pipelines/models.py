@@ -107,6 +107,7 @@ class PipelineFilter(FilterSet):
 
 
 class PluginPiping(models.Model):
+    title = models.CharField(max_length=100, blank=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
                                  related_name='plugin_pipings')
