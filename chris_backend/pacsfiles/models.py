@@ -1,4 +1,3 @@
-
 from django.db import models
 import django_filters
 from django_filters.rest_framework import FilterSet
@@ -20,8 +19,11 @@ class PACSFile(models.Model):
     PatientName = models.CharField(max_length=150, blank=True)
     PatientBirthDate = models.DateField(blank=True, null=True)
     PatientAge = models.IntegerField(blank=True, null=True)
-    PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')],
-                                  blank=True)
+    PatientSex = models.CharField(
+        max_length=1,
+        choices=[("M", "Male"), ("F", "Female"), ("O", "Non-binary")],
+        blank=True,
+    )
     StudyDate = models.DateField(db_index=True)
     AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
     Modality = models.CharField(max_length=15, blank=True)
@@ -33,48 +35,77 @@ class PACSFile(models.Model):
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
 
     class Meta:
-        ordering = ('-fname',)
+        ordering = ("-fname",)
 
     def __str__(self):
         return self.fname.name
 
 
 class PACSFileFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
-    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
-    fname_icontains = django_filters.CharFilter(field_name='fname',
-                                                lookup_expr='icontains')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr="gte"
+    )
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr="lte"
+    )
+    fname = django_filters.CharFilter(field_name="fname", lookup_expr="startswith")
+    fname_exact = django_filters.CharFilter(field_name="fname", lookup_expr="exact")
+    fname_icontains = django_filters.CharFilter(
+        field_name="fname", lookup_expr="icontains"
+    )
     fname_icontains_topdir_unique = django_filters.CharFilter(
-        method='filter_by_icontains_topdir_unique')
-    fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
-    PatientName = django_filters.CharFilter(field_name='PatientName',
-                                            lookup_expr='icontains')
-    ProtocolName = django_filters.CharFilter(field_name='ProtocolName',
-                                             lookup_expr='icontains')
-    StudyDescription = django_filters.CharFilter(field_name='StudyDescription',
-                                                 lookup_expr='icontains')
-    SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
-                                                 lookup_expr='icontains')
-    pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
-                                                lookup_expr='exact')
-    min_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
-                                                 lookup_expr='gte')
-    max_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
-                                                 lookup_expr='lte')
+        method="filter_by_icontains_topdir_unique"
+    )
+    fname_nslashes = django_filters.CharFilter(method="filter_by_n_slashes")
+    PatientName = django_filters.CharFilter(
+        field_name="PatientName", lookup_expr="icontains"
+    )
+    ProtocolName = django_filters.CharFilter(
+        field_name="ProtocolName", lookup_expr="icontains"
+    )
+    StudyDescription = django_filters.CharFilter(
+        field_name="StudyDescription", lookup_expr="icontains"
+    )
+    SeriesDescription = django_filters.CharFilter(
+        field_name="SeriesDescription", lookup_expr="icontains"
+    )
+    pacs_identifier = django_filters.CharFilter(
+        field_name="pacs__identifier", lookup_expr="exact"
+    )
+    min_PatientAge = django_filters.NumberFilter(
+        field_name="PatientAge", lookup_expr="gte"
+    )
+    max_PatientAge = django_filters.NumberFilter(
+        field_name="PatientAge", lookup_expr="lte"
+    )
 
     class Meta:
         model = PACSFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_icontains_topdir_unique', 'fname_nslashes',
-                  'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
-                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
-                  'AccessionNumber', 'ProtocolName', 'StudyInstanceUID',
-                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
-                  'pacs_identifier']
+        fields = [
+            "id",
+            "min_creation_date",
+            "max_creation_date",
+            "fname",
+            "fname_exact",
+            "fname_icontains",
+            "fname_icontains_topdir_unique",
+            "fname_nslashes",
+            "PatientID",
+            "PatientName",
+            "PatientSex",
+            "PatientAge",
+            "min_PatientAge",
+            "max_PatientAge",
+            "PatientBirthDate",
+            "StudyDate",
+            "AccessionNumber",
+            "ProtocolName",
+            "StudyInstanceUID",
+            "StudyDescription",
+            "SeriesInstanceUID",
+            "SeriesDescription",
+            "pacs_identifier",
+        ]
 
     def filter_by_n_slashes(self, queryset, name, value):
         """
@@ -103,8 +134,8 @@ class PACSFileFilter(FilterSet):
         hash_set = set()
         for f in qs.all():
             path = f.fname.name
-            l = path.split('/', 4)  # only split 4 times
-            top_dir = '/'.join(l[:4])
+            l = path.split("/", 4)  # only split 4 times
+            top_dir = "/".join(l[:4])
             if top_dir not in hash_set:
                 ids.append(f.id)
                 hash_set.add(top_dir)
