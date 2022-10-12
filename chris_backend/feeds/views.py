@@ -355,9 +355,12 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Custom method to update the feed's owners.
         """
+        
         feed = self.get_object()
         owners = feed.owner.values('username')
         username = self.request.data.pop('owner')
+        if not isinstance(self.request.data, dict) or not getattr(self.request.data, '_mutable', 1):
+            raise ValidationError("Invalid input supplied, needs JSON string")
         if {'username': username} not in owners:
             new_owner = serializer.validate_new_owner(username)
             owners = [o for o in feed.owner.all()]

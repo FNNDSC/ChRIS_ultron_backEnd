@@ -37,6 +37,8 @@ class ServiceFileList(generics.ListCreateAPIView):
         """
         Overriden to remove computed descriptors from the request if submitted.
         """
+        if not isinstance(self.request.data, dict) or not getattr(self.request.data, '_mutable', 1):
+            raise ValidationError("Invalid input supplied, needs JSON string")
         self.request.data.pop('fname', None)
         return super(ServiceFileList, self).create(request, *args, **kwargs)
 
