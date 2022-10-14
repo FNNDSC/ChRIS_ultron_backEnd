@@ -347,6 +347,8 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to update feed's owners if requested by a PUT request.
         """
+        if not isinstance(self.request.data, dict) or not getattr(self.request.data, '_mutable', 1):
+            raise ValidationError("Invalid input supplied, needs JSON string")
         if 'owner' in self.request.data:
             self.update_owners(serializer)
         super(FeedDetail, self).perform_update(serializer)
@@ -358,6 +360,8 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         feed = self.get_object()
         owners = feed.owner.values('username')
         username = self.request.data.pop('owner')
+        if not isinstance(self.request.data, dict) or not getattr(self.request.data, '_mutable', 1):
+            raise ValidationError("Invalid input supplied, needs JSON string")
         if {'username': username} not in owners:
             new_owner = serializer.validate_new_owner(username)
             owners = [o for o in feed.owner.all()]
