@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='pacsfile',
             name='PatientSex',
-            field=models.CharField(blank=True,  max_length=20),
+            field=models.CharField(blank=True, choices=[('M', 'Male'), ('F', 'Female')], max_length=1),
         ),
         migrations.AlterField(
             model_name='pacsfile',
