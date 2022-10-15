@@ -45,7 +45,7 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
-    depends_on:
+    depends_on: 
       - chris_dev_db
       - swift_service
       - queue
@@ -55,6 +55,7 @@ services:
         aliases:
           - chrisdev.local
       remote:  # bc special automated tests worker runs within CUBE, not needed in prod
+      minikube: 
     extra_hosts:
       - "${PFCONDNS:-lhost}:${PFCONIP:-127.0.0.1}"  # used only for kubernetes, not needed in prod
     labels:
@@ -92,6 +93,10 @@ services:
     # instead use extra_hosts to let the worker know pfcon's IP address. The required
     # shell variables referenced here must then be set like this: PFCONDNS=pfcon.remote,
     # PFCONIP=<actual IP address of localhost> and REMOTENETWORK=false
+
+    # if you are using minikube to run the kubernetes cluster, Set the environment variable in make.sh
+    # MINIKUBENETWORK to true and the HOSTIP will be minikube's ip, to get this, you can run the 
+    # command 'minikube ip' on the terminal
     extra_hosts:
       - "${PFCONDNS:-lhost}:${PFCONIP:-127.0.0.1}"
     labels:
@@ -239,6 +244,8 @@ networks:
   local:
   remote:
     external: ${REMOTENETWORK:-true}
+  minikube:
+    external: ${MINIKUBENETWORK:-true}
 
 volumes:
   chris_dev_db_data:

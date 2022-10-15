@@ -245,7 +245,9 @@ shift $(($OPTIND - 1))
 if [[ $ORCHESTRATOR == kubernetes ]]; then
     if [ -z ${HOSTIP+x} ]; then
         echo "-P <hostIp> (this machine's ip address) must be specified or the shell
-             environment variable HOSTIP must be set when using kubernetes orchestrator"
+             environment variable HOSTIP must be set when using kubernetes orchestrator
+             If you are using minikube to run the development environment, HOSTIP can be gotten by running
+             'minikube ip' on the terminal"
         print_usage
     fi
 fi
@@ -275,6 +277,8 @@ rm -f dc.out ; title -d 1 "Setting global exports"
         echo -e "HOSTIP=$HOSTIP"                   | ./boxes.sh
         echo -e "exporting REMOTENETWORK=false "   | ./boxes.sh
         export REMOTENETWORK=false
+        echo -e "exporting MINIKUBENETWORK=true"
+        export MINIKUBENETWORK=true
         echo -e "exporting PFCONDNS=pfcon.remote " | ./boxes.sh
         export PFCONDNS=pfcon.remote
         boxcenter "exporting PFCONIP=$HOSTIP "
