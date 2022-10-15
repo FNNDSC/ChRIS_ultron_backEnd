@@ -1,4 +1,5 @@
-
+from cgitb import lookup
+from dataclasses import field
 from django.db import models
 
 import django_filters
@@ -223,6 +224,7 @@ class PluginFilter(FilterSet):
     category = django_filters.CharFilter(field_name='meta__category',
                                          lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='meta__type', lookup_expr='exact')
+    public_repo = django_filters.CharFilter(field_name='meta__type', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
     name_title_category = django_filters.CharFilter(method='search_name_title_category')
@@ -240,11 +242,19 @@ class PluginFilter(FilterSet):
         lookup = lookup | models.Q(meta__category__icontains=value)
         return queryset.filter(lookup)
 
+
+   def search_name_public_rep(self, queryset, name, value):
+        """
+        Custom method to get a filtered queryset with all plugins in public_repo
+        """
+        lookup = models.Q(meta__name__icontains=value)
+        lookup = lookup | models.Q(meta__public_repo__icontains=value)
+        return queryset.filter(lookup)
     class Meta:
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
                   'min_creation_date', 'max_creation_date', 'title',  'description',
-                  'name_title_category', 'compute_resource_id']
+                  'name_title_category', 'compute_resource_id', 'public_repo']
 
 
 class PluginParameter(models.Model):
