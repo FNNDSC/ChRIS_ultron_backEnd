@@ -82,11 +82,11 @@ class ViewTests(TestCase):
 
         # create two plugin pipings
         self.pips = []
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip1', plugin=plugin_ds,
                                                        pipeline=pipeline)
         self.pips.append(pip)
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, previous=pip,
-                                                       pipeline=pipeline)
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip2', plugin=plugin_ds,
+                                                       previous=pip, pipeline=pipeline)
         self.pips.append(pip)
 
         # create another user
@@ -139,12 +139,10 @@ class WorkflowListViewTests(ViewTests):
     def test_workflow_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         owner = User.objects.get(username=self.username)
-        Workflow.objects.get_or_create(created_plugin_inst_ids="1,2",
-                                               pipeline=pipeline,
-                                               owner=owner)
+        Workflow.objects.get_or_create(title='Workflow1', pipeline=pipeline, owner=owner)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "1,2")
+        self.assertContains(response, 'Workflow1')
 
     def test_workflow_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
@@ -164,9 +162,7 @@ class WorkflowListQuerySearchViewTests(ViewTests):
     def test_workflow_query_search_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         owner = User.objects.get(username=self.username)
-        Workflow.objects.get_or_create(created_plugin_inst_ids="1,2",
-                                               pipeline=pipeline,
-                                               owner=owner)
+        Workflow.objects.get_or_create(pipeline=pipeline, owner=owner)
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.query_url)
         self.assertContains(response, self.username)
@@ -185,30 +181,80 @@ class WorkflowDetailViewTests(ViewTests):
         super(WorkflowDetailViewTests, self).setUp()
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         owner = User.objects.get(username=self.username)
-        (workflow, tf) = Workflow.objects.get_or_create(created_plugin_inst_ids="1,2",
-                                                        pipeline=pipeline, owner=owner)
-        self.read_delete_url = reverse("workflow-detail", kwargs={"pk": workflow.id})
+        (workflow, tf) = Workflow.objects.get_or_create(
+            title='Workflow2', pipeline=pipeline, owner=owner)
+        self.read_update_delete_url = reverse("workflow-detail",
+                                              kwargs={"pk": workflow.id})
 
     def test_workflow_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_delete_url)
-        self.assertContains(response, "1,2")
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, 'Workflow2')
 
     def test_workflow_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_delete_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_workflow_update_success(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Workflow3"}]}})
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertContains(response, "Workflow3")
+
+    def test_workflow_update_failure_unauthenticated(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Workflow3"}]}})
+
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_workflow_update_failure_access_denied(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Workflow3"}]}})
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_workflow_delete_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Workflow.objects.count(), 0)
 
     def test_workflow_delete_failure_unauthenticated(self):
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_workflow_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class WorkflowPluginInstanceListViewTests(ViewTests):
+    """
+    Test the workflow-plugininstance-list view.
+    """
+
+    def setUp(self):
+        super(WorkflowPluginInstanceListViewTests, self).setUp()
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        owner = User.objects.get(username=self.username)
+        (workflow, tf) = Workflow.objects.get_or_create(title='Workflow4',
+                                                        pipeline=pipeline, owner=owner)
+        self.list_url = reverse("workflow-plugininstance-list", kwargs={"pk": workflow.id})
+
+    def test_workflow_plugin_instance_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_workflow_plugin_instance_list_failure_unauthenticated(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -13,6 +13,7 @@ from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from pipelineinstances.models import PipelineInstance
+from workflows.models import Workflow
 
 if settings.DEBUG:
     import pdb, pudb
@@ -52,6 +53,9 @@ class PluginInstance(models.Model):
     pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
                                       on_delete=models.SET_NULL,
                                       related_name='plugin_instances')
+    workflow = models.ForeignKey(Workflow, null=True,
+                                 on_delete=models.SET_NULL,
+                                 related_name='plugin_instances')
     cpu_limit = CPUField(null=True)
     memory_limit = MemoryField(null=True)
     number_of_workers = models.IntegerField(null=True)
@@ -176,6 +180,7 @@ class PluginInstanceFilter(FilterSet):
     plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
     pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
                                                  lookup_expr='exact')
+    workflow_id = django_filters.CharFilter(field_name='workflow_id', lookup_expr='exact')
     plugin_name = django_filters.CharFilter(field_name='plugin__meta__name',
                                             lookup_expr='icontains')
     plugin_name_exact = django_filters.CharFilter(field_name='plugin__meta__name',
@@ -188,7 +193,7 @@ class PluginInstanceFilter(FilterSet):
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
                   'max_end_date', 'root_id', 'title', 'status', 'owner_username',
                   'feed_id', 'plugin_id', 'plugin_name', 'plugin_name_exact',
-                  'plugin_version', 'pipeline_inst_id']
+                  'plugin_version', 'pipeline_inst_id', 'workflow_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """

@@ -82,11 +82,11 @@ class ViewTests(TestCase):
 
         # create two plugin pipings
         self.pips = []
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip1', plugin=plugin_ds,
                                                        pipeline=pipeline)
         self.pips.append(pip)
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, previous=pip,
-                                                       pipeline=pipeline)
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip2', plugin=plugin_ds,
+                                                       previous=pip, pipeline=pipeline)
         self.pips.append(pip)
 
         # create another user
