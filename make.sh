@@ -553,9 +553,11 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
-    STR1='[{"plugin_name": "pl-s3retrieve", "plugin_version": "'
-    STR2='", "plugin_parameter_defaults": [{"name": "bucket", "default": "somebucket"}, {"name": "awssecretkey", "default": "somekey"},
-    {"name": "awskeyid", "default": "somekeyid"}], "previous_index": null}, {"plugin_name": "pl-simpledsapp", "plugin_version": "'
+    STR1='[{"title": "pl-s3retrieve", "plugin_name": "pl-s3retrieve", "plugin_version": "'
+    STR2='", "plugin_parameter_defaults": [{"name": "bucket", "default": "somebucket"},
+      {"name": "awssecretkey", "default": "somekey"},
+    {"name": "awskeyid", "default": "somekeyid"}], "previous_index": null},  {"title":
+    "pl-simpledsapp", "plugin_name": "pl-simpledsapp", "plugin_version": "'
     STR3='", "previous_index": 0}]'
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
@@ -567,9 +569,11 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
-    STR4='[{"plugin_name": "pl-simpledsapp", "plugin_version": "'
-    STR5='", "previous_index": null},{"plugin_name": "pl-simpledsapp", "plugin_version": "'
-    STR6='", "previous_index": 0},{"plugin_name": "pl-simpledsapp", "plugin_version": "'
+    STR4='[{"title": "pl-simpledsapp1", "plugin_name": "pl-simpledsapp", "plugin_version": "'
+    STR5='", "previous_index": null},{"title": "pl-simpledsapp2", "plugin_name":
+    "pl-simpledsapp", "plugin_version": "'
+    STR6='", "previous_index": 0},{"title": "pl-simpledsapp3", "plugin_name":
+    "pl-simpledsapp", "plugin_version": "'
     STR7='", "previous_index": 0}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom

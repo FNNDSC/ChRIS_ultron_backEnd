@@ -293,6 +293,10 @@ urlpatterns = format_suffix_patterns([
          workflow_views.WorkflowDetail.as_view(),
          name='workflow-detail'),
 
+    path('v1/pipelines/workflows/<int:pk>/plugininstances/',
+         workflow_views.WorkflowPluginInstanceList.as_view(),
+         name='workflow-plugininstance-list'),
+
 
     path('v1/uploadedfiles/',
         uploadedfile_views.UploadedFileList.as_view(),

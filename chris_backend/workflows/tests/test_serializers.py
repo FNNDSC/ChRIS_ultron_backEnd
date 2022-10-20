@@ -81,11 +81,11 @@ class SerializerTests(TestCase):
 
         # create two plugin pipings
         self.pips = []
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds,
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip1', plugin=plugin_ds,
                                                        pipeline=pipeline)
         self.pips.append(pip)
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, previous=pip,
-                                                       pipeline=pipeline)
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip2', plugin=plugin_ds,
+                                                       previous=pip, pipeline=pipeline)
         self.pips.append(pip)
 
     def tearDown(self):
@@ -114,9 +114,11 @@ class WorkflowSerializerTests(SerializerTests):
 
         data = {'previous_plugin_inst_id': self.pl_inst.id,
                 'nodes_info': json.dumps([{"piping_id": self.pips[0].id,
+                                           "title": "title1",
                                            "compute_resource_name": "host",
                                            "plugin_parameter_defaults": [{"name": "dummyInt", "default": 3}]},
                                           {"piping_id": self.pips[1].id,
+                                           "title": "title2",
                                            "compute_resource_name": "host"}])}
 
         workflow_serializer = WorkflowSerializer(data=data)
@@ -135,16 +137,14 @@ class WorkflowSerializerTests(SerializerTests):
 
     def test_validate_previous_plugin_inst_id(self):
         """
-        Test whether overriden validate_previous_plugin_inst_id method validates that an
-        integer id is provided for previous plugin instance. Then it checks that the id
-        exists in the DB and that the user can run plugins within the corresponding feed.
+        Test whether overriden validate_previous_plugin_inst_id method validates that the
+        provided previous plugin instance id exists in the DB and that the user can run
+        plugins within the corresponding feed.
         """
         workflow_serializer = WorkflowSerializer()
         workflow_serializer.context['request'] = mock.Mock()
         workflow_serializer.context['request'].user = self.owner
 
-        with self.assertRaises(serializers.ValidationError):
-            workflow_serializer.validate_previous_plugin_inst_id(None)
         with self.assertRaises(serializers.ValidationError):
             workflow_serializer.validate_previous_plugin_inst_id(self.pl_inst.id + 1)
         # create another user
@@ -182,6 +182,21 @@ class WorkflowSerializerTests(SerializerTests):
                                                                  "title": "c"*101,
                                                                  "compute_resource_name": "host"}]))
         with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([{"piping_id": self.pips[0].id,
+                                                                 "title": "pip",
+                                                                 "compute_resource_name": "host"},
+                                                                {"piping_id": self.pips[1].id,
+                                                                 "title": "pip",
+                                                                 "compute_resource_name": "host"}]))
+
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([{"piping_id": self.pips[0].id,
+                                                                 "compute_resource_name": "host"},
+                                                                {"piping_id": self.pips[1].id,
+                                                                 "title": self.pips[0].title,
+                                                                 "compute_resource_name": "host"}]))
+
+        with self.assertRaises(serializers.ValidationError):
             workflow_serializer.validate_nodes_info(
                 json.dumps([{"piping_id": self.pips[0].id, "compute_resource_name": "host",
                              "plugin_parameter_defaults": [{"name": "dummyInt", "default": "badInt"}]},
@@ -206,13 +221,13 @@ class WorkflowSerializerTests(SerializerTests):
             GivenNodeInfo(
                 piping_id=self.pips[0].id,
                 compute_resource_name=ComputeResourceName("host"),
-                title="",
+                title="pip1",
                 plugin_parameter_defaults=[]
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
-                title="",
+                title="pip2",
                 plugin_parameter_defaults=[]
             )
         ]
@@ -229,13 +244,13 @@ class WorkflowSerializerTests(SerializerTests):
             GivenNodeInfo(
                 piping_id=self.pips[0].id,
                 compute_resource_name=None,
-                title="",
+                title="pip1",
                 plugin_parameter_defaults=[]
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
-                title="",
+                title="pip2",
                 plugin_parameter_defaults=[]
             )
         ]

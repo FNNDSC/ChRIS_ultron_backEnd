@@ -29,9 +29,10 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
     plugin_type = serializers.ReadOnlyField(source='plugin.meta.type')
-    pipeline_id = serializers.ReadOnlyField(source='pipeline_inst.pipeline.id')
-    pipeline_name = serializers.ReadOnlyField(source='pipeline_inst.pipeline.name')
+    pipeline_id = serializers.ReadOnlyField(source='workflow.pipeline.id')
+    pipeline_name = serializers.ReadOnlyField(source='workflow.pipeline.name')
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
+    workflow_id = serializers.ReadOnlyField(source='workflow.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     output_path = serializers.SerializerMethodField()
     summary = serializers.ReadOnlyField()
@@ -55,6 +56,9 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_inst = serializers.HyperlinkedRelatedField(
         view_name='pipelineinstance-detail', read_only=True
     )
+    workflow = serializers.HyperlinkedRelatedField(
+        view_name='workflow-detail', read_only=True
+    )
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
     compute_resource = serializers.HyperlinkedRelatedField(
         view_name='computeresource-detail', read_only=True
@@ -65,12 +69,12 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         model = PluginInstance
         fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
                   'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
-                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'pipeline_inst',
                   'feed_id', 'start_date', 'end_date', 'output_path', 'status',
+                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'workflow_id',
                   'summary', 'raw', 'owner_username', 'cpu_limit', 'memory_limit',
                   'number_of_workers', 'gpu_limit', 'size', 'error_code', 'previous',
-                  'feed', 'plugin', 'descendants', 'files', 'parameters',
-                  'compute_resource', 'splits')
+                  'feed', 'plugin', 'workflow', 'pipeline_inst', 'compute_resource',
+                  'descendants', 'files', 'parameters',  'splits')
 
     def get_output_path(self, obj):
         """
