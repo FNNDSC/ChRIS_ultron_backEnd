@@ -68,6 +68,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             tree_dict = {'root_index': 0, 'tree': []}
             curr_ix = 0
             queue = [root_plg_inst]
+            titles = []
             while len(queue) > 0:
                 visited_instance = queue.pop()
                 plg_id = visited_instance.plugin.id
@@ -77,9 +78,17 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 upper_ix = lower_ix + len(child_instances)
                 child_indices = list(range(lower_ix, upper_ix))
                 parameter_instances = visited_instance.get_parameter_instances()
+
                 # parameter defaults assigned from the plugin instance's parameter values
                 defaults = [{'name': p_inst.plugin_param.name, 'default': p_inst.value}
                             for p_inst in parameter_instances]
+
+                if visited_instance.title in titles:  # avoid duplicated titles
+                    raise serializers.ValidationError(
+                        {'non_field_errors': ["The tree of plugin instances contain "
+                                              "duplicated (perhaps empty) titles"]})
+                titles.append(visited_instance.title)
+
                 tree_dict['tree'].append({'plugin_id': plg_id,
                                           'title': visited_instance.title,
                                           'plugin_parameter_defaults': defaults,
@@ -108,7 +117,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'non_field_errors': ["At least one of the fields 'plugin_tree' "
                                           "or 'plugin_inst_id' must be provided."]})
-            if 'plugin_tree' in data  and 'locked' in data and not data['locked']:
+            if 'plugin_tree' in data and 'locked' in data and not data['locked']:
                 # if user wants to unlock pipeline right away at creation time then check
                 # that defaults for all plugin parameters can be defined
                 tree = data['plugin_tree']['tree']
@@ -164,6 +173,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             msg = ["Invalid empty list in %s" % plugin_tree]
             raise serializers.ValidationError(msg)
 
+        titles = []
         for d in plugin_list:
             try:
                 prev_ix = d['previous_index']
@@ -191,10 +201,16 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 msg = ["Plugin %s is of type 'fs' and therefore can not be used to "
                        "create a pipeline." % plg]
                 raise serializers.ValidationError(msg)
+
             title = d.get('title')
             if title is None:
-                d['title'] = plg.meta.name
+                raise serializers.ValidationError(['All nodes in the pipeline must have '
+                                                   'a title'])
             else:
+                if title in titles:
+                    raise serializers.ValidationError(
+                        ["Pipeline tree can not contain duplicated titles"])
+                titles.append(title)
                 piping_serializer = PluginPipingSerializer(data={'title': title})
                 try:
                     piping_serializer.is_valid(raise_exception=True)

@@ -56,8 +56,10 @@ class PipelineManagerTests(TestCase):
         (pipeline, tf) = Pipeline.objects.get_or_create(name=self.pipeline_name, owner=user, category='test')
 
         # create two plugin pipings
-        (pip, tf) = PluginPiping.objects.get_or_create(plugin=plugin_ds, pipeline=pipeline)
-        PluginPiping.objects.get_or_create(plugin=plugin_ds, previous=pip, pipeline=pipeline)
+        (pip, tf) = PluginPiping.objects.get_or_create(title='pip1', plugin=plugin_ds,
+                                                       pipeline=pipeline)
+        PluginPiping.objects.get_or_create(title='pip2', plugin=plugin_ds,
+                                           previous=pip, pipeline=pipeline)
 
         self.pipeline_manager = manager.PipelineManager()
 
@@ -69,8 +71,10 @@ class PipelineManagerTests(TestCase):
         """
         Test whether the manager can add a new pipeline to the system.
         """
-        plugin_tree = '[{"plugin_name": "simpledsapp", "plugin_version": "0.1", "previous_index": null}, ' \
-                      '{"plugin_name": "simpledsapp", "plugin_version": "0.1", "previous_index": 0}]'
+        plugin_tree = '[{"title": "pip3", "plugin_name": "simpledsapp", ' \
+                      '"plugin_version": "0.1", "previous_index": null},  {"title": ' \
+                      '"pip4", "plugin_name": "simpledsapp", "plugin_version": "0.1",  ' \
+                      '"previous_index": 0}]'
         self.pipeline_manager.run(['add', 'Pipeline2', self.username, plugin_tree, '--unlock'])
         self.assertEqual(Pipeline.objects.count(), 2)
 

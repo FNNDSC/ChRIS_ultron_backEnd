@@ -97,8 +97,8 @@ class PipelineSerializerTests(SerializerTests):
         plugin_ds2.save()
 
         owner = User.objects.get(username=self.username)
-        plugin_tree = '[{"plugin_id": ' + str(plugin_ds1.id) + \
-                         ', "previous_index": null}, {"plugin_id": ' + \
+        plugin_tree = '[{"title": "pip1", "plugin_id": ' + str(plugin_ds1.id) + \
+                         ', "previous_index": null}, {"title": "pip2", "plugin_id": ' + \
                          str(plugin_ds2.id) + ', "previous_index": 0}]'
         data = {'name': 'Pipeline2', 'plugin_tree': plugin_tree}
 
@@ -220,15 +220,14 @@ class PipelineSerializerTests(SerializerTests):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
-        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "previous_index": null}]'
+        tree = '[{"title": "pip7", "plugin_id": ' + str(plugin_ds.id) + ', "previous_index": null}]'
         with mock.patch('pipelines.serializers.PipelineSerializer.get_tree') as get_tree_mock:
             get_tree_mock.side_effect = ValueError
             with self.assertRaises(serializers.ValidationError):
                 pipeline_serializer.validate_plugin_tree(tree)
-            get_tree_mock.assert_called_with([{"plugin_id": plugin_ds.id,
-                                               "title": plugin_ds.meta.name,
-                                               "plugin_parameter_defaults": [],
-                                               "previous_index": None}])
+            get_tree_mock.assert_called_with([{'title': 'pip7', 'plugin_id': plugin_ds.id,
+                                               'previous_index': None,
+                                               'plugin_parameter_defaults': []}])
 
     def test_validate_plugin_tree_raises_validation_error_if_validate_tree_raises_value_error(self):
         """
@@ -245,6 +244,39 @@ class PipelineSerializerTests(SerializerTests):
             with self.assertRaises(serializers.ValidationError):
                 pipeline_serializer.validate_plugin_tree(tree)
                 validate_tree_mock.assert_called_with(tree_dict)
+
+    def test_validate_plugin_tree_raises_validation_error_if_missing_a_tree_title(self):
+        """
+        Test whether overriden validate_plugin_tree method raises ValidationError if
+        internal call to validate_tree method raises ValueError exception.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', previous_index": null}]'
+        tree_dict = {'root_index': 0, 'tree': [{"plugin_id": plugin_ds.id, "child_indices": []}]}
+        with mock.patch('pipelines.serializers.PipelineSerializer.validate_tree') as validate_tree_mock:
+            validate_tree_mock.return_value = None
+            with self.assertRaises(serializers.ValidationError):
+                pipeline_serializer.validate_plugin_tree(tree)
+                validate_tree_mock.assert_called_with(tree_dict)
+
+    def test_validate_plugin_tree_raises_validation_error_if_duplicated_tree_title(self):
+        """
+        Test whether overriden validate_plugin_tree method raises ValidationError if
+        internal call to validate_tree method raises ValueError exception.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        title = 20 * 's'
+        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "title": ' + title + ', ' \
+               'previous_index": null}, {"plugin_id": ' + str(plugin_ds.id) + ', ' \
+               '"title": ' + title + ', previous_index": 0}]'
+        with mock.patch('pipelines.serializers.PipelineSerializer.validate_tree') as validate_tree_mock:
+            validate_tree_mock.return_value = None
+            with self.assertRaises(serializers.ValidationError):
+                pipeline_serializer.validate_plugin_tree(tree)
 
     def test_validate_plugin_tree_raises_validation_error_if_title_too_long(self):
         """
