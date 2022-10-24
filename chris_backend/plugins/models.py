@@ -1,5 +1,4 @@
-from cgitb import lookup
-from dataclasses import field
+
 from django.db import models
 
 import django_filters
@@ -242,14 +241,6 @@ class PluginFilter(FilterSet):
         lookup = lookup | models.Q(meta__category__icontains=value)
         return queryset.filter(lookup)
 
-
-   def search_name_public_rep(self, queryset, name, value):
-        """
-        Custom method to get a filtered queryset with all plugins in public_repo
-        """
-        lookup = models.Q(meta__name__icontains=value)
-        lookup = lookup | models.Q(meta__public_repo__icontains=value)
-        return queryset.filter(lookup)
     class Meta:
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
