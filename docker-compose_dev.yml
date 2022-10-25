@@ -245,7 +245,7 @@ networks:
   remote:
     external: ${REMOTENETWORK:-true}
   minikube:
-    external: ${MINIKUBENETWORK:-true}
+    external: ${MINIKUBENETWORK:-false}
 
 volumes:
   chris_dev_db_data:
