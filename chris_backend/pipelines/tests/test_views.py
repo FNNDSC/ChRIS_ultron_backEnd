@@ -130,7 +130,6 @@ class PipelineListViewTests(PipelineViewTests):
 
     def test_pipeline_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PipelineListQuerySearchViewTests(PipelineViewTests):

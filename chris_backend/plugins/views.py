@@ -135,7 +135,7 @@ class PluginList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """

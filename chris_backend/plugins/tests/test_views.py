@@ -214,7 +214,6 @@ class PluginListViewTests(ViewTests):
 
     def test_plugin_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PluginListQuerySearchViewTests(ViewTests):

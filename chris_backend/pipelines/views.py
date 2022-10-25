@@ -21,7 +21,7 @@ class PipelineList(generics.ListCreateAPIView):
     """
     http_method_names = ['get', 'post']
     serializer_class = PipelineSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
     def get_queryset(self):
         """

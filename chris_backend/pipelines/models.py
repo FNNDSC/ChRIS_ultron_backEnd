@@ -4,6 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 import django_filters
 from django_filters.rest_framework import FilterSet
+from rest_framework import  permissions
 
 from plugins.models import Plugin, PluginParameter
 
@@ -80,7 +81,7 @@ class Pipeline(models.Model):
         """
         queryset = Pipeline.objects.all()
         # if the user is chris then return all the pipelines in the queryset
-        if user.username == 'chris':
+        if user.username == 'chris' or not user.is_authenticated:
             return queryset
         # construct the full lookup expression.
         lookup = models.Q(locked=False) | models.Q(owner=user)
