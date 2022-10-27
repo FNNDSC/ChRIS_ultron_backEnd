@@ -132,14 +132,6 @@ class PluginInstanceManager(object):
             self.save_plugin_instance_final_status()
             return
 
-        # env variables to be injected into remote plugin's container
-        job_id = self.str_job_id
-        env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={self.c_plugin_inst.id}']
-        if plugin_type != 'fs':
-            prev_id = self.c_plugin_inst.previous.id
-            env.append(f'CHRIS_PREV_PLG_INST_ID={prev_id}')
-            env.append(f'CHRIS_PREV_JID={self.str_job_id_prefix + str(prev_id)}')
-
         # create job description dictionary
         job_descriptors = {
             'entrypoint': self._assemble_exec(plugin.selfpath, plugin.selfexec, plugin.execshell),
@@ -152,8 +144,9 @@ class PluginInstanceManager(object):
             'gpu_limit': self.c_plugin_inst.gpu_limit,
             'image': plugin.dock_image,
             'type': plugin_type,
-            'env': env
+            'env': self._compute_env_vars()
         }
+        job_id = self.str_job_id
         pfcon_url = self.pfcon_client.url
         logger.info(f'Submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
                     f'description: {json.dumps(job_descriptors, indent=4)}')
@@ -187,6 +180,31 @@ class PluginInstanceManager(object):
         if not execshell:
             return [entrypoint_path]
         return [execshell, entrypoint_path]
+
+    def _compute_env_vars(self):
+        """
+        Helper method to compute a list of environment variables to be injected into
+        remote plugin's container.
+        """
+        job_id = self.str_job_id
+        plugin_inst = self.c_plugin_inst
+        plugin = plugin_inst.plugin
+        plugin_type = plugin.meta.type
+
+        env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={plugin_inst.id}']
+        if plugin_type != 'fs':
+            prev_id = plugin_inst.previous.id
+            env.append(f'CHRIS_PREV_PLG_INST_ID={prev_id}')
+            env.append(f'CHRIS_PREV_JID={self.str_job_id_prefix + str(prev_id)}')
+
+        if plugin_inst.workflow:
+            workflow_instances_info = ''
+            for inst in plugin_inst.workflow.plugin_instances.all():
+                workflow_instances_info += f'{inst.title}:{inst.id},'
+            env.append(f'CHRIS_WORKFLOW_ID={plugin_inst.workflow.id}')
+            env.append(f'CHRIS_PIPELINE_ID={plugin_inst.workflow.pipeline.id}')
+            env.append(f'CHRIS_WORKFLOW_PLG_INSTANCES={workflow_instances_info[:-1]}')
+        return env
 
     def _submit_job(self, job_id, job_descriptors, dfile, timeout=9000):
         """
