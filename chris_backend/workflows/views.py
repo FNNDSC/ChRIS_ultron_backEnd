@@ -50,8 +50,8 @@ class WorkflowList(generics.ListCreateAPIView):
         }
 
         root_id = pipings_tree['root_id']
-        plugin_inst = self.create_plugin_inst(inst_data[root_id], previous_plugin_inst,
-                                              workflow)
+        plugin_inst = self.create_plugin_inst(
+            inst_data[root_id], previous_plugin_inst, workflow)
         plugin_instances = [plugin_inst]
         # breath-first traversal
         plugin_inst_queue = [plugin_inst]
@@ -61,8 +61,8 @@ class WorkflowList(generics.ListCreateAPIView):
             curr_plugin_inst = plugin_inst_queue.pop(0)
             child_ids = tree[curr_id]['child_ids']
             for id in child_ids:
-                plugin_inst = self.create_plugin_inst(inst_data[id], curr_plugin_inst,
-                                                      workflow)
+                plugin_inst = self.create_plugin_inst(
+                    inst_data[id], curr_plugin_inst, workflow)
                 plugin_instances.append(plugin_inst)
                 pip_id_queue.append(id)
                 plugin_inst_queue.append(plugin_inst)
@@ -85,7 +85,10 @@ class WorkflowList(generics.ListCreateAPIView):
                                      kwargs={"pk": pipeline.id})}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'previous_plugin_inst_id': '', 'title': '', 'nodes_info': ''}
+        template_data = {
+            'previous_plugin_inst_id': '',
+            'title': '',
+            'nodes_info': ''}
         return services.append_collection_template(response, template_data)
 
     def get_workflows_queryset(self):
@@ -95,8 +98,11 @@ class WorkflowList(generics.ListCreateAPIView):
         pipeline = self.get_object()
         return self.filter_queryset(pipeline.workflows.all())
 
-    def create_plugin_inst(self, data: WorkflowPluginInstanceTemplate, previous:
-    PluginInstance, workflow: Workflow) -> PluginInstance:
+    def create_plugin_inst(
+            self,
+            data: WorkflowPluginInstanceTemplate,
+            previous: PluginInstance,
+            workflow: Workflow) -> PluginInstance:
         """
         Custom method to create a plugin instance and set its parameters.
         """
@@ -132,7 +138,10 @@ class AllWorkflowList(generics.ListAPIView):
         """
         response = super(AllWorkflowList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('allworkflow-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'allworkflow-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'pipelines': reverse('pipeline-list', request=request)}
@@ -157,13 +166,20 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = WorkflowSerializer
     queryset = Workflow.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template to the response.
         """
-        response = super(WorkflowDetail, self).retrieve(request, *args, **kwargs)
+        response = super(
+            WorkflowDetail,
+            self).retrieve(
+            request,
+            *
+            args,
+            **kwargs)
         template_data = {'title': ''}
         return services.append_collection_template(response, template_data)
 

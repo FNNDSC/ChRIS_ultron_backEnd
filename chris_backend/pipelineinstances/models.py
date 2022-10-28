@@ -26,14 +26,20 @@ class PipelineInstance(models.Model):
 
 
 class PipelineInstanceFilter(FilterSet):
-    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    title = django_filters.CharFilter(
+        field_name='title', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
     pipeline_name = django_filters.CharFilter(field_name='pipeline__name',
-                                               lookup_expr='icontains')
+                                              lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
 
     class Meta:
         model = PipelineInstance
-        fields = ['id', 'title', 'description', 'pipeline_name', 'owner_username']
+        fields = [
+            'id',
+            'title',
+            'description',
+            'pipeline_name',
+            'owner_username']

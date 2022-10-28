@@ -16,7 +16,10 @@ class Pipeline(models.Model):
     authors = models.CharField(max_length=200, blank=True)
     category = models.CharField(max_length=100, blank=True)
     description = models.CharField(max_length=800, blank=True)
-    owner = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL)
+    owner = models.ForeignKey(
+        'auth.User',
+        null=True,
+        on_delete=models.SET_NULL)
     plugins = models.ManyToManyField(Plugin, related_name='pipelines',
                                      through='PluginPiping')
 
@@ -37,7 +40,8 @@ class Pipeline(models.Model):
         for pip in pipings:
             plg = pip.plugin
             prev_pip_id = pip.previous.id if pip.previous else 'null'
-            # param name becomes <plugin.id>_<piping.id>_<previous_piping.id>_<param.name>
+            # param name becomes
+            # <plugin.id>_<piping.id>_<previous_piping.id>_<param.name>
             param_names.extend(['%s_%s_%s_%s' % (plg.id, pip.id, prev_pip_id, param.name)
                                 for param in plg.parameters.all()])
         return param_names
@@ -53,7 +57,7 @@ class Pipeline(models.Model):
         root_pip = [pip for pip in pipings if not pip.previous][0]
         root_id = root_pip.id
         tree = {}
-        tree[root_id] = {'piping': root_pip, 'child_ids':[]}
+        tree[root_id] = {'piping': root_pip, 'child_ids': []}
         for pip in pipings:
             if pip.id not in tree:
                 tree[pip.id] = {'piping': pip, 'child_ids': []}
@@ -61,7 +65,10 @@ class Pipeline(models.Model):
                 if prev_id in tree:
                     tree[prev_id]['child_ids'].append(pip.id)
                 else:
-                    tree[prev_id] = {'piping': pip.previous, 'child_ids': [pip.id]}
+                    tree[prev_id] = {
+                        'piping': pip.previous,
+                        'child_ids': [
+                            pip.id]}
         return {'root_id': root_id, 'tree': tree}
 
     def check_parameter_defaults(self):
@@ -88,17 +95,20 @@ class Pipeline(models.Model):
 
 
 class PipelineFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='lte')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='icontains')
+    category = django_filters.CharFilter(
+        field_name='category', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
-    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
+    authors = django_filters.CharFilter(
+        field_name='authors', lookup_expr='icontains')
 
     class Meta:
         model = Pipeline
@@ -171,7 +181,7 @@ class PluginPiping(models.Model):
 class DefaultPipingStrParameter(models.Model):
     value = models.CharField(max_length=600, null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
-                                    related_name='string_param')
+                                      related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='string_piping_default')
 
@@ -185,7 +195,7 @@ class DefaultPipingStrParameter(models.Model):
 class DefaultPipingIntParameter(models.Model):
     value = models.IntegerField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
-                                    related_name='integer_param')
+                                      related_name='integer_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='integer_piping_default')
 
@@ -199,7 +209,7 @@ class DefaultPipingIntParameter(models.Model):
 class DefaultPipingFloatParameter(models.Model):
     value = models.FloatField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
-                                    related_name='float_param')
+                                      related_name='float_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='float_piping_default')
 
@@ -213,7 +223,7 @@ class DefaultPipingFloatParameter(models.Model):
 class DefaultPipingBoolParameter(models.Model):
     value = models.BooleanField(null=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
-                                    related_name='boolean_param')
+                                      related_name='boolean_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
                                      related_name='boolean_piping_default')
 

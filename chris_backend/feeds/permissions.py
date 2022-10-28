@@ -12,9 +12,12 @@ class IsOwnerOrChris(permissions.BasePermission):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
         if hasattr(obj.owner, 'all'):
-            return (request.user in obj.owner.all()) or (request.user.username == 'chris')
-        return (obj.owner == request.user) or (request.user.username == 'chris')
-    
+            return (
+                request.user in obj.owner.all()) or (
+                request.user.username == 'chris')
+        return (obj.owner == request.user) or (
+            request.user.username == 'chris')
+
 
 class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
     """
@@ -28,10 +31,14 @@ class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Write permissions are only allowed to the owner and superuser 'chris'.
+        # Write permissions are only allowed to the owner and superuser
+        # 'chris'.
         if hasattr(obj.owner, 'all'):
-            return (request.user in obj.owner.all()) or (request.user.username == 'chris')
-        return (obj.owner == request.user) or (request.user.username == 'chris')
+            return (
+                request.user in obj.owner.all()) or (
+                request.user.username == 'chris')
+        return (obj.owner == request.user) or (
+            request.user.username == 'chris')
 
 
 class IsRelatedFeedOwnerOrChris(permissions.BasePermission):
@@ -57,6 +64,7 @@ class IsRelatedTagOwnerOrChris(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
-        if (request.user.username == 'chris') or (request.user == obj.tag.owner):
+        if (request.user.username == 'chris') or (
+                request.user == obj.tag.owner):
             return True
         return False

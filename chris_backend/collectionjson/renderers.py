@@ -1,8 +1,11 @@
 
 import json
 
-from rest_framework.serializers import (HyperlinkedRelatedField, HyperlinkedIdentityField,
-                                        HyperlinkedModelSerializer, ManyRelatedField)
+from rest_framework.serializers import (
+    HyperlinkedRelatedField,
+    HyperlinkedIdentityField,
+    HyperlinkedModelSerializer,
+    ManyRelatedField)
 from rest_framework.renderers import JSONRenderer
 
 from .fields import ItemLinkField
@@ -29,13 +32,22 @@ class CollectionJsonRenderer(JSONRenderer):
             return None
 
     def _get_related_fields(self, fields, id_field):
-        return [k for (k, v) in fields
-                if k != id_field
-                and (isinstance(v, HyperlinkedRelatedField)
-                or isinstance(v, HyperlinkedIdentityField)   
-                or isinstance(v, ItemLinkField)
-                or (isinstance(v, ManyRelatedField)
-                    and isinstance(v.child_relation, HyperlinkedRelatedField)))]
+        return [
+            k for (
+                k,
+                v) in fields if k != id_field and (
+                isinstance(
+                    v,
+                    HyperlinkedRelatedField) or isinstance(
+                    v,
+                    HyperlinkedIdentityField) or isinstance(
+                        v,
+                        ItemLinkField) or (
+                            isinstance(
+                                v,
+                                ManyRelatedField) and isinstance(
+                                    v.child_relation,
+                                HyperlinkedRelatedField)))]
 
     def _make_link(self, rel, href):
         return {'rel': rel, 'href': href}
@@ -119,22 +131,23 @@ class CollectionJsonRenderer(JSONRenderer):
         if 'collection_links' in data:
             l = data.pop('collection_links')
             links = [self._make_link(key, l[key]) for key in l.keys()]
-            
+
         if view.get_view_name() == 'Api Root':
-            links = links.extend([self._make_link(key, data[key]) for key in data.keys()])
+            links = links.extend([self._make_link(key, data[key])
+                                 for key in data.keys()])
             items = []
         else:
             if self._is_paginated(data):
                 links.extend(self._get_pagination_links(data))
                 data = self._get_items_from_paginated_data(data)
-            
+
             items = self._transform_items(view, data)
 
         return {
             'items': items,
             'links': links,
         }
-    
+
     def get_href(self, request):
         return request.build_absolute_uri()
 

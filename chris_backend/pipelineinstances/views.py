@@ -48,7 +48,8 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         tree = pipings_tree['tree']
         root_id = pipings_tree['root_id']
         root_pip = tree[root_id]['piping']
-        plugin_inst_dict = self.create_plugin_inst(root_pip, previous_plugin_inst)
+        plugin_inst_dict = self.create_plugin_inst(
+            root_pip, previous_plugin_inst)
         plugin_instances = [plugin_inst_dict]
         # breath-first traversal
         plugin_inst_queue = [plugin_inst_dict]
@@ -65,7 +66,8 @@ class PipelineInstanceList(generics.ListCreateAPIView):
                 pip_id_queue.append(id)
                 plugin_inst_queue.append(plugin_inst_dict)
         # if no validation errors at this point then save to the DB
-        self.pipeline_inst = serializer.save(owner=self.request.user, pipeline=pipeline)
+        self.pipeline_inst = serializer.save(
+            owner=self.request.user, pipeline=pipeline)
         for plg_inst_dict in plugin_instances:
             self.save_plugin_inst(plg_inst_dict)
 
@@ -87,12 +89,17 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         pipeline = self.get_object()
         # append document-level link relations
         links = {'pipeline': reverse('pipeline-detail', request=request,
-                                   kwargs={"pk": pipeline.id})}
+                                     kwargs={"pk": pipeline.id})}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'previous_plugin_inst_id': "", 'title': "", 'description': "",
-                         'cpu_limit': "", 'memory_limit': "", 'number_of_workers': "",
-                         'gpu_limit': ""}
+        template_data = {
+            'previous_plugin_inst_id': "",
+            'title': "",
+            'description': "",
+            'cpu_limit': "",
+            'memory_limit': "",
+            'number_of_workers': "",
+            'gpu_limit': ""}
         param_names = pipeline.get_pipings_parameters_names()
         for name in param_names:
             template_data[name] = ""
@@ -120,15 +127,16 @@ class PipelineInstanceList(generics.ListCreateAPIView):
         parameter_serializers = []
         parameters = piping.plugin.parameters.all()
         for parameter in parameters:
-            if (piping.id in parsed_parameters) and (parameter.name in
-                                                     parsed_parameters[piping.id]):
+            if (piping.id in parsed_parameters) and (
+                    parameter.name in parsed_parameters[piping.id]):
                 request_value = parsed_parameters[piping.id][parameter.name]
                 data = {'value': request_value}
             else:
                 default = getattr(piping, parameter.type + '_param').filter(
                     plugin_param=parameter)[0]
                 data = {'value': default.value}
-            parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](data=data)
+            parameter_serializer = PARAMETER_SERIALIZERS[parameter.type](
+                data=data)
             try:
                 parameter_serializer.is_valid(raise_exception=True)
             except ValidationError:
@@ -198,9 +206,18 @@ class AllPipelineInstanceList(generics.ListAPIView):
         """
         Overriden to add a query list and document-level link relation to the response.
         """
-        response = super(AllPipelineInstanceList, self).list(request, *args, **kwargs)
+        response = super(
+            AllPipelineInstanceList,
+            self).list(
+            request,
+            *
+            args,
+            **kwargs)
         # append query list
-        query_list = [reverse('allpipelineinstance-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'allpipelineinstance-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'pipelines': reverse('pipeline-list', request=request)}
@@ -225,13 +242,20 @@ class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PipelineInstanceSerializer
     queryset = PipelineInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template to the response.
         """
-        response = super(PipelineInstanceDetail, self).retrieve(request, *args, **kwargs)
+        response = super(
+            PipelineInstanceDetail,
+            self).retrieve(
+            request,
+            *
+            args,
+            **kwargs)
         template_data = {'title': '', 'description': ''}
         return services.append_collection_template(response, template_data)
 
@@ -245,7 +269,13 @@ class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         data.pop('number_of_workers', None)
         data.pop('cpu_limit', None)
         data.pop('memory_limit', None)
-        return super(PipelineInstanceDetail, self).update(request, *args, **kwargs)
+        return super(
+            PipelineInstanceDetail,
+            self).update(
+            request,
+            *
+            args,
+            **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -258,7 +288,13 @@ class PipelineInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
                 cancel_plugin_instance.delay(plg_inst.id)  # call async task
             plg_inst.status = 'cancelled'
             plg_inst.save()
-        return super(PipelineInstanceDetail, self).destroy(request, *args, **kwargs)
+        return super(
+            PipelineInstanceDetail,
+            self).destroy(
+            request,
+            *
+            args,
+            **kwargs)
 
 
 class PipelineInstancePluginInstanceList(generics.ListAPIView):

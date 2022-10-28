@@ -52,20 +52,29 @@ class WorkflowPluginInstanceTemplateFactory:
     def get_piping(self, piping_id: PipingId) -> PluginPiping:
         return self.tree[piping_id]['piping']
 
-    def get_compute_resource(self, piping: PluginPiping, name: Optional[ComputeResourceName]) -> ComputeResource:
+    def get_compute_resource(
+            self,
+            piping: PluginPiping,
+            name: Optional[ComputeResourceName]) -> ComputeResource:
         compute_resources = piping.plugin.compute_resources
         if name:
             compute_resources = compute_resources.filter(name=name)
         return compute_resources.first()
 
-    def inflate(self, node_info: GivenNodeInfo) -> WorkflowPluginInstanceTemplate:
+    def inflate(
+            self,
+            node_info: GivenNodeInfo) -> WorkflowPluginInstanceTemplate:
         piping = self.get_piping(node_info['piping_id'])
         return WorkflowPluginInstanceTemplate(
-            piping=self.get_piping(node_info['piping_id']),
-            compute_resource=self.get_compute_resource(piping, node_info['compute_resource_name']),
+            piping=self.get_piping(
+                node_info['piping_id']),
+            compute_resource=self.get_compute_resource(
+                piping,
+                node_info['compute_resource_name']),
             title=node_info['title'],
-            params=self._reconcile_params(node_info['plugin_parameter_defaults'], piping)
-        )
+            params=self._reconcile_params(
+                node_info['plugin_parameter_defaults'],
+                piping))
 
     @classmethod
     def _reconcile_params(cls,
@@ -77,7 +86,9 @@ class WorkflowPluginInstanceTemplateFactory:
         piping_default_params.extend(list(piping.integer_param.all()))
         piping_default_params.extend(list(piping.float_param.all()))
         piping_default_params.extend(list(piping.boolean_param.all()))
-        reconciled_params = (cls._reconcile_param(p, plugin_parameter_defaults) for p in piping_default_params)
+        reconciled_params = (
+            cls._reconcile_param(
+                p, plugin_parameter_defaults) for p in piping_default_params)
         return [p for p in reconciled_params if p is not None]
 
     @staticmethod
@@ -85,7 +96,8 @@ class WorkflowPluginInstanceTemplateFactory:
                          plugin_parameter_defaults: List[GivenWorkflowPluginParameterDefault]
                          ) -> Optional[Tuple[PluginParameter, Any]]:
         plugin_param = default_param.plugin_param
-        l = [d for d in plugin_parameter_defaults if d.get('name') == plugin_param.name]
+        l = [d for d in plugin_parameter_defaults if d.get(
+            'name') == plugin_param.name]
 
         default_value = None
         if plugin_param.get_default() is not None:
@@ -96,6 +108,7 @@ class WorkflowPluginInstanceTemplateFactory:
             return plugin_param, param_default
         elif default_param.value != default_value:
             # if default piping parameter value is different from the plugin's
-            # provided default (if any) then also create a new plg inst parameter
+            # provided default (if any) then also create a new plg inst
+            # parameter
             return default_param.plugin_param, default_param.value
         return None

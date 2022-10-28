@@ -20,10 +20,12 @@ class PACSFile(models.Model):
     PatientName = models.CharField(max_length=150, blank=True)
     PatientBirthDate = models.DateField(blank=True, null=True)
     PatientAge = models.IntegerField(blank=True, null=True)
-    PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female')],
-                                  blank=True)
+    PatientSex = models.CharField(
+        max_length=1, choices=[
+            ('M', 'Male'), ('F', 'Female')], blank=True)
     StudyDate = models.DateField(db_index=True)
-    AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
+    AccessionNumber = models.CharField(
+        max_length=100, blank=True, db_index=True)
     Modality = models.CharField(max_length=15, blank=True)
     ProtocolName = models.CharField(max_length=64, blank=True)
     StudyInstanceUID = models.CharField(max_length=100)
@@ -40,12 +42,14 @@ class PACSFile(models.Model):
 
 
 class PACSFileFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
-    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='lte')
+    fname = django_filters.CharFilter(
+        field_name='fname', lookup_expr='startswith')
+    fname_exact = django_filters.CharFilter(
+        field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
     fname_icontains_topdir_unique = django_filters.CharFilter(
@@ -57,8 +61,8 @@ class PACSFileFilter(FilterSet):
                                              lookup_expr='icontains')
     StudyDescription = django_filters.CharFilter(field_name='StudyDescription',
                                                  lookup_expr='icontains')
-    SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
-                                                 lookup_expr='icontains')
+    SeriesDescription = django_filters.CharFilter(
+        field_name='SeriesDescription', lookup_expr='icontains')
     pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
                                                 lookup_expr='exact')
     min_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
@@ -68,13 +72,30 @@ class PACSFileFilter(FilterSet):
 
     class Meta:
         model = PACSFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_icontains_topdir_unique', 'fname_nslashes',
-                  'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
-                  'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
-                  'AccessionNumber', 'ProtocolName', 'StudyInstanceUID',
-                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
-                  'pacs_identifier']
+        fields = [
+            'id',
+            'min_creation_date',
+            'max_creation_date',
+            'fname',
+            'fname_exact',
+            'fname_icontains',
+            'fname_icontains_topdir_unique',
+            'fname_nslashes',
+            'PatientID',
+            'PatientName',
+            'PatientSex',
+            'PatientAge',
+            'min_PatientAge',
+            'max_PatientAge',
+            'PatientBirthDate',
+            'StudyDate',
+            'AccessionNumber',
+            'ProtocolName',
+            'StudyInstanceUID',
+            'StudyDescription',
+            'SeriesInstanceUID',
+            'SeriesDescription',
+            'pacs_identifier']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """

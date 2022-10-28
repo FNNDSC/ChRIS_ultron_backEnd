@@ -15,15 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(many=True, view_name='feed-detail',
-                                               read_only=True)
+    feed = serializers.HyperlinkedRelatedField(
+        many=True, view_name='feed-detail', read_only=True)
     username = serializers.CharField(min_length=4, max_length=32,
                                      validators=[UniqueValidator(
                                          queryset=User.objects.all())])
     email = serializers.EmailField(required=True,
                                    validators=[UniqueValidator(
                                        queryset=User.objects.all())])
-    password = serializers.CharField(min_length=8, max_length=100, write_only=True)
+    password = serializers.CharField(
+        min_length=8, max_length=100, write_only=True)
 
     class Meta:
         model = User
@@ -49,8 +50,9 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
             welcome_file.fname.name = welcome_file_path
             welcome_file.save()
         except Exception as e:
-            logger.error('Could not create welcome file in user space, detail: %s' %
-                         str(e))
+            logger.error(
+                'Could not create welcome file in user space, detail: %s' %
+                str(e))
         return user
 
     def validate_username(self, username):

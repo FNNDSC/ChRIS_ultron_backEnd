@@ -63,7 +63,8 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
             Service.objects.get(identifier=service_name)
         except Service.DoesNotExist:
             # validate new Service identifier
-            service_serializer = ServiceSerializer(data={'identifier': service_name})
+            service_serializer = ServiceSerializer(
+                data={'identifier': service_name})
             try:
                 service_serializer.is_valid(raise_exception=True)
             except serializers.ValidationError as e:
@@ -91,9 +92,11 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
             swift_path_exists = swift_manager.obj_exists(path)
         except Exception as e:
             logger.error('Swift storage error, detail: %s' % str(e))
-            raise serializers.ValidationError({'path': ["Could not find this path."]})
+            raise serializers.ValidationError(
+                {'path': ["Could not find this path."]})
         if not swift_path_exists:
-            raise serializers.ValidationError({'path': ["Could not find this path."]})
+            raise serializers.ValidationError(
+                {'path': ["Could not find this path."]})
         # verify that the file has not already been registered
         try:
             ServiceFile.objects.get(fname=path)

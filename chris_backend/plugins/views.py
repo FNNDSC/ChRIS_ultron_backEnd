@@ -24,9 +24,18 @@ class ComputeResourceList(generics.ListAPIView):
         Overriden to append document-level link relations and a query list to the
         response.
         """
-        response = super(ComputeResourceList, self).list(request, *args, **kwargs)
+        response = super(
+            ComputeResourceList,
+            self).list(
+            request,
+            *
+            args,
+            **kwargs)
         # append query list
-        query_list = [reverse('computeresource-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'computeresource-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request)}

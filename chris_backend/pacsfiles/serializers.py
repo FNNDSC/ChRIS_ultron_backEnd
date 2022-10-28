@@ -31,11 +31,29 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PACSFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'path', 'PatientID',
-                  'PatientName', 'PatientBirthDate', 'PatientAge', 'PatientSex',
-                  'StudyDate', 'AccessionNumber', 'Modality', 'ProtocolName',
-                  'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
-                  'SeriesDescription', 'pacs_identifier', 'pacs_name', 'file_resource')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'fname',
+            'fsize',
+            'path',
+            'PatientID',
+            'PatientName',
+            'PatientBirthDate',
+            'PatientAge',
+            'PatientSex',
+            'StudyDate',
+            'AccessionNumber',
+            'Modality',
+            'ProtocolName',
+            'StudyInstanceUID',
+            'StudyDescription',
+            'SeriesInstanceUID',
+            'SeriesDescription',
+            'pacs_identifier',
+            'pacs_name',
+            'file_resource')
 
     def get_file_link(self, obj):
         """

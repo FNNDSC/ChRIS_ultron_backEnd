@@ -19,7 +19,10 @@ class Service(models.Model):
 class ServiceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=512, unique=True)
-    service = models.ForeignKey(Service, db_index=True, on_delete=models.CASCADE)
+    service = models.ForeignKey(
+        Service,
+        db_index=True,
+        on_delete=models.CASCADE)
 
     class Meta:
         ordering = ('-fname',)
@@ -29,23 +32,34 @@ class ServiceFile(models.Model):
 
 
 class ServiceFileFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
-    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='lte')
+    fname = django_filters.CharFilter(
+        field_name='fname', lookup_expr='startswith')
+    fname_exact = django_filters.CharFilter(
+        field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
-    service_identifier = django_filters.CharFilter(field_name='service__identifier',
-                                                   lookup_expr='exact')
-    service_id = django_filters.CharFilter(field_name='service_id', lookup_expr='exact')
+    service_identifier = django_filters.CharFilter(
+        field_name='service__identifier', lookup_expr='exact')
+    service_id = django_filters.CharFilter(
+        field_name='service_id', lookup_expr='exact')
 
     class Meta:
         model = ServiceFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_nslashes', 'service_identifier', 'service_id']
+        fields = [
+            'id',
+            'min_creation_date',
+            'max_creation_date',
+            'fname',
+            'fname_exact',
+            'fname_icontains',
+            'fname_nslashes',
+            'service_identifier',
+            'service_id']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """

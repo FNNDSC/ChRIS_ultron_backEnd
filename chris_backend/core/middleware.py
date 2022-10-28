@@ -10,6 +10,7 @@ class RenderedResponse(HttpResponse):
     """
     An HttpResponse that renders its content into Collection+JSON or JSON.
     """
+
     def __init__(self, data, **kwargs):
         request = data.pop('request')
         mime = request.META.get('HTTP_ACCEPT')
@@ -21,14 +22,18 @@ class RenderedResponse(HttpResponse):
         else:
             kwargs['content_type'] = 'application/vnd.collection+json'
             self.exception = True
-            renderer_context = {'request': request, 'view': None, 'response': self}
+            renderer_context = {
+                'request': request,
+                'view': None,
+                'response': self}
             renderer = CollectionJsonRenderer()
             content = renderer.render(data, renderer_context=renderer_context)
         super(RenderedResponse, self).__init__(content, **kwargs)
 
 
 def api_500(request):
-    return RenderedResponse({'detail': 'Internal server error', 'request': request},
+    return RenderedResponse({'detail': 'Internal server error',
+                             'request': request},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

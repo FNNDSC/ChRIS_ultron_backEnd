@@ -53,11 +53,15 @@ app.conf.beat_schedule = {
 }
 
 # use logging settings in Django settings
+
+
 @setup_logging.connect
 def config_loggers(*args, **kwags):
     dictConfig(settings.LOGGING)
 
 # example task that is passed info about itself
+
+
 @app.task(bind=True)
 def debug_task(self):
     print('Request: {0!r}'.format(self.request))

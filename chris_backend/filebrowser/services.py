@@ -31,7 +31,8 @@ def get_path_file_queryset(path, user):
     path_username = path.split('/', 1)[0]
     if model_class == PluginInstanceFile and not path_username == username:
 
-        if username == 'chris':  # chris special case (can see others' not shared feeds)
+        # chris special case (can see others' not shared feeds)
+        if username == 'chris':
             if path == path_username:
                 return model_class.objects.filter(fname__startswith=path + '/')
             else:
@@ -44,7 +45,8 @@ def get_path_file_queryset(path, user):
                 shared_feed_user = feed_creator
                 break
         if shared_feed_user is None:
-            # path doesn't start with a username that shared a feed with this user
+            # path doesn't start with a username that shared a feed with this
+            # user
             raise ValueError('Path not found.')
         elif path == shared_feed_user.username:
             qs = model_class.objects.none()
@@ -53,7 +55,8 @@ def get_path_file_queryset(path, user):
                 owner=user).filter(owner=shared_feed_user)
             shared_feed = None
             for feed in shared_feeds_qs.all():
-                if path.startswith(f'{shared_feed_user.username}/feed_{feed.id}'):
+                if path.startswith(
+                        f'{shared_feed_user.username}/feed_{feed.id}'):
                     shared_feed = feed
                     break
             if shared_feed is None:
@@ -62,13 +65,17 @@ def get_path_file_queryset(path, user):
                 qs = model_class.objects.filter(fname__startswith=path)
     else:
         if path == username:  # avoid colliding with usernames that are a superset of this
-            qs = model_class.objects.filter(fname__startswith=path+'/')
+            qs = model_class.objects.filter(fname__startswith=path + '/')
         else:
             qs = model_class.objects.filter(fname__startswith=path)
         try:
             qs[0]
         except IndexError:
-            if path not in ('SERVICES', 'SERVICES/PACS', username, f'{username}/uploads'):
+            if path not in (
+                'SERVICES',
+                'SERVICES/PACS',
+                username,
+                    f'{username}/uploads'):
                 raise ValueError('Path not found.')
     return qs
 
@@ -83,8 +90,10 @@ def get_path_folders(path, user):
 
     if model_class == PluginInstanceFile and path.split('/', 1)[0] == path and path != \
             username and username != 'chris':  # handle chris special case
-            shared_feeds_qs = Feed.objects.filter(owner=user).filter(owner__username=path)
-            subfolders = sorted([f'feed_{feed.id}' for feed in shared_feeds_qs])
+        shared_feeds_qs = Feed.objects.filter(
+            owner=user).filter(
+            owner__username=path)
+        subfolders = sorted([f'feed_{feed.id}' for feed in shared_feeds_qs])
     else:
         hash_set = set()
         existing_path = False

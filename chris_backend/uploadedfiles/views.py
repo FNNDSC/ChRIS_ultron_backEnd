@@ -33,7 +33,8 @@ class UploadedFileList(generics.ListCreateAPIView):
         owned by the currently authenticated user.
         """
         user = self.request.user
-        # if the user is chris then return all the files in the sandboxed filesystem
+        # if the user is chris then return all the files in the sandboxed
+        # filesystem
         if user.username == 'chris':
             return UploadedFile.objects.all()
         return UploadedFile.objects.filter(owner=user)
@@ -45,7 +46,10 @@ class UploadedFileList(generics.ListCreateAPIView):
         """
         response = super(UploadedFileList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('uploadedfile-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'uploadedfile-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
         template_data = {'upload_path': "", 'fname': ""}
@@ -76,7 +80,13 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         Overriden to append a collection+json template.
         """
-        response = super(UploadedFileDetail, self).retrieve(request, *args, **kwargs)
+        response = super(
+            UploadedFileDetail,
+            self).retrieve(
+            request,
+            *
+            args,
+            **kwargs)
         template_data = {"upload_path": ""}
         return services.append_collection_template(response, template_data)
 
@@ -85,7 +95,8 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to include the current fname in the request.
         """
         user_file = self.get_object()
-        request.data['fname'] = user_file.fname.file  # fname required in the serializer
+        # fname required in the serializer
+        request.data['fname'] = user_file.fname.file
         return super(UploadedFileDetail, self).update(request, *args, **kwargs)
 
     def perform_update(self, serializer):

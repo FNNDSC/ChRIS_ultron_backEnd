@@ -41,8 +41,8 @@ class PluginInstanceList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner, a plugin and a previous plugin instance with 
-        the newly created plugin instance before first saving to the DB. All the plugin 
+        Overriden to associate an owner, a plugin and a previous plugin instance with
+        the newly created plugin instance before first saving to the DB. All the plugin
         instance's parameters in the request are also properly saved to the DB. Finally
         the plugin's app is run with the provided plugin instance's parameters.
         """
@@ -64,25 +64,32 @@ class PluginInstanceList(generics.ListCreateAPIView):
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](
                         data=data, user=user)
                 elif param_type == 'string' and plugin.meta.type == 'ts':
-                    # these serializers need the param's name, plugin type and previous
+                    # these serializers need the param's name, plugin type and
+                    # previous
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](
                         data=data, param_name=parameter.name, plugin_type='ts',
                         previous=previous)
                 else:
-                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data)
+                    parameter_serializer = PARAMETER_SERIALIZERS[param_type](
+                        data=data)
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
             elif not parameter.optional:
-                raise ValidationError({parameter.name: ["This field is required."]})
+                raise ValidationError(
+                    {parameter.name: ["This field is required."]})
 
         # if no validation errors at this point then save to the DB
         cr_data = serializer.validated_data.get('compute_resource')
         if cr_data:
-            compute_resource = plugin.compute_resources.get(name=cr_data['name'])
+            compute_resource = plugin.compute_resources.get(
+                name=cr_data['name'])
         else:
             compute_resource = plugin.compute_resources.first()
-        plg_inst = serializer.save(owner=user, plugin=plugin, previous=previous,
-                                   compute_resource=compute_resource)
+        plg_inst = serializer.save(
+            owner=user,
+            plugin=plugin,
+            previous=previous,
+            compute_resource=compute_resource)
         for param, param_serializer in parameter_serializers:
             param_serializer.save(plugin_inst=plg_inst, plugin_param=param)
 
@@ -97,17 +104,28 @@ class PluginInstanceList(generics.ListCreateAPIView):
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
         # append document-level link relations
-        links = {'plugin': reverse('plugin-detail', request=request,
-                                   kwargs={"pk": plugin.id}),
-                 'compute_resources': reverse('plugin-computeresource-list',
-                                              request=request, kwargs={"pk": plugin.id})
-                 }
+        links = {
+            'plugin': reverse(
+                'plugin-detail',
+                request=request,
+                kwargs={
+                    "pk": plugin.id}),
+            'compute_resources': reverse(
+                'plugin-computeresource-list',
+                request=request,
+                kwargs={
+                    "pk": plugin.id})}
         response = services.append_collection_links(response, links)
         # append write template
         param_names = plugin.get_plugin_parameter_names()
-        template_data = {'title': '', 'compute_resource_name': '', 'previous_id': '',
-                         'cpu_limit': '', 'memory_limit': '', 'number_of_workers': '',
-                         'gpu_limit': ''}
+        template_data = {
+            'title': '',
+            'compute_resource_name': '',
+            'previous_id': '',
+            'cpu_limit': '',
+            'memory_limit': '',
+            'number_of_workers': '',
+            'gpu_limit': ''}
         for name in param_names:
             template_data[name] = ''
         return services.append_collection_template(response, template_data)
@@ -133,9 +151,18 @@ class AllPluginInstanceList(generics.ListAPIView):
         """
         Overriden to add a query list and document-level link relation to the response.
         """
-        response = super(AllPluginInstanceList, self).list(request, *args, **kwargs)
+        response = super(
+            AllPluginInstanceList,
+            self).list(
+            request,
+            *
+            args,
+            **kwargs)
         # append query list
-        query_list = [reverse('allplugininstance-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'allplugininstance-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append document-level link relations
         links = {'plugins': reverse('plugin-list', request=request)}
@@ -152,7 +179,7 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginInstanceFilter
 
-        
+
 class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A plugin instance view.
@@ -160,13 +187,20 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to add a collection+json template to the response.
         """
-        response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
+        response = super(
+            PluginInstanceDetail,
+            self).retrieve(
+            request,
+            *
+            args,
+            **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)
 
@@ -180,7 +214,13 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         data.pop('number_of_workers', None)
         data.pop('cpu_limit', None)
         data.pop('memory_limit', None)
-        return super(PluginInstanceDetail, self).update(request, *args, **kwargs)
+        return super(
+            PluginInstanceDetail,
+            self).update(
+            request,
+            *
+            args,
+            **kwargs)
 
     def perform_update(self, serializer):
         """
@@ -191,7 +231,8 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
             if instance.status != 'cancelled':
                 descendants = instance.get_descendant_instances()
                 if instance.status == 'started':
-                    cancel_plugin_instance.delay(instance.id)  # call async task
+                    cancel_plugin_instance.delay(
+                        instance.id)  # call async task
                 for plg_inst in descendants:
                     plg_inst.status = 'cancelled'
                     plg_inst.save()
@@ -208,11 +249,19 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         if instance.status == 'started':
             cancel_plugin_instance(instance.id)
         for plg_inst in descendants:
-            if plg_inst.status not in ('finishedSuccessfully', 'finishedWithError',
-                                       'cancelled'):
+            if plg_inst.status not in (
+                'finishedSuccessfully',
+                'finishedWithError',
+                    'cancelled'):
                 plg_inst.status = 'cancelled'
                 plg_inst.save()
-        return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
+        return super(
+            PluginInstanceDetail,
+            self).destroy(
+            request,
+            *
+            args,
+            **kwargs)
 
 
 class PluginInstanceDescendantList(generics.ListAPIView):
@@ -257,16 +306,19 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
         """
         user = self.request.user
         instance = self.get_object()
-        plg_topologcopy = Plugin.objects.filter(meta__name='pl-topologicalcopy').first()
+        plg_topologcopy = Plugin.objects.filter(
+            meta__name='pl-topologicalcopy').first()
 
         cr_name = serializer.validated_data.pop('compute_resource_name', '')
         if cr_name:
-            compute_resource = plg_topologcopy.compute_resources.get(name=cr_name)
+            compute_resource = plg_topologcopy.compute_resources.get(
+                name=cr_name)
         else:
             compute_resource = plg_topologcopy.compute_resources.first()
 
         plg_filter_param = plg_topologcopy.parameters.get(name='filter')
-        plg_plugininstances_param = plg_topologcopy.parameters.get(name='plugininstances')
+        plg_plugininstances_param = plg_topologcopy.parameters.get(
+            name='plugininstances')
 
         created_plg_inst_ids = []
         filter_list = serializer.validated_data.get('filter', '').split(',')
@@ -286,8 +338,8 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
             created_plg_inst_ids.append(str(plg_inst.id))
 
         serializer.save(
-            plugin_inst=instance, created_plugin_inst_ids=','.join(created_plg_inst_ids)
-        )
+            plugin_inst=instance,
+            created_plugin_inst_ids=','.join(created_plg_inst_ids))
 
     def list(self, request, *args, **kwargs):
         """
@@ -299,8 +351,12 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
         response = services.get_list_response(self, queryset)
         instance = self.get_object()
         # append document-level link relations
-        links = {'plugin_inst': reverse('plugininstance-detail', request=request,
-                                        kwargs={"pk": instance.id})}
+        links = {
+            'plugin_inst': reverse(
+                'plugininstance-detail',
+                request=request,
+                kwargs={
+                    "pk": instance.id})}
         response = services.append_collection_links(response, links)
         # append write template
         template_data = {'filter': '', 'compute_resource_name': ''}
@@ -331,7 +387,8 @@ class PluginInstanceFileList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginInstanceFileSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsRelatedFeedOwnerOrChris,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -342,10 +399,17 @@ class PluginInstanceFileList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         instance = self.get_object()
         feed = instance.feed
-        links = {'feed': reverse('feed-detail', request=request,
-                             kwargs={"pk": feed.id}),
-                 'plugin_inst': reverse('plugininstance-detail', request=request,
-                                                 kwargs={"pk": instance.id})}
+        links = {
+            'feed': reverse(
+                'feed-detail',
+                request=request,
+                kwargs={
+                    "pk": feed.id}),
+            'plugin_inst': reverse(
+                'plugininstance-detail',
+                request=request,
+                kwargs={
+                    "pk": instance.id})}
         return services.append_collection_links(response, links)
 
     def get_files_queryset(self):
@@ -369,9 +433,17 @@ class AllPluginInstanceFileList(generics.ListAPIView):
         """
         Overriden to add a query list to the response.
         """
-        response = super(AllPluginInstanceFileList, self).list(request, *args, **kwargs)
+        response = super(
+            AllPluginInstanceFileList,
+            self).list(
+            request,
+            *args,
+            **kwargs)
         # append query list
-        query_list = [reverse('allplugininstancefile-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'allplugininstancefile-list-query-search',
+                request=request)]
         return services.append_collection_querylist(response, query_list)
 
     def get_queryset(self):
@@ -415,7 +487,8 @@ class PluginInstanceFileDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     serializer_class = PluginInstanceFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsRelatedFeedOwnerOrChris,)
 
 
 class FileResource(generics.GenericAPIView):
@@ -425,7 +498,8 @@ class FileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsRelatedFeedOwnerOrChris,)
 
     def get(self, request, *args, **kwargs):
         """
@@ -468,7 +542,7 @@ class StrParameterDetail(generics.RetrieveAPIView):
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StrParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    
+
 
 class IntParameterDetail(generics.RetrieveAPIView):
     """
@@ -488,7 +562,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = FloatParameter.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    
+
 
 class BoolParameterDetail(generics.RetrieveAPIView):
     """

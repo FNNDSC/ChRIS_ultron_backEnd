@@ -8,7 +8,8 @@ from .models import UploadedFile
 
 
 class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
+    owner = serializers.HyperlinkedRelatedField(
+        view_name='user-detail', read_only=True)
     file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
@@ -16,8 +17,15 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UploadedFile
-        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize',
-                  'file_resource', 'owner')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'upload_path',
+            'fname',
+            'fsize',
+            'file_resource',
+            'owner')
 
     def get_file_link(self, obj):
         """
@@ -42,7 +50,8 @@ class UploadedFileSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to attach the upload path to the owner object.
         """
-        # remove upload_path as it is not part of the model and attach it to the owner obj
+        # remove upload_path as it is not part of the model and attach it to
+        # the owner obj
         upload_path = data.pop('upload_path')
         owner = self.context['request'].user
         owner.upload_path = upload_path

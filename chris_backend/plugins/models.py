@@ -14,8 +14,13 @@ TYPE_CHOICES = [("string", "String values"), ("float", "Float values"),
                 ("path", "Path values"), ("unextpath", "Unextracted path values")]
 
 # table of equivalence between front-end API types and back-end types
-TYPES = {'string': 'str', 'integer': 'int', 'float': 'float', 'boolean': 'bool',
-         'path': 'path', 'unextpath': 'unextpath'}
+TYPES = {
+    'string': 'str',
+    'integer': 'int',
+    'float': 'float',
+    'boolean': 'bool',
+    'path': 'path',
+    'unextpath': 'unextpath'}
 
 PLUGIN_TYPE_CHOICES = [("ds", "Data synthesis"), ("fs", "Feed synthesis"),
                        ("ts", "Topology synthesis")]
@@ -35,7 +40,8 @@ class ComputeResource(models.Model):
     compute_auth_token = models.CharField(max_length=500, blank=True,
                                           default='initial_token')
     description = models.CharField(max_length=600, blank=True)
-    max_job_exec_seconds = models.IntegerField(blank=True, default=-1)  # unlimited
+    max_job_exec_seconds = models.IntegerField(
+        blank=True, default=-1)  # unlimited
 
     def __str__(self):
         return self.name
@@ -45,7 +51,8 @@ class ComputeResource(models.Model):
         Overriden to save a default value for the auth url.
         """
         if not self.compute_auth_url:
-            self.compute_auth_url = str(self.compute_url) + 'auth-token/'  # set default
+            self.compute_auth_url = str(
+                self.compute_url) + 'auth-token/'  # set default
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -66,15 +73,18 @@ class ComputeResource(models.Model):
         Custom method to get the list of plugin ids for the plugins that are only
         registered with this single compute resource.
         """
-        return [pl.id for pl in self.plugins.all() if pl.compute_resources.count() == 1]
+        return [pl.id for pl in self.plugins.all(
+        ) if pl.compute_resources.count() == 1]
 
 
 class ComputeResourceFilter(FilterSet):
     """
     Filter class for the ComputeResource model.
     """
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(
+        field_name='name', lookup_expr='exact')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
     plugin_id = django_filters.CharFilter(field_name='plugins__id',
@@ -97,7 +107,10 @@ class PluginMeta(models.Model):
     stars = models.IntegerField(default=0)
     public_repo = models.URLField(max_length=300, blank=True)
     license = models.CharField(max_length=50, blank=True)
-    type = models.CharField(choices=PLUGIN_TYPE_CHOICES, default='ds', max_length=4)
+    type = models.CharField(
+        choices=PLUGIN_TYPE_CHOICES,
+        default='ds',
+        max_length=4)
     icon = models.URLField(max_length=300, blank=True)
     category = models.CharField(max_length=100, blank=True)
     authors = models.CharField(max_length=200, blank=True)
@@ -114,17 +127,23 @@ class PluginMetaFilter(FilterSet):
     """
     Filter class for the PluginMeta model.
     """
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
-    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
-    category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='lte')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(
+        field_name='name', lookup_expr='exact')
+    title = django_filters.CharFilter(
+        field_name='title', lookup_expr='icontains')
+    category = django_filters.CharFilter(
+        field_name='category', lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='type', lookup_expr='exact')
-    authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
-    name_title_category = django_filters.CharFilter(method='search_name_title_category')
+    authors = django_filters.CharFilter(
+        field_name='authors', lookup_expr='icontains')
+    name_title_category = django_filters.CharFilter(
+        method='search_name_title_category')
     name_authors_category = django_filters.CharFilter(
         method='search_name_authors_category')
 
@@ -152,9 +171,18 @@ class PluginMetaFilter(FilterSet):
 
     class Meta:
         model = PluginMeta
-        fields = ['id', 'name', 'name_exact', 'title', 'category', 'type', 'authors',
-                  'min_creation_date', 'max_creation_date', 'name_title_category',
-                  'name_authors_category']
+        fields = [
+            'id',
+            'name',
+            'name_exact',
+            'title',
+            'category',
+            'type',
+            'authors',
+            'min_creation_date',
+            'max_creation_date',
+            'name_title_category',
+            'name_authors_category']
 
 
 class Plugin(models.Model):
@@ -163,12 +191,15 @@ class Plugin(models.Model):
     """
     # default resource limits inserted at registration time
     defaults = {
-                'min_cpu_limit': 1000,    # in millicores
-                'min_memory_limit': 200,  # in Mi
-                'max_limit': 2147483647   # maxint
-               }
+        'min_cpu_limit': 1000,    # in millicores
+        'min_memory_limit': 200,  # in Mi
+        'max_limit': 2147483647   # maxint
+    }
     creation_date = models.DateTimeField(auto_now_add=True)
-    meta = models.ForeignKey(PluginMeta, on_delete=models.CASCADE, related_name='plugins')
+    meta = models.ForeignKey(
+        PluginMeta,
+        on_delete=models.CASCADE,
+        related_name='plugins')
     version = models.CharField(max_length=10)
     dock_image = models.CharField(max_length=500)
     execshell = models.CharField(max_length=50)
@@ -177,18 +208,24 @@ class Plugin(models.Model):
     description = models.CharField(max_length=2000, blank=True)
     min_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
     max_gpu_limit = models.IntegerField(null=True, blank=True, default=0)
-    min_number_of_workers = models.IntegerField(null=True, blank=True, default=1)
+    min_number_of_workers = models.IntegerField(
+        null=True, blank=True, default=1)
     max_number_of_workers = models.IntegerField(null=True, blank=True,
                                                 default=defaults['max_limit'])
-    min_cpu_limit = CPUField(null=True, blank=True,
-                             default=defaults['min_cpu_limit'])  # In millicores
+    min_cpu_limit = CPUField(
+        null=True,
+        blank=True,
+        default=defaults['min_cpu_limit'])  # In millicores
     max_cpu_limit = CPUField(null=True, blank=True,
                              default=defaults['max_limit'])  # In millicores
-    min_memory_limit = MemoryField(null=True, blank=True,
-                                   default=defaults['min_memory_limit'])  # In Mi
+    min_memory_limit = MemoryField(
+        null=True,
+        blank=True,
+        default=defaults['min_memory_limit'])  # In Mi
     max_memory_limit = MemoryField(null=True, blank=True,
                                    default=defaults['max_limit'])  # In Mi
-    compute_resources = models.ManyToManyField(ComputeResource, related_name='plugins')
+    compute_resources = models.ManyToManyField(
+        ComputeResource, related_name='plugins')
 
     class Meta:
         unique_together = [['meta', 'version'], ['meta', 'dock_image']]
@@ -213,21 +250,29 @@ class PluginFilter(FilterSet):
     """
     Filter class for the Plugin model.
     """
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='lte')
-    name = django_filters.CharFilter(field_name='meta__name', lookup_expr='icontains')
-    name_exact = django_filters.CharFilter(field_name='meta__name', lookup_expr='exact')
-    title = django_filters.CharFilter(field_name='meta__title', lookup_expr='icontains')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='lte')
+    name = django_filters.CharFilter(
+        field_name='meta__name',
+        lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(
+        field_name='meta__name', lookup_expr='exact')
+    title = django_filters.CharFilter(
+        field_name='meta__title',
+        lookup_expr='icontains')
     category = django_filters.CharFilter(field_name='meta__category',
                                          lookup_expr='icontains')
-    type = django_filters.CharFilter(field_name='meta__type', lookup_expr='exact')
+    type = django_filters.CharFilter(
+        field_name='meta__type',
+        lookup_expr='exact')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
-    name_title_category = django_filters.CharFilter(method='search_name_title_category')
-    compute_resource_id = django_filters.CharFilter(field_name='compute_resources__id',
-                                                    lookup_expr='exact')
+    name_title_category = django_filters.CharFilter(
+        method='search_name_title_category')
+    compute_resource_id = django_filters.CharFilter(
+        field_name='compute_resources__id', lookup_expr='exact')
 
     def search_name_title_category(self, queryset, name, value):
         """
@@ -242,9 +287,20 @@ class PluginFilter(FilterSet):
 
     class Meta:
         model = Plugin
-        fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
-                  'min_creation_date', 'max_creation_date', 'title',  'description',
-                  'name_title_category', 'compute_resource_id']
+        fields = [
+            'id',
+            'name',
+            'name_exact',
+            'version',
+            'dock_image',
+            'type',
+            'category',
+            'min_creation_date',
+            'max_creation_date',
+            'title',
+            'description',
+            'name_title_category',
+            'compute_resource_id']
 
 
 class PluginParameter(models.Model):
@@ -256,12 +312,15 @@ class PluginParameter(models.Model):
     short_flag = models.CharField(max_length=52, blank=True)
     action = models.CharField(max_length=20, default='store')
     optional = models.BooleanField(default=False)
-    type = models.CharField(choices=TYPE_CHOICES, default='string', max_length=10)
+    type = models.CharField(
+        choices=TYPE_CHOICES,
+        default='string',
+        max_length=10)
     help = models.TextField(blank=True)
     ui_exposed = models.BooleanField(default=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE,
                                related_name='parameters')
-    
+
     class Meta:
         ordering = ('plugin',)
 
@@ -281,8 +340,10 @@ class DefaultStrParameter(models.Model):
     Model class that defines a default value for a plugin parameter of type string.
     """
     value = models.CharField(max_length=600, blank=True)
-    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
-                                        related_name='string_default')
+    plugin_param = models.OneToOneField(
+        PluginParameter,
+        on_delete=models.CASCADE,
+        related_name='string_default')
 
     def __str__(self):
         return self.value
@@ -293,8 +354,10 @@ class DefaultIntParameter(models.Model):
     Model class that defines a default value for a plugin parameter of type integer.
     """
     value = models.IntegerField()
-    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
-                                        related_name='integer_default')
+    plugin_param = models.OneToOneField(
+        PluginParameter,
+        on_delete=models.CASCADE,
+        related_name='integer_default')
 
     def __str__(self):
         return str(self.value)
@@ -305,8 +368,10 @@ class DefaultFloatParameter(models.Model):
     Model class that defines a default value for a plugin parameter of type float.
     """
     value = models.FloatField()
-    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
-                                        related_name='float_default')
+    plugin_param = models.OneToOneField(
+        PluginParameter,
+        on_delete=models.CASCADE,
+        related_name='float_default')
 
     def __str__(self):
         return str(self.value)
@@ -317,8 +382,10 @@ class DefaultBoolParameter(models.Model):
     Model class that defines a default value for a plugin parameter of type boolean.
     """
     value = models.BooleanField()
-    plugin_param = models.OneToOneField(PluginParameter, on_delete=models.CASCADE,
-                                        related_name='boolean_default')
+    plugin_param = models.OneToOneField(
+        PluginParameter,
+        on_delete=models.CASCADE,
+        related_name='boolean_default')
 
     def __str__(self):
         return str(self.value)

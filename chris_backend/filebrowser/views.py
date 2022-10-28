@@ -8,8 +8,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.utils import filter_files_by_n_slashes
-from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
-                          FileBrowserPathFileSerializer)
+from .serializers import (
+    FileBrowserPathListSerializer,
+    FileBrowserPathSerializer,
+    FileBrowserPathFileSerializer)
 from .services import (get_path_folders, get_path_file_queryset,
                        get_path_file_model_class, get_shared_feed_creators_set)
 
@@ -27,9 +29,17 @@ class FileBrowserPathList(generics.ListAPIView):
         """
         Overriden to append a query list to the response.
         """
-        response = super(FileBrowserPathList, self).list(request, *args, **kwargs)
+        response = super(
+            FileBrowserPathList,
+            self).list(
+            request,
+            *
+            args,
+            **kwargs)
         # append query list
-        query_url = reverse('filebrowserpath-list-query-search', request=request)
+        query_url = reverse(
+            'filebrowserpath-list-query-search',
+            request=request)
         data = [{'name': 'path', 'value': ''}]
         queries = [{'href': query_url, 'rel': 'search', 'data': data}]
         response.data['queries'] = queries
@@ -69,14 +79,16 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
             shared_feed_creators = get_shared_feed_creators_set(user)
             for creator in shared_feed_creators:
                 subfolders.append(creator.username)
-            objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
+            objects = [
+                {'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
         else:
             try:
                 subfolders = get_path_folders(path, user)  # already sorted
             except ValueError:
                 objects = []
             else:
-                objects = [{'path': path, 'subfolders': json.dumps(subfolders)}]
+                objects = [{'path': path,
+                            'subfolders': json.dumps(subfolders)}]
         return self.filter_queryset(objects)
 
     def get_serializer_class(self, *args, **kwargs):

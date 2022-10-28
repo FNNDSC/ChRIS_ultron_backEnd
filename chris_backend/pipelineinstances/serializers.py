@@ -10,8 +10,8 @@ from .models import PipelineInstance
 class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='pipeline.name')
-    previous_plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
-                                                       required=False)
+    previous_plugin_inst_id = serializers.IntegerField(
+        min_value=1, write_only=True, required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
@@ -20,10 +20,21 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PipelineInstance
-        fields = ('url', 'id', 'title', 'pipeline_id', 'pipeline_name', 'owner_username',
-                  'description', 'previous_plugin_inst_id', 'pipeline',
-                  'plugin_instances', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit')
+        fields = (
+            'url',
+            'id',
+            'title',
+            'pipeline_id',
+            'pipeline_name',
+            'owner_username',
+            'description',
+            'previous_plugin_inst_id',
+            'pipeline',
+            'plugin_instances',
+            'cpu_limit',
+            'memory_limit',
+            'number_of_workers',
+            'gpu_limit')
 
     def create(self, validated_data):
         """
@@ -48,14 +59,15 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, ObjectDoesNotExist):
             raise serializers.ValidationError(
                 {'previous_plugin_inst_id':
-                     [f"Couldn't find any 'previous' plugin instance with id {pk}."]})
+                 [f"Couldn't find any 'previous' plugin instance with id {pk}."]})
         # check that the user can run plugins within this feed
         user = self.context['request'].user
         if user not in previous_plugin_inst.feed.owner.all():
             raise serializers.ValidationError(
-                {'previous_plugin_inst_id':
-                     ["User is not an owner of feed for previous instance with id %s." %
-                      previous_plugin_inst_id]})
+                {
+                    'previous_plugin_inst_id': [
+                        "User is not an owner of feed for previous instance with id %s." %
+                        previous_plugin_inst_id]})
         return previous_plugin_inst
 
     def parse_parameters(self):
@@ -79,5 +91,6 @@ class PipelineInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 if piping_id in parsed_params_dict:
                     parsed_params_dict[piping_id][param_name] = request_data[param]
                 else:
-                    parsed_params_dict[piping_id] = {param_name: request_data[param]}
+                    parsed_params_dict[piping_id] = {
+                        param_name: request_data[param]}
         return parsed_params_dict

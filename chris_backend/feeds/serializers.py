@@ -9,7 +9,8 @@ from .models import Note, Feed, Tag, Tagging, Comment
 
 
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
-    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(
+        view_name='feed-detail', read_only=True)
 
     class Meta:
         model = Note
@@ -19,23 +20,40 @@ class NoteSerializer(serializers.HyperlinkedModelSerializer):
 class TagSerializer(serializers.HyperlinkedModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
     feeds = serializers.HyperlinkedIdentityField(view_name='tag-feed-list')
-    taggings = serializers.HyperlinkedIdentityField(view_name='tag-tagging-list')
+    taggings = serializers.HyperlinkedIdentityField(
+        view_name='tag-tagging-list')
 
     class Meta:
         model = Tag
-        fields = ('url', 'id', 'name', 'owner_username', 'color', 'feeds', 'taggings')
+        fields = (
+            'url',
+            'id',
+            'name',
+            'owner_username',
+            'color',
+            'feeds',
+            'taggings')
 
 
 class TaggingSerializer(serializers.HyperlinkedModelSerializer):
     owner_username = serializers.ReadOnlyField(source='tag.owner.username')
     tag_id = serializers.ReadOnlyField(source='tag.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
-    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
-    tag = serializers.HyperlinkedRelatedField(view_name='tag-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(
+        view_name='feed-detail', read_only=True)
+    tag = serializers.HyperlinkedRelatedField(
+        view_name='tag-detail', read_only=True)
 
     class Meta:
         model = Tagging
-        fields = ('url', 'id', 'owner_username', 'tag_id', 'feed_id', 'tag', 'feed')
+        fields = (
+            'url',
+            'id',
+            'owner_username',
+            'tag_id',
+            'feed_id',
+            'tag',
+            'feed')
 
     def create(self, validated_data):
         """
@@ -48,8 +66,8 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
             tag = validated_data['tag']
             raise serializers.ValidationError(
                 {'non_field_errors':
-                     ["Tagging for feed_id %s and tag_id %s already exists." %
-                      (feed.id, tag.id)]})
+                 ["Tagging for feed_id %s and tag_id %s already exists." %
+                  (feed.id, tag.id)]})
 
     def validate_tag(self, tag_id):
         """
@@ -57,7 +75,8 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
         owned by the user.
         """
         if not tag_id:
-            raise serializers.ValidationError({'tag_id': ["A tag id is required."]})
+            raise serializers.ValidationError(
+                {'tag_id': ["A tag id is required."]})
         try:
             pk = int(tag_id)
             tag = Tag.objects.get(pk=pk)
@@ -76,7 +95,8 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
         owned by the user.
         """
         if not feed_id:
-            raise serializers.ValidationError({'feed_id': ["A feed id is required."]})
+            raise serializers.ValidationError(
+                {'feed_id': ["A feed id is required."]})
         try:
             pk = int(feed_id)
             feed = Feed.objects.get(pk=pk)
@@ -100,23 +120,42 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     finished_jobs = serializers.SerializerMethodField()
     errored_jobs = serializers.SerializerMethodField()
     cancelled_jobs = serializers.SerializerMethodField()
-    note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
+    note = serializers.HyperlinkedRelatedField(
+        view_name='note-detail', read_only=True)
     tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
-    taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
+    taggings = serializers.HyperlinkedIdentityField(
+        view_name='feed-tagging-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
     plugin_instances = serializers.HyperlinkedIdentityField(
         view_name='feed-plugininstance-list')
-    owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
-                                                read_only=True)
+    owner = serializers.HyperlinkedRelatedField(
+        many=True, view_name='user-detail', read_only=True)
 
     class Meta:
         model = Feed
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
-                  'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
-                  'started_jobs', 'registering_jobs', 'finished_jobs', 'errored_jobs',
-                  'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
-                  'files', 'plugin_instances')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'modification_date',
+            'name',
+            'creator_username',
+            'created_jobs',
+            'waiting_jobs',
+            'scheduled_jobs',
+            'started_jobs',
+            'registering_jobs',
+            'finished_jobs',
+            'errored_jobs',
+            'cancelled_jobs',
+            'owner',
+            'note',
+            'tags',
+            'taggings',
+            'comments',
+            'files',
+            'plugin_instances')
 
     def validate_name(self, name):
         """
@@ -154,7 +193,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the number of plugin instances in 'created' status.
         """
         if 'created' not in [status[0] for status in STATUS_CHOICES]:
-            raise KeyError("Undefined plugin instance execution status: 'created'.")
+            raise KeyError(
+                "Undefined plugin instance execution status: 'created'.")
         return obj.get_plugin_instances_status_count('created')
 
     def get_waiting_jobs(self, obj):
@@ -171,7 +211,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the number of plugin instances in 'scheduled' status.
         """
         if 'scheduled' not in [status[0] for status in STATUS_CHOICES]:
-            raise KeyError("Undefined plugin instance execution status: 'scheduled'.")
+            raise KeyError(
+                "Undefined plugin instance execution status: 'scheduled'.")
         return obj.get_plugin_instances_status_count('scheduled')
 
     def get_started_jobs(self, obj):
@@ -179,7 +220,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the number of plugin instances in 'started' status.
         """
         if 'started' not in [status[0] for status in STATUS_CHOICES]:
-            raise KeyError("Undefined plugin instance execution status: 'started'.")
+            raise KeyError(
+                "Undefined plugin instance execution status: 'started'.")
         return obj.get_plugin_instances_status_count('started')
 
     def get_registering_jobs(self, obj):
@@ -195,7 +237,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the number of plugin instances in 'finishedSuccessfully' status.
         """
-        if 'finishedSuccessfully' not in [status[0] for status in STATUS_CHOICES]:
+        if 'finishedSuccessfully' not in [
+                status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: "
                            "'finishedSuccessfully'.")
         return obj.get_plugin_instances_status_count('finishedSuccessfully')
@@ -214,13 +257,15 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the number of plugin instances in 'cancelled' status.
         """
         if 'cancelled' not in [status[0] for status in STATUS_CHOICES]:
-            raise KeyError("Undefined plugin instance execution status: 'cancelled'.")
+            raise KeyError(
+                "Undefined plugin instance execution status: 'cancelled'.")
         return obj.get_plugin_instances_status_count('cancelled')
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(
+        view_name='feed-detail', read_only=True)
 
     class Meta:
         model = Comment

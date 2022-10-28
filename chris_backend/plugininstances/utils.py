@@ -13,10 +13,9 @@ def run_if_ready(plg_inst, previous):
         plg_inst.save()
         run_plugin_instance.delay(plg_inst.id)  # call async task
     elif previous.status in ('created', 'waiting', 'scheduled',
-                                  'registeringFiles', 'started'):
+                             'registeringFiles', 'started'):
         plg_inst.status = 'waiting'
         plg_inst.save()
     elif previous.status in ('finishedWithError', 'cancelled'):
         plg_inst.status = 'cancelled'
         plg_inst.save()
-

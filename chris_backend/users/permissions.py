@@ -16,5 +16,3 @@ class IsUserOrChrisOrReadOnly(permissions.BasePermission):
         # Write permissions are only allowed to the authenticated user and
         # superuser 'chris'.
         return (obj == request.user) or (request.user.username == 'chris')
-
-

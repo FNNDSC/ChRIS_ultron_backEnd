@@ -48,7 +48,8 @@ class IsChrisOrOwnerOrNotLocked(permissions.BasePermission):
 
     def has_object_permission(self, request, view, obj):
         pipeline = obj.pipeline
-        if (request.user.username == 'chris') or (pipeline.owner == request.user):
+        if (request.user.username == 'chris') or (
+                pipeline.owner == request.user):
             # superuser 'chris' and owner always have read/write access
             return True
         return not pipeline.locked

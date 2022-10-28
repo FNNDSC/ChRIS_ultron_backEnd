@@ -11,7 +11,8 @@ class IsOwnerOrChris(permissions.BasePermission):
         # Read and write permissions are only allowed to
         # the owner and superuser 'chris'.
         if hasattr(obj.owner, 'all'):
-            return (request.user in obj.owner.all()) or (request.user.username == 'chris')
-        return (obj.owner == request.user) or (request.user.username == 'chris')
-
-
+            return (
+                request.user in obj.owner.all()) or (
+                request.user.username == 'chris')
+        return (obj.owner == request.user) or (
+            request.user.username == 'chris')

@@ -32,7 +32,11 @@ class FileBrowserPathSerializer(NoModelSerializer):
         """
         request = self.context['request']
         path = self.context['view'].kwargs.get('path')
-        return reverse('filebrowserpath', request=request, kwargs={"path": path})
+        return reverse(
+            'filebrowserpath',
+            request=request,
+            kwargs={
+                "path": path})
 
     def get_files(self, obj):
         """
@@ -40,7 +44,11 @@ class FileBrowserPathSerializer(NoModelSerializer):
         """
         request = self.context['request']
         path = self.context['view'].kwargs.get('path')
-        return reverse('filebrowserpathfile-list', request=request, kwargs={"path": path})
+        return reverse(
+            'filebrowserpathfile-list',
+            request=request,
+            kwargs={
+                "path": path})
 
 
 class FileBrowserPathFileSerializer(serializers.HyperlinkedModelSerializer):

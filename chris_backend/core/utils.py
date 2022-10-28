@@ -1,7 +1,8 @@
 
 import os
 import json
-import zlib, base64
+import zlib
+import base64
 
 
 def get_file_resource_link(file_serializer, obj):

@@ -33,8 +33,10 @@ class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Write permissions are only allowed to the owner and superuser 'chris'.
-        return (request.user == obj.owner) or (request.user.username == 'chris')
+        # Write permissions are only allowed to the owner and superuser
+        # 'chris'.
+        return (request.user == obj.owner) or (
+            request.user.username == 'chris')
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -47,5 +49,6 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Write permissions are only allowed to the owner and superuser 'chris'.
+        # Write permissions are only allowed to the owner and superuser
+        # 'chris'.
         return request.user == obj.owner

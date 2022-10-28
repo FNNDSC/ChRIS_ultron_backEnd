@@ -61,7 +61,8 @@ class SwiftManager(object):
             conn = self.get_connection()
             for i in range(5):
                 try:
-                    # get the full list of objects in Swift storage with given prefix
+                    # get the full list of objects in Swift storage with given
+                    # prefix
                     ld_obj = conn.get_container(self.container_name,
                                                 prefix=path,
                                                 full_listing=b_full_listing)[1]
@@ -126,8 +127,8 @@ class SwiftManager(object):
         conn = self.get_connection()
         for i in range(5):
             try:
-                resp_headers, obj_contents = conn.get_object(self.container_name,
-                                                             obj_path, **kwargs)
+                resp_headers, obj_contents = conn.get_object(
+                    self.container_name, obj_path, **kwargs)
             except ClientException as e:
                 logger.error(str(e))
                 if i == 4:
@@ -191,7 +192,8 @@ class SwiftManager(object):
         """
         # upload all files down the <local_dir>
         for root, dirs, files in os.walk(local_dir):
-            swift_base = root.replace(local_dir, swift_prefix, 1) if swift_prefix else root
+            swift_base = root.replace(
+                local_dir, swift_prefix, 1) if swift_prefix else root
             for filename in files:
                 swift_path = os.path.join(swift_base, filename)
                 if not self.obj_exists(swift_path):

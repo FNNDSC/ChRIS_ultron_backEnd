@@ -20,6 +20,7 @@ def skip_if_running(f):
     https://stackoverflow.com/questions/20894771/celery-beat-limit-to-single-task-instance-at-a-time
     """
     task_name = f'{f.__module__}.{f.__name__}'
+
     @wraps(f)
     def wrapped(self, *args, **kwargs):
         workers = self.app.control.inspect().active()
@@ -71,13 +72,14 @@ def cancel_plugin_instance(plg_inst_id):
 
 @shared_task(bind=True)
 @skip_if_running
-def schedule_waiting_plugin_instances(self):  # task is passed info about itself
+# task is passed info about itself
+def schedule_waiting_plugin_instances(self):
     """
     Schedule the apps corresponding to all plugin instances in 'waiting' DB status
     and whom previous plugin instance is in 'finishedSuccessfully' DB status.
     """
-    instances = PluginInstance.objects.filter(status='waiting',
-                                              previous__status='finishedSuccessfully')
+    instances = PluginInstance.objects.filter(
+        status='waiting', previous__status='finishedSuccessfully')
     for plg_inst in instances:
         plg_inst.status = 'scheduled'
         plg_inst.save()
@@ -102,7 +104,9 @@ def cancel_waiting_plugin_instances():
     status when their previous plugin instance is in either 'finishedWithError' or
     'cancelled' DB status.
     """
-    lookup = Q(previous__status='finishedWithError') | Q(previous__status='cancelled')
+    lookup = Q(
+        previous__status='finishedWithError') | Q(
+        previous__status='cancelled')
     PluginInstance.objects.filter(
         status='waiting'
     ).filter(lookup).update(status='cancelled')

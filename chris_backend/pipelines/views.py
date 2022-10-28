@@ -49,8 +49,14 @@ class PipelineList(generics.ListCreateAPIView):
         links = {'plugins': reverse('plugin-list', request=request)}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': "",
-                         'locked': "", 'plugin_tree': "", 'plugin_inst_id': ""}
+        template_data = {
+            'name': "",
+            'authors': "",
+            'category': "",
+            'description': "",
+            'locked': "",
+            'plugin_tree': "",
+            'plugin_inst_id': ""}
         return services.append_collection_template(response, template_data)
 
 
@@ -78,14 +84,27 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrNotLockedReadOnly,)
+    permission_classes = (
+        permissions.IsAuthenticated,
+        IsChrisOrOwnerOrNotLockedReadOnly,
+    )
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
-        response = super(PipelineDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': ""}
+        response = super(
+            PipelineDetail,
+            self).retrieve(
+            request,
+            *
+            args,
+            **kwargs)
+        template_data = {
+            'name': "",
+            'authors': "",
+            'category': "",
+            'description': ""}
         pipeline = self.get_object()
         if pipeline.locked:
             template_data['locked'] = ""
@@ -98,10 +117,12 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         pipeline = self.get_object()
         if not pipeline.locked and 'locked' in request.data:
-            # this pipeline was made available to the public so it cannot be locked
+            # this pipeline was made available to the public so it cannot be
+            # locked
             del request.data['locked']
         if 'name' not in request.data:
-            request.data['name'] = pipeline.name  # name is required in the serializer
+            # name is required in the serializer
+            request.data['name'] = pipeline.name
         return super(PipelineDetail, self).update(request, *args, **kwargs)
 
     # def destroy(self, request, *args, **kwargs):
@@ -133,7 +154,7 @@ class PipelinePluginList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         pipeline = self.get_object()
         links = {'pipeline': reverse('pipeline-detail', request=request,
-                                   kwargs={"pk": pipeline.id})}
+                                     kwargs={"pk": pipeline.id})}
         return services.append_collection_links(response, links)
 
     def get_plugins_queryset(self):
@@ -163,7 +184,7 @@ class PipelinePluginPipingList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         pipeline = self.get_object()
         links = {'pipeline': reverse('pipeline-detail', request=request,
-                                   kwargs={"pk": pipeline.id})}
+                                     kwargs={"pk": pipeline.id})}
         return services.append_collection_links(response, links)
 
     def get_plugin_pipings_queryset(self,):
@@ -218,7 +239,8 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrNotLocked,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsChrisOrOwnerOrNotLocked,)
 
 
 class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):

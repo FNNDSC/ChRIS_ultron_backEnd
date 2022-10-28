@@ -16,34 +16,41 @@ from pipelineinstances.models import PipelineInstance
 from workflows.models import Workflow
 
 if settings.DEBUG:
-    import pdb, pudb
+    import pdb
+    import pudb
 
 
 logger = logging.getLogger(__name__)
 
 
-STATUS_CHOICES = [("created",               "Default initial"),
-                  ("waiting",               "Waiting to be scheduled"),
-                  ("scheduled",             "Scheduled on worker"),
-                  ("started",               "Started on compute env"),
-                  ("registeringFiles",      "Registering output files"),
-                  ("finishedSuccessfully",  "Finished successfully"),
-                  ("finishedWithError",     "Finished with error"),
-                  ("cancelled",             "Cancelled")]
+STATUS_CHOICES = [("created", "Default initial"),
+                  ("waiting", "Waiting to be scheduled"),
+                  ("scheduled", "Scheduled on worker"),
+                  ("started", "Started on compute env"),
+                  ("registeringFiles", "Registering output files"),
+                  ("finishedSuccessfully", "Finished successfully"),
+                  ("finishedWithError", "Finished with error"),
+                  ("cancelled", "Cancelled")]
 
 
 class PluginInstance(models.Model):
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='created')
     summary = models.CharField(max_length=4000, blank=True)
     raw = models.TextField(blank=True)
     size = models.BigIntegerField(default=0)
     error_code = models.CharField(max_length=7, blank=True)
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
-    plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
+    plugin = models.ForeignKey(
+        Plugin,
+        on_delete=models.CASCADE,
+        related_name='instances')
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
                              related_name='plugin_instances')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
@@ -136,15 +143,17 @@ class PluginInstance(models.Model):
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
         # 'ds' and 'ts' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
-        #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
+        # /previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
         current = self
         path = '/{0}_{1}/data'.format(current.plugin.meta.name, current.id)
         while not current.plugin.meta.type == 'fs':
             current = current.previous
-            path = '/{0}_{1}'.format(current.plugin.meta.name, current.id) + path
+            path = '/{0}_{1}'.format(current.plugin.meta.name,
+                                     current.id) + path
         feed = current.feed
         #username = self.owner.username
-        username = feed.get_creator().username  # use creator of the feed for shared feeds
+        # use creator of the feed for shared feeds
+        username = feed.get_creator().username
         output_path = '{0}/feed_{1}'.format(username, feed.id) + path
         return output_path
 
@@ -172,28 +181,45 @@ class PluginInstanceFilter(FilterSet):
                                                     lookup_expr='gte')
     max_end_date = django_filters.IsoDateTimeFilter(field_name='end_date',
                                                     lookup_expr='lte')
-    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    title = django_filters.CharFilter(
+        field_name='title', lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
-    feed_id = django_filters.CharFilter(field_name='feed_id', lookup_expr='exact')
+    feed_id = django_filters.CharFilter(
+        field_name='feed_id', lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
-    plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
+    plugin_id = django_filters.CharFilter(
+        field_name='plugin_id', lookup_expr='exact')
     pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
                                                  lookup_expr='exact')
-    workflow_id = django_filters.CharFilter(field_name='workflow_id', lookup_expr='exact')
+    workflow_id = django_filters.CharFilter(
+        field_name='workflow_id', lookup_expr='exact')
     plugin_name = django_filters.CharFilter(field_name='plugin__meta__name',
                                             lookup_expr='icontains')
-    plugin_name_exact = django_filters.CharFilter(field_name='plugin__meta__name',
-                                                  lookup_expr='exact')
+    plugin_name_exact = django_filters.CharFilter(
+        field_name='plugin__meta__name', lookup_expr='exact')
     plugin_version = django_filters.CharFilter(field_name='plugin__version',
                                                lookup_expr='exact')
 
     class Meta:
         model = PluginInstance
-        fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
-                  'max_end_date', 'root_id', 'title', 'status', 'owner_username',
-                  'feed_id', 'plugin_id', 'plugin_name', 'plugin_name_exact',
-                  'plugin_version', 'pipeline_inst_id', 'workflow_id']
+        fields = [
+            'id',
+            'min_start_date',
+            'max_start_date',
+            'min_end_date',
+            'max_end_date',
+            'root_id',
+            'title',
+            'status',
+            'owner_username',
+            'feed_id',
+            'plugin_id',
+            'plugin_name',
+            'plugin_name_exact',
+            'plugin_version',
+            'pipeline_inst_id',
+            'workflow_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """
@@ -214,8 +240,10 @@ class PluginInstanceFilter(FilterSet):
 
 
 class PluginInstanceLock(models.Model):
-    plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE,
-                                       related_name='lock')
+    plugin_inst = models.OneToOneField(
+        PluginInstance,
+        on_delete=models.CASCADE,
+        related_name='lock')
 
     def __str__(self):
         return self.plugin_inst.id
@@ -238,8 +266,11 @@ class PluginInstanceSplit(models.Model):
 class PluginInstanceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=1024, unique=True)
-    plugin_inst = models.ForeignKey(PluginInstance, db_index=True,
-                                    on_delete=models.CASCADE, related_name='files')
+    plugin_inst = models.ForeignKey(
+        PluginInstance,
+        db_index=True,
+        on_delete=models.CASCADE,
+        related_name='files')
 
     class Meta:
         ordering = ('-fname',)
@@ -249,24 +280,34 @@ class PluginInstanceFile(models.Model):
 
 
 class PluginInstanceFileFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='lte')
     plugin_inst_id = django_filters.CharFilter(field_name='plugin_inst_id',
                                                lookup_expr='exact')
     feed_id = django_filters.CharFilter(field_name='plugin_inst__feed_id',
-                                               lookup_expr='exact')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
-    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+                                        lookup_expr='exact')
+    fname = django_filters.CharFilter(
+        field_name='fname', lookup_expr='startswith')
+    fname_exact = django_filters.CharFilter(
+        field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
 
     class Meta:
         model = PluginInstanceFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'plugin_inst_id',
-                  'feed_id', 'fname', 'fname_exact', 'fname_icontains', 'fname_nslashes']
+        fields = [
+            'id',
+            'min_creation_date',
+            'max_creation_date',
+            'plugin_inst_id',
+            'feed_id',
+            'fname',
+            'fname_exact',
+            'fname_icontains',
+            'fname_nslashes']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """
@@ -335,7 +376,8 @@ class BoolParameter(models.Model):
 
 
 class PathParameter(models.Model):
-    value = models.CharField(max_length=16000)  # this string can be a list of long paths
+    # this string can be a list of long paths
+    value = models.CharField(max_length=16000)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='path_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
@@ -349,7 +391,8 @@ class PathParameter(models.Model):
 
 
 class UnextpathParameter(models.Model):
-    value = models.CharField(max_length=16000)  # this string can be a list of long paths
+    # this string can be a list of long paths
+    value = models.CharField(max_length=16000)
     plugin_inst = models.ForeignKey(PluginInstance, on_delete=models.CASCADE,
                                     related_name='unextpath_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,

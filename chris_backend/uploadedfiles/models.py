@@ -14,7 +14,10 @@ def uploaded_file_path(instance, filename):
 
 class UploadedFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=512, upload_to=uploaded_file_path, unique=True)
+    fname = models.FileField(
+        max_length=512,
+        upload_to=uploaded_file_path,
+        unique=True)
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
@@ -25,12 +28,14 @@ class UploadedFile(models.Model):
 
 
 class UploadedFileFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    fname = django_filters.CharFilter(field_name='fname', lookup_expr='startswith')
-    fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name='creation_date', lookup_expr='lte')
+    fname = django_filters.CharFilter(
+        field_name='fname', lookup_expr='startswith')
+    fname_exact = django_filters.CharFilter(
+        field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
     fname_icontains_multiple = django_filters.CharFilter(
@@ -41,8 +46,15 @@ class UploadedFileFilter(FilterSet):
 
     class Meta:
         model = UploadedFile
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_nslashes', 'owner_username']
+        fields = [
+            'id',
+            'min_creation_date',
+            'max_creation_date',
+            'fname',
+            'fname_exact',
+            'fname_icontains',
+            'fname_nslashes',
+            'owner_username']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """

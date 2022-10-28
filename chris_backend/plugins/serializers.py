@@ -5,13 +5,17 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import ComputeResource, PluginMeta, Plugin, PluginParameter
-from .models import (DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter,
-                     DefaultStrParameter)
+from .models import (
+    DefaultFloatParameter,
+    DefaultIntParameter,
+    DefaultBoolParameter,
+    DefaultStrParameter)
 from .fields import MemoryInt, CPUInt
 
 
 class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
-    compute_user = serializers.CharField(min_length=4, max_length=32, write_only=True)
+    compute_user = serializers.CharField(
+        min_length=4, max_length=32, write_only=True)
     compute_password = serializers.CharField(min_length=8, max_length=100,
                                              write_only=True)
     compute_auth_token = serializers.CharField(max_length=500, write_only=True,
@@ -26,13 +30,27 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
-    plugins = serializers.HyperlinkedIdentityField(view_name='pluginmeta-plugin-list')
+    plugins = serializers.HyperlinkedIdentityField(
+        view_name='pluginmeta-plugin-list')
 
     class Meta:
         model = PluginMeta
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'title',
-                  'stars', 'public_repo', 'license', 'type', 'icon', 'category',
-                  'authors', 'documentation', 'plugins')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'modification_date',
+            'name',
+            'title',
+            'stars',
+            'public_repo',
+            'license',
+            'type',
+            'icon',
+            'category',
+            'authors',
+            'documentation',
+            'plugins')
 
     def update(self, instance, validated_data):
         """
@@ -40,7 +58,11 @@ class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
         """
         instance.modification_date = timezone.now()
         instance.save()
-        return super(PluginMetaSerializer, self).update(instance, validated_data)
+        return super(
+            PluginMetaSerializer,
+            self).update(
+            instance,
+            validated_data)
 
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
@@ -56,20 +78,47 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
     stars = serializers.ReadOnlyField(source='meta.stars')
     meta = serializers.HyperlinkedRelatedField(view_name='pluginmeta-detail',
                                                read_only=True)
-    parameters = serializers.HyperlinkedIdentityField(view_name='pluginparameter-list')
-    instances = serializers.HyperlinkedIdentityField(view_name='plugininstance-list')
+    parameters = serializers.HyperlinkedIdentityField(
+        view_name='pluginparameter-list')
+    instances = serializers.HyperlinkedIdentityField(
+        view_name='plugininstance-list')
     compute_resources = serializers.HyperlinkedIdentityField(
         view_name='plugin-computeresource-list')
 
     class Meta:
         model = Plugin
-        fields = ('url', 'id', 'creation_date', 'name', 'version', 'dock_image',
-                  'public_repo', 'icon', 'type', 'stars', 'authors', 'title', 'category',
-                  'description', 'documentation', 'license',  'execshell', 'selfpath',
-                  'selfexec', 'min_number_of_workers', 'max_number_of_workers',
-                  'min_cpu_limit', 'max_cpu_limit', 'min_memory_limit',
-                  'max_memory_limit', 'min_gpu_limit', 'max_gpu_limit', 'meta',
-                  'parameters', 'instances', 'compute_resources')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'name',
+            'version',
+            'dock_image',
+            'public_repo',
+            'icon',
+            'type',
+            'stars',
+            'authors',
+            'title',
+            'category',
+            'description',
+            'documentation',
+            'license',
+            'execshell',
+            'selfpath',
+            'selfexec',
+            'min_number_of_workers',
+            'max_number_of_workers',
+            'min_cpu_limit',
+            'max_cpu_limit',
+            'min_memory_limit',
+            'max_memory_limit',
+            'min_gpu_limit',
+            'max_gpu_limit',
+            'meta',
+            'parameters',
+            'instances',
+            'compute_resources')
 
     def validate(self, data):
         """
@@ -115,14 +164,14 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         self.validate_app_descriptor_limits(data, 'min_number_of_workers',
                                             'max_number_of_workers', err_msg)
         err_msg = "Minimum cpu limit should be less than maximum cpu limit."
-        self.validate_app_descriptor_limits(data, 'min_cpu_limit', 'max_cpu_limit',
-                                            err_msg)
+        self.validate_app_descriptor_limits(
+            data, 'min_cpu_limit', 'max_cpu_limit', err_msg)
         err_msg = "Minimum memory limit should be less than maximum memory limit."
         self.validate_app_descriptor_limits(data, 'min_memory_limit',
                                             'max_memory_limit', err_msg)
         err_msg = "Minimum gpu limit should be less than maximum gpu limit."
-        self.validate_app_descriptor_limits(data, 'min_gpu_limit', 'max_gpu_limit',
-                                            err_msg)
+        self.validate_app_descriptor_limits(
+            data, 'min_gpu_limit', 'max_gpu_limit', err_msg)
         return data
 
     def validate_version(self, version):
@@ -130,11 +179,11 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to check that a proper version type and format has been submitted.
         """
         if not isinstance(version, str):
-            raise serializers.ValidationError(["Invalid type for plugin app version "
-                                               "field. Must be a string."])
+            raise serializers.ValidationError(
+                ["Invalid type for plugin app version " "field. Must be a string."])
         if not re.match(r"^[0-9.]+$", version):
-            raise serializers.ValidationError(["Invalid plugin app version number "
-                                               "format %s." % version])
+            raise serializers.ValidationError(
+                ["Invalid plugin app version number " "format %s." % version])
         return version
 
     @staticmethod
@@ -143,9 +192,11 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         Custom method to validate plugin maximum and minimum workers descriptors.
         """
         error_msg = "This field must be a positive integer."
-        int_d = PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
+        int_d = PluginSerializer.validate_app_int_descriptor(
+            descriptor_dict, error_msg)
         if int_d < 1:
-            raise serializers.ValidationError({descriptor_dict['name']: [error_msg]})
+            raise serializers.ValidationError(
+                {descriptor_dict['name']: [error_msg]})
         return int_d
 
     @staticmethod
@@ -156,7 +207,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         try:
             return CPUInt(descriptor_dict['value'])
         except ValueError as e:
-            raise serializers.ValidationError({descriptor_dict['name']: [str(e)]})
+            raise serializers.ValidationError(
+                {descriptor_dict['name']: [str(e)]})
 
     @staticmethod
     def validate_app_memory_descriptor(descriptor_dict):
@@ -166,7 +218,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         try:
             return MemoryInt(descriptor_dict['value'])
         except ValueError as e:
-            raise serializers.ValidationError({descriptor_dict['name']: [str(e)]})
+            raise serializers.ValidationError(
+                {descriptor_dict['name']: [str(e)]})
 
     @staticmethod
     def validate_app_gpu_descriptor(descriptor_dict):
@@ -174,7 +227,8 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         Custom method to validate plugin maximum and minimum gpu descriptors.
         """
         error_msg = "This field must be a non-negative integer."
-        return PluginSerializer.validate_app_int_descriptor(descriptor_dict, error_msg)
+        return PluginSerializer.validate_app_int_descriptor(
+            descriptor_dict, error_msg)
 
     @staticmethod
     def validate_app_int_descriptor(descriptor_dict, error_msg):
@@ -185,18 +239,23 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
             int_d = int(descriptor_dict['value'])
             assert int_d >= 0
         except (ValueError, AssertionError):
-            raise serializers.ValidationError({descriptor_dict['name']: [error_msg]})
+            raise serializers.ValidationError(
+                {descriptor_dict['name']: [error_msg]})
         return int_d
 
     @staticmethod
-    def validate_app_descriptor_limits(app_repr, min_descriptor_name, max_descriptor_name,
-                                       error_msg=''):
+    def validate_app_descriptor_limits(
+            app_repr,
+            min_descriptor_name,
+            max_descriptor_name,
+            error_msg=''):
         """
         Custom method to validate that a descriptor's minimum is smaller than its maximum.
         """
         if (min_descriptor_name in app_repr) and (max_descriptor_name in app_repr) \
                 and (app_repr[max_descriptor_name] < app_repr[min_descriptor_name]):
-            raise serializers.ValidationError({'non_field_errors': [error_msg]})
+            raise serializers.ValidationError(
+                {'non_field_errors': [error_msg]})
 
 
 class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
@@ -218,7 +277,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
         param_type = data.get('type')
         if optional and param_type in ('path', 'unextpath'):
             error_msg = "Parameters of type 'path' or 'unextpath' cannot be optional."
-            raise serializers.ValidationError({'non_field_errors': [error_msg]})
+            raise serializers.ValidationError(
+                {'non_field_errors': [error_msg]})
         return data
 
     def get_default(self, obj):
@@ -232,8 +292,8 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
 class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultStrParameter
@@ -243,8 +303,8 @@ class DefaultStrParameterSerializer(serializers.HyperlinkedModelSerializer):
 class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultIntParameter
@@ -254,8 +314,8 @@ class DefaultIntParameterSerializer(serializers.HyperlinkedModelSerializer):
 class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultFloatParameter
@@ -265,8 +325,8 @@ class DefaultFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
 class DefaultBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultBoolParameter

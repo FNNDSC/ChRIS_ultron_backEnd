@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
-    compute_resource_name = serializers.CharField(max_length=100, required=False,
-                                                  source='compute_resource.name')
+    compute_resource_name = serializers.CharField(
+        max_length=100, required=False, source='compute_resource.name')
     previous_id = serializers.ReadOnlyField(source='previous.id')
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
@@ -49,7 +49,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     parameters = serializers.HyperlinkedIdentityField(
         view_name='plugininstance-parameter-list'
     )
-    files = serializers.HyperlinkedIdentityField(view_name='plugininstancefile-list')
+    files = serializers.HyperlinkedIdentityField(
+        view_name='plugininstancefile-list')
     plugin = serializers.HyperlinkedRelatedField(
         view_name='plugin-detail', read_only=True
     )
@@ -59,22 +60,54 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     workflow = serializers.HyperlinkedRelatedField(
         view_name='workflow-detail', read_only=True
     )
-    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    feed = serializers.HyperlinkedRelatedField(
+        view_name='feed-detail', read_only=True)
     compute_resource = serializers.HyperlinkedRelatedField(
         view_name='computeresource-detail', read_only=True
     )
-    splits = serializers.HyperlinkedIdentityField(view_name='plugininstancesplit-list')
+    splits = serializers.HyperlinkedIdentityField(
+        view_name='plugininstancesplit-list')
 
     class Meta:
         model = PluginInstance
-        fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
-                  'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
-                  'feed_id', 'start_date', 'end_date', 'output_path', 'status',
-                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'workflow_id',
-                  'summary', 'raw', 'owner_username', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit', 'size', 'error_code', 'previous',
-                  'feed', 'plugin', 'workflow', 'pipeline_inst', 'compute_resource',
-                  'descendants', 'files', 'parameters',  'splits')
+        fields = (
+            'url',
+            'id',
+            'title',
+            'previous_id',
+            'compute_resource_name',
+            'plugin_id',
+            'plugin_name',
+            'plugin_version',
+            'plugin_type',
+            'feed_id',
+            'start_date',
+            'end_date',
+            'output_path',
+            'status',
+            'pipeline_id',
+            'pipeline_name',
+            'pipeline_inst_id',
+            'workflow_id',
+            'summary',
+            'raw',
+            'owner_username',
+            'cpu_limit',
+            'memory_limit',
+            'number_of_workers',
+            'gpu_limit',
+            'size',
+            'error_code',
+            'previous',
+            'feed',
+            'plugin',
+            'workflow',
+            'pipeline_inst',
+            'compute_resource',
+            'descendants',
+            'files',
+            'parameters',
+            'splits')
 
     def get_output_path(self, obj):
         """
@@ -118,7 +151,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         corresponding plugin.
         """
         plg = self.context['view'].get_object()
-        if plg.compute_resources.filter(name=compute_resource_name).count() == 0:
+        if plg.compute_resources.filter(
+                name=compute_resource_name).count() == 0:
             msg = "Plugin '%s' with version '%s' has not been registered with compute " \
                   "resource '%s'." % (plg.meta.name, plg.version, compute_resource_name)
             raise serializers.ValidationError([msg])
@@ -133,7 +167,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                          instance.status in ('finishedSuccessfully',
                                              'finishedWithError')):
             msg = "Can not change status from '%s' to '%s'."
-            raise serializers.ValidationError([msg % (instance.status, status)])
+            raise serializers.ValidationError(
+                [msg % (instance.status, status)])
         return status
 
     def validate_gpu_limit(self, gpu_limit):
@@ -179,21 +214,29 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     @staticmethod
     def validate_value_within_interval(val, min_val, max_val):
         if val < min_val or val > max_val:
-            raise serializers.ValidationError(["This field value is out of range."])
+            raise serializers.ValidationError(
+                ["This field value is out of range."])
 
 
 class PluginInstanceSplitSerializer(serializers.HyperlinkedModelSerializer):
-    compute_resource_name = serializers.CharField(max_length=100, write_only=True,
-                                                  required=False)
+    compute_resource_name = serializers.CharField(
+        max_length=100, write_only=True, required=False)
     created_plugin_inst_ids = serializers.ReadOnlyField()
     plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
 
     class Meta:
         model = PluginInstanceSplit
-        fields = ('url', 'id', 'creation_date', 'filter', 'plugin_inst_id',
-                  'created_plugin_inst_ids', 'compute_resource_name', 'plugin_inst')
+        fields = (
+            'url',
+            'id',
+            'creation_date',
+            'filter',
+            'plugin_inst_id',
+            'created_plugin_inst_ids',
+            'compute_resource_name',
+            'plugin_inst')
 
     def validate_filter(self, filter_value):
         """
@@ -210,23 +253,26 @@ class PluginInstanceSplitSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to check the provided compute resource name is registered with
         pl-topologicalplugin.
         """
-        plg_topologcopy = Plugin.objects.filter(meta__name='pl-topologicalcopy').first()
+        plg_topologcopy = Plugin.objects.filter(
+            meta__name='pl-topologicalcopy').first()
         if not plg_topologcopy:
             raise serializers.ValidationError([f"Could not find plugin "
                                                f"'pl-topologicalcopy'. Please contact "
                                                f"your ChRIS admin."])
         if plg_topologcopy.compute_resources.filter(
                 name=compute_resource_name).count() == 0:
-            raise serializers.ValidationError([f"Plugin 'pl-topologicalcopy' with version"
-                                               f" '{plg_topologcopy.version}' has not"
-                                               f" been registered with compute resource"
-                                               f" '{compute_resource_name}'."])
+            raise serializers.ValidationError(
+                [
+                    f"Plugin 'pl-topologicalcopy' with version"
+                    f" '{plg_topologcopy.version}' has not"
+                    f" been registered with compute resource"
+                    f" '{compute_resource_name}'."])
         return compute_resource_name
 
 
 class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
     file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
@@ -248,10 +294,10 @@ class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
 class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = StrParameter
@@ -274,8 +320,10 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
         (value should be a string of plugin instance ids separated by commas).
         """
         if value and self.param_name and self.plugin_type and self.previous:
-            if (self.param_name == 'plugininstances') and (self.plugin_type == 'ts'):
-                plg_inst_ids = [inst_id.strip() for inst_id in value.split(',')]
+            if (self.param_name == 'plugininstances') and (
+                    self.plugin_type == 'ts'):
+                plg_inst_ids = [inst_id.strip()
+                                for inst_id in value.split(',')]
                 if str(self.previous.id) not in plg_inst_ids:
                     raise serializers.ValidationError(
                         [f"Previous instance id '{self.previous.id}' must be included in "
@@ -299,10 +347,10 @@ class StrParameterSerializer(serializers.HyperlinkedModelSerializer):
 class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = IntParameter
@@ -313,10 +361,10 @@ class IntParameterSerializer(serializers.HyperlinkedModelSerializer):
 class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = FloatParameter
@@ -327,10 +375,10 @@ class FloatParameterSerializer(serializers.HyperlinkedModelSerializer):
 class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = BoolParameter
@@ -384,10 +432,10 @@ def validate_paths(user, string):
 class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = PathParameter
@@ -413,10 +461,10 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
 class UnextpathParameterSerializer(serializers.HyperlinkedModelSerializer):
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = UnextpathParameter
@@ -444,10 +492,10 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
     type = serializers.ReadOnlyField(source='plugin_param.type')
     value = serializers.SerializerMethodField()
     url = ItemLinkField('_get_url')
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_inst = serializers.HyperlinkedRelatedField(
+        view_name='plugininstance-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = StrParameter

@@ -27,7 +27,10 @@ class ServiceFileList(generics.ListCreateAPIView):
         """
         response = super(ServiceFileList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('servicefile-list-query-search', request=request)]
+        query_list = [
+            reverse(
+                'servicefile-list-query-search',
+                request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
         template_data = {'path': "", 'service_name': ""}

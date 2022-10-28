@@ -22,8 +22,8 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
     pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
-    previous = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
+    previous = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
     plugin = serializers.HyperlinkedRelatedField(view_name='plugin-detail',
                                                  read_only=True)
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
@@ -31,8 +31,18 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PluginPiping
-        fields = ('url', 'id', 'previous_id', 'title', 'plugin_id', 'plugin_name',
-                  'plugin_version', 'pipeline_id', 'previous', 'plugin', 'pipeline')
+        fields = (
+            'url',
+            'id',
+            'previous_id',
+            'title',
+            'plugin_id',
+            'plugin_name',
+            'plugin_version',
+            'pipeline_id',
+            'previous',
+            'plugin',
+            'pipeline')
 
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
@@ -40,20 +50,36 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
                                               required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
+    plugins = serializers.HyperlinkedIdentityField(
+        view_name='pipeline-plugin-list')
     plugin_pipings = serializers.HyperlinkedIdentityField(
         view_name='pipeline-pluginpiping-list')
     default_parameters = serializers.HyperlinkedIdentityField(
         view_name='pipeline-defaultparameter-list')
-    instances = serializers.HyperlinkedIdentityField(view_name='pipelineinstance-list')
+    instances = serializers.HyperlinkedIdentityField(
+        view_name='pipelineinstance-list')
     workflows = serializers.HyperlinkedIdentityField(view_name='workflow-list')
 
     class Meta:
         model = Pipeline
-        fields = ('url', 'id', 'name', 'locked', 'authors', 'category', 'description',
-                  'plugin_tree', 'plugin_inst_id', 'owner_username', 'creation_date',
-                  'modification_date', 'plugins', 'plugin_pipings', 'default_parameters',
-                  'instances', 'workflows')
+        fields = (
+            'url',
+            'id',
+            'name',
+            'locked',
+            'authors',
+            'category',
+            'description',
+            'plugin_tree',
+            'plugin_inst_id',
+            'owner_username',
+            'creation_date',
+            'modification_date',
+            'plugins',
+            'plugin_pipings',
+            'default_parameters',
+            'instances',
+            'workflows')
 
     def create(self, validated_data):
         """
@@ -79,9 +105,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 child_indices = list(range(lower_ix, upper_ix))
                 parameter_instances = visited_instance.get_parameter_instances()
 
-                # parameter defaults assigned from the plugin instance's parameter values
-                defaults = [{'name': p_inst.plugin_param.name, 'default': p_inst.value}
-                            for p_inst in parameter_instances]
+                # parameter defaults assigned from the plugin instance's
+                # parameter values
+                defaults = [{'name': p_inst.plugin_param.name,
+                             'default': p_inst.value} for p_inst in parameter_instances]
 
                 if visited_instance.title in titles:  # avoid duplicated titles
                     raise serializers.ValidationError(
@@ -130,7 +157,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                         if parameter_default is None:  # no default provided by the plugin
                             plg_param_defaults = node['plugin_parameter_defaults']
                             param_default = [d for d in plg_param_defaults if
-                                                  d['name'] == parameter.name]
+                                             d['name'] == parameter.name]
                             if not param_default:  # no default provided by the user
                                 error_msg = 'Pipeline can not be unlocked until all ' \
                                             'plugin parameters have default values.'
@@ -163,7 +190,8 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         try:
             plugin_list = list(json.loads(plugin_tree))
         except json.decoder.JSONDecodeError:
-            # overriden validation methods automatically add the field name to the msg
+            # overriden validation methods automatically add the field name to
+            # the msg
             msg = ["Invalid JSON string %s." % plugin_tree]
             raise serializers.ValidationError(msg)
         except Exception:
@@ -180,46 +208,54 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 if 'plugin_id' not in d:
                     plg_name = d['plugin_name']
                     plg_version = d['plugin_version']
-                    plg = Plugin.objects.get(meta__name=plg_name, version=plg_version)
+                    plg = Plugin.objects.get(
+                        meta__name=plg_name, version=plg_version)
                     d['plugin_id'] = plg.id
                 else:
                     plg_id = d['plugin_id']
                     plg = Plugin.objects.get(pk=plg_id)
             except ObjectDoesNotExist:
                 if 'plugin_id' not in d:
-                    msg = ["Couldn't find any plugin with name %s and version %s." %
-                     (plg_name, plg_version)]
+                    msg = [
+                        "Couldn't find any plugin with name %s and version %s." %
+                        (plg_name, plg_version)]
                 else:
                     msg = ["Couldn't find any plugin with id %s." % plg_id]
                 raise serializers.ValidationError(msg)
             except Exception:
-                msg = ["Object %s must be a JSON object with 'previous_index' and "
-                       "either 'plugin_id' or 'plugin_name' and 'plugin_version' "
-                       "properties." % d]
+                msg = [
+                    "Object %s must be a JSON object with 'previous_index' and "
+                    "either 'plugin_id' or 'plugin_name' and 'plugin_version' "
+                    "properties." %
+                    d]
                 raise serializers.ValidationError(msg)
             if plg.meta.type == 'fs':
-                msg = ["Plugin %s is of type 'fs' and therefore can not be used to "
-                       "create a pipeline." % plg]
+                msg = [
+                    "Plugin %s is of type 'fs' and therefore can not be used to "
+                    "create a pipeline." %
+                    plg]
                 raise serializers.ValidationError(msg)
 
             title = d.get('title')
             if title is None:
-                raise serializers.ValidationError(['All nodes in the pipeline must have '
-                                                   'a title'])
+                raise serializers.ValidationError(
+                    ['All nodes in the pipeline must have ' 'a title'])
             else:
                 if title in titles:
                     raise serializers.ValidationError(
                         ["Pipeline tree can not contain duplicated titles"])
                 titles.append(title)
-                piping_serializer = PluginPipingSerializer(data={'title': title})
+                piping_serializer = PluginPipingSerializer(
+                    data={'title': title})
                 try:
                     piping_serializer.is_valid(raise_exception=True)
                 except serializers.ValidationError as e:
-                    raise serializers.ValidationError([f'Invalid title: {title}, '
-                                                       f'detail: {str(e)}'])
+                    raise serializers.ValidationError(
+                        [f'Invalid title: {title}, ' f'detail: {str(e)}'])
             if 'plugin_parameter_defaults' in d:
                 param_defaults = d['plugin_parameter_defaults']
-                PipelineSerializer.validate_plugin_parameter_defaults(plg, param_defaults)
+                PipelineSerializer.validate_plugin_parameter_defaults(
+                    plg, param_defaults)
             else:
                 d['plugin_parameter_defaults'] = []
         try:
@@ -278,10 +314,12 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         containing the plugin id, its parameter defaults and the list of child indices.
         """
         try:
-            root_ix = [ix for ix,d in enumerate(tree_list)
+            root_ix = [ix for ix, d in enumerate(tree_list)
                        if d['previous_index'] is None][0]
         except IndexError:
-            raise ValueError("Couldn't find the root of the tree in %s" % tree_list)
+            raise ValueError(
+                "Couldn't find the root of the tree in %s" %
+                tree_list)
         tree = [None] * len(tree_list)
         plugin_id = tree_list[root_ix]['plugin_id']
         title = tree_list[root_ix]['title']
@@ -313,7 +351,8 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                                          'plugin_parameter_defaults': defaults,
                                          'child_indices': [ix]}
                 except (IndexError, TypeError):
-                    raise ValueError("Invalid 'previous_index' for node %s" % d)
+                    raise ValueError(
+                        "Invalid 'previous_index' for node %s" % d)
         return {'root_index': root_ix, 'tree': tree}
 
     @staticmethod
@@ -346,8 +385,8 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         tree = tree_dict['tree']
         root_plg = Plugin.objects.get(pk=tree[root_ix]['plugin_id'])
         title = tree[root_ix]['title']
-        root_plg_piping = PluginPiping.objects.create(title=title, pipeline=pipeline,
-                                                      plugin=root_plg)
+        root_plg_piping = PluginPiping.objects.create(
+            title=title, pipeline=pipeline, plugin=root_plg)
         defaults = tree[root_ix]['plugin_parameter_defaults']
         root_plg_piping.save(parameter_defaults=defaults)
         # breath-first traversal
@@ -359,124 +398,194 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             for ix in tree[curr_ix]['child_indices']:
                 plg = Plugin.objects.get(pk=tree[ix]['plugin_id'])
                 title = tree[ix]['title']
-                plg_piping = PluginPiping.objects.create(title=title, pipeline=pipeline,
-                                                         plugin=plg, previous=curr_piping)
+                plg_piping = PluginPiping.objects.create(
+                    title=title, pipeline=pipeline, plugin=plg, previous=curr_piping)
                 defaults = tree[ix]['plugin_parameter_defaults']
                 plg_piping.save(parameter_defaults=defaults)
                 ix_queue.append(ix)
                 piping_queue.append(plg_piping)
 
 
-class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultPipingStrParameterSerializer(
+        serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
-    plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
+    plugin_name = serializers.ReadOnlyField(
+        source='plugin_param.plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(
+        source='plugin_param.plugin.version')
     param_id = serializers.ReadOnlyField(source='plugin_param.id')
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_piping = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultPipingStrParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
+        fields = (
+            'url',
+            'id',
+            'value',
+            'type',
+            'plugin_piping_id',
+            'previous_plugin_piping_id',
+            'param_name',
+            'param_id',
+            'plugin_piping',
+            'plugin_name',
+            'plugin_version',
+            'plugin_id',
+            'plugin_param')
 
 
-class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultPipingIntParameterSerializer(
+        serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
-    plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
+    plugin_name = serializers.ReadOnlyField(
+        source='plugin_param.plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(
+        source='plugin_param.plugin.version')
     param_id = serializers.ReadOnlyField(source='plugin_param.id')
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_piping = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultPipingIntParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
+        fields = (
+            'url',
+            'id',
+            'value',
+            'type',
+            'plugin_piping_id',
+            'previous_plugin_piping_id',
+            'param_name',
+            'param_id',
+            'plugin_piping',
+            'plugin_name',
+            'plugin_version',
+            'plugin_id',
+            'plugin_param')
 
 
-class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultPipingFloatParameterSerializer(
+        serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
-    plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
+    plugin_name = serializers.ReadOnlyField(
+        source='plugin_param.plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(
+        source='plugin_param.plugin.version')
     param_id = serializers.ReadOnlyField(source='plugin_param.id')
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_piping = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultPipingFloatParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
+        fields = (
+            'url',
+            'id',
+            'value',
+            'type',
+            'plugin_piping_id',
+            'previous_plugin_piping_id',
+            'param_name',
+            'param_id',
+            'plugin_piping',
+            'plugin_name',
+            'plugin_version',
+            'plugin_id',
+            'plugin_param')
 
 
-class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerializer):
+class DefaultPipingBoolParameterSerializer(
+        serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
-    plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
+    plugin_name = serializers.ReadOnlyField(
+        source='plugin_param.plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(
+        source='plugin_param.plugin.version')
     param_id = serializers.ReadOnlyField(source='plugin_param.id')
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_piping = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultPipingBoolParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
+        fields = (
+            'url',
+            'id',
+            'value',
+            'type',
+            'plugin_piping_id',
+            'previous_plugin_piping_id',
+            'param_name',
+            'param_id',
+            'plugin_piping',
+            'plugin_name',
+            'plugin_version',
+            'plugin_id',
+            'plugin_param')
 
 
-class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerializer):
+class GenericDefaultPipingParameterSerializer(
+        serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
-    plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
-    plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
+    plugin_name = serializers.ReadOnlyField(
+        source='plugin_param.plugin.meta.name')
+    plugin_version = serializers.ReadOnlyField(
+        source='plugin_param.plugin.version')
     param_id = serializers.ReadOnlyField(source='plugin_param.id')
     param_name = serializers.ReadOnlyField(source='plugin_param.name')
     type = serializers.ReadOnlyField(source='plugin_param.type')
     value = serializers.SerializerMethodField()
     url = ItemLinkField('_get_url')
-    plugin_piping = serializers.HyperlinkedRelatedField(view_name='pluginpiping-detail',
-                                                   read_only=True)
-    plugin_param = serializers.HyperlinkedRelatedField(view_name='pluginparameter-detail',
-                                                       read_only=True)
+    plugin_piping = serializers.HyperlinkedRelatedField(
+        view_name='pluginpiping-detail', read_only=True)
+    plugin_param = serializers.HyperlinkedRelatedField(
+        view_name='pluginparameter-detail', read_only=True)
 
     class Meta:
         model = DefaultPipingStrParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
-                  'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
-                  'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
+        fields = (
+            'url',
+            'id',
+            'value',
+            'type',
+            'plugin_piping_id',
+            'previous_plugin_piping_id',
+            'param_name',
+            'param_id',
+            'plugin_piping',
+            'plugin_name',
+            'plugin_version',
+            'plugin_id',
+            'plugin_param')
 
     def _get_url(self, obj):
         """
@@ -486,7 +595,8 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
         request = self.context['request']
         # here default piping parameter detail view names are assumed to
         # follow a convention
-        view_name = 'defaultpiping' + TYPES[obj.plugin_param.type] + 'parameter-detail'
+        view_name = 'defaultpiping' + \
+            TYPES[obj.plugin_param.type] + 'parameter-detail'
         return reverse(view_name, request=request, kwargs={"pk": obj.id})
 
     def get_value(self, obj):
@@ -496,7 +606,8 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
         return obj.value
 
 
-DEFAULT_PIPING_PARAMETER_SERIALIZERS = {'string': DefaultPipingStrParameterSerializer,
-                                        'integer': DefaultPipingIntParameterSerializer,
-                                        'float': DefaultPipingFloatParameterSerializer,
-                                        'boolean': DefaultPipingBoolParameterSerializer}
+DEFAULT_PIPING_PARAMETER_SERIALIZERS = {
+    'string': DefaultPipingStrParameterSerializer,
+    'integer': DefaultPipingIntParameterSerializer,
+    'float': DefaultPipingFloatParameterSerializer,
+    'boolean': DefaultPipingBoolParameterSerializer}

@@ -51,12 +51,14 @@ class Feed(models.Model):
 class FeedFilter(FilterSet):
     min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')
     max_id = django_filters.NumberFilter(field_name="id", lookup_expr='lte')
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
-                                                         lookup_expr='lte')
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
+    min_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(
+        field_name="creation_date", lookup_expr='lte')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(
+        field_name='name', lookup_expr='exact')
     name_startswith = django_filters.CharFilter(field_name='name',
                                                 lookup_expr='startswith')
     files_fname_icontains = django_filters.CharFilter(
@@ -64,8 +66,16 @@ class FeedFilter(FilterSet):
 
     class Meta:
         model = Feed
-        fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
-                  'min_creation_date', 'max_creation_date', 'files_fname_icontains']
+        fields = [
+            'id',
+            'name',
+            'name_exact',
+            'name_startswith',
+            'min_id',
+            'max_id',
+            'min_creation_date',
+            'max_creation_date',
+            'files_fname_icontains']
 
     def filter_by_fname_icontains(self, queryset, name, value):
         """
@@ -78,7 +88,9 @@ class FeedFilter(FilterSet):
         value_l = value.split()
         qs_l = []
         for val in value_l:
-            qs_l.append(queryset.filter(plugin_instances__files__fname__icontains=val))
+            qs_l.append(
+                queryset.filter(
+                    plugin_instances__files__fname__icontains=val))
         return queryset.intersection(*qs_l)
 
 
@@ -87,7 +99,10 @@ class Note(models.Model):
     modification_date = models.DateTimeField(auto_now_add=True)
     title = models.CharField(max_length=100, blank=True)
     content = models.TextField(blank=True)
-    feed = models.OneToOneField(Feed, on_delete=models.CASCADE, related_name='note')
+    feed = models.OneToOneField(
+        Feed,
+        on_delete=models.CASCADE,
+        related_name='note')
 
     def __str__(self):
         return self.title
@@ -105,8 +120,10 @@ class Tag(models.Model):
 
 
 class TagFilter(FilterSet):
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    color = django_filters.CharFilter(field_name='color', lookup_expr='icontains')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='icontains')
+    color = django_filters.CharFilter(
+        field_name='color', lookup_expr='icontains')
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
 
@@ -130,7 +147,10 @@ class Comment(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     title = models.CharField(max_length=100, blank=True)
     content = models.TextField(blank=True)
-    feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name='comments')
+    feed = models.ForeignKey(
+        Feed,
+        on_delete=models.CASCADE,
+        related_name='comments')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:

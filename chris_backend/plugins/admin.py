@@ -31,18 +31,33 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         """
         Overriden to only show the read/write fields in the add compute resource page.
         """
-        self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
-                       'compute_password', 'compute_auth_token', 'description',
-                       'max_job_exec_seconds']
-        return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
+        self.fields = [
+            'name',
+            'compute_url',
+            'compute_auth_url',
+            'compute_user',
+            'compute_password',
+            'compute_auth_token',
+            'description',
+            'max_job_exec_seconds']
+        return admin.ModelAdmin.add_view(
+            self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """
         Overriden to show all compute resources's fields in the compute resource page.
         """
-        self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
-                       'compute_password', 'compute_auth_token', 'description',
-                       'max_job_exec_seconds', 'creation_date', 'modification_date']
+        self.fields = [
+            'name',
+            'compute_url',
+            'compute_auth_url',
+            'compute_user',
+            'compute_password',
+            'compute_auth_token',
+            'description',
+            'max_job_exec_seconds',
+            'creation_date',
+            'modification_date']
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 
@@ -84,9 +99,19 @@ class ComputeResourceAdmin(admin.ModelAdmin):
 
 
 class PluginMetaAdmin(admin.ModelAdmin):
-    readonly_fields = ['name', 'title', 'stars', 'public_repo', 'license', 'type', 'icon',
-                       'category', 'authors', 'documentation', 'creation_date',
-                       'modification_date']
+    readonly_fields = [
+        'name',
+        'title',
+        'stars',
+        'public_repo',
+        'license',
+        'type',
+        'icon',
+        'category',
+        'authors',
+        'documentation',
+        'creation_date',
+        'modification_date']
     list_display = ('name', 'type', 'id')
     list_filter = ['type', 'creation_date', 'modification_date', 'category']
     search_fields = ['name']
@@ -127,26 +152,32 @@ class PluginAdminForm(forms.ModelForm):
             cr = compute_resources[0]
             if url:
                 try:
-                    self.instance = pl_manager.register_plugin_by_url(url, cr.name)
+                    self.instance = pl_manager.register_plugin_by_url(
+                        url, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
             else:
                 name = self.cleaned_data.get('name')
                 if not name:
-                    raise forms.ValidationError("A plugin's name or url is required")
+                    raise forms.ValidationError(
+                        "A plugin's name or url is required")
                 # get user-provided version (can be blank)
                 version = self.cleaned_data.get('version')
                 try:
-                    self.instance = pl_manager.register_plugin(name, version, cr.name)
+                    self.instance = pl_manager.register_plugin(
+                        name, version, cr.name)
                 except Exception as e:
                     raise forms.ValidationError(e)
             # reset form validated data
             self.cleaned_data['name'] = self.instance.meta.name
             self.cleaned_data['version'] = self.instance.version
-            current_compute_resources = list(self.instance.compute_resources.all())
-            compute_resources = list(compute_resources) + current_compute_resources
+            current_compute_resources = list(
+                self.instance.compute_resources.all())
+            compute_resources = list(compute_resources) + \
+                current_compute_resources
             self.instance.compute_resources.set(compute_resources)
-            self.cleaned_data['compute_resources'] = self.instance.compute_resources.all()
+            self.cleaned_data['compute_resources'] = self.instance.compute_resources.all(
+            )
 
 
 class PluginAdmin(admin.ModelAdmin):
@@ -163,11 +194,13 @@ class PluginAdmin(admin.ModelAdmin):
         """
         self.readonly_fields = []
         self.fieldsets = [
-            ('Compute resources', {'fields': ['compute_resources']}),
-            ('Identify plugin by name and version', {'fields': [('name', 'version')]}),
-            ('Or identify plugin by url', {'fields': ['url']}),
-        ]
-        return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
+            ('Compute resources', {
+                'fields': ['compute_resources']}), ('Identify plugin by name and version', {
+                    'fields': [
+                        ('name', 'version')]}), ('Or identify plugin by url', {
+                            'fields': ['url']}), ]
+        return admin.ModelAdmin.add_view(
+            self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """
@@ -237,11 +270,13 @@ class PluginAdmin(admin.ModelAdmin):
             file_form = UploadFileForm(request.POST, request.FILES)
             if file_form.is_valid():
                 # handle uploaded file (request.FILES['file'])
-                summary = self.register_plugins_from_file(request.FILES['file'])
+                summary = self.register_plugins_from_file(
+                    request.FILES['file'])
                 context['summary'] = summary
-                return render(request,
-                              'admin/plugins/plugin/add_plugins_from_file_result.html',
-                              context)
+                return render(
+                    request,
+                    'admin/plugins/plugin/add_plugins_from_file_result.html',
+                    context)
         else:
             file_form = UploadFileForm()
         context['file_form'] = file_form
@@ -284,7 +319,8 @@ class PluginAdmin(admin.ModelAdmin):
                         pl_manager.register_plugin(plg_name, plg_version,
                                                    compute_resource)
                     except Exception as e:
-                        summary['error'].append({'plugin_name': plg_name, 'code': str(e)})
+                        summary['error'].append(
+                            {'plugin_name': plg_name, 'code': str(e)})
                     else:
                         summary['success'].append({'plugin_name': plg_name})
                 else:
@@ -292,9 +328,11 @@ class PluginAdmin(admin.ModelAdmin):
                     plg_url = strings[0]
                     compute_resource = strings[1]
                     try:
-                        pl_manager.register_plugin_by_url(plg_url, compute_resource)
+                        pl_manager.register_plugin_by_url(
+                            plg_url, compute_resource)
                     except Exception as e:
-                        summary['error'].append({'plugin_name': plg_url, 'code': str(e)})
+                        summary['error'].append(
+                            {'plugin_name': plg_url, 'code': str(e)})
                     else:
                         summary['success'].append({'plugin_name': plg_url})
         return summary
@@ -315,7 +353,13 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
         """
         Overriden to append a collection+json template to the response.
         """
-        response = super(ComputeResourceAdminList, self).list(request, *args, **kwargs)
+        response = super(
+            ComputeResourceAdminList,
+            self).list(
+            request,
+            *
+            args,
+            **kwargs)
         # append write template
         template_data = {'name': '', 'compute_url': '', 'compute_auth_url': '',
                          'compute_user': '', 'compute_password': '',
@@ -337,7 +381,8 @@ class PluginAdminSerializer(PluginSerializer):
     selfexec = serializers.CharField(required=False)
 
     class Meta(PluginSerializer.Meta):
-        fields = PluginSerializer.Meta.fields + ('plugin_store_url', 'compute_name')
+        fields = PluginSerializer.Meta.fields + \
+            ('plugin_store_url', 'compute_name')
 
     def validate(self, data):
         """
@@ -349,7 +394,8 @@ class PluginAdminSerializer(PluginSerializer):
         plugin_store_url = data.pop('plugin_store_url')
         pl_manager = PluginManager()
         try:
-            self.instance = pl_manager.register_plugin_by_url(plugin_store_url, cr_name)
+            self.instance = pl_manager.register_plugin_by_url(
+                plugin_store_url, cr_name)
         except Exception as e:
             raise serializers.ValidationError({'non_field_errors': [str(e)]})
         return data
