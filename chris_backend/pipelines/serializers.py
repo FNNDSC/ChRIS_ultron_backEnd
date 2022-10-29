@@ -371,6 +371,7 @@ class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
+    plugin_piping_title = serializers.ReadOnlyField(source='plugin_piping.title')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -384,7 +385,7 @@ class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer
 
     class Meta:
         model = DefaultPipingStrParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
+        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -393,6 +394,7 @@ class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
+    plugin_piping_title = serializers.ReadOnlyField(source='plugin_piping.title')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -406,7 +408,7 @@ class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer
 
     class Meta:
         model = DefaultPipingIntParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
+        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -415,6 +417,7 @@ class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializ
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
+    plugin_piping_title = serializers.ReadOnlyField(source='plugin_piping.title')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -428,7 +431,7 @@ class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializ
 
     class Meta:
         model = DefaultPipingFloatParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
+        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -437,6 +440,7 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
+    plugin_piping_title = serializers.ReadOnlyField(source='plugin_piping.title')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -450,7 +454,7 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
 
     class Meta:
         model = DefaultPipingBoolParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
+        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -459,6 +463,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
     previous_plugin_piping_id = serializers.ReadOnlyField(
         source='plugin_piping.previous_id')
     plugin_piping_id = serializers.ReadOnlyField(source='plugin_piping.id')
+    plugin_piping_title = serializers.ReadOnlyField(source='plugin_piping.title')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -474,7 +479,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
 
     class Meta:
         model = DefaultPipingStrParameter
-        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id',
+        fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
