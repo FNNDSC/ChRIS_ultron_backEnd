@@ -91,6 +91,7 @@ class PACSFileSerializerTests(TestCase):
         data = {'PatientID': '123456', 'PatientName': 'crazy',
                 'StudyDate': '2020-07-15',
                 'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
+                'PatientSex':'O',
                 'StudyDescription': 'brain_crazy_study',
                 'SeriesDescription': 'SAG T1 MPRAGE',
                 'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
