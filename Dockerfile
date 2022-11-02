@@ -40,7 +40,7 @@ LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
       org.opencontainers.image.licenses="MIT"
 
 # Pass a UID on build command line (see above) to set internal UID
-ARG UID=1001
+ARG UID=1000
 ARG ENVIRONMENT=production
 ENV UID=$UID DEBIAN_FRONTEND=noninteractive VERSION="0.1"
 

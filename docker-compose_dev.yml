@@ -69,6 +69,7 @@ services:
       context: .
       args:
         ENVIRONMENT: local
+        UID: 1000
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
     environment:
