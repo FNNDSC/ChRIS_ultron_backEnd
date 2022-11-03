@@ -43,6 +43,7 @@ class PACSFileViewTests(TestCase):
         pacs.save()
         pacs_file = PACSFile(PatientID='123456',
                              PatientName='crazy',
+                             PatientSex='O',
                              StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              StudyDescription='brain_crazy_study',
@@ -72,6 +73,7 @@ class PACSFileListViewTests(PACSFileViewTests):
             {"template": {"data": [{"name": "path", "value": path},
                                    {"name": "PatientID", "value": "123456"},
                                    {"name": "PatientName", "value": "crazy"},
+                                   {"name": "PatientSex", "value": "O"},
                                    {"name": "StudyDate", "value": '2020-07-15'},
                                    {"name": "StudyInstanceUID",
                                     "value": '1.1.3432.54.6545674765.765434'},
