@@ -11,9 +11,13 @@ from django.utils import timezone
 from django.conf import settings
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from rest_framework import status
+from rest_framework import serializers
 
 from plugins import admin as pl_admin
+from plugins.models import PluginMeta, Plugin, PluginParameter
+
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -493,65 +497,14 @@ class ComputeResourceAdminListViewTests(PluginAdminFormTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class PluginAdminSerializerTests(PluginAdminFormTests):
-
-    def test_validate_registers_plugin(self):
-        """
-        Test whether overriden validate method registers plugin by url.
-        """
-        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
-                                                                  type='fs')
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
-                                                             version=self.plugin_version)
-        # mock manager's register_plugin_by_url method
-        plugin_store_url = "http://chris-store.local:8010/api/v1/1/"
-        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
-                               return_value=plugin) as register_plugin_by_url_mock:
-            plg_admin_serializer = pl_admin.PluginAdminSerializer(plugin)
-            data = {'plugin_store_url': plugin_store_url,
-                    'compute_name': self.compute_resource.name}
-            data = plg_admin_serializer.validate(data)
-            self.assertNotIn('plugin_store_url', data)
-            self.assertNotIn('compute_name', data)
-            register_plugin_by_url_mock.assert_called_with(plugin_store_url,
-                                                           self.compute_resource.name)
-
-    def test_validate_raises_validation_error_if_cannot_register_plugin(self):
-        """
-        Test whether overriden validate method raises a ValidationError when there
-        is a validation error or it cannot save a new plugin to the DB.
-        """
-        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
-                                                                  type='fs')
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
-                                                             version=self.plugin_version)
-        # mock manager's register_plugin method
-        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
-                               side_effect=Exception) as register_plugin_by_url_mock:
-            plg_admin_serializer = pl_admin.PluginAdminSerializer(plugin)
-            plugin_store_url = "http://chris-store.local:8010/api/v1/1/"
-            data = {'plugin_store_url': plugin_store_url,
-                    'compute_name': self.compute_resource.name}
-            with self.assertRaises(pl_admin.serializers.ValidationError):
-                plg_admin_serializer.validate(data)
-
-
-class PluginAdminListViewTests(PluginAdminFormTests):
+class ComputeResourceAdminDetailViewTests(PluginAdminFormTests):
     """
-    Test the admin-plugin-list view.
+    Test the admin-computeresource-detail view.
     """
 
     def setUp(self):
-        super(PluginAdminListViewTests, self).setUp()
+        super(ComputeResourceAdminDetailViewTests, self).setUp()
 
-        self.content_type = 'application/vnd.collection+json'
-        self.create_read_url = reverse("admin-plugin-list")
-        self.post = json.dumps(
-            {"template": {"data": [{"name": "plugin_store_url",
-                                    "value": "http://chris-store.local:8010/api/v1/1/"},
-                                   {"name": "compute_name",
-                                    "value": self.compute_resource.name}
-                                   ]}})
         self.admin_username = 'admin'
         self.admin_password = 'adminpass'
         self.username = 'foo'
@@ -564,27 +517,575 @@ class PluginAdminListViewTests(PluginAdminFormTests):
         User.objects.create_user(username=self.username,
                                  password=self.password)
 
-    def test_plugin_create_success(self):
-        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name=self.plugin_name,
-                                                                  type='fs')
-        (plugin, tf) = pl_admin.Plugin.objects.get_or_create(meta=pl_meta,
-                                                             version=self.plugin_version)
+        self.read_delete_url = reverse("admin-computeresource-detail",
+                                       kwargs={"pk": self.compute_resource.id})
+
+    def test_compute_resource_detail_success(self):
         self.client.login(username=self.admin_username, password=self.admin_password)
-        with mock.patch.object(pl_admin.PluginManager, 'register_plugin_by_url',
-                               return_value=plugin) as register_plugin_by_url_mock:
-            response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'host')
+
+    def test_compute_resource_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_compute_resource_detail_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PluginAdminSerializerTests(PluginAdminFormTests):
+
+    def setUp(self):
+        super(PluginAdminSerializerTests, self).setUp()
+
+        self.content_type = 'application/vnd.collection+json'
+        self.create_read_url = reverse("admin-plugin-list")
+        self.post = {'fname': '', 'compute_names': 'host'}
+        self.admin_username = 'admin'
+        self.admin_password = 'adminpass'
+        self.username = 'foo'
+        self.password = 'pass'
+        # create admin user
+        User.objects.create_superuser(username=self.admin_username,
+                                      password=self.admin_password,
+                                      email='admin@babymri.org')
+        # create normal user
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+        plugin_parameters = [{'name': 'dir', 'type': str.__name__, 'action': 'store',
+                              'optional': True, 'flag': '--dir', 'short_flag': '-d',
+                              'default': '/', 'help': 'test plugin', 'ui_exposed': True}]
+
+        self.plg_data = {'description': 'Dir test plugin',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'version': self.plugin_version,
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
+
+        self.plg_meta_data = {'name': self.plugin_name,
+                              'title': 'Dir plugin',
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'authors': 'DEV FNNDSC'}
+
+        self.plg_repr = self.plg_data.copy()
+        self.plg_repr.update(self.plg_meta_data)
+        self.plg_repr['parameters'] = plugin_parameters
+
+        # create a plugin
+        (meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_name)
+        (plugin, tf) = Plugin.objects.get_or_create(meta=meta,
+                                                    version=self.plg_repr['version'],
+                                                    dock_image=self.plg_repr['dock_image'])
+
+        # add plugin's parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=self.plg_repr['parameters'][0]['name'],
+            type=self.plg_repr['parameters'][0]['type'],
+            optional=self.plg_repr['parameters'][0]['optional'],
+            action=self.plg_repr['parameters'][0]['action'],
+            flag=self.plg_repr['parameters'][0]['flag'],
+            short_flag=self.plg_repr['parameters'][0]['short_flag'],
+        )
+        param_names = plugin.get_plugin_parameter_names()
+        self.assertEqual(param_names, [self.plg_repr['parameters'][0]['name']])
+
+    def test_validate_app_version(self):
+        """
+        Test whether custom validate_app_version method raises a ValidationError when
+        wrong version type or format has been submitted.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_version(1.2)
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_version('v1.2')
+
+    def test_validate_meta_version(self):
+        """
+        Test whether custom validate_meta_version method raises a ValidationError when
+        plugin meta and version are not unique together.
+        """
+        (meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_meta_version(meta, self.plg_repr['version'])
+
+    def test_validate_meta_image(self):
+        """
+        Test whether custom validate_meta_image method raises a ValidationError when
+        plugin meta and docker image are not unique together.
+        """
+        (meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_meta_image(meta, self.plg_repr['dock_image'])
+
+    def test_create_also_creates_meta_first_time_plugin_name_is_used(self):
+        """
+        Test whether overriden create also creates a new plugin meta when creating a
+        plugin with a new name that doesn't already exist in the system.
+        """
+        user = User.objects.get(username=self.username)
+        validated_data = self.plg_repr.copy()
+        validated_data['name'] = 'testapp'
+        validated_data['parameters'][0]['type'] = 'string'
+        validated_data['dock_image'] = 'fnndsc/pl-testapp'
+        f = ContentFile(json.dumps(self.plg_repr).encode())
+        f.name = 'testapp.json'
+        validated_data['fname'] = f
+        validated_data['compute_names'] = [self.compute_resource]
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with self.assertRaises(PluginMeta.DoesNotExist):
+            PluginMeta.objects.get(name='testapp')
+        plg_serializer.create(validated_data)
+        self.assertEqual(PluginMeta.objects.get(name='testapp').name, 'testapp')
+
+    def test_create_does_not_create_meta_after_first_time_plugin_name_is_used(self):
+        """
+        Test whether overriden create does not create a new plugin meta when creating a
+        plugin version with a name that already exists in the system.
+        """
+        user = User.objects.get(username=self.username)
+        validated_data = self.plg_repr.copy()
+        validated_data['parameters'][0]['type'] = 'string'
+        validated_data['version'] = '0.2.2'
+        validated_data['dock_image'] = 'fnndsc/pl-testapp'
+        f = ContentFile(json.dumps(self.plg_repr).encode())
+        f.name = 'testapp.json'
+        validated_data['fname'] = f
+        validated_data['compute_names'] = [self.compute_resource]
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        n_plg_meta = PluginMeta.objects.count()
+        plg_meta = PluginMeta.objects.get(name=self.plugin_name)
+        plugin = plg_serializer.create(validated_data)
+        self.assertEqual(n_plg_meta, PluginMeta.objects.count())
+        self.assertEqual(plugin.meta, plg_meta)
+
+    def test_read_app_representation(self):
+        """
+        Test whether custom read_app_representation method returns an appropriate plugin
+        representation dictionary from an uploaded json representation file.
+        """
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            self.assertEqual(pl_admin.PluginAdminSerializer.read_app_representation(f),
+                             self.plg_repr)
+
+    def test_check_required_descriptor(self):
+        """
+        Test whether custom check_required_descriptor method raises a ValidationError
+        when a required descriptor is missing from the plugin app representation.
+        """
+        del self.plg_repr['execshell']
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.check_required_descriptor(self.plg_repr,
+                                                                     'execshell')
+
+    def test_validate_app_descriptor_limits(self):
+        """
+        Test whether custom validate_app_descriptor_limit method raises a ValidationError
+        when the max limit is smaller than the min limit.
+        """
+        self.plg_repr['min_cpu_limit'] = 200
+        self.plg_repr['max_cpu_limit'] = 100
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_descriptor_limits(self.plg_repr,
+                                                            'min_cpu_limit',
+                                                            'max_cpu_limit')
+
+    def test_validate_app_int_descriptor(self):
+        """
+        Test whether custom validate_app_int_descriptor method raises a ValidationError
+        when the descriptor cannot be converted to a non-negative integer.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_int_descriptor('one')
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_int_descriptor(-1)
+
+    def test_validate_app_gpu_descriptor(self):
+        """
+        Test whether custom validate_app_gpu_descriptor method raises a ValidationError
+        when the gpu descriptor cannot be converted to a non-negative integer.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_gpu_descriptor('one')
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_gpu_descriptor(-1)
+
+    def test_validate_app_workers_descriptor(self):
+        """
+        Test whether custom validate_app_workers_descriptor method raises a ValidationError
+        when the app worker descriptor cannot be converted to a positive integer.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_workers_descriptor('one')
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_workers_descriptor(0)
+
+    def test_validate_app_cpu_descriptor(self):
+        """
+        Test whether custom validate_app_cpu_descriptor method raises a ValidationError
+        when the app cpu descriptor cannot be converted to a fields.CPUInt.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_cpu_descriptor('100me')
+            self.assertEqual(100, pl_admin.PluginAdminSerializer.validate_app_cpu_descriptor('100m'))
+
+    def test_validate_app_memory_descriptor(self):
+        """
+        Test whether custom validate_app_memory_descriptor method raises a ValidationError
+        when the app memory descriptor cannot be converted to a fields.MemoryInt.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            pl_admin.PluginAdminSerializer.validate_app_cpu_descriptor('100me')
+            self.assertEqual(100, pl_admin.PluginAdminSerializer.validate_app_cpu_descriptor('100mi'))
+            self.assertEqual(100, pl_admin.PluginAdminSerializer.validate_app_cpu_descriptor('100gi'))
+
+    def test_validate_app_parameters_type(self):
+        """
+        Test whether custom validate_app_parameters method raises a ValidationError when
+        a plugin parameter has an unsupported type.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        parameter_list = self.plg_repr['parameters']
+        parameter_list[0]['type'] = 'booleano'
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_parameters(parameter_list)
+
+    def test_validate_app_parameters_default(self):
+        """
+        Test whether custom validate_app_parameters method raises a ValidationError when
+        an optional plugin parameter doesn't have a default value specified.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        parameter_list = self.plg_repr['parameters']
+        parameter_list[0]['default'] = None
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_parameters(parameter_list)
+
+    def test_validate_app_parameters_of_path_type_and_optional(self):
+        """
+        Test whether custom validate_app_parameters method raises a ValidationError when
+        a plugin parameter is optional anf of type 'path' or 'unextpath'.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        parameter_list = self.plg_repr['parameters']
+        parameter_list[0]['type'] = 'path'
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_parameters(parameter_list)
+        parameter_list[0]['type'] = 'unextpath'
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_parameters(parameter_list)
+
+    def test_validate_app_parameters_not_ui_exposed_and_not_optional(self):
+        """
+        Test whether custom validate_app_parameters method raises a ValidationError when
+        a plugin parameter that is not optional is not exposed to the ui.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        parameter_list = self.plg_repr['parameters']
+        parameter_list[0]['optional'] = False
+        parameter_list[0]['ui_exposed'] = False
+        with self.assertRaises(serializers.ValidationError):
+            plg_serializer.validate_app_parameters(parameter_list)
+
+    def test_validate_check_required_execshell(self):
+        """
+        Test whether the custom validate method raises a ValidationError when required
+        'execshell' descriptor is missing from the plugin app representation.
+        """
+        del self.plg_repr['execshell'] # remove required 'execshell' from representation
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_check_required_selfpath(self):
+        """
+        Test whether the custom validate method raises a ValidationError when required
+        'selfpath' descriptor is missing from the plugin app representation.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        del self.plg_repr['selfpath'] # remove required 'selfpath' from representation
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_check_required_selfexec(self):
+        """
+        Test whether the custom validate method raises a ValidationError when required
+        'selfexec' descriptor is missing from the plugin app representation.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        del self.plg_repr['selfexec'] # remove required 'selfexec' from representation
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_check_required_parameters(self):
+        """
+        Test whether the custom validate method raises a ValidationError when required
+        'parameters' descriptor is missing from the plugin app representation.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        del self.plg_repr['parameters'] # remove required 'parameters' from representation
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_remove_empty_min_number_of_workers(self):
+        """
+        Test whether the custom validate method removes 'min_number_of_workers'
+        descriptor from the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['min_number_of_workers'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('min_number_of_workers', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_max_number_of_workers(self):
+        """
+        Test whether the custom validate method removes 'max_number_of_workers'
+        descriptor from the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['max_number_of_workers'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('max_number_of_workers', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_min_gpu_limit(self):
+        """
+        Test whether the custom validate method removes 'min_gpu_limit' descriptor from
+        the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['min_gpu_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('min_gpu_limit', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_max_gpu_limit(self):
+        """
+        Test whether the custom validate method removes 'max_gpu_limit' descriptor from
+        the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['max_gpu_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('max_gpu_limit', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_min_cpu_limit(self):
+        """
+        Test whether the custom validate method removes 'min_cpu_limit' descriptor from
+        the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['min_cpu_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('min_cpu_limit', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_max_cpu_limit(self):
+        """
+        Test whether the custom validate method removes 'max_cpu_limit' descriptor from
+        the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['max_cpu_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('max_cpu_limit', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_min_memory_limit(self):
+        """
+        Test whether the custom validate method removes 'min_memory_limit'
+        descriptor from the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['min_memory_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('min_memory_limit', plg_serializer.validate(data))
+
+    def test_validate_remove_empty_max_memory_limit(self):
+        """
+        Test whether the custom validate method removes 'max_memory_limit'
+        descriptor from the validated data when it is the empty string.
+        """
+        plugin = Plugin.objects.get(meta__name=self.plugin_name)
+        plg_serializer = pl_admin.PluginAdminSerializer(plugin)
+        self.plg_repr['max_memory_limit'] = ''
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            self.assertNotIn('max_memory_limit', plg_serializer.validate(data))
+
+    def test_validate_workers_limits(self):
+        """
+        Test whether custom validate method raises a ValidationError when the
+        'max_number_of_workers' is smaller than the 'min_number_of_workers'.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        self.plg_repr['min_number_of_workers'] = 2
+        self.plg_repr['max_number_of_workers'] = 1
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_cpu_limits(self):
+        """
+        Test whether custom validate method raises a ValidationError when the
+        'max_cpu_limit' is smaller than the 'min_cpu_limit'.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        self.plg_repr['min_cpu_limit'] = 200
+        self.plg_repr['max_cpu_limit'] = 100
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_memory_limits(self):
+        """
+        Test whether custom validate method raises a ValidationError when the
+        'max_memory_limit' is smaller than the 'min_memory_limit'.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        self.plg_repr['min_memory_limit'] = 100000
+        self.plg_repr['max_memory_limit'] = 10000
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_gpu_limits(self):
+        """
+        Test whether custom validate method raises a ValidationError when the
+        'max_gpu_limit' is smaller than the 'max_gpu_limit'.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        self.plg_repr['min_gpu_limit'] = 2
+        self.plg_repr['max_gpu_limit'] = 1
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_validate_app_parameters(self):
+        """
+        Test whether custom validate method validates submitted plugin's parameters.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        parameter_list = self.plg_repr['parameters']
+        parameter_list[0]['type'] = 'booleano'
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            with self.assertRaises(serializers.ValidationError):
+                plg_serializer.validate(data)
+
+    def test_validate_update_validated_data(self):
+        """
+        Test whether custom validate method updates validated data with the plugin app
+        representation.
+        """
+        plg_serializer = pl_admin.PluginAdminSerializer()
+        with io.BytesIO(json.dumps(self.plg_repr).encode()) as f:
+            data = {'fname': f}
+            new_data = plg_serializer.validate(data)
+            self.assertIn('version', new_data)
+            self.assertIn('execshell', new_data)
+            self.assertIn('selfpath', new_data)
+            self.assertIn('selfexec', new_data)
+            self.assertIn('parameters', new_data)
+
+
+class PluginAdminListViewTests(PluginAdminFormTests):
+    """
+    Test the admin-plugin-list view.
+    """
+
+    def setUp(self):
+        super(PluginAdminListViewTests, self).setUp()
+
+        self.create_read_url = reverse("admin-plugin-list")
+        self.post = {'fname': '', 'compute_names': 'host'}
+        self.admin_username = 'admin'
+        self.admin_password = 'adminpass'
+        self.username = 'foo'
+        self.password = 'pass'
+        # create admin user
+        User.objects.create_superuser(username=self.admin_username,
+                                      password=self.admin_password,
+                                      email='admin@babymri.org')
+        # create normal user
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+        plugin_parameters = [{'name': 'dir', 'type': str.__name__, 'action': 'store',
+                              'optional': True, 'flag': '--dir', 'short_flag': '-d',
+                              'default': '/', 'help': 'test plugin', 'ui_exposed': True}]
+
+        self.plg_data = {'description': 'Dir test plugin',
+                         'dock_image': 'fnndsc/pl-simplefsapp',
+                         'version': self.plugin_version,
+                         'execshell': 'python3',
+                         'selfpath': '/usr/src/simplefsapp',
+                         'selfexec': 'simplefsapp.py'}
+
+        self.plg_meta_data = {'name': self.plugin_name,
+                              'title': 'Dir plugin',
+                              'license': 'MIT',
+                              'type': 'fs',
+                              'icon': 'http://github.com/plugin',
+                              'category': 'Dir',
+                              'authors': 'DEV FNNDSC'}
+
+        self.plg_repr = self.plg_data.copy()
+        self.plg_repr.update(self.plg_meta_data)
+        self.plg_repr['parameters'] = plugin_parameters
+
+    def test_plugin_create_success(self):
+        with io.StringIO(json.dumps(self.plg_repr)) as f:
+            post = self.post.copy()
+            post["fname"] = f
+            self.client.login(username=self.admin_username, password=self.admin_password)
+            #  multipart request
+            response = self.client.post(self.create_read_url, data=post)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_plugin_create_failure_unauthenticated(self):
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
+        response = self.client.post(self.create_read_url, data=self.post)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_create_failure_access_denied(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
+        response = self.client.post(self.create_read_url, data=self.post)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_plugin_list_success(self):
@@ -602,4 +1103,63 @@ class PluginAdminListViewTests(PluginAdminFormTests):
     def test_plugin_list_failure_access_denied(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PluginAdminDetailViewTests(PluginAdminFormTests):
+    """
+    Test the admin-plugin-detail view.
+    """
+
+    def setUp(self):
+        super(PluginAdminDetailViewTests, self).setUp()
+
+        self.admin_username = 'admin'
+        self.admin_password = 'adminpass'
+        self.username = 'foo'
+        self.password = 'pass'
+        # create admin user
+        User.objects.create_superuser(username=self.admin_username,
+                                      password=self.admin_password,
+                                      email='admin@babymri.org')
+        # create normal user
+        User.objects.create_user(username=self.username,
+                                 password=self.password)
+
+        # create a plugin
+        (pl_meta, tf) = pl_admin.PluginMeta.objects.get_or_create(name='mytestcopyapp',
+                                                                  type='fs')
+        plugin = pl_admin.Plugin()
+        plugin.meta = pl_meta
+        plugin.version = '0.1'
+        plugin.save()
+        self.read_delete_url = reverse("admin-plugin-detail", kwargs={"pk": plugin.id})
+
+    def test_plugin_detail_success(self):
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'mytestcopyapp')
+
+    def test_plugin_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_detail_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_delete_success(self):
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Plugin.objects.count(), 0)
+
+    def test_plugin_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_delete_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

@@ -1,19 +1,25 @@
 
+import json
+import re
+
 from django.contrib import admin
 from django.utils import timezone
 from django.urls import path
 from django.shortcuts import render
 from django import forms
 from django.core.validators import URLValidator
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib import messages
 from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
 
 from collectionjson import services
 
-from .models import PluginMeta, Plugin, ComputeResource
-from .serializers import ComputeResourceSerializer, PluginSerializer
+from .models import PluginMeta, Plugin, ComputeResource, TYPES
+from .fields import CPUInt, MemoryInt
+from .serializers import (ComputeResourceSerializer, PluginMetaSerializer,
+                          PluginSerializer, PluginParameterSerializer,
+                          DEFAULT_PARAMETER_SERIALIZERS)
 from .services.manager import PluginManager
 
 
@@ -324,12 +330,33 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
         return services.append_collection_template(response, template_data)
 
 
+class ComputeResourceAdminDetail(generics.RetrieveDestroyAPIView):
+    """
+    A JSON view for a compute resource that can be used by ChRIS admins to delete the
+    compute resource through a REST API.
+    """
+    http_method_names = ['get', 'delete']
+    serializer_class = ComputeResourceSerializer
+    queryset = ComputeResource.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to only allow the delete if no plugin would be left without a compute
+        resource after the operation.
+        """
+        try:
+            instance.delete()
+        except ValidationError as e:
+            raise serializers.ValidationError({'non_field_errors': [str(e)]})
+
+
 class PluginAdminSerializer(PluginSerializer):
     """
     A Plugin serializer for the PluginAdminList JSON view.
     """
-    plugin_store_url = serializers.URLField(write_only=True)
-    compute_name = serializers.CharField(max_length=100, write_only=True)
+    fname = serializers.FileField(write_only=True)
+    compute_names = serializers.CharField(max_length=2000, write_only=True)
     version = serializers.CharField(required=False)
     dock_image = serializers.CharField(required=False)
     execshell = serializers.CharField(required=False)
@@ -337,22 +364,348 @@ class PluginAdminSerializer(PluginSerializer):
     selfexec = serializers.CharField(required=False)
 
     class Meta(PluginSerializer.Meta):
-        fields = PluginSerializer.Meta.fields + ('plugin_store_url', 'compute_name')
+        fields = PluginSerializer.Meta.fields + ('fname', 'compute_names')
+
+    def create(self, validated_data):
+        """
+        Overriden to validate and save all the plugin descriptors and parameters
+        associated with the plugin when creating it.
+        """
+        # gather the data that belongs to the plugin meta
+        meta_data = {'name': validated_data.pop('name'),
+                     'public_repo': validated_data.pop('public_repo', ''),
+                     'title': validated_data.pop('title', ''),
+                     'license': validated_data.pop('license', ''),
+                     'type': validated_data.pop('type', ''),
+                     'icon': validated_data.pop('icon', ''),
+                     'category': validated_data.pop('category', ''),
+                     'authors': validated_data.pop('authors', ''),
+                     'documentation': validated_data.pop('documentation', '')}
+
+        # check whether plugin meta does not exist and validate the plugin meta data
+        try:
+            meta = PluginMeta.objects.get(name=meta_data['name'])
+        except ObjectDoesNotExist:
+            meta_serializer = PluginMetaSerializer(data=meta_data)
+        else:
+            #  validate meta, version are unique
+            self.validate_meta_version(meta, validated_data['version'])
+            #  validate meta, docker image are unique
+            self.validate_meta_image(meta, validated_data['dock_image'])
+            meta_serializer = PluginMetaSerializer(meta, data=meta_data)
+        meta_serializer.is_valid(raise_exception=True)
+
+        # run all default validators for the full set of plugin fields
+        compute_resources = validated_data.pop('compute_names')
+        request_parameters = validated_data.pop('parameters')
+        new_plg_serializer = PluginSerializer(data=validated_data)
+        new_plg_serializer.validate = lambda x: x  # no need to rerun custom validation
+        new_plg_serializer.is_valid(raise_exception=True)
+
+        # validate all the plugin parameters and their default values
+        parameters_serializers = []
+        for request_param in request_parameters:
+            default = request_param.pop('default', None)
+            param_serializer = PluginParameterSerializer(data=request_param)
+            param_serializer.is_valid(raise_exception=True)
+            serializer_dict = {'serializer': param_serializer,
+                               'default_serializer': None}
+            if default is not None:
+                param_type = request_param['type']
+                default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[param_type](
+                    data={'value': default})
+                default_param_serializer.is_valid(raise_exception=True)
+                serializer_dict['default_serializer'] = default_param_serializer
+            parameters_serializers.append(serializer_dict)
+
+        # if no validation errors at this point then save everything to the DB!
+
+        validated_data = new_plg_serializer.validated_data
+        pl_meta = meta_serializer.save()
+        validated_data['meta'] = pl_meta
+
+        plugin = super(PluginSerializer, self).create(validated_data)
+        plugin.compute_resources.set(compute_resources)
+
+        for param_serializer_dict in parameters_serializers:
+            param = param_serializer_dict['serializer'].save(plugin=plugin)
+            if param_serializer_dict['default_serializer'] is not None:
+                param_serializer_dict['default_serializer'].save(plugin_param=param)
+        return plugin
+
+    def validate_compute_names(self, compute_names):
+        """
+        Overriden to validate that the compute resource names exist in the DB.
+        """
+        cr_l = []
+        for cr_name in compute_names.split(','):
+            cr_name = cr_name.strip()
+            if cr_name:
+                try:
+                    cr = ComputeResource.objects.get(name=cr_name)
+                except ComputeResource.DoesNotExist:
+                    raise serializers.ValidationError(
+                        [f"Compute resource '{cr_name}' does not exist"])
+                cr_l.append(cr)
+        if not cr_l:
+            raise serializers.ValidationError(
+                ['At least one valid compute resource name is required'])
+        return cr_l
 
     def validate(self, data):
         """
-        Overriden to validate and register a plugin from a ChRIS store with a compute
-        resource associated with this ChRIS instance.
+        Overriden to validate descriptors in the plugin app representation.
         """
-        # remove write_only fields that not part of the Plugin model
-        cr_name = data.pop('compute_name')
-        plugin_store_url = data.pop('plugin_store_url')
-        pl_manager = PluginManager()
-        try:
-            self.instance = pl_manager.register_plugin_by_url(plugin_store_url, cr_name)
-        except Exception as e:
-            raise serializers.ValidationError({'non_field_errors': [str(e)]})
+        app_repr = self.read_app_representation(data.pop('fname'))
+
+        # check for required descriptors in the app representation
+        self.check_required_descriptor(app_repr, 'name')
+        self.check_required_descriptor(app_repr, 'version')
+        self.check_required_descriptor(app_repr, 'dock_image')
+        self.check_required_descriptor(app_repr, 'execshell')
+        self.check_required_descriptor(app_repr, 'selfpath')
+        self.check_required_descriptor(app_repr, 'selfexec')
+        self.check_required_descriptor(app_repr, 'parameters')
+
+        self.validate_app_version(app_repr['version'])
+
+        # delete from the request those integer descriptors with an empty string or
+        # otherwise validate them
+        if ('min_number_of_workers' in app_repr) and (
+                app_repr['min_number_of_workers'] == ''):
+            del app_repr['min_number_of_workers']
+        elif 'min_number_of_workers' in app_repr:
+            app_repr['min_number_of_workers'] = self.validate_app_workers_descriptor(
+                app_repr['min_number_of_workers'])
+
+        if ('max_number_of_workers' in app_repr) and (
+                app_repr['max_number_of_workers'] == ''):
+            del app_repr['max_number_of_workers']
+        elif 'max_number_of_workers' in app_repr:
+            app_repr['max_number_of_workers'] = self.validate_app_workers_descriptor(
+                app_repr['max_number_of_workers'])
+
+        if ('min_gpu_limit' in app_repr) and (app_repr['min_gpu_limit'] == ''):
+            del app_repr['min_gpu_limit']
+        elif 'min_gpu_limit' in app_repr:
+            app_repr['min_gpu_limit'] = self.validate_app_gpu_descriptor(
+                app_repr['min_gpu_limit'])
+
+        if ('max_gpu_limit' in app_repr) and (app_repr['max_gpu_limit'] == ''):
+            del app_repr['max_gpu_limit']
+        elif 'max_gpu_limit' in app_repr:
+            app_repr['max_gpu_limit'] = self.validate_app_gpu_descriptor(
+                app_repr['max_gpu_limit'])
+
+        if ('min_cpu_limit' in app_repr) and (app_repr['min_cpu_limit'] == ''):
+            del app_repr['min_cpu_limit']
+        elif 'min_cpu_limit' in app_repr:
+            app_repr['min_cpu_limit'] = self.validate_app_cpu_descriptor(
+                app_repr['min_cpu_limit'])
+
+        if ('max_cpu_limit' in app_repr) and (app_repr['max_cpu_limit'] == ''):
+            del app_repr['max_cpu_limit']
+        elif 'max_cpu_limit' in app_repr:
+            app_repr['max_cpu_limit'] = self.validate_app_cpu_descriptor(
+                app_repr['max_cpu_limit'])
+
+        if ('min_memory_limit' in app_repr) and app_repr['min_memory_limit'] == '':
+            del app_repr['min_memory_limit']
+        elif 'min_memory_limit' in app_repr:
+            app_repr['min_memory_limit'] = self.validate_app_memory_descriptor(
+                app_repr['min_memory_limit'])
+
+        if ('max_memory_limit' in app_repr) and app_repr['max_memory_limit'] == '':
+            del app_repr['max_memory_limit']
+        elif 'max_memory_limit' in app_repr:
+            app_repr['max_memory_limit'] = self.validate_app_memory_descriptor(
+                app_repr['max_memory_limit'])
+
+        # validate limits
+        err_msg = 'The minimum number of workers should be less than the maximum.'
+        self.validate_app_descriptor_limits(app_repr, 'min_number_of_workers',
+                                            'max_number_of_workers', err_msg)
+
+        err_msg = 'Minimum cpu limit should be less than maximum cpu limit.'
+        self.validate_app_descriptor_limits(app_repr, 'min_cpu_limit',
+                                            'max_cpu_limit', err_msg)
+
+        err_msg = 'Minimum memory limit should be less than maximum memory limit.'
+        self.validate_app_descriptor_limits(app_repr, 'min_memory_limit',
+                                            'max_memory_limit', err_msg)
+
+        err_msg = 'Minimum gpu limit should be less than maximum gpu limit.'
+        self.validate_app_descriptor_limits(app_repr, 'min_gpu_limit',
+                                            'max_gpu_limit', err_msg)
+
+        # validate plugin parameters in the request data
+        app_repr['parameters'] = self.validate_app_parameters(app_repr['parameters'])
+
+        # update the request data
+        data.update(app_repr)
         return data
+
+    @staticmethod
+    def read_app_representation(representation_file):
+        """
+        Custom method to read the submitted plugin app representation file.
+        """
+        try:
+            app_repr = json.loads(representation_file.read().decode())
+            representation_file.seek(0)
+        except Exception:
+            raise serializers.ValidationError(
+                {'fname': ['Invalid json representation file.']})
+        return app_repr
+
+    @staticmethod
+    def check_required_descriptor(app_repr, descriptor_name):
+        """
+        Custom method to check that a required descriptor is in the plugin app
+        representation.
+        """
+        if not (descriptor_name in app_repr):
+            raise serializers.ValidationError(
+                {'fname': [f'Descriptor {descriptor_name} must be in the app '
+                                     f'representation dictionary.']})
+
+    @staticmethod
+    def validate_app_version(version):
+        """
+        Custom method to check that a proper version type and format has been submitted.
+        """
+        if not isinstance(version, str):
+            raise serializers.ValidationError(
+                {'fname': ['Invalid type for plugin app version field. Must be '
+                                     'a string.']})
+        if not re.match(r"^[0-9.]+$", version):
+            raise serializers.ValidationError(
+                {'fname': [f'Invalid plugin app version number format '
+                                     f'{version}.']})
+        return version
+
+    @staticmethod
+    def validate_meta_version(meta, version):
+        """
+        Custom method to check if plugin meta and version are unique together.
+        """
+        try:
+            Plugin.objects.get(meta=meta, version=version)
+        except ObjectDoesNotExist:
+            pass
+        else:
+            msg = f'Plugin with name {meta.name} and version {version} already exists.'
+            raise serializers.ValidationError({'non_field_errors': [msg]})
+
+    @staticmethod
+    def validate_meta_image(meta, dock_image):
+        """
+        Custom method to check if plugin meta and docker image are unique together.
+        """
+        try:
+            Plugin.objects.get(meta=meta, dock_image=dock_image)
+        except ObjectDoesNotExist:
+            pass
+        else:
+            raise serializers.ValidationError(
+                {'non_field_errors': [f'Docker image {dock_image} already used in a '
+                                      f'previous version of plugin {meta.name}. '
+                                      f'Please properly version the new image.']})
+
+    @staticmethod
+    def validate_app_parameters(parameter_list):
+        """
+        Custom method to validate plugin parameters.
+        """
+        for param in parameter_list:
+            if 'type' not in param:
+                raise serializers.ValidationError(
+                    {'fname': ['Parameter type is required.']})
+            # translate from back-end type to front-end type, eg. bool->boolean
+            param_type = [key for key in TYPES if TYPES[key] == param['type']]
+            if not param_type:
+                raise serializers.ValidationError(
+                    {'fname': ['Invalid parameter type %s.' % param['type']]})
+            param['type'] = param_type[0]
+            default = param['default'] if 'default' in param else None
+            optional = param['optional'] if 'optional' in param else None
+            if optional:
+                if param['type'] in ('path', 'unextpath'):
+                    raise serializers.ValidationError(
+                        {'fname': ["Parameters of type 'path' or 'unextpath' "
+                                             "cannot be optional."]})
+                if default is None:
+                    raise serializers.ValidationError(
+                        {'fname': ['A default value is required for optional '
+                                             'parameters.']})
+            elif 'ui_exposed' in param and not param['ui_exposed']:
+                raise serializers.ValidationError(
+                    {'fname': ['Any parameter that is not optional must be '
+                                         'exposed to the UI.']})
+            if param['type'] == 'boolean' and 'action' not in param:
+                param['action'] = 'store_false' if default else 'store_true'
+        return parameter_list
+
+    @staticmethod
+    def validate_app_workers_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum workers descriptors.
+        """
+        error_msg = 'Minimum and maximum number of workers must be positive integers.'
+        int_d = PluginAdminSerializer.validate_app_int_descriptor(descriptor, error_msg)
+        if int_d < 1:
+            raise serializers.ValidationError({'fname': [error_msg]})
+        return int_d
+
+    @staticmethod
+    def validate_app_cpu_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum cpu descriptors.
+        """
+        try:
+            return CPUInt(descriptor)
+        except ValueError as e:
+            raise serializers.ValidationError({'fname': [str(e)]})
+
+    @staticmethod
+    def validate_app_memory_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum memory descriptors.
+        """
+        try:
+            return MemoryInt(descriptor)
+        except ValueError as e:
+            raise serializers.ValidationError({'fname': [str(e)]})
+
+    @staticmethod
+    def validate_app_gpu_descriptor(descriptor):
+        """
+        Custom method to validate plugin maximum and minimum gpu descriptors.
+        """
+        error_msg = 'Minimum and maximum gpu must be non-negative integers.'
+        return PluginAdminSerializer.validate_app_int_descriptor(descriptor, error_msg)
+
+    @staticmethod
+    def validate_app_int_descriptor(descriptor, error_msg=''):
+        """
+        Custom method to validate a positive integer descriptor.
+        """
+        try:
+            int_d = int(descriptor)
+            assert int_d >= 0
+        except (ValueError, AssertionError):
+            raise serializers.ValidationError({'fname': [error_msg]})
+        return int_d
+
+    @staticmethod
+    def validate_app_descriptor_limits(app_repr, min_descriptor_name, max_descriptor_name,
+                                       error_msg=''):
+        """
+        Custom method to validate that a descriptor's minimum is smaller than its maximum.
+        """
+        if (min_descriptor_name in app_repr) and (max_descriptor_name in app_repr) \
+                and (app_repr[max_descriptor_name] < app_repr[min_descriptor_name]):
+            raise serializers.ValidationError({'fname': [error_msg]})
 
 
 class PluginAdminList(generics.ListCreateAPIView):
@@ -376,8 +729,28 @@ class PluginAdminList(generics.ListCreateAPIView):
                                               request=request)}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'plugin_store_url': '', 'compute_name': ''}
+        template_data = {'fname': '', 'compute_names': ''}
         return services.append_collection_template(response, template_data)
+
+
+class PluginAdminDetail(generics.RetrieveDestroyAPIView):
+    """
+    A JSON view for a plugin that can be used by ChRIS admins to delete the plugin
+    through a REST API.
+    """
+    http_method_names = ['get', 'delete']
+    serializer_class = PluginSerializer
+    queryset = Plugin.objects.all()
+    permission_classes = (permissions.IsAdminUser,)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to delete the associated plugin meta if this is the last plugin.
+        """
+        if instance.meta.plugins.count() == 1:
+            instance.meta.delete()  # the cascade deletes the plugin too
+        else:
+            instance.delete()
 
 
 admin.site.register(ComputeResource, ComputeResourceAdmin)

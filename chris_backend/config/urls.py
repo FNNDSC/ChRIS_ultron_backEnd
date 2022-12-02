@@ -26,9 +26,16 @@ urlpatterns = [
          plugin_admin_views.PluginAdminList.as_view(),
          name='admin-plugin-list'),
 
+    path('chris-admin/api/v1/<int:pk>/',
+         plugin_admin_views.PluginAdminDetail.as_view(), name='admin-plugin-detail'),
+
     path('chris-admin/api/v1/computeresources/',
          plugin_admin_views.ComputeResourceAdminList.as_view(),
          name='admin-computeresource-list'),
+
+    path('chris-admin/api/v1/computeresources/<int:pk>/',
+         plugin_admin_views.ComputeResourceAdminDetail.as_view(),
+         name='admin-computeresource-detail'),
 
     path('chris-admin/', admin.site.urls),
 
