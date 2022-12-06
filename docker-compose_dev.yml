@@ -28,6 +28,7 @@ services:
       - chris_store
     profiles:
       - tools
+
   chris_dev:
     image: ${CHRISREPO}/chris:dev
     build:
