@@ -61,7 +61,6 @@ class PluginMetaList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = PluginMeta.objects.all()
     serializer_class = PluginMetaSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -85,7 +84,6 @@ class PluginMetaListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginMetaSerializer
     queryset = PluginMeta.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginMetaFilter
 
 
@@ -96,7 +94,6 @@ class PluginMetaDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PluginMetaSerializer
     queryset = PluginMeta.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginMetaPluginList(generics.ListAPIView):
@@ -106,7 +103,6 @@ class PluginMetaPluginList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = PluginMeta.objects.all()
     serializer_class = PluginSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -135,7 +131,6 @@ class PluginList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -159,7 +154,6 @@ class PluginListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginFilter
 
 
@@ -199,7 +193,6 @@ class PluginDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PluginSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginParameterList(generics.ListAPIView):
@@ -209,7 +202,6 @@ class PluginParameterList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginParameterSerializer
     queryset = Plugin.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -238,4 +230,3 @@ class PluginParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PluginParameterSerializer
     queryset = PluginParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)

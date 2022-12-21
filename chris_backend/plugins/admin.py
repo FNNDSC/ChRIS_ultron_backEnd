@@ -749,7 +749,7 @@ class PluginAdminList(generics.ListCreateAPIView):
                                               request=request)}
         response = services.append_collection_links(response, links)
         # append write template
-        template_data = {'fname': '', 'compute_names': ''}
+        template_data = {'fname': '', 'compute_names': '', 'plugin_store_url': ''}
         return services.append_collection_template(response, template_data)
 
 

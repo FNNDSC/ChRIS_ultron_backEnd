@@ -128,9 +128,9 @@ class PipelineListViewTests(PipelineViewTests):
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "Pipeline1")
 
-    def test_pipeline_list_failure_unauthenticated(self):
+    def test_pipeline_list_success_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotContains(response, "Pipeline1")
 
 
 class PipelineListQuerySearchViewTests(PipelineViewTests):
@@ -155,9 +155,15 @@ class PipelineListQuerySearchViewTests(PipelineViewTests):
         self.assertContains(response, "Pipeline1")
         self.assertContains(response, "Pipeline2")
 
-    def test_plugin_list_query_search_failure_unauthenticated(self):
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    def test_plugin_list_query_search_success_unauthenticated(self):
+
+        owner = User.objects.get(username=self.username)
+        Pipeline.objects.get_or_create(name='Pipeline2', owner=owner,
+                                       category='test', locked=False)
+        list_url = reverse("pipeline-list-query-search") + '?category=test'
+        response = self.client.get(list_url)
+        self.assertNotContains(response, "Pipeline1")
+        self.assertContains(response, "Pipeline2")
 
 
 class PipelineDetailViewTests(PipelineViewTests):
@@ -178,7 +184,7 @@ class PipelineDetailViewTests(PipelineViewTests):
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "Pipeline1")
 
-    def test_pipeline_detail_failure_unauthenticated(self):
+    def test_pipeline_detail_locked_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -302,7 +308,7 @@ class PipelineDefaultParameterListViewTests(PipelineViewTests):
         self.assertContains(response, plugin_ds.meta.name)
         self.assertContains(response, 111111)
 
-    def test_pipeline_default_parameter_list_failure_unauthenticated(self):
+    def test_pipeline_default_parameter_list_failure_locked__unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 

@@ -79,11 +79,14 @@ class Pipeline(models.Model):
         accessible to a given user (not locked or otherwise own by the user).
         """
         queryset = Pipeline.objects.all()
-        # if the user is chris then return all the pipelines in the queryset
-        if user.username == 'chris':
-            return queryset
-        # construct the full lookup expression.
-        lookup = models.Q(locked=False) | models.Q(owner=user)
+        if user.is_authenticated:
+            # if the user is chris then return all the pipelines in the queryset
+            if user.username == 'chris':
+                return queryset
+            # construct the full lookup expression.
+            lookup = models.Q(locked=False) | models.Q(owner=user)
+        else:
+            lookup = models.Q(locked=False)
         return queryset.filter(lookup)
 
 
