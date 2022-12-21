@@ -130,9 +130,10 @@ class PluginMetaListViewTests(ViewTests):
         self.assertContains(response, 'simplecopyapp')
         self.assertContains(response, 'mri_convert')
 
-    def test_plugin_meta_list_failure_unauthenticated(self):
+    def test_plugin_meta_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, 'simplecopyapp')
+        self.assertContains(response, 'mri_convert')
 
 
 class PluginMetaListQuerySearchViewTests(ViewTests):
@@ -149,9 +150,9 @@ class PluginMetaListQuerySearchViewTests(ViewTests):
         response = self.client.get(self.list_url)
         self.assertContains(response, 'simplecopyapp')
 
-    def test_plugin_meta_list_query_search_failure_unauthenticated(self):
+    def test_plugin_meta_list_query_search_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, 'simplecopyapp')
 
 
 class PluginMetaPluginListViewTests(ViewTests):
@@ -171,9 +172,10 @@ class PluginMetaPluginListViewTests(ViewTests):
         self.assertContains(response, "simplecopyapp")
         self.assertNotContains(response, "mri_convert")  # plugin list is plugin meta-specific
 
-    def test_plugin_compute_resource_list_failure_unauthenticated(self):
+    def test_plugin_compute_resource_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "simplecopyapp")
+        self.assertNotContains(response, "mri_convert")
 
 
 class PluginMetaDetailViewTests(ViewTests):
@@ -192,9 +194,9 @@ class PluginMetaDetailViewTests(ViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, 'simplecopyapp')
 
-    def test_plugin_meta_detail_failure_unauthenticated(self):
+    def test_plugin_meta_detail_success_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, 'simplecopyapp')
 
 
 class PluginListViewTests(ViewTests):
@@ -212,9 +214,10 @@ class PluginListViewTests(ViewTests):
         self.assertContains(response, "simplecopyapp")
         self.assertContains(response, "mri_convert")
 
-    def test_plugin_list_failure_unauthenticated(self):
+    def test_plugin_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "simplecopyapp")
+        self.assertContains(response, "mri_convert")
 
 
 class PluginListQuerySearchViewTests(ViewTests):
@@ -232,9 +235,10 @@ class PluginListQuerySearchViewTests(ViewTests):
         self.assertContains(response, "simplecopyapp")
         self.assertNotContains(response, "mri_convert")
 
-    def test_plugin_list_query_search_failure_unauthenticated(self):
+    def test_plugin_list_query_search_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "simplecopyapp")
+        self.assertNotContains(response, "mri_convert")
 
 
 class PluginComputeResourceListViewTests(ViewTests):
@@ -277,9 +281,9 @@ class PluginDetailViewTests(ViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, "simplecopyapp")
 
-    def test_plugin_detail_failure_unauthenticated(self):
+    def test_plugin_detail_success_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "simplecopyapp")
 
 
 class PluginParameterListViewTests(ViewTests):
@@ -307,9 +311,10 @@ class PluginParameterListViewTests(ViewTests):
         self.assertContains(response, "img_type")
         self.assertContains(response, "prefix")
 
-    def test_plugin_parameter_list_failure_unauthenticated(self):
+    def test_plugin_parameter_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "img_type")
+        self.assertContains(response, "prefix")
 
 
 class PluginParameterDetailViewTests(ViewTests):
@@ -330,6 +335,8 @@ class PluginParameterDetailViewTests(ViewTests):
         self.assertContains(response, "default")
         self.assertContains(response, "./")
 
-    def test_plugin_parameter_detail_failure_unauthenticated(self):
+    def test_plugin_parameter_detail_success_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, "dir")
+        self.assertContains(response, "default")
+        self.assertContains(response, "./")
