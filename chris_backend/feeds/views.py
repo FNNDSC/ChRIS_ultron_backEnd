@@ -265,11 +265,10 @@ class TaggingDetail(generics.RetrieveDestroyAPIView):
 
 class FeedList(generics.ListAPIView):
     """
-    A view for the collection of feeds.
+    A view for the collection of feeds. This is also the API's "homepage".
     """
     http_method_names = ['get']
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         """
@@ -277,6 +276,8 @@ class FeedList(generics.ListAPIView):
         owned by the currently authenticated user.
         """
         user = self.request.user
+        if not user.is_authenticated:
+            return []
         # if the user is chris then return all the feeds in the system
         if user.username == 'chris':
             return Feed.objects.all()
@@ -287,14 +288,14 @@ class FeedList(generics.ListAPIView):
         Overriden to append document-level link relations.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('feed-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
-        user = self.request.user
         links = {'chrisinstance': reverse('chrisinstance-detail', request=request,
                                           kwargs={"pk": 1}),
-                 'admin': reverse('admin-plugin-list', request=request),
                  'files': reverse('allplugininstancefile-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request),
@@ -308,8 +309,13 @@ class FeedList(generics.ListAPIView):
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),
-                 'filebrowser': reverse('filebrowserpath-list', request=request),
-                 'user': reverse('user-detail', request=request, kwargs={"pk": user.id})}
+                 'filebrowser': reverse('filebrowserpath-list', request=request)}
+
+        user = self.request.user
+        if user.is_authenticated:
+            links['user'] = reverse('user-detail', request=request, kwargs={"pk": user.id})
+            if user.is_staff:
+                links['admin'] = reverse('admin-plugin-list', request=request)
         return services.append_collection_links(response, links)
 
 

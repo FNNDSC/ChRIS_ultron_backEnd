@@ -164,9 +164,10 @@ class FeedListViewTests(ViewTests):
         self.assertContains(response, "Feed1")
         self.assertContains(response, "Feed2")
 
-    def test_feed_list_failure_unauthenticated(self):
+    def test_feed_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotContains(response, "Feed1")
+        self.assertNotContains(response, "Feed2")
 
     def test_feed_list_from_other_users_not_listed(self):
         self.client.login(username=self.other_username, password=self.other_password)
