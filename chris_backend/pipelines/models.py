@@ -172,7 +172,7 @@ class PluginPiping(models.Model):
 
 
 class DefaultPipingStrParameter(models.Model):
-    value = models.CharField(max_length=600, null=True)
+    value = models.CharField(max_length=600, null=True, blank=True)
     plugin_piping = models.ForeignKey(PluginPiping, on_delete=models.CASCADE,
                                     related_name='string_param')
     plugin_param = models.ForeignKey(PluginParameter, on_delete=models.CASCADE,
