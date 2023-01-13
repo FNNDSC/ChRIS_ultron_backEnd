@@ -8,6 +8,7 @@ from rest_framework import serializers
 from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
+from plugininstances.models import STATUS_CHOICES
 from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
 from .models import Workflow
 
@@ -19,6 +20,14 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                                                        required=False)
     nodes_info = serializers.JSONField(write_only=True, default='[]')
     owner_username = serializers.ReadOnlyField(source='owner.username')
+    created_jobs = serializers.SerializerMethodField()
+    waiting_jobs = serializers.SerializerMethodField()
+    scheduled_jobs = serializers.SerializerMethodField()
+    started_jobs = serializers.SerializerMethodField()
+    registering_jobs = serializers.SerializerMethodField()
+    finished_jobs = serializers.SerializerMethodField()
+    errored_jobs = serializers.SerializerMethodField()
+    cancelled_jobs = serializers.SerializerMethodField()
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
     plugin_instances = serializers.HyperlinkedIdentityField(
@@ -28,6 +37,8 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         model = Workflow
         fields = ('url', 'id', 'creation_date', 'title', 'pipeline_id',
                   'pipeline_name', 'owner_username', 'previous_plugin_inst_id',
+                  'created_jobs', 'waiting_jobs', 'scheduled_jobs', 'started_jobs',
+                  'registering_jobs', 'finished_jobs', 'errored_jobs', 'cancelled_jobs',
                   'nodes_info', 'pipeline', 'plugin_instances')
 
     def create(self, validated_data):
@@ -186,3 +197,71 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'previous_plugin_inst_id': ["This field is required."]})
         return data
+
+    def get_created_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'created' status.
+        """
+        if 'created' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'created'.")
+        return obj.get_plugin_instances_status_count('created')
+
+    def get_waiting_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'waiting' status.
+        """
+        if 'waiting' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'waiting'."
+            raise KeyError(msg)
+        return obj.get_plugin_instances_status_count('waiting')
+
+    def get_scheduled_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'scheduled' status.
+        """
+        if 'scheduled' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'scheduled'.")
+        return obj.get_plugin_instances_status_count('scheduled')
+
+    def get_started_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'started' status.
+        """
+        if 'started' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'started'.")
+        return obj.get_plugin_instances_status_count('started')
+
+    def get_registering_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'registeringFiles' status.
+        """
+        if 'registeringFiles' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'registeringFiles'."
+            raise KeyError(msg)
+        return obj.get_plugin_instances_status_count('registeringFiles')
+
+    def get_finished_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'finishedSuccessfully' status.
+        """
+        if 'finishedSuccessfully' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: "
+                           "'finishedSuccessfully'.")
+        return obj.get_plugin_instances_status_count('finishedSuccessfully')
+
+    def get_errored_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'finishedWithError' status.
+        """
+        if 'finishedWithError' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: "
+                           "'finishedWithError'.")
+        return obj.get_plugin_instances_status_count('finishedWithError')
+
+    def get_cancelled_jobs(self, obj):
+        """
+        Overriden to get the number of plugin instances in 'cancelled' status.
+        """
+        if 'cancelled' not in [status[0] for status in STATUS_CHOICES]:
+            raise KeyError("Undefined plugin instance execution status: 'cancelled'.")
+        return obj.get_plugin_instances_status_count('cancelled')

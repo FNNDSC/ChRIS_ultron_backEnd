@@ -19,6 +19,13 @@ class Workflow(models.Model):
     def __str__(self):
         return self.title
 
+    def get_plugin_instances_status_count(self, status):
+        """
+        Custom method to get the number of associated plugin instances with a given
+        execution status.
+        """
+        return self.plugin_instances.filter(status=status).count()
+
 
 class WorkflowFilter(FilterSet):
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
