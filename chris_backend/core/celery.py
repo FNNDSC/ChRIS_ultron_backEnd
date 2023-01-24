@@ -40,15 +40,15 @@ app.conf.update(task_routes=task_routes)
 app.conf.beat_schedule = {
     'schedule-waiting-plugin-instances-every-45-seconds': {
         'task': 'plugininstances.tasks.schedule_waiting_plugin_instances',
-        'schedule': 45.0,
+        'schedule': settings.CUBE_CELERY_POLL_INTERVAL,
     },
     'check-started-plugin-instances-exec-status-every-30-seconds': {
         'task': 'plugininstances.tasks.check_started_plugin_instances_exec_status',
-        'schedule': 30.0,
+        'schedule': settings.CUBE_CELERY_POLL_INTERVAL,
     },
     'cancel-waiting-plugin-instances-every-30-seconds': {
         'task': 'plugininstances.tasks.cancel_waiting_plugin_instances',
-        'schedule': 30.0,
+        'schedule': settings.CUBE_CELERY_POLL_INTERVAL,
     },
 }
 

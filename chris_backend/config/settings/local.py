@@ -158,6 +158,9 @@ CELERY_TASK_SERIALIZER = 'json'
 # default is 4 (four messages for each process)
 CELERYD_PREFETCH_MULTIPLIER = 2
 
+# How often to check for plugin instance status changes
+# and schedule waiting plugin instances.
+CUBE_CELERY_POLL_INTERVAL = 5.0
 
 # LDAP auth configuration
 AUTH_LDAP = False
@@ -178,3 +181,4 @@ if AUTH_LDAP:
         'django_auth_ldap.backend.LDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )
+

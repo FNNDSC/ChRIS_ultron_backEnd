@@ -126,6 +126,9 @@ CELERY_TASK_SERIALIZER = 'json'
 # default is 4 (four messages for each process)
 CELERYD_PREFETCH_MULTIPLIER = 2
 
+# How often to check for plugin instance status changes
+# and schedule waiting plugin instances.
+CUBE_CELERY_POLL_INTERVAL = env.float('CUBE_CELERY_POLL_INTERVAL', 5.0)
 
 # REVERSE PROXY
 # ------------------------------------------------------------------------------
