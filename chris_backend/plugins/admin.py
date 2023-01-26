@@ -446,6 +446,15 @@ class PluginAdminSerializer(PluginSerializer):
         plugin.compute_resources.set(compute_resources)
         return plugin
 
+    def update(self, instance, validated_data):
+        """
+        Overriden to add modification date.
+        """
+        compute_resources = validated_data.pop('compute_names')
+        instance.compute_resources.set(compute_resources)
+        instance.save()
+        return super(PluginAdminSerializer, self).update(instance, validated_data)
+
     def validate_compute_names(self, compute_names):
         """
         Overriden to validate that the compute resource names exist in the DB.
@@ -469,100 +478,101 @@ class PluginAdminSerializer(PluginSerializer):
         """
         Overriden to validate descriptors in the plugin app representation.
         """
-        if 'fname' not in data and 'plugin_store_url' not in data:
-            raise serializers.ValidationError(
-                {'non_field_errors': ["At least one of the fields 'fname' "
-                                      "or 'plugin_store_url' must be provided."]})
+        if not self.instance:  # validation only runs for create not for update
+            if 'fname' not in data and 'plugin_store_url' not in data:
+                raise serializers.ValidationError(
+                    {'non_field_errors': ["At least one of the fields 'fname' "
+                                          "or 'plugin_store_url' must be provided."]})
 
-        fname = data.pop('fname', None)
-        if fname is not None:
-            app_repr = self.read_app_representation(fname)
+            fname = data.pop('fname', None)
+            if fname is not None:
+                app_repr = self.read_app_representation(fname)
 
-            # check for required descriptors in the app representation
-            self.check_required_descriptor(app_repr, 'name')
-            self.check_required_descriptor(app_repr, 'version')
-            self.check_required_descriptor(app_repr, 'dock_image')
-            self.check_required_descriptor(app_repr, 'execshell')
-            self.check_required_descriptor(app_repr, 'selfpath')
-            self.check_required_descriptor(app_repr, 'selfexec')
-            self.check_required_descriptor(app_repr, 'parameters')
+                # check for required descriptors in the app representation
+                self.check_required_descriptor(app_repr, 'name')
+                self.check_required_descriptor(app_repr, 'version')
+                self.check_required_descriptor(app_repr, 'dock_image')
+                self.check_required_descriptor(app_repr, 'execshell')
+                self.check_required_descriptor(app_repr, 'selfpath')
+                self.check_required_descriptor(app_repr, 'selfexec')
+                self.check_required_descriptor(app_repr, 'parameters')
 
-            self.validate_app_version(app_repr['version'])
+                self.validate_app_version(app_repr['version'])
 
-            # delete from the request those integer descriptors with an empty string or
-            # otherwise validate them
-            if ('min_number_of_workers' in app_repr) and (
-                    app_repr['min_number_of_workers'] == ''):
-                del app_repr['min_number_of_workers']
-            elif 'min_number_of_workers' in app_repr:
-                app_repr['min_number_of_workers'] = self.validate_app_workers_descriptor(
-                    app_repr['min_number_of_workers'])
+                # delete from the request those integer descriptors with an empty string or
+                # otherwise validate them
+                if ('min_number_of_workers' in app_repr) and (
+                        app_repr['min_number_of_workers'] == ''):
+                    del app_repr['min_number_of_workers']
+                elif 'min_number_of_workers' in app_repr:
+                    app_repr['min_number_of_workers'] = self.validate_app_workers_descriptor(
+                        app_repr['min_number_of_workers'])
 
-            if ('max_number_of_workers' in app_repr) and (
-                    app_repr['max_number_of_workers'] == ''):
-                del app_repr['max_number_of_workers']
-            elif 'max_number_of_workers' in app_repr:
-                app_repr['max_number_of_workers'] = self.validate_app_workers_descriptor(
-                    app_repr['max_number_of_workers'])
+                if ('max_number_of_workers' in app_repr) and (
+                        app_repr['max_number_of_workers'] == ''):
+                    del app_repr['max_number_of_workers']
+                elif 'max_number_of_workers' in app_repr:
+                    app_repr['max_number_of_workers'] = self.validate_app_workers_descriptor(
+                        app_repr['max_number_of_workers'])
 
-            if ('min_gpu_limit' in app_repr) and (app_repr['min_gpu_limit'] == ''):
-                del app_repr['min_gpu_limit']
-            elif 'min_gpu_limit' in app_repr:
-                app_repr['min_gpu_limit'] = self.validate_app_gpu_descriptor(
-                    app_repr['min_gpu_limit'])
+                if ('min_gpu_limit' in app_repr) and (app_repr['min_gpu_limit'] == ''):
+                    del app_repr['min_gpu_limit']
+                elif 'min_gpu_limit' in app_repr:
+                    app_repr['min_gpu_limit'] = self.validate_app_gpu_descriptor(
+                        app_repr['min_gpu_limit'])
 
-            if ('max_gpu_limit' in app_repr) and (app_repr['max_gpu_limit'] == ''):
-                del app_repr['max_gpu_limit']
-            elif 'max_gpu_limit' in app_repr:
-                app_repr['max_gpu_limit'] = self.validate_app_gpu_descriptor(
-                    app_repr['max_gpu_limit'])
+                if ('max_gpu_limit' in app_repr) and (app_repr['max_gpu_limit'] == ''):
+                    del app_repr['max_gpu_limit']
+                elif 'max_gpu_limit' in app_repr:
+                    app_repr['max_gpu_limit'] = self.validate_app_gpu_descriptor(
+                        app_repr['max_gpu_limit'])
 
-            if ('min_cpu_limit' in app_repr) and (app_repr['min_cpu_limit'] == ''):
-                del app_repr['min_cpu_limit']
-            elif 'min_cpu_limit' in app_repr:
-                app_repr['min_cpu_limit'] = self.validate_app_cpu_descriptor(
-                    app_repr['min_cpu_limit'])
+                if ('min_cpu_limit' in app_repr) and (app_repr['min_cpu_limit'] == ''):
+                    del app_repr['min_cpu_limit']
+                elif 'min_cpu_limit' in app_repr:
+                    app_repr['min_cpu_limit'] = self.validate_app_cpu_descriptor(
+                        app_repr['min_cpu_limit'])
 
-            if ('max_cpu_limit' in app_repr) and (app_repr['max_cpu_limit'] == ''):
-                del app_repr['max_cpu_limit']
-            elif 'max_cpu_limit' in app_repr:
-                app_repr['max_cpu_limit'] = self.validate_app_cpu_descriptor(
-                    app_repr['max_cpu_limit'])
+                if ('max_cpu_limit' in app_repr) and (app_repr['max_cpu_limit'] == ''):
+                    del app_repr['max_cpu_limit']
+                elif 'max_cpu_limit' in app_repr:
+                    app_repr['max_cpu_limit'] = self.validate_app_cpu_descriptor(
+                        app_repr['max_cpu_limit'])
 
-            if ('min_memory_limit' in app_repr) and app_repr['min_memory_limit'] == '':
-                del app_repr['min_memory_limit']
-            elif 'min_memory_limit' in app_repr:
-                app_repr['min_memory_limit'] = self.validate_app_memory_descriptor(
-                    app_repr['min_memory_limit'])
+                if ('min_memory_limit' in app_repr) and app_repr['min_memory_limit'] == '':
+                    del app_repr['min_memory_limit']
+                elif 'min_memory_limit' in app_repr:
+                    app_repr['min_memory_limit'] = self.validate_app_memory_descriptor(
+                        app_repr['min_memory_limit'])
 
-            if ('max_memory_limit' in app_repr) and app_repr['max_memory_limit'] == '':
-                del app_repr['max_memory_limit']
-            elif 'max_memory_limit' in app_repr:
-                app_repr['max_memory_limit'] = self.validate_app_memory_descriptor(
-                    app_repr['max_memory_limit'])
+                if ('max_memory_limit' in app_repr) and app_repr['max_memory_limit'] == '':
+                    del app_repr['max_memory_limit']
+                elif 'max_memory_limit' in app_repr:
+                    app_repr['max_memory_limit'] = self.validate_app_memory_descriptor(
+                        app_repr['max_memory_limit'])
 
-            # validate limits
-            err_msg = 'The minimum number of workers should be less than the maximum.'
-            self.validate_app_descriptor_limits(app_repr, 'min_number_of_workers',
-                                                'max_number_of_workers', err_msg)
+                # validate limits
+                err_msg = 'The minimum number of workers should be less than the maximum.'
+                self.validate_app_descriptor_limits(app_repr, 'min_number_of_workers',
+                                                    'max_number_of_workers', err_msg)
 
-            err_msg = 'Minimum cpu limit should be less than maximum cpu limit.'
-            self.validate_app_descriptor_limits(app_repr, 'min_cpu_limit',
-                                                'max_cpu_limit', err_msg)
+                err_msg = 'Minimum cpu limit should be less than maximum cpu limit.'
+                self.validate_app_descriptor_limits(app_repr, 'min_cpu_limit',
+                                                    'max_cpu_limit', err_msg)
 
-            err_msg = 'Minimum memory limit should be less than maximum memory limit.'
-            self.validate_app_descriptor_limits(app_repr, 'min_memory_limit',
-                                                'max_memory_limit', err_msg)
+                err_msg = 'Minimum memory limit should be less than maximum memory limit.'
+                self.validate_app_descriptor_limits(app_repr, 'min_memory_limit',
+                                                    'max_memory_limit', err_msg)
 
-            err_msg = 'Minimum gpu limit should be less than maximum gpu limit.'
-            self.validate_app_descriptor_limits(app_repr, 'min_gpu_limit',
-                                                'max_gpu_limit', err_msg)
+                err_msg = 'Minimum gpu limit should be less than maximum gpu limit.'
+                self.validate_app_descriptor_limits(app_repr, 'min_gpu_limit',
+                                                    'max_gpu_limit', err_msg)
 
-            # validate plugin parameters in the request data
-            app_repr['parameters'] = self.validate_app_parameters(app_repr['parameters'])
+                # validate plugin parameters in the request data
+                app_repr['parameters'] = self.validate_app_parameters(app_repr['parameters'])
 
-            # update the request data
-            data.update(app_repr)
+                # update the request data
+                data.update(app_repr)
         return data
 
     @staticmethod
@@ -753,15 +763,37 @@ class PluginAdminList(generics.ListCreateAPIView):
         return services.append_collection_template(response, template_data)
 
 
-class PluginAdminDetail(generics.RetrieveDestroyAPIView):
+class PluginAdminDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A JSON view for a plugin that can be used by ChRIS admins to delete the plugin
     through a REST API.
     """
-    http_method_names = ['get', 'delete']
-    serializer_class = PluginSerializer
+    http_method_names = ['get', 'put', 'delete']
+    serializer_class = PluginAdminSerializer
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAdminUser,)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to add a collection+json template to the response.
+        """
+        response = super(PluginAdminDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {'compute_names': ''}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove descriptors that are not allowed to be updated before
+        serializer validation.
+        """
+        data = self.request.data
+        data.pop('version', None)
+        data.pop('dock_image', None)
+        data.pop('execshell', None)
+        data.pop('selfpath', None)
+        data.pop('selfexec', None)
+        data.pop('plugin_store_url', None)
+        return super(PluginAdminDetail, self).update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         """

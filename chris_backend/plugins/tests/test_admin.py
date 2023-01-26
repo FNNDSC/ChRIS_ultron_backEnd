@@ -1133,33 +1133,54 @@ class PluginAdminDetailViewTests(PluginAdminFormTests):
         plugin.meta = pl_meta
         plugin.version = '0.1'
         plugin.save()
-        self.read_delete_url = reverse("admin-plugin-detail", kwargs={"pk": plugin.id})
+        self.read_update_delete_url = reverse("admin-plugin-detail",
+                                              kwargs={"pk": plugin.id})
+        self.put = json.dumps({"template": {"data": [{"name": "compute_names",
+                                                      "value": "host"}]}})
+        self.content_type = 'application/vnd.collection+json'
 
     def test_plugin_detail_success(self):
         self.client.login(username=self.admin_username, password=self.admin_password)
-        response = self.client.get(self.read_delete_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, 'mytestcopyapp')
 
     def test_plugin_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_delete_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_detail_failure_access_denied(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_delete_url)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_update_success(self):
+        self.client.login(username=self.admin_username, password=self.admin_password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_plugin_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_update_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_plugin_delete_success(self):
         self.client.login(username=self.admin_username, password=self.admin_password)
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Plugin.objects.count(), 0)
 
     def test_plugin_delete_failure_unauthenticated(self):
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_plugin_delete_failure_access_denied(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_delete_url)
+        response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
