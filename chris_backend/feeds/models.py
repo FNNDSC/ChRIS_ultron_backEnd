@@ -9,6 +9,7 @@ class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=200, blank=True, db_index=True)
+    public = models.BooleanField(blank=True, default=False, db_index=True)
     owner = models.ManyToManyField('auth.User', related_name='feed')
 
     class Meta:
@@ -65,7 +66,8 @@ class FeedFilter(FilterSet):
     class Meta:
         model = Feed
         fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
-                  'min_creation_date', 'max_creation_date', 'files_fname_icontains']
+                  'min_creation_date', 'max_creation_date', 'public',
+                  'files_fname_icontains']
 
     def filter_by_fname_icontains(self, queryset, name, value):
         """

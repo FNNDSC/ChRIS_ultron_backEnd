@@ -605,7 +605,9 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_plugin_instance_update_failure_unauthenticated(self):
-        response = self.client.put(self.read_update_delete_url, data={},
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Test instance"}]}})
+        response = self.client.put(self.read_update_delete_url, data=put,
                                    content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 

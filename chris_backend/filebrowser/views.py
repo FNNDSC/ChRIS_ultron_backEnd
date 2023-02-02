@@ -2,16 +2,19 @@
 import json
 
 from django.http import Http404
-from rest_framework import generics, permissions
+from rest_framework import generics
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.utils import filter_files_by_n_slashes
+from plugininstances.models import PluginInstanceFile
 from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
                           FileBrowserPathFileSerializer)
 from .services import (get_path_folders, get_path_file_queryset,
-                       get_path_file_model_class, get_shared_feed_creators_set)
+                       get_path_file_model_class, get_shared_feed_creators_set,
+                       get_unauthenticated_user_path_folders,
+                       get_unauthenticated_user_path_file_queryset)
 
 
 class FileBrowserPathList(generics.ListAPIView):
@@ -21,7 +24,6 @@ class FileBrowserPathList(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FileBrowserPathListSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -41,8 +43,12 @@ class FileBrowserPathList(generics.ListAPIView):
         path (empty path).
         """
         user = self.request.user
-        subfolders = ['SERVICES', user.username]
-        shared_feed_creators = get_shared_feed_creators_set(user)
+        if user.is_authenticated:
+            subfolders = ['SERVICES', user.username]
+            shared_feed_creators = get_shared_feed_creators_set(user)
+        else:
+            subfolders = []
+            shared_feed_creators = get_shared_feed_creators_set()
         for creator in shared_feed_creators:
             subfolders.append(creator.username)
         objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
@@ -55,7 +61,6 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
     The returned collection only has at most one element.
     """
     http_method_names = ['get']
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         """
@@ -65,14 +70,21 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         path = self.request.GET.get('path', '')
         path = path.strip('/')
         if not path:
-            subfolders = ['SERVICES', user.username]
-            shared_feed_creators = get_shared_feed_creators_set(user)
+            if user.is_authenticated:
+                subfolders = ['SERVICES', user.username]
+                shared_feed_creators = get_shared_feed_creators_set(user)
+            else:
+                subfolders = []
+                shared_feed_creators = get_shared_feed_creators_set()
             for creator in shared_feed_creators:
                 subfolders.append(creator.username)
             objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
         else:
             try:
-                subfolders = get_path_folders(path, user)  # already sorted
+                if user.is_authenticated:
+                    subfolders = get_path_folders(path, user)  # already sorted
+                else:
+                    subfolders = get_unauthenticated_user_path_folders(path)
             except ValueError:
                 objects = []
             else:
@@ -97,7 +109,6 @@ class FileBrowserPath(APIView):
     A file browser path view.
     """
     http_method_names = ['get']
-    permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         """
@@ -106,7 +117,10 @@ class FileBrowserPath(APIView):
         user = request.user
         path = kwargs.get('path')
         try:
-            subfolders = get_path_folders(path, user)  # already sorted
+            if user.is_authenticated:
+                subfolders = get_path_folders(path, user)  # already sorted
+            else:
+                subfolders = get_unauthenticated_user_path_folders(path)
         except ValueError:
             raise Http404('Not found.')
         object = {'path': path, 'subfolders': json.dumps(subfolders)}
@@ -132,7 +146,6 @@ class FileBrowserPathFileList(generics.ListAPIView):
     A view for the collection of a file browser path's files.
     """
     http_method_names = ['get']
-    permission_classes = (permissions.IsAuthenticated, )
 
     def get_queryset(self):
         """
@@ -141,7 +154,10 @@ class FileBrowserPathFileList(generics.ListAPIView):
         user = self.request.user
         path = self.kwargs.get('path')
         try:
-            qs = get_path_file_queryset(path, user)
+            if user.is_authenticated:
+                qs = get_path_file_queryset(path, user)
+            else:
+                qs = get_unauthenticated_user_path_file_queryset(path)
         except ValueError:
             raise Http404('Not found.')
         n_slashes = path.count('/') + 1
@@ -154,6 +170,9 @@ class FileBrowserPathFileList(generics.ListAPIView):
         """
         user = self.request.user
         path = self.kwargs.get('path')
-        model_class = get_path_file_model_class(path, user)
+        if user.is_authenticated:
+            model_class = get_path_file_model_class(path, user)
+        else:
+            model_class = PluginInstanceFile
         FileBrowserPathFileSerializer.Meta.model = model_class
         return FileBrowserPathFileSerializer

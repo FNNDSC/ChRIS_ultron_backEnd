@@ -87,6 +87,14 @@ urlpatterns = format_suffix_patterns([
         feed_views.TaggingDetail.as_view(), name='tagging-detail'),
 
 
+    path('v1/publicfeeds/',
+         feed_views.PublicFeedList.as_view(), name='publicfeed-list'),
+
+    path('v1/publicfeeds/search/',
+         feed_views.PublicFeedListQuerySearch.as_view(),
+         name='publicfeed-list-query-search'),
+
+
     path('v1/computeresources/',
          plugin_views.ComputeResourceList.as_view(), name='computeresource-list'),
 

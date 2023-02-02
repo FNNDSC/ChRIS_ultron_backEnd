@@ -16,8 +16,9 @@ from .models import BoolParameter, PathParameter, UnextpathParameter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializer
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
-from .permissions import (IsRelatedFeedOwnerOrChris, IsOwnerOrChrisOrReadOnly,
-                          IsOwnerOrReadOnly)
+from .permissions import (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
+                          IsOwnerOrReadOnly, IsRelatedFeedOwnerOrPublicReadOnlyOrChris,
+                          IsAuthenticatedReadOnlyOrPublicReadOnly)
 from .tasks import run_plugin_instance, cancel_plugin_instance
 from .utils import run_if_ready
 
@@ -160,7 +161,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -223,7 +224,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -331,7 +332,7 @@ class PluginInstanceFileList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginInstanceFileSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -415,7 +416,7 @@ class PluginInstanceFileDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     serializer_class = PluginInstanceFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
 
 
 class FileResource(generics.GenericAPIView):
@@ -425,7 +426,7 @@ class FileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = PluginInstanceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris,)
+    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
 
     def get(self, request, *args, **kwargs):
         """
@@ -442,7 +443,7 @@ class PluginInstanceParameterList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = GenericParameterSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -467,7 +468,7 @@ class StrParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StrParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
     
 
 class IntParameterDetail(generics.RetrieveAPIView):
@@ -477,7 +478,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['integer']
     queryset = IntParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
 
 
 class FloatParameterDetail(generics.RetrieveAPIView):
@@ -487,7 +488,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = FloatParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
     
 
 class BoolParameterDetail(generics.RetrieveAPIView):
@@ -497,7 +498,7 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
 
 
 class PathParameterDetail(generics.RetrieveAPIView):
@@ -507,7 +508,7 @@ class PathParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['path']
     queryset = PathParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
 
 
 class UnextpathParameterDetail(generics.RetrieveAPIView):
@@ -517,4 +518,4 @@ class UnextpathParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['unextpath']
     queryset = UnextpathParameter.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
