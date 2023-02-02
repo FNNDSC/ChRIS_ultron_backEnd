@@ -84,10 +84,6 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
                          sorted(['SERVICES', self.username, self.other_username]))
 
-    def test_filebrowserpath_list_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
 
 class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):
     """
@@ -110,10 +106,6 @@ class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, f'{self.username}/uploads')
         self.assertIn('myfolder', json.loads(response.data['results'][0]['subfolders']))
-
-    def test_filebrowserpath_list_query_search_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class FileBrowserPathViewTests(FileBrowserViewTests):
@@ -144,9 +136,9 @@ class FileBrowserPathViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url + 'unknownpath/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_filebrowserpath_failure_unauthenticated(self):
+    def test_filebrowserpath_failure__not_found_unauthenticated_user(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class FileBrowserPathFileListViewTests(FileBrowserViewTests):
@@ -190,7 +182,3 @@ class FileBrowserPathFileListViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url + 'unknownpath/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_filebrowserpathfile_list_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

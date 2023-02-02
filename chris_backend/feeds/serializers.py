@@ -112,7 +112,7 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
+        fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'public',
                   'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
                   'started_jobs', 'registering_jobs', 'finished_jobs', 'errored_jobs',
                   'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',

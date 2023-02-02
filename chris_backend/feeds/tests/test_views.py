@@ -330,11 +330,10 @@ class CommentListViewTests(ViewTests):
         self.assertContains(response, "Comment2")
         self.assertContains(response, "Comment3")
 
-    def test_comment_list_success_not_related_feed_owner(self):
+    def test_comment_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, "Comment2")
-        self.assertContains(response, "Comment3")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_comment_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)

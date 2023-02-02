@@ -14,8 +14,11 @@ from .models import Comment, CommentFilter
 from .models import Note, Tagging
 from .serializers import FeedSerializer, NoteSerializer
 from .serializers import TagSerializer, TaggingSerializer, CommentSerializer
-from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrReadOnly
-from .permissions import IsRelatedFeedOwnerOrChris, IsRelatedTagOwnerOrChris
+from .permissions import (IsOwnerOrChris, IsRelatedTagOwnerOrChris,
+                          IsFeedOwnerOrChrisOrPublicReadOnly,
+                          IsRelatedFeedOwnerOrPublicReadOnlyOrChris,
+                          IsOwnerOrChrisOrReadOnlyOrRelatedFeedPublicReadOnly,
+                          IsAuthenticatedOrRelatedFeedPublicReadOnly)
 
 
 class NoteDetail(generics.RetrieveUpdateAPIView):
@@ -25,7 +28,7 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
     http_method_names = ['get', 'put']
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
-    permission_classes = (permissions.IsAuthenticated, IsRelatedFeedOwnerOrChris)
+    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -285,7 +288,8 @@ class FeedList(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations.
+        Overriden to append document-level link relations and a query list to the
+        response.
         """
         response = super(FeedList, self).list(request, *args, **kwargs)
 
@@ -296,6 +300,7 @@ class FeedList(generics.ListAPIView):
         # append document-level link relations
         links = {'chrisinstance': reverse('chrisinstance-detail', request=request,
                                           kwargs={"pk": 1}),
+                 'public_feeds': reverse('publicfeed-list', request=request),
                  'files': reverse('allplugininstancefile-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request),
@@ -347,7 +352,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = Feed.objects.all()
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (IsFeedOwnerOrChrisOrPublicReadOnly,)
 
     def perform_update(self, serializer):
         """
@@ -375,8 +380,49 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"name": "", "owner": ""}
+        template_data = {"name": "", "public": "", "owner": ""}
         return services.append_collection_template(response, template_data)
+
+
+class PublicFeedList(generics.ListAPIView):
+    """
+    A view for the collection of public feeds.
+    """
+    http_method_names = ['get']
+    serializer_class = FeedSerializer
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the feeds
+        that are public.
+        """
+        return Feed.objects.filter(public=True)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append a query list to the response.
+        """
+        response = super(PublicFeedList, self).list(request, *args, **kwargs)
+
+        # append query list
+        query_list = [reverse('publicfeed-list-query-search', request=request)]
+        return services.append_collection_querylist(response, query_list)
+
+
+class PublicFeedListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of public feeds resulting from a query search.
+    """
+    http_method_names = ['get']
+    serializer_class = FeedSerializer
+    filterset_class = FeedFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the feeds
+        that are public.
+        """
+        return Feed.objects.filter(public=True)
 
 
 class CommentList(generics.ListCreateAPIView):
@@ -386,7 +432,7 @@ class CommentList(generics.ListCreateAPIView):
     http_method_names = ['get', 'post']
     queryset = Feed.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly)
+    permission_classes = (IsFeedOwnerOrChrisOrPublicReadOnly,)
 
     def perform_create(self, serializer):
         """
@@ -430,7 +476,7 @@ class CommentListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticatedOrRelatedFeedPublicReadOnly,)
     filterset_class = CommentFilter
 
     def get_queryset(self):
@@ -449,7 +495,7 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrReadOnlyOrRelatedFeedPublicReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -467,7 +513,7 @@ class FeedFileList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = Feed.objects.all()
     serializer_class = PluginInstanceFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (IsFeedOwnerOrChrisOrPublicReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -495,7 +541,7 @@ class FeedPluginInstanceList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = Feed.objects.all()
     serializer_class = PluginInstanceSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris,)
+    permission_classes = (IsFeedOwnerOrChrisOrPublicReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
