@@ -37,6 +37,7 @@ task_routes = {
 app.conf.update(task_routes=task_routes)
 
 
+# Note: django settings cannot be used here for not-understood module dependency resasons.
 POLL_INTERVAL = float(os.getenv('CUBE_CELERY_POLL_INTERVAL', '5.0'))
 """
 How often to poll for plugin instance status changes.
