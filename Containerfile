@@ -23,7 +23,7 @@ RUN yum update -y \
 && pip install --upgrade pip \
 && pip install -r ${REQPATH}/${ENVIRONMENT}.txt
 
-ENTRYPOINT ["/usr/src/podman-entrypoint.sh"]
+ENTRYPOINT ["/opt/app-root/src/podman-entrypoint.sh"]
 EXPOSE 8000
 
 # Start ChRIS production server
