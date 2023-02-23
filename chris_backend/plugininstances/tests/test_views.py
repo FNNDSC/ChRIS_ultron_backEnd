@@ -223,6 +223,73 @@ class PluginInstanceListViewTests(TasksViewTests):
             delay_mock.assert_not_called()
             self.assertEqual(response.data['status'], 'cancelled')
 
+    def test_ts_plugin_instance_create_success(self):
+        # Use existing 'fs' plugin instance
+        self.pl_inst.status = 'finishedSuccessfully'
+        self.pl_inst.save()
+
+        # create a new ds plugin instance to act as a parent
+        plugin_ds = Plugin.objects.get(meta__name='mri_convert')
+        user = User.objects.get(username=self.username)
+        (parent_plg_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin_ds, owner=user, previous=self.pl_inst,
+            compute_resource=plugin_ds.compute_resources.all()[0])
+
+        # now create and test a 'ts' plugin instance (has previous plugin instance)
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='ts_copy', type='ts')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+        PluginParameter.objects.get_or_create(plugin=plugin, name='plugininstances', type='string',
+                                              optional=True)
+        create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        post = json.dumps(
+            {"template": {"data": [{"name": "previous_id", "value": self.pl_inst.id},
+                                   {"name": "title", "value": "test_ts"},
+                                   {"name": "plugininstances",
+                                    "value": ','.join([str(self.pl_inst.id),
+                                                       str(parent_plg_inst.id)])}]}})
+
+        parent_plg_inst.status = 'finishedSuccessfully'
+        parent_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+            self.assertEqual(response.data['status'], 'scheduled')
+
+        parent_plg_inst.status = 'started'
+        parent_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was not called
+            delay_mock.assert_not_called()
+            self.assertEqual(response.data['status'], 'waiting')
+
+        parent_plg_inst.status = 'finishedWithError'
+        parent_plg_inst.save()
+        with mock.patch.object(views.run_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the run_plugin_instance task was not called
+            delay_mock.assert_not_called()
+            self.assertEqual(response.data['status'], 'cancelled')
+
     @tag('integration')
     def test_integration_plugin_instance_create_success(self):
 
