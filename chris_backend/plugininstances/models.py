@@ -177,6 +177,7 @@ class PluginInstanceFilter(FilterSet):
                                                lookup_expr='exact')
     feed_id = django_filters.CharFilter(field_name='feed_id', lookup_expr='exact')
     root_id = django_filters.CharFilter(method='filter_by_root_id')
+    previous_id = django_filters.CharFilter(method='filter_by_previous_id')
     plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
     pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
                                                  lookup_expr='exact')
@@ -191,9 +192,10 @@ class PluginInstanceFilter(FilterSet):
     class Meta:
         model = PluginInstance
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
-                  'max_end_date', 'root_id', 'title', 'status', 'owner_username',
-                  'feed_id', 'plugin_id', 'plugin_name', 'plugin_name_exact',
-                  'plugin_version', 'pipeline_inst_id', 'workflow_id']
+                  'max_end_date', 'root_id', 'previous_id', 'title', 'status',
+                  'owner_username', 'feed_id', 'plugin_id', 'plugin_name',
+                  'plugin_name_exact', 'plugin_version', 'pipeline_inst_id',
+                  'workflow_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """
@@ -212,6 +214,17 @@ class PluginInstanceFilter(FilterSet):
             filtered_list.append(visited.id)
         return PluginInstance.objects.filter(pk__in=filtered_list)
 
+    def filter_by_previous_id(self, queryset, name, value):
+        """
+        Custom method to return the plugin instances in a queryset with a common previous
+        plugin instance.
+        """
+        previous_queryset = queryset.filter(pk=value)
+        # check whether the previous id value is in the DB
+        if not previous_queryset.exists():
+            return previous_queryset
+        previous = previous_queryset.first()
+        return previous.next.all()
 
 class PluginInstanceLock(models.Model):
     plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE,
