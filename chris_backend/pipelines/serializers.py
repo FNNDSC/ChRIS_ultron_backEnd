@@ -1,5 +1,6 @@
 
 import json
+from collections import deque
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
@@ -350,6 +351,9 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                                                       plugin=root_plg)
         defaults = tree[root_ix]['plugin_parameter_defaults']
         root_plg_piping.save(parameter_defaults=defaults)
+
+        plg_pipings_dict = {root_ix: root_plg_piping}  # map from indices to pipings
+
         # breath-first traversal
         piping_queue = [root_plg_piping]
         ix_queue = [root_ix]
@@ -363,8 +367,20 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                                                          plugin=plg, previous=curr_piping)
                 defaults = tree[ix]['plugin_parameter_defaults']
                 plg_piping.save(parameter_defaults=defaults)
+                plg_pipings_dict[ix] = plg_piping
                 ix_queue.append(ix)
                 piping_queue.append(plg_piping)
+
+        # update the 'plugininstances' param with parent piping ids for any 'ts' piping
+        for plg_piping in plg_pipings_dict.values():
+            if plg_piping.plugin.meta.type == 'ts':
+                param = plg_piping.string_param.filter(
+                    plugin_param__name='plugininstances').first()
+                if param and param.value:
+                    parent_ixs = [int(parent_ix) for parent_ix in param.value.split(',')]
+                    parent_pip_ids = [str(plg_pipings_dict[ix].id) for ix in parent_ixs]
+                    param.value = ','.join(parent_pip_ids)
+                    param.save()
 
 
 class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):

@@ -473,6 +473,21 @@ class PipelineSerializerTests(SerializerTests):
         plugin_ds2.compute_resources.set([self.compute_resource])
         plugin_ds2.save()
 
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='ts_copy', type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+        # add a parameter with a default
+        (plg_param_ts, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ts,
+            name='plugininstances',
+            type='string',
+            optional=True
+        )
+        default = ""
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
+                                                  value=default)  # set plugin parameter default
+
         tree = [{"plugin_id": plugin_ds1.id,
                  "title": plugin_ds1.meta.name,
                  "plugin_parameter_defaults": [],
@@ -484,10 +499,28 @@ class PipelineSerializerTests(SerializerTests):
                 {"plugin_id": plugin_ds1.id,
                  "title": "piping1",
                  "plugin_parameter_defaults": [],
-                 "child_indices": []}]
+                 "child_indices": [3]},
+                {"plugin_id": plugin_ts.id,
+                 "title": "piping3",
+                 "plugin_parameter_defaults": [{'name': 'plugininstances', 'default': '1,2'}],
+                 "child_indices": [4]},
+                {"plugin_id": plugin_ds1.id,
+                 "title": "piping4",
+                 "plugin_parameter_defaults": [],
+                 "child_indices": []},
+                ]
         tree_dict = {'root_index': 0, 'tree': tree}
 
         pipeline_serializer._add_plugin_tree_to_pipeline(pipeline, tree_dict)
         pipeline_plg_names = [plugin.meta.name for plugin in pipeline.plugins.all()]
-        self.assertEqual(len(pipeline_plg_names), 3)
-        self.assertEqual(len([name for name in pipeline_plg_names if name == self.plugin_ds_name]), 2)
+        self.assertEqual(len(pipeline_plg_names), 5)
+        self.assertEqual(len([name for name in pipeline_plg_names if name ==
+                              self.plugin_ds_name]), 3)
+        self.assertEqual(1, pipeline.plugins.filter(meta__type='ts').count())
+
+        plg_pip_ids = [pip.id for pip in pipeline.plugin_pipings.all()]
+        ts_pip = pipeline.plugin_pipings.filter(plugin__meta__type='ts').first()
+        param = ts_pip.string_param.filter(plugin_param__name='plugininstances').first()
+        parent_ixs = [int(parent_ix) for parent_ix in param.value.split(',')]
+        for ix in parent_ixs:
+            self.assertIn(ix, plg_pip_ids)
