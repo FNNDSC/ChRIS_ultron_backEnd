@@ -259,19 +259,19 @@ To run only the Unit tests:
 
 ```bash
 cd ChRIS_ultron_backEnd
-docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --exclude-tag integration
+docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test --exclude-tag integration
 ```
 
 To run only the Integration tests:
 
 ```bash
-docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test --tag integration
+docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test --tag integration
 ```
 
 To run all the tests:
 
 ```bash
-docker-compose -f docker-compose_dev.yml exec chris_dev python manage.py test 
+docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test 
 ```
 
 After running the Integration tests the ``./CHRIS_REMOTE_FS`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
@@ -281,8 +281,8 @@ After running the Integration tests the ``./CHRIS_REMOTE_FS`` directory **must**
 Make sure the ``chris_backend/`` dir is world writable. Then type:
 
 ```bash
-docker-compose -f docker-compose_dev.yml exec chris_dev coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
-docker-compose -f docker-compose_dev.yml exec chris_dev coverage report
+docker compose -f docker-compose_dev.yml exec chris_dev coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
+docker compose -f docker-compose_dev.yml exec chris_dev coverage report
 ```
 
 #### Using [HTTPie](https://httpie.org/) client to play with the REST API 

@@ -460,16 +460,16 @@ windowBottom
 rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
                         "./docker-compose_dev.yml"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
-    echo "$ docker-compose -f docker-compose_dev.yml up -d --build" | ./boxes.sh LightCyan
+    echo "$ docker compose -f docker-compose_dev.yml up -d --build" | ./boxes.sh LightCyan
     windowBottom
-    docker-compose -f docker-compose_dev.yml up -d --build  >& dc.out
+    docker compose -f docker-compose_dev.yml up -d --build  >& dc.out
     dc_check $? "PRINT"
 windowBottom
 
 rm -f dc.out ; title -d 1 "Waiting until ChRIS database server is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker-compose -f docker-compose_dev.yml        \
+    docker compose -f docker-compose_dev.yml        \
         exec chris_dev_db sh -c                     \
         'while ! psql -U chris -d chris_dev -c "select 1" > dc.out 2> /dev/null; do sleep 5; done;'
     dc_check $? "PRINT"
@@ -481,7 +481,7 @@ windowBottom
 rm -f dc.out ; title -d 1 "Waiting until CUBE is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker-compose -f docker-compose_dev.yml        \
+    docker compose -f docker-compose_dev.yml        \
         exec chris_dev sh -c                        \
         'while ! curl -sSf http://localhost:8000/api/v1/users/ >/dev/null 2>/dev/null ; do sleep 5; done;' \
         > dc.out 2>&1
@@ -494,7 +494,7 @@ windowBottom
 rm -f dc.out ; title -d 1 "Waiting until remote pfcon is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker-compose -f docker-compose_dev.yml        \
+    docker compose -f docker-compose_dev.yml        \
         exec chris_dev sh -c                        \
         'while ! curl -sSf http://pfcon.remote:30005/api/v1/health/ 2> /dev/null; do
         sleep 5; done;' \
@@ -510,7 +510,7 @@ if (( ! b_skipUnitTests )) ; then
     rm -f dc.out ; title -d 1 "Running CUBE Unit tests"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker-compose -f docker-compose_dev.yml    \
+    docker compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
         test --exclude-tag integration
     status=$?
@@ -529,7 +529,7 @@ if (( ! b_skipIntegrationTests )) ; then
     rm -f dc.out ; title -d 1 "Running CUBE Integration tests"
     echo "This might take a while... please be patient."            | ./boxes.sh Yellow
     windowBottom
-    docker-compose -f docker-compose_dev.yml    \
+    docker compose -f docker-compose_dev.yml    \
         exec chris_dev python manage.py         \
         test --tag integration
     status=$?
@@ -545,7 +545,7 @@ if (( ! b_skipIntegrationTests )) ; then
 fi
 
 # Setup users and plugins
-docker-compose -f docker-compose_dev.yml run --rm chrisomatic
+docker compose -f docker-compose_dev.yml run --rm chrisomatic
 
 
 STEP=$(expr $STEP + 4 )
@@ -565,7 +565,7 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     STR3='", "previous_index": 0}]'
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
-    docker-compose -f docker-compose_dev.yml                        \
+    docker compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
         add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
     dc_check $? "PRINT"
@@ -581,7 +581,7 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     STR7='", "previous_index": 0}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom
-    docker-compose -f docker-compose_dev.yml                        \
+    docker compose -f docker-compose_dev.yml                        \
         exec chris_store python pipelines/services/manager.py       \
         add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
     dc_check $? "PRINT"
@@ -594,7 +594,7 @@ rm -f dc.out ; title -d 1 "Automatically creating a locked pipeline in CUBE"    
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
-    docker-compose -f docker-compose_dev.yml                        \
+    docker compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
                 cube "${PLUGIN_TREE}" >& dc.out
@@ -608,7 +608,7 @@ rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE" 
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom
-    docker-compose -f docker-compose_dev.yml                        \
+    docker compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
         cube "${PLUGIN_TREE}" --unlock >& dc.out
@@ -622,7 +622,7 @@ windowBottom
 #                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
 #     PLUGIN_TREE="[\n                {\n                    \"plugin_name\":      \"pl-simpledsapp\",\n                    \"plugin_version\":   \"2.0.2\",\n                    \"previous_index\":   null\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\",\n                            \"default\":  \"m:%_nospc|-_ProtocolName.jpg\"\n                            },\n                            {\n                            \"name\":     \"imageScale\",\n                            \"default\":  \"3:none\"\n                            },\n                            {\n                            \"name\":     \"outputFileStem\",\n                            \"default\":  \"PHI-tags\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagsub\",\n                    \"plugin_version\":   \"3.2.3\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"tagInfo\",\n                            \"default\":  \"PatientName,%_name|patientID_PatientName ++ PatientID,%_md5|7_PatientID ++ AccessionNumber,%_md5|8_AccessionNumber ++ PatientBirthDate,%_strmsk|******01_PatientBirthDate ++ re:.*hysician,%_md5|4_#tag ++ re:.*stitution,#tag ++ re:.*ddress,#tag\"\n                            },\n                            {\n                            \"name\":     \"splitKeyValue\",\n                            \"default\":  \",\"\n                            },\n                            {\n                            \"name\":     \"splitToken\",\n                            \"default\":  \"++\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   2,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\"]"
 #     windowBottom
-#     docker-compose -f docker-compose_dev.yml                        \
+#     docker compose -f docker-compose_dev.yml                        \
 #         exec chris_dev                                              \
 #         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
 #         cube "${PLUGIN_TREE}" --unlock >& dc.out
@@ -633,7 +633,7 @@ rm -f dc.out ; title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                 "Restarting" "chris_dev"                        | ./boxes.sh
     windowBottom
-    docker-compose -f docker-compose_dev.yml restart chris_dev >& dc.out
+    docker compose -f docker-compose_dev.yml restart chris_dev >& dc.out
     dc_check $?
 windowBottom
 

@@ -138,14 +138,14 @@ title -d 1 "Destroying CUBE containerized development environment" \
         boxcenter ""
         echo "Removing persistent volumes... please be patient."    | ./boxes.sh Yellow
         boxcenter ""
-        echo "$ docker-compose -f docker-compose_dev.yml down -v"   | ./boxes.sh LightCyan         
+        echo "$ docker compose -f docker-compose_dev.yml down -v"   | ./boxes.sh LightCyan
         windowBottom
-        docker-compose -f docker-compose_dev.yml down -v >& dc.out
+        docker compose -f docker-compose_dev.yml down -v >& dc.out
         dc_check $?
     else
         echo "Keeping persistent volumes... please be patient."     | ./boxes.sh Yellow
         windowBottom
-        docker-compose -f docker-compose_dev.yml down >& dc.out
+        docker compose -f docker-compose_dev.yml down >& dc.out
         dc_check $?
     fi
 windowBottom
