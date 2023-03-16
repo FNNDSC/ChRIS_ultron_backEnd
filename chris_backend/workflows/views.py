@@ -1,4 +1,6 @@
+
 from typing import List, Dict
+from collections import deque
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
@@ -28,7 +30,7 @@ class WorkflowList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         """
         Overriden to associate a pipeline with the newly created workflow before
-        first saving to the DB. All the pipeline instance's parameters in the request are
+        first saving to the DB. All the workflow's parameters in the request are
         parsed and properly saved to the DB with the corresponding plugin instances.
         """
         previous_plugin_inst = serializer.validated_data['previous_plugin_inst_id']
@@ -52,23 +54,38 @@ class WorkflowList(generics.ListCreateAPIView):
         root_id = pipings_tree['root_id']
         plugin_inst = self.create_plugin_inst(inst_data[root_id], previous_plugin_inst,
                                               workflow)
-        plugin_instances = [plugin_inst]
+
+        plugin_instances_dict = {root_id: plugin_inst}  # map from pip id to plg inst id
+
         # breath-first traversal
-        plugin_inst_queue = [plugin_inst]
-        pip_id_queue = [root_id]
+        plugin_inst_queue = deque()
+        plugin_inst_queue.append(plugin_inst)
+        pip_id_queue = deque()
+        pip_id_queue.append(root_id)
         while len(pip_id_queue):
-            curr_id = pip_id_queue.pop(0)
-            curr_plugin_inst = plugin_inst_queue.pop(0)
+            curr_id = pip_id_queue.popleft()
+            curr_plugin_inst = plugin_inst_queue.popleft()
             child_ids = tree[curr_id]['child_ids']
             for id in child_ids:
                 plugin_inst = self.create_plugin_inst(inst_data[id], curr_plugin_inst,
                                                       workflow)
-                plugin_instances.append(plugin_inst)
+                plugin_instances_dict[id] = plugin_inst
                 pip_id_queue.append(id)
                 plugin_inst_queue.append(plugin_inst)
 
-        # run plugin instances
-        for plg_inst in plugin_instances:
+        # update 'plugininstances' param with parent plg inst ids for any 'ts' plg inst
+        for plg_inst in plugin_instances_dict.values():
+            if plg_inst.plugin.meta.type == 'ts':
+                param = plg_inst.string_param.filter(
+                    plugin_param__name='plugininstances').first()
+                if param and param.value:
+                    parent_pip_ids = [int(pip_id) for pip_id in param.value.split(',')]
+                    parent_plg_inst_ids = [str(plugin_instances_dict[pip_id].id) for
+                                           pip_id in parent_pip_ids]
+                    param.value = ','.join(parent_plg_inst_ids)
+                    param.save()
+
+            # run plugin instance
             run_if_ready(plg_inst, plg_inst.previous)
 
     def list(self, request, *args, **kwargs):

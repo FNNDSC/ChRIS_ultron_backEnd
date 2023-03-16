@@ -326,11 +326,13 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         root_ix = tree_dict['root_index']
         tree = tree_dict['tree']
         num_nodes = len(tree)
+
         # breath-first traversal
         nodes = []
-        queue = [root_ix]
+        queue = deque()
+        queue.append(root_ix)
         while len(queue):
-            curr_ix = queue.pop(0)
+            curr_ix = queue.popleft()
             nodes.append(curr_ix)
             queue.extend(tree[curr_ix]['child_indices'])
         if len(nodes) < num_nodes:
@@ -355,11 +357,13 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         plg_pipings_dict = {root_ix: root_plg_piping}  # map from indices to pipings
 
         # breath-first traversal
-        piping_queue = [root_plg_piping]
-        ix_queue = [root_ix]
+        piping_queue = deque()
+        piping_queue.append(root_plg_piping)
+        ix_queue = deque()
+        ix_queue.append(root_ix)
         while len(piping_queue):
-            curr_ix = ix_queue.pop(0)
-            curr_piping = piping_queue.pop(0)
+            curr_ix = ix_queue.popleft()
+            curr_piping = piping_queue.popleft()
             for ix in tree[curr_ix]['child_indices']:
                 plg = Plugin.objects.get(pk=tree[ix]['plugin_id'])
                 title = tree[ix]['title']
