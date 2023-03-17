@@ -45,6 +45,7 @@ services:
     # pfcon shares the data) into the spawned container. This directory is passed in the
     # STOREBASE env variable.
     environment:
+      - STORAGE_TYPE=host
       - STOREBASE
       - SECRET_KEY="w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
       - CONTAINER_ENV=swarm
