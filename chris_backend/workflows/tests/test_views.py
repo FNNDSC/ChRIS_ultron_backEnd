@@ -9,7 +9,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 
-from pipelines.models import Pipeline, PluginPiping
+from pipelines.models import Pipeline, PluginPiping, DEFAULT_PIPING_PARAMETER_MODELS
 from plugininstances.models import PluginInstance
 from plugininstances.utils import run_plugin_instance
 from plugins.models import ComputeResource
@@ -46,11 +46,6 @@ class ViewTests(TestCase):
         plugin_fs.compute_resources.set([self.compute_resource])
         plugin_fs.save()
 
-        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
-        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
-        plugin_ds.compute_resources.set([self.compute_resource])
-        plugin_ds.save()
-
         # add plugins' parameters
         (plg_param_fs, tf) = PluginParameter.objects.get_or_create(
             plugin=plugin_fs,
@@ -60,6 +55,11 @@ class ViewTests(TestCase):
         default = self.plugin_fs_parameters['dir']['default']
         DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_fs,
                                                    value=default)  # set plugin parameter default
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ds_name, type='ds')
+        (plugin_ds, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ds.compute_resources.set([self.compute_resource])
+        plugin_ds.save()
 
         # add a parameter with a default
         (plg_param_ds, tf)= PluginParameter.objects.get_or_create(
@@ -72,6 +72,22 @@ class ViewTests(TestCase):
         DefaultIntParameter.objects.get_or_create(plugin_param=plg_param_ds,
                                                   value=default)  # set plugin parameter default
 
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='ts_copy', type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+
+        # add a parameter with a default
+        (plg_param_ts, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ts,
+            name='plugininstances',
+            type='string',
+            optional=True
+        )
+        default = ""
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
+                                                  value=default)  # set plugin parameter default
+
         # create user
         user = User.objects.create_user(username=self.username, password=self.password)
 
@@ -80,14 +96,22 @@ class ViewTests(TestCase):
         (pipeline, tf) = Pipeline.objects.get_or_create(name=self.pipeline_name,
                                                         owner=user, category='test')
 
-        # create two plugin pipings
+        # create three plugin pipings
         self.pips = []
-        (pip, tf) = PluginPiping.objects.get_or_create(title='pip1', plugin=plugin_ds,
+        (pip1, tf) = PluginPiping.objects.get_or_create(title='pip_ds1', plugin=plugin_ds,
                                                        pipeline=pipeline)
-        self.pips.append(pip)
-        (pip, tf) = PluginPiping.objects.get_or_create(title='pip2', plugin=plugin_ds,
-                                                       previous=pip, pipeline=pipeline)
-        self.pips.append(pip)
+        self.pips.append(pip1)
+        (pip2, tf) = PluginPiping.objects.get_or_create(title='pip_ds2', plugin=plugin_ds,
+                                                       previous=pip1, pipeline=pipeline)
+        self.pips.append(pip2)
+        (pip3, tf) = PluginPiping.objects.get_or_create(title='pip_ts', plugin=plugin_ts,
+                                                        previous=pip1, pipeline=pipeline)
+        self.pips.append(pip3)
+        default_model_class = DEFAULT_PIPING_PARAMETER_MODELS['string']
+        (default_piping_param, tf) = default_model_class.objects.get_or_create(
+                plugin_piping=pip3, plugin_param=plg_param_ts)
+        default_piping_param.value = f"{pip1.id},{pip2.id}"
+        default_piping_param.save()
 
         # create another user
         self.other_username = 'boo'
@@ -121,11 +145,13 @@ class WorkflowListViewTests(ViewTests):
             {"template": {"data": [{"name": "previous_plugin_inst_id", "value": self.pl_inst.id},
                                    {"name": "nodes_info",
                                     "value": json.dumps([{"piping_id": self.pips[0].id,
-                                           "compute_resource_name": "host", "title": "Inst1",
+                                           "compute_resource_name": "host", "title": "Inst_ds1",
                                            "plugin_parameter_defaults": [
                                                {"name": "dummyInt", "default": 3}]},
-                                          {"piping_id": self.pips[1].id,
-                                           "compute_resource_name": "host"}])}]}})
+                                          {"piping_id": self.pips[1].id, "title": "Inst_ds2",
+                                           "compute_resource_name": "host"},
+                                          {"piping_id": self.pips[2].id, "title": "Inst_ts",
+                                            "compute_resource_name": "host"}])}]}})
 
         plg_instances_count = PluginInstance.objects.count()
         with mock.patch.object(run_plugin_instance, 'delay',
@@ -134,7 +160,16 @@ class WorkflowListViewTests(ViewTests):
             response = self.client.post(self.create_read_url, data=post,
                                         content_type=self.content_type)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            self.assertEqual(PluginInstance.objects.count(), plg_instances_count + 2)
+            self.assertEqual(PluginInstance.objects.count(), plg_instances_count + 3)
+
+            inst_ds1 = PluginInstance.objects.get(title="Inst_ds1")
+            inst_ds2 = PluginInstance.objects.get(title="Inst_ds2")
+            inst_ts = PluginInstance.objects.get(title="Inst_ts")
+            param = inst_ts.string_param.filter(
+                plugin_param__name='plugininstances').first()
+            parent_ids = [int(parent_id) for parent_id in param.value.split(',')]
+            for inst_id in parent_ids:
+                self.assertIn(inst_id, [inst_ds1.id, inst_ds2.id])
 
     def test_workflow_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
