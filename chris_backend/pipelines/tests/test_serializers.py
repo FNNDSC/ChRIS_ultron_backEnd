@@ -30,6 +30,8 @@ class SerializerTests(TestCase):
         self.plugin_ds_name = "simpledsapp"
         self.plugin_ds_parameters = {'dummyInt': {'type': 'integer', 'optional': True,
                                                   'default': 111111}}
+        self.plugin_ts_name = "ts_copy"
+
         self.username = 'foo'
         self.password = 'foo-pass'
 
@@ -66,6 +68,22 @@ class SerializerTests(TestCase):
         )
         default = self.plugin_ds_parameters['dummyInt']['default']
         DefaultIntParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=default)  # set plugin parameter default
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ts_name, type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+
+        # add a parameter with a default
+        (plg_param_ts, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ts,
+            name='plugininstances',
+            type='string',
+            optional=True
+        )
+        default = ""
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
                                                   value=default)  # set plugin parameter default
 
         # create user
@@ -245,6 +263,25 @@ class PipelineSerializerTests(SerializerTests):
                 pipeline_serializer.validate_plugin_tree(tree)
                 validate_tree_mock.assert_called_with(tree_dict)
 
+    def test_validate_plugin_tree_raises_validation_error_if_validate_DAG_raises_value_error(self):
+        """
+        Test whether overriden validate_plugin_tree method raises ValidationError if
+        internal call to validate_DAG method raises ValueError exception.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "previous_index": null, ' \
+                '"title": "simpleds1"}, {"plugin_id": ' + str(plugin_ts.id) + '' \
+                ', "previous_index": 0, "title": "topo1", "plugin_parameter_defaults": ' \
+                '[{"name": "plugininstances", "default": "0,2"}]}]'
+        with mock.patch('pipelines.serializers.PipelineSerializer.validate_DAG') as validate_DAG_mock:
+            validate_DAG_mock.side_effect = ValueError
+            with self.assertRaises(serializers.ValidationError):
+                pipeline_serializer.validate_plugin_tree(tree)
+                validate_DAG_mock.assert_called_with(tree, [False, True])
+
     def test_validate_plugin_tree_raises_validation_error_if_missing_a_tree_title(self):
         """
         Test whether overriden validate_plugin_tree method raises ValidationError if
@@ -301,14 +338,22 @@ class PipelineSerializerTests(SerializerTests):
         'name' or 'default' properties are not included.
         """
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        prev_ix = 0
+        nplugin = 2
         parameter_defaults = [{'name': 'dummyInt'}]
         with self.assertRaises(serializers.ValidationError):
-            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, parameter_defaults)
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
         parameter_defaults = [{'default': 3}]
         with self.assertRaises(serializers.ValidationError):
-            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, parameter_defaults)
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
         parameter_defaults = [{'name': 'dummyInt', 'default': 3}]
-        PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, parameter_defaults)
+        PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, prev_ix,
+                                                              nplugin,
+                                                              parameter_defaults)
 
     def test_validate_plugin_parameter_defaults_raises_validation_error_if_parameter_not_found(self):
         """
@@ -316,9 +361,13 @@ class PipelineSerializerTests(SerializerTests):
         a parameter name is not found.
         """
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        prev_ix = 0
+        nplugin = 2
         parameter_defaults = [{'name': 'randomInt', 'default': 3}]
         with self.assertRaises(serializers.ValidationError):
-            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, parameter_defaults)
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
 
     def test_validate_plugin_parameter_defaults_raises_validation_error_if_invalid_default_value(self):
         """
@@ -326,9 +375,109 @@ class PipelineSerializerTests(SerializerTests):
         an invalid default value is provided for a parameter.
         """
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        prev_ix = 0
+        nplugin = 2
         parameter_defaults = [{'name': 'dummyInt', 'default': True}]
         with self.assertRaises(serializers.ValidationError):
-            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, parameter_defaults)
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ds, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+    def test_validate_plugin_parameter_defaults_raises_validation_error_if_invalid_ts_default_value(self):
+        """
+        Test whether custom validate_plugin_parameter_defaults method raises ValidationError if
+        an invalid default value is provided for the plugininstances parameter of a ts
+        plugin.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        prev_ix = 0
+        nplugin = 3
+
+        parameter_defaults = [{'name': 'plugininstances', 'default': '0,a'}]  # list with non-ints
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ts, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+
+        parameter_defaults = [{'name': 'plugininstances', 'default': '1'}]  # list doesn't include prev_ix
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ts, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+
+        parameter_defaults = [{'name': 'plugininstances', 'default': ''}]  # empty list doesn't include prev_ix
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ts, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+
+        parameter_defaults = [{'name': 'plugininstances', 'default': '0,3'}]  # list with out-of-range ints
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ts, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+        prev_ix = None
+        parameter_defaults = [{'name': 'plugininstances', 'default': '0'}]  # default must be the empty string
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer.validate_plugin_parameter_defaults(plugin_ts, prev_ix,
+                                                                  nplugin,
+                                                                  parameter_defaults)
+
+    def test_validate_DAG_raises_value_error_if_cycle_found(self):
+        """
+        Test whether custom validate_DAG method raises ValueError if an indices cycle
+        is found.
+        """
+        tree_list = [{'plugin_id': 4, 'previous_index': None, 'title': 'simpleds1',
+          'plugin_parameter_defaults': []},
+         {'plugin_id': 4, 'previous_index': 0, 'title': 'simpleds2',
+          'plugin_parameter_defaults': []},
+         {'plugin_id': 1, 'previous_index': 0, 'title': 'topo1',
+          'plugin_parameter_defaults': [{'name': 'plugininstances', 'default': '0,2'}]}]
+
+        plugin_is_ts_list = [False, False, True]
+
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        with self.assertRaises(ValueError):
+            pipeline_serializer.validate_DAG(tree_list, plugin_is_ts_list)
+
+    def test_validate_DAG(self):
+        """
+        Test whether custom validate_DAG method properly validates a pipeline without
+        cycles.
+        """
+        tree_list = [{'plugin_id': 4, 'previous_index': None, 'title': 'simpleds1',
+          'plugin_parameter_defaults': []},
+         {'plugin_id': 4, 'previous_index': 0, 'title': 'simpleds2',
+          'plugin_parameter_defaults': []},
+         {'plugin_id': 1, 'previous_index': 0, 'title': 'topo1',
+          'plugin_parameter_defaults': [{'name': 'plugininstances', 'default': '0,1'}]}]
+
+        plugin_is_ts_list = [False, False, True]
+
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        result = pipeline_serializer.validate_DAG(tree_list, plugin_is_ts_list)
+        self.assertIsNone(result)
+
+    def test_validate_DAG_first_plugin_ts_and_empty_string_default(self):
+        """
+        Test whether custom validate_DAG method properly validates a pipeline without
+        cycles where the first plugin is 'ts' and the default value of its
+        plugininstances parameter is the empty string.
+        """
+        tree_list = [{'plugin_id': 1, 'previous_index': None, 'title': 'topo1',
+                      'plugin_parameter_defaults': [{'name': 'plugininstances',
+                                                     'default': ''}]},
+                     {'plugin_id': 4, 'previous_index': 0, 'title': 'simpleds1',
+                      'plugin_parameter_defaults': []}]
+
+        plugin_is_ts_list = [True, False]
+
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        result = pipeline_serializer.validate_DAG(tree_list, plugin_is_ts_list)
+        self.assertIsNone(result)
 
     def test_get_tree(self):
         """
