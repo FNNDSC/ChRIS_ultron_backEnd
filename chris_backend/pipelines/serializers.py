@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
+from core.graph import Graph
 from collectionjson.fields import ItemLinkField
 from plugins.models import Plugin, TYPES
 from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
@@ -158,8 +159,9 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     def validate_plugin_tree(self, plugin_tree):
         """
         Overriden to validate the tree of plugin ids. It should be a list of dictionaries.
-        Each dictionary is a tree node containing the index of the previous node in the
-        list and either a plugin id or a plugin name and a plugin version.
+        Each dictionary is a tree node containing a unique title within the tree, the
+        index of the previous node in the list and either a plugin id or a plugin name
+        and a plugin version.
         """
         try:
             plugin_list = list(json.loads(plugin_tree))
@@ -170,21 +172,27 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         except Exception:
             msg = ["Invalid tree list in %s" % plugin_tree]
             raise serializers.ValidationError(msg)
-        if len(plugin_list) == 0:
+
+        nplugin = len(plugin_list)
+        if nplugin == 0:
             msg = ["Invalid empty list in %s" % plugin_tree]
             raise serializers.ValidationError(msg)
 
+        plugin_is_ts_list = []
         titles = []
         for d in plugin_list:
             try:
                 prev_ix = d['previous_index']
+                if prev_ix is not None:
+                    prev_ix = int(prev_ix)
+
                 if 'plugin_id' not in d:
                     plg_name = d['plugin_name']
                     plg_version = d['plugin_version']
                     plg = Plugin.objects.get(meta__name=plg_name, version=plg_version)
                     d['plugin_id'] = plg.id
                 else:
-                    plg_id = d['plugin_id']
+                    plg_id = int(d['plugin_id'])
                     plg = Plugin.objects.get(pk=plg_id)
             except ObjectDoesNotExist:
                 if 'plugin_id' not in d:
@@ -194,14 +202,17 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     msg = ["Couldn't find any plugin with id %s." % plg_id]
                 raise serializers.ValidationError(msg)
             except Exception:
-                msg = ["Object %s must be a JSON object with 'previous_index' and "
-                       "either 'plugin_id' or 'plugin_name' and 'plugin_version' "
-                       "properties." % d]
+                msg = ["Object %s must be a JSON object with 'previous_index' int and "
+                       "either 'plugin_id' int or 'plugin_name' and 'plugin_version' "
+                       "str properties." % d]
                 raise serializers.ValidationError(msg)
+
             if plg.meta.type == 'fs':
                 msg = ["Plugin %s is of type 'fs' and therefore can not be used to "
                        "create a pipeline." % plg]
                 raise serializers.ValidationError(msg)
+
+            plugin_is_ts_list.append(plg.meta.type == 'ts')
 
             title = d.get('title')
             if title is None:
@@ -218,14 +229,20 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 except serializers.ValidationError as e:
                     raise serializers.ValidationError([f'Invalid title: {title}, '
                                                        f'detail: {str(e)}'])
+
             if 'plugin_parameter_defaults' in d:
                 param_defaults = d['plugin_parameter_defaults']
-                PipelineSerializer.validate_plugin_parameter_defaults(plg, param_defaults)
+                PipelineSerializer.validate_plugin_parameter_defaults(plg, prev_ix,
+                                                                      nplugin,
+                                                                      param_defaults)
             else:
                 d['plugin_parameter_defaults'] = []
+
         try:
             tree_dict = PipelineSerializer.get_tree(plugin_list)
             PipelineSerializer.validate_tree(tree_dict)
+            if True in plugin_is_ts_list:
+                PipelineSerializer.validate_DAG(plugin_list, plugin_is_ts_list)
         except (ValueError, Exception) as e:
             raise serializers.ValidationError([str(e)])
         return tree_dict
@@ -245,7 +262,8 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         return locked
 
     @staticmethod
-    def validate_plugin_parameter_defaults(plugin, parameter_defaults):
+    def validate_plugin_parameter_defaults(plugin, previous_ix, nplugin,
+                                           parameter_defaults):
         """
         Custom method to validate the parameter names and their default values given
         for a plugin in the plugin tree.
@@ -259,17 +277,55 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 error_msg = "Invalid parameter default object %s. Each default object " \
                             "must have 'name' and 'default' properties." % d
                 raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
             param = [param for param in parameters if param.name == name]
             if not param:
                 error_msg = "Could not find any parameter with name %s for plugin %s." % \
                             (name, plugin.meta.name)
                 raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
             default_param_serializer = DEFAULT_PARAMETER_SERIALIZERS[param[0].type](
                 data={'value': default})
             if not default_param_serializer.is_valid():
                 error_msg = "Invalid default value %s for parameter %s for plugin %s." % \
                             (default, name, plugin.meta.name)
                 raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
+            if plugin.meta.type == 'ts' and name == 'plugininstances':
+                if previous_ix is None and default:
+                    error_msg = f"The plugininstances parameter's default must be " \
+                                f"the empty string for 'ts' plugins with null " \
+                                f"previous_index"
+                    raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
+                if previous_ix is not None and not default:
+                    error_msg = f"Invalid default value '{default}' for parameter " \
+                                f"{name} for plugin {plugin.meta.name}. Must " \
+                                f"contain previous_index."
+                    raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
+                if default:
+                    try:
+                        parent_ixs = [int(parent_ix) for parent_ix in default.split(',')]
+                    except ValueError:
+                        error_msg = f"The plugininstances value for plugin " \
+                                    f"{plugin.meta.name} must be a string " \
+                                    f"representing a comma-separated list of integers"
+                        raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
+                    if previous_ix not in parent_ixs:
+                        error_msg = f"Invalid default value '{default}' for parameter " \
+                                    f"{name} for plugin {plugin.meta.name}. Must " \
+                                    f"contain previous_index."
+                        raise serializers.ValidationError({'plugin_tree': [error_msg]})
+
+                    for ix in parent_ixs:
+                        if ix > nplugin - 1:
+                            error_msg = f"Invalid default value '{default}' for " \
+                                        f"parameter {name} for plugin " \
+                                        f"{plugin.meta.name}. Parent index {ix} is out " \
+                                        f"of range."
+                            raise serializers.ValidationError({'plugin_tree': [error_msg]})
 
     @staticmethod
     def get_tree(tree_list):
@@ -336,7 +392,39 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             nodes.append(curr_ix)
             queue.extend(tree[curr_ix]['child_indices'])
         if len(nodes) < num_nodes:
-            raise ValueError("Tree is not connected!")
+            raise ValueError("Pipeline's tree is not connected!")
+
+    @staticmethod
+    def validate_DAG(tree_list, plugin_is_ts_list):
+        """
+        Custom method to validate whether the represented DAG (Directed Acyclic Graph) in
+        tree_list doesn't have cycles.
+        """
+        nvert = len(tree_list)
+        g = Graph(nvert, directed=True)
+        root_vert = 1
+
+        for ix, d in enumerate(tree_list):
+            previous_ix = d['previous_index']
+            if previous_ix is None:
+                root_vert = ix + 1
+            else:
+                g.insert_edge(previous_ix+1, ix+1)  # graph's vertices are int >= 1
+
+            if plugin_is_ts_list[ix] and d['plugin_parameter_defaults']:
+                for default_d in d['plugin_parameter_defaults']:
+                    if default_d['name'] == 'plugininstances':
+                        default = default_d['default']
+                        if default:
+                            parent_ixs = [int(str_ix) for str_ix in default.split(',')]
+                            for p_ix in parent_ixs:
+                                if p_ix != previous_ix:
+                                    g.insert_edge(p_ix + 1, ix + 1)
+                        break
+        g.dfs(root_vert)
+        if g.cycle:
+            cycle = ','.join([str(vert-1) for vert in g.cycle])
+            raise ValueError(f"Pipeline's DAG has an indices cycle: {cycle}!")
 
     @staticmethod
     def _add_plugin_tree_to_pipeline(pipeline, tree_dict):
