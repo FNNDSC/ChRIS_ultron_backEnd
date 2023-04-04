@@ -138,7 +138,7 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
-    command: celery -A core beat -l info --pidfile /home/localuser/celerybeat.pid --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       - chris_dev_db
       - queue
