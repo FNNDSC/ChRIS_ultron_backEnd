@@ -36,6 +36,16 @@ class IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly(permissions.BasePerm
                                                                obj.feed.public)
 
 
+class IsNotDeleteFSPluginInstance(permissions.BasePermission):
+    """
+    Custom permission to only allow deleting a plugin instance if it is not of type
+    'fs'.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        return request.method != 'DELETE' or obj.plugin.meta.type != 'fs'
+
+
 class IsAuthenticatedReadOnlyOrPublicReadOnly(permissions.BasePermission):
     """
     Custom permission to allow read only access to authenticated users and to
