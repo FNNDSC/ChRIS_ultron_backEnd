@@ -688,10 +688,24 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_plugin_instance_delete_success(self):
+        user = User.objects.get(username=self.username)
+        # create two plugin instances
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        (fs_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+        (ds_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, previous=fs_inst,
+            compute_resource=plugin.compute_resources.all()[0])
+
+        url = reverse("plugininstance-detail", kwargs={"pk": ds_inst.id})
+        inst_count = PluginInstance.objects.count()
+
         self.client.login(username=self.username, password=self.password)
-        response = self.client.delete(self.read_update_delete_url)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(PluginInstance.objects.count(), 0)
+        self.assertEqual(PluginInstance.objects.count(), inst_count-1)
 
     def test_plugin_instance_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
@@ -699,6 +713,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
     def test_plugin_instance_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_instance_delete_failure_fs_plugin(self):
+        self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 

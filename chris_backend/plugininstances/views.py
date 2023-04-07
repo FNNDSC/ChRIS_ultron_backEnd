@@ -18,7 +18,8 @@ from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializ
 from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
 from .permissions import (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
                           IsOwnerOrReadOnly, IsRelatedFeedOwnerOrPublicReadOnlyOrChris,
-                          IsAuthenticatedReadOnlyOrPublicReadOnly)
+                          IsAuthenticatedReadOnlyOrPublicReadOnly,
+                          IsNotDeleteFSPluginInstance)
 from .tasks import run_plugin_instance, cancel_plugin_instance
 from .utils import run_if_ready
 
@@ -161,7 +162,8 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
+                          IsNotDeleteFSPluginInstance,)
 
     def retrieve(self, request, *args, **kwargs):
         """
