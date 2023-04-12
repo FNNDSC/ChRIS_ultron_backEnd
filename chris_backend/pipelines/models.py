@@ -1,4 +1,6 @@
 
+from collections import deque
+
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -42,6 +44,23 @@ class Pipeline(models.Model):
                                 for param in plg.parameters.all()])
         return param_names
 
+    def get_default_parameters(self):
+        """
+        Custom method to get the list of all the pipeline's plugin parameter default
+        values regardless of their type.
+        """
+        pipeline_default_parameters = []
+        pipeline_default_parameters.extend(list(DefaultPipingStrParameter.objects.filter(
+            plugin_piping__pipeline=self)))
+        pipeline_default_parameters.extend(list(DefaultPipingIntParameter.objects.filter(
+            plugin_piping__pipeline=self)))
+        pipeline_default_parameters.extend(
+            list(DefaultPipingFloatParameter.objects.filter(
+                plugin_piping__pipeline=self)))
+        pipeline_default_parameters.extend(list(DefaultPipingBoolParameter.objects.filter(
+            plugin_piping__pipeline=self)))
+        return pipeline_default_parameters
+
     def get_pipings_tree(self):
         """
         Custom method to return a dictionary containing a dictionary representing a tree
@@ -71,6 +90,76 @@ class Pipeline(models.Model):
         """
         for piping in self.plugin_pipings.all():
             piping.check_parameter_defaults()
+
+    def get_plugin_tree(self):
+        """
+        Custom method to return a list representation of the pipeline's plugin_tree.
+        """
+        pipeline_default_parameters = self.get_default_parameters()
+
+        tree_nodes_dict = {}
+        is_ts_dict = {}
+        for default_param in pipeline_default_parameters:
+            piping = default_param.plugin_piping
+            previous = piping.previous
+
+            if piping.id not in tree_nodes_dict:
+                tree_nodes_dict[piping.id] = {
+                    'plugin_id': piping.plugin.id,
+                    'previous_index': previous.id if previous is not None else None,
+                    'title': piping.title,
+                    'plugin_parameter_defaults': []
+                }
+                is_ts_dict[piping.id] = piping.plugin.meta.type == 'ts'
+
+            tree_nodes_dict[piping.id]['plugin_parameter_defaults'].append(
+                {
+                    'name': default_param.plugin_param.name,
+                    'default': default_param.value
+                }
+            )
+
+        root_pip_id = [pip_id for pip_id in tree_nodes_dict.keys()
+                       if tree_nodes_dict[pip_id]['previous_index'] is None][0]
+        tree = {root_pip_id: []}  # dict with list of child ids for each piping id
+
+        for pip_id in tree_nodes_dict.keys():
+            if pip_id not in tree:
+                tree[pip_id] = []
+                prev_pip_id = tree_nodes_dict[pip_id]['previous_index']
+                if prev_pip_id in tree:
+                    tree[prev_pip_id].append(pip_id)
+                else:
+                    tree[prev_pip_id] = [pip_id]
+
+        ix = 0
+        index = {root_pip_id: ix}  # mapping from piping id to index
+        plugin_tree = [tree_nodes_dict[root_pip_id]]
+        is_ts_list = [is_ts_dict[root_pip_id]]  # whether piping's plugin is of type 'ts'
+
+        # breath-first traversal of tree
+        queue = deque(tree[root_pip_id])
+        while len(queue):
+            curr_pip_id = queue.popleft()
+            previous_pip_id = tree_nodes_dict[curr_pip_id]['previous_index']
+            tree_nodes_dict[curr_pip_id]['previous_index'] = index[previous_pip_id]
+            ix += 1
+            index[curr_pip_id] = ix
+            plugin_tree.append(tree_nodes_dict[curr_pip_id])
+            is_ts_list.append(is_ts_dict[curr_pip_id])
+            queue.extend(tree[curr_pip_id])
+
+        for is_ts, tree_node in zip(is_ts_list, plugin_tree):
+            if is_ts:  # process 'ts' plugins
+                for param_default in tree_node['plugin_parameter_defaults']:
+                    if param_default['name'] == 'plugininstances':
+                        default = param_default['default']
+                        if default:
+                            parent_pip_ids = [int(pip_id) for pip_id in default.split(',')]
+                            parent_ixs = [str(index[pip_id]) for pip_id in parent_pip_ids]
+                            param_default['default'] = ','.join(parent_ixs)
+                        break
+        return plugin_tree
 
     @staticmethod
     def get_accesible_pipelines(user):

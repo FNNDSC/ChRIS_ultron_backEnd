@@ -155,6 +155,10 @@ urlpatterns = format_suffix_patterns([
         pipeline_views.PipelineDetail.as_view(),
         name='pipeline-detail'),
 
+    path('v1/pipelines/<int:pk>/json/',
+         pipeline_views.PipelineCustomJsonDetail.as_view(),
+         name='pipeline-customjson-detail'),
+
     path('v1/pipelines/<int:pk>/plugins/',
         pipeline_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
 

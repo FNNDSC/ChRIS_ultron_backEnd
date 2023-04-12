@@ -13,7 +13,7 @@ from plugins.models import ComputeResource
 from plugins.models import PluginParameter
 from plugins.models import DefaultStrParameter, DefaultBoolParameter
 from plugins.models import DefaultFloatParameter, DefaultIntParameter
-from pipelines.models import Pipeline, PluginPiping
+from pipelines.models import Pipeline, PluginPiping, DefaultPipingStrParameter
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -219,6 +219,68 @@ class PipelineDetailViewTests(PipelineViewTests):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PipelineCustomJsonDetailViewTests(PipelineViewTests):
+    """
+    Test the pipeline-customjson-detail view.
+    """
+
+    def setUp(self):
+        super(PipelineCustomJsonDetailViewTests, self).setUp()
+        pipeline = Pipeline.objects.get(name="Pipeline1")
+        self.read_url = reverse("pipeline-detail", kwargs={"pk": pipeline.id})
+
+    def test_pipeline_detail_success(self):
+        owner = User.objects.get(username=self.username)
+        # create a pipeline
+        (pipeline_ts, tf) = Pipeline.objects.get_or_create(name='Pipeline_ts',
+                                                        owner=owner, category='test')
+        plugin_ds1 = Plugin.objects.get(meta__name=self.plugin_ds_name)
+
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='ts_mycopy', type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+        # add a parameter with a default
+        (plg_param_ts, tf) = PluginParameter.objects.get_or_create(
+            plugin=plugin_ts,
+            name='plugininstances',
+            type='string',
+            optional=True
+        )
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
+                                                  value="")  # set plugin parameter default
+
+        # create plugin pipings
+        (pip_ds1, tf) = PluginPiping.objects.get_or_create(title='pip1',
+                                                           plugin=plugin_ds1,
+                                                           pipeline=pipeline_ts)
+        (pip_ds2, tf) = PluginPiping.objects.get_or_create(title='pip2',
+                                                           plugin=plugin_ds1,
+                                                           previous=pip_ds1,
+                                                           pipeline=pipeline_ts)
+        (pip_ts, tf) = PluginPiping.objects.get_or_create(title='pip3',
+                                                          plugin=plugin_ts,
+                                                          previous=pip_ds1,
+                                                          pipeline=pipeline_ts)
+        (default, tf) = DefaultPipingStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
+                                                                        plugin_piping=pip_ts)  # set piping's parameter default
+        default.value = f"{pip_ds1.id},{pip_ds2.id}"
+        default.save()
+
+        read_url = reverse("pipeline-customjson-detail", kwargs={"pk": pipeline_ts.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, "Pipeline_ts")
+        self.assertContains(response, "plugininstances")
+        self.assertContains(response, "0,")  # could be "0,1" or "0,2"
+
+    def test_pipeline_detail_locked_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 
 
 class PipelinePluginListViewTests(PipelineViewTests):

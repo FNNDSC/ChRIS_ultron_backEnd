@@ -153,10 +153,10 @@ class PipelineSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             pipeline_serializer.validate(data)
 
-    def test_validate_validates_all_defaults_can_be_defined_if_pipeline_unlocked(self):
+    def test_validate_validates_all_defaults_can_be_defined(self):
         """
         Test whether overriden validate method validates that all parameter defaults
-        for the pipeline can be defined if the pipeline is unlocked.
+        for the pipeline can be defined.
         """
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
         # add a parameter without a default
@@ -170,7 +170,7 @@ class PipelineSerializerTests(SerializerTests):
         plugin_tree = {'root_index': 0, 'tree': [{'plugin_id': plugin_ds.id,
                                                   'child_indices': [],
                                                   'plugin_parameter_defaults': []}]}
-        data = {'name': 'Pipeline2', 'owner': owner, 'plugin_tree': plugin_tree, 'locked': False}
+        data = {'name': 'Pipeline2', 'owner': owner, 'plugin_tree': plugin_tree}
         pipeline_serializer = PipelineSerializer(data=data)
         with self.assertRaises(serializers.ValidationError):
             pipeline_serializer.validate(data)

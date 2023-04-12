@@ -8,7 +8,8 @@ from plugins.serializers import PluginSerializer
 from .models import Pipeline, PipelineFilter, PluginPiping
 from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
 from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
-from .serializers import PipelineSerializer, PluginPipingSerializer
+from .serializers import (PipelineSerializer, PipelineCustomJsonSerializer,
+                          PluginPipingSerializer)
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .serializers import GenericDefaultPipingParameterSerializer
 from .permissions import IsChrisOrOwnerOrNotLockedReadOnly, IsChrisOrOwnerOrNotLocked
@@ -113,6 +114,16 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     #     return super(PipelineDetail, self).destroy(request, *args, **kwargs)
 
 
+class PipelineCustomJsonDetail(generics.RetrieveAPIView):
+    """
+    A pipeline with a custom JSON view resembling the originaly submitted pipeline data.
+    """
+    http_method_names = ['get']
+    queryset = Pipeline.objects.all()
+    serializer_class = PipelineCustomJsonSerializer
+    permission_classes = (IsChrisOrOwnerOrNotLockedReadOnly,)
+
+
 class PipelinePluginList(generics.ListAPIView):
     """
     A view for a pipeline-specific collection of plugins.
@@ -191,20 +202,11 @@ class PipelineDefaultParameterList(generics.ListAPIView):
 
     def get_default_parameters_queryset(self):
         """
-        Custom method to get a queryset with all the default parameters regardless their
-        type.
+        Custom method to get a queryset with all the default parameters regardless of
+        their type.
         """
         pipeline = self.get_object()
-        queryset = []
-        queryset.extend(list(DefaultPipingStrParameter.objects.filter(
-            plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultPipingIntParameter.objects.filter(
-            plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultPipingFloatParameter.objects.filter(
-            plugin_piping__pipeline=pipeline)))
-        queryset.extend(list(DefaultPipingBoolParameter.objects.filter(
-            plugin_piping__pipeline=pipeline)))
-        return self.filter_queryset(queryset)
+        return self.filter_queryset(pipeline.get_default_parameters())
 
 
 class PluginPipingDetail(generics.RetrieveAPIView):
