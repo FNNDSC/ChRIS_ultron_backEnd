@@ -119,9 +119,8 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'non_field_errors': ["At least one of the fields 'plugin_tree' "
                                           "or 'plugin_inst_id' must be provided."]})
-            if 'plugin_tree' in data and 'locked' in data and not data['locked']:
-                # if user wants to unlock pipeline right away at creation time then check
-                # that defaults for all plugin parameters can be defined
+            if 'plugin_tree' in data:
+                # check that defaults for all plugin parameters can be defined
                 tree = data['plugin_tree']['tree']
                 for node in tree:
                     plg = Plugin.objects.get(pk=node['plugin_id'])
@@ -134,10 +133,12 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                             param_default = [d for d in plg_param_defaults if
                                                   d['name'] == parameter.name]
                             if not param_default:  # no default provided by the user
-                                error_msg = 'Pipeline can not be unlocked until all ' \
-                                            'plugin parameters have default values.'
+                                error_msg = f"Missing default value for " \
+                                            f"parameter {parameter.name} for plugin " \
+                                            f"{plg}. Pipeline can not be created until " \
+                                            f"all plugin parameters have default values."
                                 raise serializers.ValidationError(
-                                    {'non_field_errors': [error_msg]})
+                                    {'plugin_tree': [error_msg]})
         return data
 
     def validate_plugin_inst_id(self, plugin_inst_id):
@@ -246,20 +247,6 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, Exception) as e:
             raise serializers.ValidationError([str(e)])
         return tree_dict
-
-    def validate_locked(self, locked):
-        """
-        Overriden to raise a validation error when the locked value is false and there
-        are plugin parameters in the pipeline without default values.
-        """
-        error_msg = 'Pipeline can not be unlocked until all plugin parameters have ' \
-                    'default values.'
-        if not locked and self.instance:  # this validation only happens on update
-            try:
-                self.instance.check_parameter_defaults()
-            except ValueError:
-                raise serializers.ValidationError([error_msg])
-        return locked
 
     @staticmethod
     def validate_plugin_parameter_defaults(plugin, previous_ix, nplugin,
@@ -474,6 +461,20 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     param.value = ','.join(parent_pip_ids)
                     param.save()
 
+
+class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
+    plugin_tree = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Pipeline
+        fields = ('url', 'name', 'locked', 'authors', 'category', 'description',
+                  'plugin_tree')
+
+    def get_plugin_tree(self, obj):
+        """
+        Overriden to get the plugin_tree JSON string.
+        """
+        return json.dumps(obj.get_plugin_tree())
 
 class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(
