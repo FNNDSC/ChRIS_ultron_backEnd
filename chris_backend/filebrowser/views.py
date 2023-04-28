@@ -44,10 +44,10 @@ class FileBrowserPathList(generics.ListAPIView):
         """
         user = self.request.user
         if user.is_authenticated:
-            subfolders = ['SERVICES', user.username]
+            subfolders = ['PIPELINES', 'SERVICES', user.username]
             shared_feed_creators = get_shared_feed_creators_set(user)
         else:
-            subfolders = []
+            subfolders = ['PIPELINES']
             shared_feed_creators = get_shared_feed_creators_set()
         for creator in shared_feed_creators:
             subfolders.append(creator.username)
@@ -71,10 +71,10 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         path = path.strip('/')
         if not path:
             if user.is_authenticated:
-                subfolders = ['SERVICES', user.username]
+                subfolders = ['PIPELINES', 'SERVICES', user.username]
                 shared_feed_creators = get_shared_feed_creators_set(user)
             else:
-                subfolders = []
+                subfolders = ['PIPELINES']
                 shared_feed_creators = get_shared_feed_creators_set()
             for creator in shared_feed_creators:
                 subfolders.append(creator.username)

@@ -57,7 +57,7 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, 'path')
         self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
-                         sorted(['SERVICES', self.username]))
+                         sorted(['PIPELINES', 'SERVICES', self.username]))
 
     def test_filebrowserpath_list_success_shared_feed(self):
         user = User.objects.create_user(username=self.other_username,
@@ -82,7 +82,8 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
         self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
-                         sorted(['SERVICES', self.username, self.other_username]))
+                         sorted(['PIPELINES', 'SERVICES', self.username,
+                                 self.other_username]))
 
 
 class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):

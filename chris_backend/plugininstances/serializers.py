@@ -352,7 +352,7 @@ def validate_paths(user, string):
             # trying to access the root of the storage
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
-        if path_parts[0] != user.username and path_parts[0] != 'SERVICES':
+        if path_parts[0] not in (user.username, 'SERVICES', 'PIPELINES'):
             if len(path_parts) == 1 or path_parts[1] == 'uploads':
                 # trying to access another user's root or personal space
                 raise serializers.ValidationError(

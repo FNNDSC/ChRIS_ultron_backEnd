@@ -1,19 +1,29 @@
 
+import logging
+
+from django.conf import settings
+from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
+from core.swiftmanager import SwiftManager
+from core.renderers import BinaryFileRenderer
 from collectionjson import services
 from plugins.serializers import PluginSerializer
 
-from .models import Pipeline, PipelineFilter, PluginPiping
-from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
-from .models import DefaultPipingIntParameter, DefaultPipingFloatParameter
+from .models import (Pipeline, PipelineFilter, PipelineSourceFile,
+                     PipelineSourceFileFilter, PluginPiping)
+from .models import (DefaultPipingBoolParameter, DefaultPipingStrParameter,
+                     DefaultPipingIntParameter, DefaultPipingFloatParameter)
 from .serializers import (PipelineSerializer, PipelineCustomJsonSerializer,
-                          PluginPipingSerializer)
+                          PipelineSourceFileSerializer, PluginPipingSerializer)
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .serializers import GenericDefaultPipingParameterSerializer
 from .permissions import IsChrisOrOwnerOrNotLockedReadOnly, IsChrisOrOwnerOrNotLocked
 from .permissions import IsChrisOrOwnerAndLockedOrNotLockedReadOnly
+
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineList(generics.ListCreateAPIView):
@@ -113,15 +123,96 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     #         return Response(status=status.HTTP_304_NOT_MODIFIED)
     #     return super(PipelineDetail, self).destroy(request, *args, **kwargs)
 
+    def perform_destroy(self, instance):
+        """
+        Overriden to delete the pipeline's source file from swift storage.
+        """
+        swift_path = ''
+        if hasattr(instance, 'source_file'):
+            swift_path = instance.source_file.fname.name
+        instance.delete()
+        if swift_path:
+            swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                                         settings.SWIFT_CONNECTION_PARAMS)
+            try:
+                swift_manager.delete_obj(swift_path)
+            except Exception as e:
+                logger.error('Swift storage error, detail: %s' % str(e))
+
 
 class PipelineCustomJsonDetail(generics.RetrieveAPIView):
     """
-    A pipeline with a custom JSON view resembling the originaly submitted pipeline data.
+    A pipeline with a custom JSON view resembling the originally submitted pipeline data.
     """
     http_method_names = ['get']
     queryset = Pipeline.objects.all()
     serializer_class = PipelineCustomJsonSerializer
     permission_classes = (IsChrisOrOwnerOrNotLockedReadOnly,)
+
+
+class PipelineSourceFileList(generics.ListCreateAPIView):
+    """
+    A view for the collection of pipeline source files.
+    """
+    http_method_names = ['get', 'post']
+    queryset = PipelineSourceFile.objects.all()
+    serializer_class = PipelineSourceFileSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate an owner with the pipeline source file before first
+        saving to the DB.
+        """
+        serializer.save(owner=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append document-level link relations and a collection+json
+        template to the response.
+        """
+        response = super(PipelineSourceFileList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('pipelinesourcefile-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append write template
+        template_data = {'fname': ''}
+        return services.append_collection_template(response, template_data)
+
+
+class PipelineSourceFileListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of pipeline source files resulting from a query search.
+    """
+    http_method_names = ['get']
+    serializer_class = PipelineSourceFileSerializer
+    queryset = PipelineSourceFile.objects.all()
+    filterset_class = PipelineSourceFileFilter
+
+
+class PipelineSourceFileDetail(generics.RetrieveAPIView):
+    """
+    A pipeline source file view.
+    """
+    http_method_names = ['get']
+    queryset = PipelineSourceFile.objects.all()
+    serializer_class = PipelineSourceFileSerializer
+
+
+class PipelineSourceFileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a pipeline's source file resource.
+    """
+    http_method_names = ['get']
+    queryset = PipelineSourceFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Overriden to be able to make a GET request to an actual file resource.
+        """
+        source_file = self.get_object()
+        return FileResponse(source_file.fname)
 
 
 class PipelinePluginList(generics.ListAPIView):
