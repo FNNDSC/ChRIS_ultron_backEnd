@@ -6,6 +6,7 @@ from servicefiles.models import ServiceFile
 from pacsfiles.models import PACSFile
 from uploadedfiles.models import UploadedFile
 from plugininstances.models import PluginInstanceFile
+from pipelines.models import PipelineSourceFile
 
 
 def get_path_file_model_class(path, username):
@@ -13,7 +14,9 @@ def get_path_file_model_class(path, username):
     Convenience function to get the file model class associated to a path.
     """
     model_class = PluginInstanceFile
-    if path.startswith('SERVICES/PACS'):
+    if path.split('/', 1)[0] == 'PIPELINES':
+        model_class = PipelineSourceFile
+    elif path.startswith('SERVICES/PACS'):
         model_class = PACSFile
     elif path.split('/', 1)[0] == 'SERVICES':
         model_class = ServiceFile
@@ -71,7 +74,8 @@ def get_path_file_queryset(path, user):
         try:
             qs[0]
         except IndexError:
-            if path not in ('SERVICES', 'SERVICES/PACS', username, f'{username}/uploads'):
+            if path not in ('PIPELINES', 'SERVICES', 'SERVICES/PACS', username,
+                            f'{username}/uploads'):
                 raise ValueError('Path not found.')
     return qs
 
@@ -82,6 +86,8 @@ def get_unauthenticated_user_path_file_queryset(path):
     users. Raises ValueError if the path is not found.
     """
     path_username = path.split('/', 1)[0]
+    if path_username == 'PIPELINES':
+        return PipelineSourceFile.objects.filter(fname__startswith=path)
     public_feed_user = None
     public_feed_creators = get_shared_feed_creators_set()
     for feed_creator in public_feed_creators:
@@ -152,8 +158,9 @@ def get_unauthenticated_user_path_folders(path):
     users.
     """
     qs = get_unauthenticated_user_path_file_queryset(path)
+    path_username = path.split('/', 1)[0]
 
-    if path.split('/', 1)[0] == path:
+    if path_username == path and path_username != 'PIPELINES':
             shared_feeds_qs = Feed.objects.filter(owner__username=path).filter(public=True)
             subfolders = sorted([f'feed_{feed.id}' for feed in shared_feeds_qs])
     else:

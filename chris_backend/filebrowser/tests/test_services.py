@@ -9,6 +9,7 @@ from servicefiles.models import ServiceFile, Service
 from pacsfiles.models import PACSFile
 from uploadedfiles.models import UploadedFile
 from plugininstances.models import PluginInstanceFile
+from pipelines.models import PipelineSourceFile
 from filebrowser import services
 
 
@@ -37,6 +38,10 @@ class ServiceTests(TestCase):
         model class associated to a path.
         """
         username = self.username
+
+        path = 'PIPELINES'
+        model_class = services.get_path_file_model_class(path, username)
+        self.assertEqual(model_class, PipelineSourceFile)
 
         path = 'SERVICES/PACS'
         model_class = services.get_path_file_model_class(path, username)
@@ -79,8 +84,8 @@ class ServiceTests(TestCase):
 
     def test_get_path_folders(self):
         """
-        Test whether services.get_path_folders function appends a collection+json
-        template to its response argument
+        Test whether services.get_path_folders function correctly returns a path's
+        list of folders.
         """
         username = self.username
         user = User.objects.get(username=self.username)

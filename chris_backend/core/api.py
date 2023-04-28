@@ -159,6 +159,22 @@ urlpatterns = format_suffix_patterns([
          pipeline_views.PipelineCustomJsonDetail.as_view(),
          name='pipeline-customjson-detail'),
 
+    path('v1/pipelines/sourcefiles/',
+         pipeline_views.PipelineSourceFileList.as_view(),
+         name='pipelinesourcefile-list'),
+
+    path('v1/pipelines/sourcefiles/search/',
+         pipeline_views.PipelineSourceFileListQuerySearch.as_view(),
+         name='pipelinesourcefile-list-query-search'),
+
+    path('v1/pipelines/sourcefiles/<int:pk>/',
+         pipeline_views.PipelineSourceFileDetail.as_view(),
+         name='pipelinesourcefile-detail'),
+
+    re_path(r'^v1/pipelines/sourcefiles/(?P<pk>[0-9]+)/.*$',
+            pipeline_views.PipelineSourceFileResource.as_view(),
+            name='pipelinesourcefile-resource'),
+
     path('v1/pipelines/<int:pk>/plugins/',
         pipeline_views.PipelinePluginList.as_view(), name='pipeline-plugin-list'),
 

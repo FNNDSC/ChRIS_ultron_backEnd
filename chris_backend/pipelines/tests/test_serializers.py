@@ -1,5 +1,8 @@
 
 import logging
+import io
+import json
+import yaml
 from unittest import mock
 
 from django.test import TestCase
@@ -12,7 +15,7 @@ from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from pipelines.models import Pipeline
-from pipelines.serializers import PipelineSerializer
+from pipelines.serializers import PipelineSerializer, PipelineSourceFileSerializer
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -673,3 +676,150 @@ class PipelineSerializerTests(SerializerTests):
         parent_ixs = [int(parent_ix) for parent_ix in param.value.split(',')]
         for ix in parent_ixs:
             self.assertIn(ix, plg_pip_ids)
+
+class PipelineSourceFileSerializerTests(SerializerTests):
+
+    def setUp(self):
+        super(PipelineSourceFileSerializerTests, self).setUp()
+        self.pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp v0.1
+          previous: ~
+        - title: simpledsapp2
+          plugin: simpledsapp v0.1
+          previous: simpledsapp1
+        - title: join
+          plugin: ts_copy v0.1
+          previous: simpledsapp1
+          plugin_parameter_defaults:
+            plugininstances: simpledsapp1, simpledsapp2
+        """
+
+    def test_read_pipeline_representation(self):
+        """
+        Test whether custom read_pipeline_representation method returns an appropriate
+        yaml pipeline representation from an uploaded yaml representation file.
+        """
+        pipeline_repr = yaml.safe_load(self.pipeline_str)
+        with io.BytesIO(self.pipeline_str.encode()) as f:
+            self.assertEqual(PipelineSourceFileSerializer.read_pipeline_representation(f),
+                             pipeline_repr)
+
+    def test_read_pipeline_representation_raises_validation_error_if_invalid_yaml_file(self):
+        """
+        Test whether custom read_pipeline_representation method raises ValidationError if
+        uploaded yaml representation file is invalid.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp v0.1
+          previous: ~
+          - title: simpledsapp2
+          plugin: simpledsapp v0.1
+          previous: simpledsapp1
+        """
+        with self.assertRaises(serializers.ValidationError):
+            with io.BytesIO(pipeline_str.encode()) as f:
+                PipelineSourceFileSerializer.read_pipeline_representation(f)
+
+    def test_get_pipeline_canonical_representation(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method returns an
+        appropriate canonical JSON pipeline representation from the yaml representation.
+        """
+        pipeline_repr = yaml.safe_load(self.pipeline_str)
+        canonical_repr = {'name': 'TestPipeline',
+                          'locked': False,
+                          'plugin_tree': '[{"title": "simpledsapp1", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous_index": null}, '
+                                         '{"title": "simpledsapp2", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous_index": 0}, '
+                                         '{"title": "join", "plugin_name": "ts_copy", "plugin_version": "0.1", "previous_index": 0, '
+                                         '"plugin_parameter_defaults": [{"name": "plugininstances", "default": "0,1"}]}]'}
+        self.assertEqual(PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr), canonical_repr)
+
+    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_node_title(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method raises
+        ValidationError if a node is missing its title.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - plugin: simpledsapp v0.1
+          previous: ~
+        """
+        pipeline_repr = yaml.safe_load(pipeline_str)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+
+    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_node_plugin(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method raises
+        ValidationError if a node is missing its plugin.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          previous: ~
+        """
+        pipeline_repr = yaml.safe_load(pipeline_str)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+
+    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_plugin_name_or_version(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method raises
+        ValidationError if a node is missing its plugin name or version.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp 
+          previous: ~
+        """
+        pipeline_repr = yaml.safe_load(pipeline_str)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+
+    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_node_previous(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method raises
+        ValidationError if a node is missing its previous.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp v0.1
+        """
+        pipeline_repr = yaml.safe_load(pipeline_str)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+
+    def test_get_pipeline_canonical_representation_raises_validation_error_if_plugin_not_found(self):
+        """
+        Test whether custom get_pipeline_canonical_representation method raises
+        ValidationError if a node plugin name and version is not found.
+        """
+        pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp v99.9
+          previous: ~
+        """
+        pipeline_repr = yaml.safe_load(pipeline_str)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)

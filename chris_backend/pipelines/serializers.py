@@ -2,18 +2,21 @@
 import json
 from collections import deque
 
+import yaml
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from core.graph import Graph
+from core.utils import get_file_resource_link
 from collectionjson.fields import ItemLinkField
 from plugins.models import Plugin, TYPES
 from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 
-from .models import Pipeline, PluginPiping
+from .models import Pipeline, PipelineSourceFile, PluginPiping
 from .models import DefaultPipingFloatParameter, DefaultPipingIntParameter
 from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
 
@@ -49,13 +52,17 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         view_name='pipeline-defaultparameter-list')
     instances = serializers.HyperlinkedIdentityField(view_name='pipelineinstance-list')
     workflows = serializers.HyperlinkedIdentityField(view_name='workflow-list')
+    json_repr = serializers.HyperlinkedIdentityField(
+        view_name='pipeline-customjson-detail')
+    source_file = serializers.HyperlinkedRelatedField(
+        view_name='pipelinesourcefile-detail', read_only=True)
 
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'locked', 'authors', 'category', 'description',
                   'plugin_tree', 'plugin_inst_id', 'owner_username', 'creation_date',
                   'modification_date', 'plugins', 'plugin_pipings', 'default_parameters',
-                  'instances', 'workflows')
+                  'instances', 'workflows', 'json_repr', 'source_file')
 
     def create(self, validated_data):
         """
@@ -475,6 +482,132 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to get the plugin_tree JSON string.
         """
         return json.dumps(obj.get_plugin_tree())
+
+
+class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
+    fname = serializers.FileField(use_url=False)
+    fsize = serializers.ReadOnlyField(source='fname.size')
+    file_resource = ItemLinkField('get_file_link')
+    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
+                                                   read_only=True)
+    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
+
+    class Meta:
+        model = PipelineSourceFile
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'file_resource',
+                  'pipeline', 'owner')
+
+    def get_file_link(self, obj):
+        """
+        Custom method to get the hyperlink to the actual file resource.
+        """
+        return get_file_resource_link(self, obj)
+
+    def create(self, validated_data):
+        """
+        Overriden to create the pipeline from the source file data.
+        """
+        pipeline_repr = validated_data.get('pipeline')
+        pipeline_serializer = PipelineSerializer(data=pipeline_repr)
+        pipeline_serializer.is_valid(raise_exception=True)
+        pipeline = pipeline_serializer.save(owner=validated_data['owner'])
+        validated_data['pipeline'] = pipeline
+        return super(PipelineSourceFileSerializer, self).create(validated_data)
+
+    def validate(self, data):
+        """
+        Overriden to validate the pipeline data in the source file.
+        """
+        pipeline_repr = self.read_pipeline_representation(data['fname'])
+        pipeline_repr = self.get_pipeline_canonical_representation(pipeline_repr)
+        data['pipeline'] = pipeline_repr
+        return data
+
+    @staticmethod
+    def read_pipeline_representation(pipeline_source_file):
+        """
+        Custom method to read the submitted pipeline source file.
+        """
+        try:
+            pipeline_repr = yaml.safe_load(pipeline_source_file.read().decode())
+            pipeline_source_file.seek(0)
+        except Exception:
+            error_msg = "Invalid yaml representation file."
+            raise serializers.ValidationError({'fname': [error_msg]})
+        return pipeline_repr
+
+    @staticmethod
+    def get_pipeline_canonical_representation(pipeline_repr):
+        """
+        Custom method to convert the submitted pipeline representation to the canonical
+        JSON representation.
+        """
+        title_to_ix = {}
+        plugin_tree = []
+        for ix, node in enumerate(pipeline_repr.get('plugin_tree', [])):
+            title = node.get('title')
+            if not title:
+                error_msg = "A 'title' key is required or all plugin_tree nodes."
+                raise serializers.ValidationError({'fname': [error_msg]})
+
+            plugin = node.get('plugin')
+            if not plugin:
+                error_msg = "A 'plugin' key is required for all plugin_tree nodes."
+                raise serializers.ValidationError({'fname': [error_msg]})
+            try:
+                plg_list = plugin.strip().split(' ')
+                plugin_name = plg_list[0]
+                plugin_version = plg_list[-1][1:]
+            except Exception:
+                error_msg = "Missing plugin name or version."
+                raise serializers.ValidationError({'fname': [error_msg]})
+
+            try:
+                previous_index = node['previous']
+            except KeyError:
+                error_msg = "A 'previous' key is required or all plugin_tree nodes."
+                raise serializers.ValidationError({'fname': [error_msg]})
+
+            defaults_dict = node.get('plugin_parameter_defaults', {})
+            plg_param_defaults = []
+            for key in defaults_dict:
+                plg_param_defaults.append({'name': key, 'default': defaults_dict[key]})
+
+            canonical_node = {
+                'title': title,
+                'plugin_name': plugin_name,
+                'plugin_version': plugin_version,
+                'previous_index': previous_index
+            }
+            if plg_param_defaults:
+                canonical_node['plugin_parameter_defaults'] = plg_param_defaults
+
+            plugin_tree.append(canonical_node)
+            title_to_ix[title] = ix
+
+        for canonical_node in plugin_tree:  # change titles to indices
+            prev_ix = canonical_node['previous_index']
+            canonical_node['previous_index'] = title_to_ix[prev_ix] if prev_ix else None
+
+            plg_name = canonical_node['plugin_name']
+            plg_version = canonical_node['plugin_version']
+            try:
+                plg = Plugin.objects.get(meta__name=plg_name, version=plg_version)
+            except ObjectDoesNotExist:
+                error_msg = f"Couldn't find any plugin with name {plg_name} and " \
+                            f"version {plg_version}."
+                raise serializers.ValidationError({'fname': [error_msg]})
+            if plg.meta.type == 'ts':
+                for d in canonical_node.get('plugin_parameter_defaults', []):
+                    if d['name'] == 'plugininstances':
+                        default = d['default']
+                        if default:
+                            parent_str_ixs = [str(title_to_ix[title.strip()])
+                                              for title in default.split(',')]
+                            d['default'] = ','.join(parent_str_ixs)
+
+        pipeline_repr['plugin_tree'] = json.dumps(plugin_tree)
+        return pipeline_repr
 
 class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer):
     previous_plugin_piping_id = serializers.ReadOnlyField(

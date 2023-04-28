@@ -57,7 +57,7 @@ class UserSerializerTests(TestCase):
         """
         Test whether overriden validate_username method raises a
         serializers.ValidationError when the username contains forward slashes or it is
-        'chris' or 'SERVICES' special identifiers.
+        'chris' or 'SERVICES' or 'PIPELINES' special identifiers.
         """
         user_serializer = UserSerializer()
         with self.assertRaises(serializers.ValidationError):
@@ -66,5 +66,7 @@ class UserSerializerTests(TestCase):
             user_serializer.validate_username('chris')
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('SERVICES')
+        with self.assertRaises(serializers.ValidationError):
+            user_serializer.validate_username('PIPELINES')
         username = user_serializer.validate_username(self.username)
         self.assertEqual(username, self.username)

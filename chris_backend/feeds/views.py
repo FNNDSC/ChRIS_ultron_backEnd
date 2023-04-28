@@ -311,6 +311,8 @@ class FeedList(generics.ListAPIView):
                                                request=request),
                  'workflows': reverse('allworkflow-list', request=request),
                  'tags': reverse('tag-list', request=request),
+                 'pipelinesourcefiles': reverse('pipelinesourcefile-list',
+                                                request=request),
                  'uploadedfiles': reverse('uploadedfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),

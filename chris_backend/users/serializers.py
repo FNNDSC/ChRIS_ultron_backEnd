@@ -56,12 +56,12 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     def validate_username(self, username):
         """
         Overriden to check that the username does not contain forward slashes and it is
-        not 'chris' or 'SERVICES' special identifiers.
+        not 'chris' or 'SERVICES' or 'PIPELINES' special identifiers.
         """
         if '/' in username:
             raise serializers.ValidationError(
                 ["This field may not contain forward slashes."])
-        if username == 'chris' or username == 'SERVICES':
+        if username in ('chris', 'SERVICES', 'PIPELINES'):
             raise serializers.ValidationError(
                 ["Username %s is not available." % username])
         return username

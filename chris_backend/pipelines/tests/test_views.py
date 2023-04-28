@@ -1,8 +1,9 @@
 
 import logging
 import json
+import io
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -14,6 +15,8 @@ from plugins.models import PluginParameter
 from plugins.models import DefaultStrParameter, DefaultBoolParameter
 from plugins.models import DefaultFloatParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping, DefaultPipingStrParameter
+
+from core.swiftmanager import SwiftManager
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -51,6 +54,23 @@ class ViewTests(TestCase):
         )
         default = self.plugin_ds_parameters['dummyInt']['default']
         DefaultIntParameter.objects.get_or_create(plugin_param=plg_param_ds,
+                                                  value=default)  # set plugin parameter default
+
+        self.plugin_ts_name = "ts_copy"
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_ts_name, type='ts')
+        (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_ts.compute_resources.set([self.compute_resource])
+        plugin_ts.save()
+
+        # add a parameter with a default
+        (plg_param_ts, tf)= PluginParameter.objects.get_or_create(
+            plugin=plugin_ts,
+            name='plugininstances',
+            type='string',
+            optional=True
+        )
+        default = ""
+        DefaultStrParameter.objects.get_or_create(plugin_param=plg_param_ts,
                                                   value=default)  # set plugin parameter default
 
         # create user
@@ -281,6 +301,54 @@ class PipelineCustomJsonDetailViewTests(PipelineViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+class PipelineSourceFileViewTests(PipelineViewTests):
+    """
+    Test the pipelinesourcefile-list view.
+    """
+
+    def setUp(self):
+        super(PipelineSourceFileViewTests, self).setUp()
+        self.create_read_url = reverse("pipelinesourcefile-list")
+        self.pipeline_str = """
+        name: TestPipeline
+        locked: false
+        plugin_tree:
+        - title: simpledsapp1
+          plugin: simpledsapp v0.1
+          previous: ~
+        - title: simpledsapp2
+          plugin: simpledsapp v0.1
+          previous: simpledsapp1
+        - title: join
+          plugin: ts_copy v0.1
+          previous: simpledsapp1
+          plugin_parameter_defaults:
+            plugininstances: simpledsapp1, simpledsapp2
+        """
+
+    def tearDown(self):
+        super(PipelineSourceFileViewTests, self).tearDown()
+
+    @tag('integration')
+    def test_integration_pipelinesourcefile_create_success(self):
+
+        # POST request using multipart/form-data to be able to upload file
+        self.client.login(username=self.username, password=self.password)
+
+        with io.BytesIO(self.pipeline_str.encode()) as f:
+            f.name = 'test_pipeline0000001.yaml'
+            post = {"fname": f}
+            response = self.client.post(self.create_read_url, data=post)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        fpath = f'PIPELINES/{self.username}/test_pipeline0000001.yaml'
+        # delete file from Swift storage
+        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
+                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager.delete_obj(fpath)
+
+    def test_pipelinesourcefile_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data={"fname": {}})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class PipelinePluginListViewTests(PipelineViewTests):
