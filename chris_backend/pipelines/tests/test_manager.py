@@ -72,9 +72,9 @@ class PipelineManagerTests(TestCase):
         Test whether the manager can add a new pipeline to the system.
         """
         plugin_tree = '[{"title": "pip3", "plugin_name": "simpledsapp", ' \
-                      '"plugin_version": "0.1", "previous_index": null},  {"title": ' \
+                      '"plugin_version": "0.1", "previous": null},  {"title": ' \
                       '"pip4", "plugin_name": "simpledsapp", "plugin_version": "0.1",  ' \
-                      '"previous_index": 0}]'
+                      '"previous": "pip3"}]'
         self.pipeline_manager.run(['add', 'Pipeline2', self.username, plugin_tree, '--unlock'])
         self.assertEqual(Pipeline.objects.count(), 2)
 

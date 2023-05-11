@@ -98,67 +98,58 @@ class Pipeline(models.Model):
         pipeline_default_parameters = self.get_default_parameters()
 
         tree_nodes_dict = {}
+        id_to_title = {}  # mapping from piping id to piping title
         is_ts_dict = {}
         for default_param in pipeline_default_parameters:
             piping = default_param.plugin_piping
             previous = piping.previous
 
-            if piping.id not in tree_nodes_dict:
-                tree_nodes_dict[piping.id] = {
+            if piping.title not in tree_nodes_dict:
+                tree_nodes_dict[piping.title] = {
                     'plugin_id': piping.plugin.id,
-                    'previous_index': previous.id if previous is not None else None,
+                    'previous': previous.title if previous is not None else None,
                     'title': piping.title,
                     'plugin_parameter_defaults': []
                 }
-                is_ts_dict[piping.id] = piping.plugin.meta.type == 'ts'
+                id_to_title[piping.id] = piping.title
+                is_ts_dict[piping.title] = piping.plugin.meta.type == 'ts'
 
-            tree_nodes_dict[piping.id]['plugin_parameter_defaults'].append(
+            tree_nodes_dict[piping.title]['plugin_parameter_defaults'].append(
                 {
                     'name': default_param.plugin_param.name,
                     'default': default_param.value
                 }
             )
 
-        root_pip_id = [pip_id for pip_id in tree_nodes_dict.keys()
-                       if tree_nodes_dict[pip_id]['previous_index'] is None][0]
-        tree = {root_pip_id: []}  # dict with list of child ids for each piping id
-
-        for pip_id in tree_nodes_dict.keys():
-            if pip_id not in tree:
-                tree[pip_id] = []
-                prev_pip_id = tree_nodes_dict[pip_id]['previous_index']
-                if prev_pip_id in tree:
-                    tree[prev_pip_id].append(pip_id)
-                else:
-                    tree[prev_pip_id] = [pip_id]
-
-        ix = 0
-        index = {root_pip_id: ix}  # mapping from piping id to index
-        plugin_tree = [tree_nodes_dict[root_pip_id]]
-        is_ts_list = [is_ts_dict[root_pip_id]]  # whether piping's plugin is of type 'ts'
-
-        # breath-first traversal of tree
-        queue = deque(tree[root_pip_id])
-        while len(queue):
-            curr_pip_id = queue.popleft()
-            previous_pip_id = tree_nodes_dict[curr_pip_id]['previous_index']
-            tree_nodes_dict[curr_pip_id]['previous_index'] = index[previous_pip_id]
-            ix += 1
-            index[curr_pip_id] = ix
-            plugin_tree.append(tree_nodes_dict[curr_pip_id])
-            is_ts_list.append(is_ts_dict[curr_pip_id])
-            queue.extend(tree[curr_pip_id])
-
-        for is_ts, tree_node in zip(is_ts_list, plugin_tree):
-            if is_ts:  # process 'ts' plugins
-                for param_default in tree_node['plugin_parameter_defaults']:
-                    if param_default['name'] == 'plugininstances':
-                        default = param_default['default']
+        root_title = [pip_title for pip_title in tree_nodes_dict.keys()
+                      if tree_nodes_dict[pip_title]['previous'] is None][0]
+        tree = {root_title: []}  # dict with list of child titles for each piping title
+        for title in tree_nodes_dict.keys():
+            if is_ts_dict[title]:  # process 'ts' plugins
+                for default_d in tree_nodes_dict[title]['plugin_parameter_defaults']:
+                    if default_d['name'] == 'plugininstances':
+                        default = default_d['default']
                         if default:
-                            parent_pip_ids = [int(pip_id) for pip_id in default.split(',')]
-                            parent_ixs = [str(index[pip_id]) for pip_id in parent_pip_ids]
-                            param_default['default'] = ','.join(parent_ixs)
+                            parent_titles = [id_to_title[int(pip_id)] for pip_id in
+                                             default.split(',')]
+                            default_d['default'] = ','.join(parent_titles)
                         break
+            if title not in tree:
+                tree[title] = []
+                prev_title = tree_nodes_dict[title]['previous']
+                if prev_title in tree:
+                    tree[prev_title].append(title)
+                else:
+                    tree[prev_title] = [title]
+
+        plugin_tree = [tree_nodes_dict[root_title]]
+        # breath-first traversal of tree to order nodes in the returned plugin_tree
+        queue = deque(tree[root_title])
+        while len(queue):
+            curr_title = queue.popleft()
+            plugin_tree.append(tree_nodes_dict[curr_title])
+            queue.extend(tree[curr_title])
+
         return plugin_tree
 
     @staticmethod

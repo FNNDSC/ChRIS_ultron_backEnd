@@ -85,24 +85,25 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         if nodes_info is None:
             nodes_info = '[]'
         try:
-            node_list: List[GivenNodeInfo] = json.loads(nodes_info)
+            input_node_list: List[GivenNodeInfo] = json.loads(nodes_info)
         except json.decoder.JSONDecodeError:
             # overriden validation methods automatically add the field name to the msg
             raise serializers.ValidationError([f'Invalid JSON string {nodes_info}.'])
-        if not isinstance(node_list, list):
+        if not isinstance(input_node_list, list):
             raise serializers.ValidationError([f'Invalid list in {nodes_info}'])
 
-        for d in node_list:
+        for d in input_node_list:
             if 'piping_id' not in d:
                 raise serializers.ValidationError(
                     f'Element does not specify "piping_id": {d}')
 
         pipeline = self.context['view'].get_object()
         pipings = list(pipeline.plugin_pipings.all())
+        node_list = []
+        titles = set()
 
-        titles = []
         for piping in pipings:
-            d_l = [d for d in node_list if d.get('piping_id') == piping.id]
+            d_l = [d for d in input_node_list if d.get('piping_id') == piping.id]
             if d_l:
                 d = d_l[0]
                 if 'title' in d:
@@ -110,7 +111,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                     if title in titles:
                         raise serializers.ValidationError(
                             [f"Workflow tree can not contain duplicated title: {title}"])
-                    titles.append(title)
+                    titles.add(title)
                     plg_inst_serializer = PluginInstanceSerializer(data={'title': title})
                     try:
                         plg_inst_serializer.is_valid(raise_exception=True)
@@ -122,7 +123,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                     if title in titles:
                         raise serializers.ValidationError(
                             [f"Workflow tree can not contain duplicated title: {title}"])
-                    titles.append(title)
+                    titles.add(title)
                     d['title'] = title
                 if 'compute_resource_name' not in d:
                     d['compute_resource_name'] = None
@@ -133,26 +134,29 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 if title in titles:
                     raise serializers.ValidationError(
                         [f"Workflow tree can not contain duplicated title: {title}"])
-                titles.append(title)
+                titles.add(title)
                 d = GivenNodeInfo(
                     piping_id=piping.id,
                     compute_resource_name=None,
                     title=title,
                     plugin_parameter_defaults=[]
                 )
-                node_list.append(d)
 
             cr_name = d.get('compute_resource_name')
-            if cr_name and piping.plugin.compute_resources.filter(name=cr_name).count() == 0:
+            if cr_name and piping.plugin.compute_resources.filter(
+                    name=cr_name).count() == 0:
                 msg = [f'Plugin for pipping with id {piping.id} has not been registered '
                        f'with a compute resource named {cr_name}']
                 raise serializers.ValidationError(msg)
 
             piping_param_defaults = d.get('plugin_parameter_defaults')
-            param_sets = (piping.string_param, piping.integer_param, piping.float_param, piping.boolean_param)
+            param_sets = (piping.string_param, piping.integer_param, piping.float_param,
+                          piping.boolean_param)
             for param_set in param_sets:
                 for default_param in param_set.all():
-                    self.validate_piping_params(piping.id, default_param, piping_param_defaults)
+                    self.validate_piping_params(piping.id, default_param,
+                                                piping_param_defaults)
+            node_list.append(d)
         return node_list
 
     @staticmethod

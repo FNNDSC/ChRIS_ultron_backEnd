@@ -560,9 +560,9 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     STR1='[{"title": "pl-s3retrieve", "plugin_name": "pl-s3retrieve", "plugin_version": "'
     STR2='", "plugin_parameter_defaults": [{"name": "bucket", "default": "somebucket"},
       {"name": "awssecretkey", "default": "somekey"},
-    {"name": "awskeyid", "default": "somekeyid"}], "previous_index": null},  {"title":
+    {"name": "awskeyid", "default": "somekeyid"}], "previous_index": null, "previous": null},  {"title":
     "pl-simpledsapp", "plugin_name": "pl-simpledsapp", "plugin_version": "'
-    STR3='", "previous_index": 0}]'
+    STR3='", "previous_index": 0, "previous": "pl-s3retrieve"}]'
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
     docker compose -f docker-compose_dev.yml                        \
@@ -574,11 +574,11 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     STR4='[{"title": "pl-simpledsapp1", "plugin_name": "pl-simpledsapp", "plugin_version": "'
-    STR5='", "previous_index": null},{"title": "pl-simpledsapp2", "plugin_name":
+    STR5='", "previous_index": null, "previous": null},{"title": "pl-simpledsapp2", "plugin_name":
     "pl-simpledsapp", "plugin_version": "'
-    STR6='", "previous_index": 0},{"title": "pl-simpledsapp3", "plugin_name":
+    STR6='", "previous_index": 0, "previous": "pl-simpledsapp1"},{"title": "pl-simpledsapp3", "plugin_name":
     "pl-simpledsapp", "plugin_version": "'
-    STR7='", "previous_index": 0}]'
+    STR7='", "previous_index": 0, "previous": "pl-simpledsapp1"}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom
     docker compose -f docker-compose_dev.yml                        \
@@ -614,20 +614,6 @@ rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE" 
         cube "${PLUGIN_TREE}" --unlock >& dc.out
     dc_check $? "PRINT"
 windowBottom
-
-# rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE"    \
-#                 "(unmutable and available to all users)"
-#     PIPELINE_NAME="DICOM_anonymization_and_tag_extractor"
-#     printf "%20s${LightBlue}%60s${NC}\n"                            \
-#                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
-#     PLUGIN_TREE="[\n                {\n                    \"plugin_name\":      \"pl-simpledsapp\",\n                    \"plugin_version\":   \"2.0.2\",\n                    \"previous_index\":   null\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\",\n                            \"default\":  \"m:%_nospc|-_ProtocolName.jpg\"\n                            },\n                            {\n                            \"name\":     \"imageScale\",\n                            \"default\":  \"3:none\"\n                            },\n                            {\n                            \"name\":     \"outputFileStem\",\n                            \"default\":  \"PHI-tags\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagsub\",\n                    \"plugin_version\":   \"3.2.3\",\n                    \"previous_index\":   0,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"tagInfo\",\n                            \"default\":  \"PatientName,%_name|patientID_PatientName ++ PatientID,%_md5|7_PatientID ++ AccessionNumber,%_md5|8_AccessionNumber ++ PatientBirthDate,%_strmsk|******01_PatientBirthDate ++ re:.*hysician,%_md5|4_#tag ++ re:.*stitution,#tag ++ re:.*ddress,#tag\"\n                            },\n                            {\n                            \"name\":     \"splitKeyValue\",\n                            \"default\":  \",\"\n                            },\n                            {\n                            \"name\":     \"splitToken\",\n                            \"default\":  \"++\"\n                            }\n                        ]\n                },\n                {\n                    \"plugin_name\":      \"pl-pfdicom_tagextract\",\n                    \"plugin_version\":   \"3.1.2\",\n                    \"previous_index\":   2,\n                    \"plugin_parameter_defaults\": [\n                            {\n                            \"name\":     \"extension\",\n                            \"default\":  \".dcm\"\n                            },\n                            {\n                            \"name\":     \"imageFile\"]"
-#     windowBottom
-#     docker compose -f docker-compose_dev.yml                        \
-#         exec chris_dev                                              \
-#         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
-#         cube "${PLUGIN_TREE}" --unlock >& dc.out
-#     dc_check $? "PRINT"
-# windowBottom
 
 rm -f dc.out ; title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
