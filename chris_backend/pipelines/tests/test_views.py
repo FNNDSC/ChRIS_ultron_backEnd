@@ -131,8 +131,8 @@ class PipelineListViewTests(PipelineViewTests):
         plugin_ds2.save()
 
         plugin_tree = '[{"title": "pip5", "plugin_id": ' + str(plugin_ds1.id) + \
-                      ', "previous_index": null}, {"title": "pip6", "plugin_id": ' + \
-                      str(plugin_ds2.id) + ', "previous_index": 0}]'
+                      ', "previous": null}, {"title": "pip6", "plugin_id": ' + \
+                      str(plugin_ds2.id) + ', "previous": "pip5"}]'
         post = json.dumps(
             {"template": {"data": [{"name": "name", "value": "Pipeline2"},
                                    {"name": "plugin_tree", "value": plugin_tree}]}})
@@ -251,12 +251,12 @@ class PipelineCustomJsonDetailViewTests(PipelineViewTests):
         pipeline = Pipeline.objects.get(name="Pipeline1")
         self.read_url = reverse("pipeline-detail", kwargs={"pk": pipeline.id})
 
-    def test_pipeline_detail_success(self):
+    def test_pipeline_json_detail_success(self):
         owner = User.objects.get(username=self.username)
         # create a pipeline
         (pipeline_ts, tf) = Pipeline.objects.get_or_create(name='Pipeline_ts',
                                                         owner=owner, category='test')
-        plugin_ds1 = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
 
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name='ts_mycopy', type='ts')
         (plugin_ts, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
@@ -274,10 +274,10 @@ class PipelineCustomJsonDetailViewTests(PipelineViewTests):
 
         # create plugin pipings
         (pip_ds1, tf) = PluginPiping.objects.get_or_create(title='pip1',
-                                                           plugin=plugin_ds1,
+                                                           plugin=plugin_ds,
                                                            pipeline=pipeline_ts)
         (pip_ds2, tf) = PluginPiping.objects.get_or_create(title='pip2',
-                                                           plugin=plugin_ds1,
+                                                           plugin=plugin_ds,
                                                            previous=pip_ds1,
                                                            pipeline=pipeline_ts)
         (pip_ts, tf) = PluginPiping.objects.get_or_create(title='pip3',
@@ -294,7 +294,7 @@ class PipelineCustomJsonDetailViewTests(PipelineViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, "Pipeline_ts")
         self.assertContains(response, "plugininstances")
-        self.assertContains(response, "0,")  # could be "0,1" or "0,2"
+        self.assertContains(response, "pip1")
 
     def test_pipeline_detail_locked_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
@@ -323,7 +323,7 @@ class PipelineSourceFileViewTests(PipelineViewTests):
           plugin: ts_copy v0.1
           previous: simpledsapp1
           plugin_parameter_defaults:
-            plugininstances: simpledsapp1, simpledsapp2
+            plugininstances: simpledsapp1,simpledsapp2
         """
 
     def tearDown(self):

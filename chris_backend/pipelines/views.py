@@ -103,9 +103,12 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include required parameters if not in the request and delete
-        'locked' parameter if the pipeline is not locked.
+        Overriden to remove parameters that are not allowed to be used on update,
+        include required parameters if not in the request and delete 'locked' parameter
+        if the pipeline is not locked.
         """
+        request.data.pop('plugin_tree', None)
+        request.data.pop('plugin_inst_id', None)
         pipeline = self.get_object()
         if not pipeline.locked and 'locked' in request.data:
             # this pipeline was made available to the public so it cannot be locked
