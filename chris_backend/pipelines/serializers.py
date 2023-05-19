@@ -493,7 +493,7 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PipelineSourceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'file_resource',
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'type', 'file_resource',
                   'pipeline', 'owner')
 
     def get_file_link(self, obj):
@@ -515,17 +515,27 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         """
-        Overriden to validate the pipeline data in the source file.
+        Overriden to validate and transform the pipeline data in the source file to the
+        json canonical representation.
         """
-        pipeline_repr = self.read_pipeline_representation(data['fname'])
-        pipeline_repr = self.get_pipeline_canonical_representation(pipeline_repr)
+        type = data.get('type', 'yaml')
+        pipeline_repr = ''
+
+        if type == 'yaml':
+            pipeline_repr = self.read_yaml_pipeline_representation(data['fname'])
+            pipeline_repr = self.get_yaml_pipeline_canonical_representation(pipeline_repr)
+
+        elif type == 'json':
+            pipeline_repr = self.read_json_pipeline_representation(data['fname'])
+            pipeline_repr = self.get_json_pipeline_canonical_representation(pipeline_repr)
+
         data['pipeline'] = pipeline_repr
         return data
 
     @staticmethod
-    def read_pipeline_representation(pipeline_source_file):
+    def read_yaml_pipeline_representation(pipeline_source_file):
         """
-        Custom method to read the submitted pipeline source file.
+        Custom method to read the submitted yaml pipeline source file.
         """
         try:
             pipeline_repr = yaml.safe_load(pipeline_source_file.read().decode())
@@ -536,10 +546,23 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
         return pipeline_repr
 
     @staticmethod
-    def get_pipeline_canonical_representation(pipeline_repr):
+    def read_json_pipeline_representation(pipeline_source_file):
         """
-        Custom method to convert the submitted pipeline representation to the canonical
-        JSON representation.
+        Custom method to read the submitted json pipeline source file.
+        """
+        try:
+            pipeline_repr = json.loads(pipeline_source_file.read().decode())
+            pipeline_source_file.seek(0)
+        except Exception:
+            error_msg = "Invalid json representation file."
+            raise serializers.ValidationError({'fname': [error_msg]})
+        return pipeline_repr
+
+    @staticmethod
+    def get_yaml_pipeline_canonical_representation(pipeline_repr):
+        """
+        Custom method to convert the submitted yaml pipeline representation to the
+        canonical JSON representation.
         """
         plugin_tree = []
         for node in pipeline_repr.get('plugin_tree', []):
@@ -571,6 +594,16 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
 
             plugin_tree.append(canonical_node)
 
+        pipeline_repr['plugin_tree'] = json.dumps(plugin_tree)
+        return pipeline_repr
+
+    @staticmethod
+    def get_json_pipeline_canonical_representation(pipeline_repr):
+        """
+        Custom method to convert the submitted json pipeline representation to the
+        canonical JSON representation.
+        """
+        plugin_tree = pipeline_repr.get('plugin_tree', [])
         pipeline_repr['plugin_tree'] = json.dumps(plugin_tree)
         return pipeline_repr
 
