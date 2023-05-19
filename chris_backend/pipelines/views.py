@@ -179,7 +179,7 @@ class PipelineSourceFileList(generics.ListCreateAPIView):
         query_list = [reverse('pipelinesourcefile-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
-        template_data = {'fname': ''}
+        template_data = {'type': '', 'fname': ''}
         return services.append_collection_template(response, template_data)
 
 

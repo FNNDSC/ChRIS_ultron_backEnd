@@ -1,8 +1,10 @@
 
 import logging
 import io
-import yaml
+import json
 from unittest import mock
+
+import yaml
 
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -565,7 +567,7 @@ class PipelineSourceFileSerializerTests(SerializerTests):
 
     def setUp(self):
         super(PipelineSourceFileSerializerTests, self).setUp()
-        self.pipeline_str = """
+        self.yaml_pipeline_str = """
         name: TestPipeline
         locked: false
         plugin_tree:
@@ -581,20 +583,34 @@ class PipelineSourceFileSerializerTests(SerializerTests):
           plugin_parameter_defaults:
             plugininstances: simpledsapp1,simpledsapp2
         """
+        self.json_pipeline_str = '{"name": "TestPipeline", "locked": false,' \
+                                 '"plugin_tree": [' \
+                                 '{"title": "simpledsapp1",' \
+                                 '"plugin_name": "simpledsapp", ' \
+                                 '"plugin_version": "0.1","previous": null},' \
+                                 '{"title": "simpledsapp2",' \
+                                 '"plugin_name": "simpledsapp",' \
+                                 '"plugin_version": "0.1","previous": "simpledsapp1"},' \
+                                 '{"title": "join",' \
+                                 '"plugin_name": "ts_copy",' \
+                                 '"plugin_version": "0.1","previous": "simpledsapp1",' \
+                                 '"plugin_parameter_defaults": [' \
+                                 '{"name": "plugininstances",' \
+                                 '"default": "simpledsapp1,simpledsapp2"}]}]}'
 
-    def test_read_pipeline_representation(self):
+    def test_read_yaml_pipeline_representation(self):
         """
-        Test whether custom read_pipeline_representation method returns an appropriate
+        Test whether custom read_yaml_pipeline_representation method returns an appropriate
         yaml pipeline representation from an uploaded yaml representation file.
         """
-        pipeline_repr = yaml.safe_load(self.pipeline_str)
-        with io.BytesIO(self.pipeline_str.encode()) as f:
-            self.assertEqual(PipelineSourceFileSerializer.read_pipeline_representation(f),
+        pipeline_repr = yaml.safe_load(self.yaml_pipeline_str)
+        with io.BytesIO(self.yaml_pipeline_str.encode()) as f:
+            self.assertEqual(PipelineSourceFileSerializer.read_yaml_pipeline_representation(f),
                              pipeline_repr)
 
-    def test_read_pipeline_representation_raises_validation_error_if_invalid_yaml_file(self):
+    def test_read_yaml_pipeline_representation_raises_validation_error_if_invalid_yaml_file(self):
         """
-        Test whether custom read_pipeline_representation method raises ValidationError if
+        Test whether custom read_yaml_pipeline_representation method raises ValidationError if
         uploaded yaml representation file is invalid.
         """
         pipeline_str = """
@@ -610,26 +626,54 @@ class PipelineSourceFileSerializerTests(SerializerTests):
         """
         with self.assertRaises(serializers.ValidationError):
             with io.BytesIO(pipeline_str.encode()) as f:
-                PipelineSourceFileSerializer.read_pipeline_representation(f)
+                PipelineSourceFileSerializer.read_yaml_pipeline_representation(f)
 
-    def test_get_pipeline_canonical_representation(self):
+    def test_read_json_pipeline_representation(self):
         """
-        Test whether custom get_pipeline_canonical_representation method returns an
+        Test whether custom read_json_pipeline_representation method returns an appropriate
+        json pipeline representation from an uploaded json representation file.
+        """
+        pipeline_repr = json.loads(self.json_pipeline_str)
+        with io.BytesIO(self.json_pipeline_str.encode()) as f:
+            self.assertEqual(PipelineSourceFileSerializer.read_json_pipeline_representation(f),
+                             pipeline_repr)
+
+    def test_read_json_pipeline_representation_raises_validation_error_if_invalid_json_file(self):
+        """
+        Test whether custom read_json_pipeline_representation method raises
+        ValidationError if uploaded json representation file is invalid.
+        """
+        pipeline_str = '{"name": "TestPipeline", "locked": false,' \
+                         '"plugin_tree": [' \
+                         '{"title": "simpledsapp1",' \
+                         '"plugin_name": "simpledsapp", ' \
+                         '"plugin_version": "0.1","previous": null},' \
+                         '{"title": "simpledsapp2",' \
+                         '"plugin_name": "simpledsapp",' \
+                         '"plugin_version": "0.1","previous": "simpledsapp1"}}'
+        with self.assertRaises(serializers.ValidationError):
+            with io.BytesIO(pipeline_str.encode()) as f:
+                PipelineSourceFileSerializer.read_json_pipeline_representation(f)
+
+    def test_get_yaml_pipeline_canonical_representation(self):
+        """
+        Test whether custom get_yaml_pipeline_canonical_representation method returns an
         appropriate canonical JSON pipeline representation from the yaml representation.
         """
-        pipeline_repr = yaml.safe_load(self.pipeline_str)
+        pipeline_repr = yaml.safe_load(self.yaml_pipeline_str)
         canonical_repr = {'name': 'TestPipeline',
                           'locked': False,
                           'plugin_tree': '[{"title": "simpledsapp1", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous": null}, '
                                          '{"title": "simpledsapp2", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous": "simpledsapp1"}, '
                                          '{"title": "join", "plugin_name": "ts_copy", "plugin_version": "0.1", "previous": "simpledsapp1", '
                                          '"plugin_parameter_defaults": [{"name": "plugininstances", "default": "simpledsapp1,simpledsapp2"}]}]'}
-        self.assertEqual(PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr), canonical_repr)
+        self.assertEqual(PipelineSourceFileSerializer.get_yaml_pipeline_canonical_representation(pipeline_repr),
+                         canonical_repr)
 
 
-    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_node_plugin(self):
+    def test_get_yaml_pipeline_canonical_representation_raises_validation_error_if_missing_node_plugin(self):
         """
-        Test whether custom get_pipeline_canonical_representation method raises
+        Test whether custom get_yaml_pipeline_canonical_representation method raises
         ValidationError if a node is missing its plugin.
         """
         pipeline_str = """
@@ -641,11 +685,11 @@ class PipelineSourceFileSerializerTests(SerializerTests):
         """
         pipeline_repr = yaml.safe_load(pipeline_str)
         with self.assertRaises(serializers.ValidationError):
-            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+            PipelineSourceFileSerializer.get_yaml_pipeline_canonical_representation(pipeline_repr)
 
-    def test_get_pipeline_canonical_representation_raises_validation_error_if_missing_plugin_name_or_version(self):
+    def test_get_yaml_pipeline_canonical_representation_raises_validation_error_if_missing_plugin_name_or_version(self):
         """
-        Test whether custom get_pipeline_canonical_representation method raises
+        Test whether custom get_yaml_pipeline_canonical_representation method raises
         ValidationError if a node is missing its plugin name or version.
         """
         pipeline_str = """
@@ -658,4 +702,19 @@ class PipelineSourceFileSerializerTests(SerializerTests):
         """
         pipeline_repr = yaml.safe_load(pipeline_str)
         with self.assertRaises(serializers.ValidationError):
-            PipelineSourceFileSerializer.get_pipeline_canonical_representation(pipeline_repr)
+            PipelineSourceFileSerializer.get_yaml_pipeline_canonical_representation(pipeline_repr)
+
+    def test_get_json_pipeline_canonical_representation(self):
+        """
+        Test whether custom get_json_pipeline_canonical_representation method returns an
+        appropriate canonical JSON pipeline representation from the json representation.
+        """
+        pipeline_repr = json.loads(self.json_pipeline_str)
+        canonical_repr = {'name': 'TestPipeline',
+                          'locked': False,
+                          'plugin_tree': '[{"title": "simpledsapp1", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous": null}, '
+                                         '{"title": "simpledsapp2", "plugin_name": "simpledsapp", "plugin_version": "0.1", "previous": "simpledsapp1"}, '
+                                         '{"title": "join", "plugin_name": "ts_copy", "plugin_version": "0.1", "previous": "simpledsapp1", '
+                                         '"plugin_parameter_defaults": [{"name": "plugininstances", "default": "simpledsapp1,simpledsapp2"}]}]'}
+        self.assertEqual(PipelineSourceFileSerializer.get_json_pipeline_canonical_representation(pipeline_repr),
+                         canonical_repr)

@@ -10,6 +10,9 @@ from django_filters.rest_framework import FilterSet
 from plugins.models import Plugin, PluginParameter
 
 
+PIPELINE_SOURCE_FILE_TYPE_CHOICES = [('yaml', 'YAML file'), ('json', 'JSON file')]
+
+
 class Pipeline(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
@@ -199,6 +202,8 @@ def source_file_path(instance, filename):
 class PipelineSourceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=512, upload_to=source_file_path, unique=True)
+    type = models.CharField(choices=PIPELINE_SOURCE_FILE_TYPE_CHOICES, default='yaml',
+                            max_length=8, blank=True)
     pipeline = models.OneToOneField(Pipeline, on_delete=models.CASCADE,
                                     related_name='source_file')
     owner = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL)
@@ -225,7 +230,7 @@ class PipelineSourceFileFilter(FilterSet):
     class Meta:
         model = PipelineSourceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'owner_username']
+                  'fname_icontains', 'type', 'owner_username']
 
 
 class PluginPiping(models.Model):
