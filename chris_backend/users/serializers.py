@@ -7,7 +7,7 @@ from django.conf import settings
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from uploadedfiles.models import UploadedFile
 
 
@@ -38,8 +38,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         email = validated_data.get('email')
         password = validated_data.get('password')
         user = User.objects.create_user(username, email, password)
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
         welcome_file_path = '%s/uploads/welcome.txt' % username
         try:
             with io.StringIO('Welcome to ChRIS!') as f:

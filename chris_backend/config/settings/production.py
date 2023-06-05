@@ -8,7 +8,7 @@ import ldap
 from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
 from environs import Env, EnvValidationError
-from core.swiftmanager import SwiftManager
+from core.storage import verify_storage_connection
 
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
@@ -55,16 +55,28 @@ DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 
 # SWIFT SERVICE CONFIGURATION
 # ------------------------------------------------------------------------------
-DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
-SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
-SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
-SWIFT_KEY = get_secret('SWIFT_KEY')
-SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
-SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
-                           'key': SWIFT_KEY,
-                           'authurl': SWIFT_AUTH_URL}
+DEFAULT_FILE_STORAGE = get_secret('DEFAULT_FILE_STORAGE')
+
+if DEFAULT_FILE_STORAGE == 'django.core.files.storage.FileSystemStorage':
+    MEDIA_ROOT = get_secret('MEDIA_ROOT')
+    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE, MEDIA_ROOT=MEDIA_ROOT)
+elif DEFAULT_FILE_STORAGE == 'swift.storage.SwiftStorage':
+    SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
+    SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
+    SWIFT_KEY = get_secret('SWIFT_KEY')
+    SWIFT_CONTAINER_NAME = get_secret('SWIFT_CONTAINER_NAME')
+    SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
+                               'key': SWIFT_KEY,
+                               'authurl': SWIFT_AUTH_URL}
+    verify_storage = lambda: verify_storage_connection(
+        SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
+        SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
+    )
+else:
+    verify_storage = lambda: verify_storage_connection()
+
 try:
-    SwiftManager(SWIFT_CONTAINER_NAME, SWIFT_CONNECTION_PARAMS).create_container()
+    verify_storage()
 except Exception as e:
     raise ImproperlyConfigured(str(e))
 

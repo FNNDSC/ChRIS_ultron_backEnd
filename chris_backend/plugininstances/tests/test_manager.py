@@ -9,7 +9,7 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
@@ -25,8 +25,7 @@ class PluginInstanceManagerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                          settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
 
         self.plugin_fs_name = "simplefsapp"
         self.username = 'foo'

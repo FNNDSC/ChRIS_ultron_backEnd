@@ -13,3 +13,4 @@ dc.out
 celerybeat.pid
 swarm/prod/secrets/
 kubernetes/prod/base/secrets/
+venv

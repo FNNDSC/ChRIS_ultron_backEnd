@@ -9,11 +9,12 @@ import time
 from swiftclient import Connection
 from swiftclient.exceptions import ClientException
 
+from core.storage.storagemanager import StorageManager
 
 logger = logging.getLogger(__name__)
 
 
-class SwiftManager(object):
+class SwiftManager(StorageManager):
 
     def __init__(self, container_name, conn_params):
         self.container_name = container_name

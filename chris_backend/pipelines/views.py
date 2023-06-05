@@ -6,7 +6,7 @@ from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from core.renderers import BinaryFileRenderer
 from collectionjson import services
 from plugins.serializers import PluginSerializer
@@ -135,8 +135,8 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
             swift_path = instance.source_file.fname.name
         instance.delete()
         if swift_path:
-            swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                         settings.SWIFT_CONNECTION_PARAMS)
+            swift_manager = connect_storage(settings)
+
             try:
                 swift_manager.delete_obj(swift_path)
             except Exception as e:

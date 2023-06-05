@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from uploadedfiles.models import UploadedFile
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
@@ -151,9 +151,7 @@ class FileBrowserPathFileListViewTests(FileBrowserViewTests):
         super(FileBrowserPathFileListViewTests, self).setUp()
 
         # create a file in the DB "already uploaded" to the server)
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                          settings.SWIFT_CONNECTION_PARAMS)
-
+        self.swift_manager = connect_storage(settings)
         # upload file to Swift storage
         self.upload_path = f'{self.username}/uploads/file2.txt'
         with io.StringIO("test file") as file1:
