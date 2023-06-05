@@ -9,7 +9,7 @@ from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from plugins.models import TYPES, Plugin
 from feeds.models import Feed
 
@@ -343,8 +343,7 @@ def validate_paths(user, string):
     Custom function to check that a user is allowed to access the provided object storage
     paths.
     """
-    swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                 settings.SWIFT_CONNECTION_PARAMS)
+    swift_manager = connect_storage(settings)
     path_list = [s.strip() for s in string.split(',')]
     for path in path_list:
         path_parts = pathlib.Path(path).parts

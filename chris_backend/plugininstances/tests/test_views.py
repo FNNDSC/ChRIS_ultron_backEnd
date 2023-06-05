@@ -16,7 +16,7 @@ from celery.contrib.testing.worker import start_worker
 
 from core.celery import app as celery_app
 from core.celery import task_routes
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.models import PathParameter, FloatParameter
@@ -96,8 +96,7 @@ class TasksViewTests(TransactionTestCase):
 
     def setUp(self):
 
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                          settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
         self.username = 'foo'
@@ -946,8 +945,7 @@ class PluginInstanceFileViewTests(ViewTests):
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
         # create a plugin instance file associated to the plugin instance
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
         # upload file to Swift storage
         self.path = 'tests/file1.txt'
         with io.StringIO("test file") as file1:

@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 
 from .models import PACS, PACSFile
 
@@ -76,8 +76,7 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["File path must start with 'SERVICES/PACS/'."])
         # verify that the file is indeed already in Swift
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
         try:
             swift_path_exists = swift_manager.obj_exists(path)
         except Exception as e:

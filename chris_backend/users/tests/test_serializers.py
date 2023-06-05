@@ -1,15 +1,13 @@
 
 import logging
 
-
-from unittest import mock
-
 from django.test import TestCase
 
 from rest_framework import serializers
 
 from uploadedfiles.models import UploadedFile
-from users.serializers import UserSerializer, SwiftManager
+from users.serializers import UserSerializer
+from core.storage.helpers import mock_storage
 
 
 class UserSerializerTests(TestCase):
@@ -37,9 +35,7 @@ class UserSerializerTests(TestCase):
         user_serializer = UserSerializer()
         validated_data = {'username': self.username, 'password': self.password,
                           'email': self.email}
-        with mock.patch.object(SwiftManager, 'upload_obj',
-                               return_value=None) as upload_obj_mock:
-
+        with mock_storage('users.serializers.settings') as storage_manager:
             user = user_serializer.create(validated_data)
 
             self.assertEqual(user.username, self.username)
@@ -50,8 +46,7 @@ class UserSerializerTests(TestCase):
             welcome_file_path = '%s/uploads/welcome.txt' % self.username
             welcome_file = UploadedFile.objects.get(owner=user)
             self.assertEqual(welcome_file.fname.name, welcome_file_path)
-            upload_obj_mock.assert_called_with(welcome_file_path, mock.ANY,
-                                               content_type='text/plain')
+            self.assertTrue(storage_manager.obj_exists(welcome_file_path))
 
     def test_validate_username(self):
         """

@@ -2,7 +2,6 @@
 import logging
 import time
 import io
-from unittest import mock
 
 from django.test import TestCase, tag
 from django.conf import settings
@@ -10,7 +9,7 @@ from rest_framework import serializers
 
 from pacsfiles.models import PACS, PACSFile
 from pacsfiles.serializers import PACSFileSerializer
-from pacsfiles.serializers import SwiftManager
+from core.storage.helpers import connect_storage, mock_storage
 
 
 class PACSFileSerializerTests(TestCase):
@@ -44,11 +43,17 @@ class PACSFileSerializerTests(TestCase):
         pacsfiles_serializer = PACSFileSerializer()
         path = 'SERVICES/PACS/MyPACS/123456-Jorge/brain/brain_mri/file1.dcm'
 
-        with mock.patch.object(SwiftManager, 'obj_exists',
-                               return_value=False) as obj_exists_mock:
+        with mock_storage('pacsfiles.serializers.settings') as storage_manager:
             with self.assertRaises(serializers.ValidationError):
                 pacsfiles_serializer.validate_path(path)
-            obj_exists_mock.assert_called_with(path.strip(' ').strip('/'))
+            expected_fname = path.strip(' ').strip('/')
+
+            expected_errmsg = r'Could not find this path\.'
+            with self.assertRaisesRegex(serializers.ValidationError, expected_errmsg):
+                pacsfiles_serializer.validate_path(path)
+
+            storage_manager.upload_obj(expected_fname, b'example data')
+            pacsfiles_serializer.validate_path(path)  # expect to not raise an exception
 
     @tag('integration')
     def test_integration_validate_path_failure_does_not_exist(self):
@@ -68,8 +73,7 @@ class PACSFileSerializerTests(TestCase):
         """
         pacsfiles_serializer = PACSFileSerializer()
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
             swift_manager.upload_obj(path, file1.read(), content_type='text/plain')

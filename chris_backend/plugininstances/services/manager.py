@@ -56,7 +56,8 @@ from django.utils import timezone
 from django.conf import settings
 from django.db.utils import IntegrityError
 
-from core.swiftmanager import SwiftManager, ClientException
+from core.storage import connect_storage
+from swiftclient.exceptions import ClientException
 from core.utils import json_zip2str
 from core.models import ChrisInstance
 from plugininstances.models import PluginInstance, PluginInstanceFile, PluginInstanceLock
@@ -84,8 +85,7 @@ class PluginInstanceManager(object):
         cr = self.c_plugin_inst.compute_resource
         self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
 
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                          settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
 
     def _refresh_compute_resource_auth_token(self):
         """

@@ -16,7 +16,7 @@ from plugins.models import DefaultStrParameter, DefaultBoolParameter
 from plugins.models import DefaultFloatParameter, DefaultIntParameter
 from pipelines.models import Pipeline, PluginPiping, DefaultPipingStrParameter
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -342,8 +342,7 @@ class PipelineSourceFileViewTests(PipelineViewTests):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fpath = f'PIPELINES/{self.username}/test_pipeline0000001.yaml'
         # delete file from Swift storage
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
         swift_manager.delete_obj(fpath)
 
     def test_pipelinesourcefile_create_failure_unauthenticated(self):

@@ -10,8 +10,7 @@ from rest_framework import serializers
 
 from servicefiles.models import Service, ServiceFile
 from servicefiles.serializers import ServiceFileSerializer
-from servicefiles.serializers import SwiftManager
-
+from core.storage.helpers import connect_storage, mock_storage
 
 class ServiceFileSerializerTests(TestCase):
 
@@ -52,13 +51,12 @@ class ServiceFileSerializerTests(TestCase):
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        with mock.patch.object(SwiftManager, 'obj_exists',
-                               return_value=True) as obj_exists_mock:
+        with mock_storage('servicefiles.serializers.settings') as storage_manager:
+            storage_manager.upload_obj(path, b'dummy data')
             new_data = servicefiles_serializer.validate(data)
             self.assertIn('service', new_data)
             self.assertNotIn('service_name', new_data)
             self.assertEqual(new_data.get('path'), path.strip(' ').strip('/'))
-            obj_exists_mock.assert_called_with(new_data.get('path'))
 
     def test_validate_failure_path_does_not_start_with_SERVICES_PACS(self):
         """
@@ -79,11 +77,9 @@ class ServiceFileSerializerTests(TestCase):
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        with mock.patch.object(SwiftManager, 'obj_exists',
-                               return_value=False) as obj_exists_mock:
+        with mock_storage('servicefiles.serializers.settings'):
             with self.assertRaises(serializers.ValidationError):
                 servicefiles_serializer.validate(data)
-            obj_exists_mock.assert_called_with(path.strip(' ').strip('/'))
 
     @tag('integration')
     def test_integration_validate_path_failure_does_not_exist(self):
@@ -106,8 +102,7 @@ class ServiceFileSerializerTests(TestCase):
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
 
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
         # upload file to Swift storage
         with io.StringIO("test file") as file1:
             swift_manager.upload_obj(path, file1.read(), content_type='text/plain')

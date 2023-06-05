@@ -1,7 +1,6 @@
 
 import logging
 import json
-from unittest import mock
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
@@ -11,7 +10,8 @@ from django.conf import settings
 from rest_framework import status
 
 from uploadedfiles.models import UploadedFile
-from users.serializers import SwiftManager
+from core.storage.helpers import mock_storage, connect_storage
+
 
 
 class UserViewTests(TestCase):
@@ -47,8 +47,7 @@ class UserCreateViewTests(UserViewTests):
                                    {"name": "email", "value": self.email}]}})
 
     def test_user_create_success(self):
-        with mock.patch.object(SwiftManager, 'upload_obj',
-                               return_value=None) as upload_obj_mock:
+        with mock_storage('users.serializers.settings') as storage_manager:
             response = self.client.post(self.create_url, data=self.post,
                                         content_type=self.content_type)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -56,8 +55,7 @@ class UserCreateViewTests(UserViewTests):
             self.assertEqual(response.data["email"], self.email)
 
             welcome_file_path = '%s/uploads/welcome.txt' % self.username
-            upload_obj_mock.assert_called_with(welcome_file_path, mock.ANY,
-                                               content_type='text/plain')
+            self.assertTrue(storage_manager.obj_exists(welcome_file_path))
 
     @tag('integration')
     def test_integration_user_create_success(self):
@@ -73,8 +71,8 @@ class UserCreateViewTests(UserViewTests):
         self.assertEqual(welcome_file.fname.name, welcome_file_path)
 
         # delete welcome file
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
+
         swift_manager.delete_obj(welcome_file_path)
 
     def test_user_create_failure_already_exists(self):

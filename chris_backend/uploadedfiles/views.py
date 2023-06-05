@@ -8,7 +8,7 @@ from rest_framework.reverse import reverse
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 
 from .models import UploadedFile, UploadedFileFilter
 from .serializers import UploadedFileSerializer
@@ -95,8 +95,8 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         user_file = self.get_object()
         old_swift_path = user_file.fname.name
         serializer.save()
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
+
         try:
             swift_manager.delete_obj(old_swift_path)
         except Exception as e:
@@ -108,8 +108,8 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         swift_path = instance.fname.name
         instance.delete()
-        swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        swift_manager = connect_storage(settings)
+
         try:
             swift_manager.delete_obj(swift_path)
         except Exception as e:

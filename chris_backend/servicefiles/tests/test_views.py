@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
-from core.swiftmanager import SwiftManager
+from core.storage import connect_storage
 from servicefiles.models import Service, ServiceFile
 from servicefiles import views
 
@@ -35,8 +35,8 @@ class ServiceFileViewTests(TestCase):
         service.save()
 
         # create a service file in the DB "already registered" to the server)
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
+
         # upload file to Swift storage
         self.path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         with io.StringIO("test file") as file1:

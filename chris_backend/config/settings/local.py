@@ -11,7 +11,7 @@ Local settings
 import ldap
 from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
-from core.swiftmanager import SwiftManager
+from core.storage import verify_storage_connection
 
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
@@ -81,6 +81,12 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pi
             'propagate': False  # required to avoid double logging with root logger
         }
 
+# Storage Settings
+#
+# To use local storage:
+# DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+# MEDIA_ROOT = '/var/chris'
+#
 # Swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
@@ -91,7 +97,12 @@ SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
                            'key': SWIFT_KEY,
                            'authurl': SWIFT_AUTH_URL}
 try:
-    SwiftManager(SWIFT_CONTAINER_NAME, SWIFT_CONNECTION_PARAMS).create_container()
+    verify_storage_connection(
+        DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
+        MEDIA_ROOT=globals().get('MEDIA_ROOT', None),
+        SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
+        SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
+    )
 except Exception as e:
     raise ImproperlyConfigured(str(e))
 

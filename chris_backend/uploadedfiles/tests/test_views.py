@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
-from core.swiftmanager import SwiftManager
+from core.storage.helpers import connect_storage, mock_storage
 from uploadedfiles.models import UploadedFile, uploaded_file_path
 from uploadedfiles import views
 
@@ -42,8 +42,7 @@ class UploadedFileViewTests(TestCase):
                                  password=self.password)
 
         # create a file in the DB "already uploaded" to the server)
-        self.swift_manager = SwiftManager(settings.SWIFT_CONTAINER_NAME,
-                                     settings.SWIFT_CONNECTION_PARAMS)
+        self.swift_manager = connect_storage(settings)
         # upload file to Swift storage
         self.upload_path = f'{self.username}/uploads/file1.txt'
         with io.StringIO("test file") as file1:
@@ -142,10 +141,9 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
     def test_uploadedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
         swift_path = self.uploadedfile.fname.name
-        mocked_method = 'uploadedfiles.views.SwiftManager.delete_obj'
-        with mock.patch(mocked_method) as delete_obj_mock:
+        with mock_storage('uploadedfiles.views.settings') as storage_manager:
             response = self.client.delete(self.read_update_delete_url)
-            delete_obj_mock.assert_called_with(swift_path)
+            self.assertFalse(storage_manager.obj_exists(swift_path))
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
             self.assertEqual(UploadedFile.objects.count(), 0)
 
