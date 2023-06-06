@@ -1,5 +1,17 @@
 # An alternative docker-compose_dev.yml which uses a local volume to store files
-# instead of Swift Object Storage.
+# instead of Swift Object Storage. For development purposes!
+#
+# To use:
+# 1. Run rm docker-compose_dev.yml && ln -sv docker-compose_noswift.yml docker-compose_dev.yml
+# 2. Edit chris_backend/config/settings/local.py, include the configs
+#
+#     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+#     MEDIA_ROOT = '/var/chris'
+#
+# 3. Run ./make.sh -s -i
+#
+# For more information: https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/Storage-Backends
+#
 
 version: '3.9'
 
@@ -21,9 +33,9 @@ services:
 
   permission_workaround:
     image: alpine
-    command: chmod 777 /tmp/chris
+    command: chmod 777 /var/chris
     volumes:
-      - chris_files:/tmp/chris
+      - chris_files:/var/chris
 
   chris_dev:
     image: ${CHRISREPO}/chris:dev
@@ -45,7 +57,6 @@ services:
       - "8000:8000"
     depends_on: 
       - chris_dev_db
-      - swift_service
       - queue
       - chris_store
     networks:
@@ -69,7 +80,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/tmp/chris
+      - chris_files:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
@@ -81,7 +92,6 @@ services:
       - "6900-6905:6900-6905"
     depends_on:
       - chris_dev_db
-      - swift_service
       - queue
       # service also depends on pfcon service defined in swarm/docker-compose_remote.yml
     networks:
@@ -110,7 +120,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/tmp/chris
+      - chris_files:/var/chris
 
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
@@ -134,7 +144,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/tmp/chris
+      - chris_files:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
@@ -191,18 +201,13 @@ services:
       - DJANGO_USE_X_FORWARDED_HOST=false
       - DATABASE_HOST=chris_store_db
       - DATABASE_PORT=5432
-      - SWIFT_AUTH_URL=http://swift_service:8080/auth/v1.0
       - POSTGRES_DB=chris_store
       - POSTGRES_USER=chris
       - POSTGRES_PASSWORD=Chris1234
-      - SWIFT_USERNAME=chris:chris1234
-      - SWIFT_KEY=testing
-      - SWIFT_CONTAINER_NAME=store_users
     ports:
       - "8010:8010"
     depends_on:
       - chris_store_db
-      - swift_service
     networks:
       local:
         aliases:
@@ -225,23 +230,6 @@ services:
       name: "ChRIS_store PostgreSQL Database"
       role: "Chris store database"
 
-  swift_service:
-    image: ${SWIFTREPO}/docker-swift-onlyone
-    init: true
-    volumes:
-      - swift_storage_dev:/srv
-    environment:
-      - SWIFT_USERNAME=chris:chris1234
-      - SWIFT_KEY=testing
-    ports:
-      - "8080:8080"
-    networks:
-      - local
-    labels:
-      name: "Swift"
-      role: "Swift object storage service"
-
-
 networks:
   local:
   remote:
@@ -253,5 +241,4 @@ volumes:
   chris_dev_db_data:
   chris_store_db_data:
   queue_data:
-  swift_storage_dev:
   chris_files:

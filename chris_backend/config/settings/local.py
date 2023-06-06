@@ -84,8 +84,8 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pi
 # Storage Settings
 #
 # To use local storage:
-# DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-# MEDIA_ROOT = '/var/chris'
+#DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+#MEDIA_ROOT = '/var/chris'
 #
 # Swift service settings
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
