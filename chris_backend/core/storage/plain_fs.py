@@ -23,7 +23,7 @@ class FilesystemManager(StorageManager):
 
     def ls(self, path_prefix: str) -> List[str]:
         all_paths = (self.__base / path_prefix).rglob('*')
-        return [str(p) for p in all_paths if p.is_file()]
+        return [str(p.relative_to(self.__base)) for p in all_paths if p.is_file()]
 
     def path_exists(self, path: str) -> bool:
         return (self.__base / path).exists()
