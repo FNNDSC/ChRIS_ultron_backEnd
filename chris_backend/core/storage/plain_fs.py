@@ -51,7 +51,10 @@ class FilesystemManager(StorageManager):
         return (self.__base / file_path).read_bytes()
 
     def copy_obj(self, src: str, dst: str) -> None:
-        (self.__base / src).link_to(self.__base / dst)
+        src_path = self.__base / src
+        dst_path = self.__base / dst
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        src_path.link_to(dst_path)
 
     def delete_obj(self, file_path: str) -> None:
         (self.__base / file_path).unlink()
