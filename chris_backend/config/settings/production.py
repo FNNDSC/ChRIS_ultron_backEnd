@@ -69,6 +69,7 @@ elif DEFAULT_FILE_STORAGE == 'swift.storage.SwiftStorage':
                                'key': SWIFT_KEY,
                                'authurl': SWIFT_AUTH_URL}
     verify_storage = lambda: verify_storage_connection(
+        DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
