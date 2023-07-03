@@ -85,6 +85,8 @@ class PluginInstanceManager(object):
         cr = self.c_plugin_inst.compute_resource
         self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
 
+        self.plugin_inst_output_files = set() # set of obj names in object storage
+
         self.swift_manager = connect_storage(settings)
 
     def _refresh_compute_resource_auth_token(self):
@@ -514,7 +516,6 @@ class PluginInstanceManager(object):
         extracted files with the DB.
         """
         job_id = self.str_job_id
-        swift_filenames = []
         try:
             memory_zip_file = io.BytesIO(zip_file_content)
             with zipfile.ZipFile(memory_zip_file, 'r', zipfile.ZIP_DEFLATED) as job_zip:
@@ -531,7 +532,7 @@ class PluginInstanceManager(object):
                                      f'{swift_fname} to swift storage, detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE07'
                         raise
-                    swift_filenames.append(swift_fname)
+                    self.plugin_inst_output_files.add(swift_fname)
         except ClientException:
             raise
         except Exception as e:
@@ -539,7 +540,6 @@ class PluginInstanceManager(object):
                          f'detail: {str(e)}')
             self.c_plugin_inst.error_code = 'CODE04'
             raise
-        self._register_output_files(swift_filenames)
 
     def save_plugin_instance_final_status(self):
         """
@@ -566,7 +566,7 @@ class PluginInstanceManager(object):
         str_sourceTraceDir      : str = ''
         job_id                  : str = self.str_job_id
         outputdir               : str = self.c_plugin_inst.get_output_path()
-        obj_output_path_list    : list = []
+
         for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
             path_list = unextpath_parameters_dict[param_flag].split(',')
@@ -596,10 +596,7 @@ class PluginInstanceManager(object):
                         self.c_plugin_inst.error_code = 'CODE09'
                         raise
                     else:
-                        obj_output_path_list.append(obj_output_path)
-        logger.info('Registering output files not extracted from swift with job %s',
-                    self.str_job_id)
-        self._register_output_files(obj_output_path_list)
+                        self.plugin_inst_output_files.add(obj_output_path)
 
     def _handle_app_ts_unextracted_input_objs(self, d_ts_input_objs, group_by_instance):
         """
@@ -608,7 +605,7 @@ class PluginInstanceManager(object):
         """
         job_id = self.str_job_id
         outputdir = self.c_plugin_inst.get_output_path()
-        obj_output_path_list = []
+
         for plg_inst_id in d_ts_input_objs:
             plg_inst_output_path = d_ts_input_objs[plg_inst_id]['output_path']
             obj_list = d_ts_input_objs[plg_inst_id]['objs']
@@ -626,10 +623,7 @@ class PluginInstanceManager(object):
                                  f'detail: {str(e)}')
                     self.c_plugin_inst.error_code = 'CODE09'
                     raise
-                obj_output_path_list.append(obj_output_path)
-        logger.info("Registering 'ts' plugin's output files not extracted from swift with"
-                    " job %s", self.str_job_id)
-        self._register_output_files(obj_output_path_list)
+                self.plugin_inst_output_files.add(obj_output_path)
 
     def _handle_finished_successfully_status(self):
         """
@@ -655,26 +649,28 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.error_code = 'CODE03'
                 self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
-                # data successfully downloaded so update summary
+                # data successfully downloaded so update summary and instance status
                 d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
                 d_jobStatusSummary['pullPath']['status'] = True
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-
-                logger.info('Registering output files from remote with job %s', job_id)
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
-                try:
-                    self.unpack_zip_file(zip_content)  # register files from remote
 
-                    # register files from unextracted path parameters
+                logger.info('Copying output files for job %s into file storage', job_id)
+                try:
+                    self.unpack_zip_file(zip_content)  # upload files from remote
+
+                    # upload(copy) files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
                         self._handle_app_unextpath_parameters(d_unextpath_params)
 
-                    # register files from filtered input instance paths ('ts' plugins)
+                    # upload(copy) files from filtered input instance paths ('ts' plugins)
                     if self.c_plugin_inst.plugin.meta.type == 'ts':
                         d_ts_input_objs, tf = self.get_ts_plugin_instance_input_objs()
                         self._handle_app_ts_unextracted_input_objs(d_ts_input_objs, tf)
+
+                    self._register_output_files()  # register output files in the DB
                 except Exception:
                     self.c_plugin_inst.status = 'cancelled'  # giving up
                 else:
@@ -718,16 +714,17 @@ class PluginInstanceManager(object):
                              f'-->{pfcon_url}<--, detail: {str(e)}')
                 self.c_plugin_inst.error_code = 'CODE03'
             else:
-                # data successfully downloaded so update summary
+                # data successfully downloaded so update summary and instance status
                 d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
                 d_jobStatusSummary['pullPath']['status'] = True
                 self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-
-                logger.info('Registering output files from remote with job %s', job_id)
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
+
+                logger.info('Copying output files for job %s into file storage', job_id)
                 try:
-                    self.unpack_zip_file(zip_content)  # register files from remote
+                    self.unpack_zip_file(zip_content)  # upload files from remote
+                    self._register_output_files() # register output files in the DB
                 except Exception:
                     pass  # giving up
             self.c_plugin_inst.status = 'finishedWithError'
@@ -744,23 +741,26 @@ class PluginInstanceManager(object):
         self.c_plugin_inst.error_code = 'CODE10'
         self.cancel_plugin_instance_app_exec()
 
-    def _register_output_files(self, filenames):
+    def _register_output_files(self):
         """
         Internal method to register output files generated for the plugin instance with
-        the DB. The 'filenames' arg is a list of obj names in object storage.
+        the DB.
         """
         job_id = self.str_job_id
-        total_size = 0
-        for obj_name in filenames:
+        logger.info('Registering output files with job %s', job_id)
+
+        files = []
+        for obj_name in self.plugin_inst_output_files:
             logger.info(f'Registering file -->{obj_name}<-- for job {job_id}')
             plg_inst_file = PluginInstanceFile(plugin_inst=self.c_plugin_inst)
             plg_inst_file.fname.name = obj_name
-            try:
-                plg_inst_file.save()
-            except IntegrityError:  # avoid re-register a file already registered
-                logger.info(f'File -->{obj_name}<-- already registered for job {job_id}')
-            else:
-                total_size += plg_inst_file.fname.size
+            files.append(plg_inst_file)
+
+        db_files = PluginInstanceFile.objects.bulk_create(files)
+
+        total_size = 0
+        for plg_inst_file in db_files:
+            total_size += plg_inst_file.fname.size
         self.c_plugin_inst.size += total_size
 
     @staticmethod
