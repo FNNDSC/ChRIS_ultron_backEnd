@@ -15,7 +15,7 @@ version: '3.9'
 
 services:
   chrisomatic:
-    image: ghcr.io/fnndsc/chrisomatic:0.4.1
+    image: ghcr.io/fnndsc/chrisomatic:0.5.0
     volumes:
       - "./chrisomatic:/etc/chrisomatic:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:rw"
@@ -62,7 +62,7 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd"
       role: "Backend development server"
-      org.chrisproject.role: "ChRIS ultron backEnd"
+      org.chrisproject.role: "ChRIS_ultron_backEnd"
 
   worker:
     image: ${CHRISREPO}/chris:dev

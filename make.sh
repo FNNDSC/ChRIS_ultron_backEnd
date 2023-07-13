@@ -549,12 +549,12 @@ docker compose -f docker-compose_dev.yml run --rm chrisomatic
 
 
 STEP=$(expr $STEP + 4 )
-rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the ChRIS STORE" \
-                        "(unmutable and available to all users)"
+rm -f dc.out ; title -d 1 "Automatically creating a locked pipeline in CUBE"       \
+        "(mutable by the owner and not available to other users)"
     S3_PLUGIN_VER=$(docker run --rm fnndsc/pl-s3retrieve s3retrieve --version)
     SIMPLEDS_PLUGIN_VER=$(docker run --rm fnndsc/pl-simpledsapp simpledsapp --version)
-
     PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
+    PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}_1"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     STR1='[{"title": "pl-s3retrieve", "plugin_name": "pl-s3retrieve", "plugin_version": "'
@@ -563,35 +563,6 @@ rm -f dc.out ; title -d 1 "Automatically creating two unlocked pipelines in the 
     {"name": "awskeyid", "default": "somekeyid"}], "previous_index": null, "previous": null},  {"title":
     "pl-simpledsapp", "plugin_name": "pl-simpledsapp", "plugin_version": "'
     STR3='", "previous_index": 0, "previous": "pl-s3retrieve"}]'
-    PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
-    windowBottom
-    docker compose -f docker-compose_dev.yml                        \
-        exec chris_store python pipelines/services/manager.py       \
-        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
-    dc_check $? "PRINT"
-
-    PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
-    printf "%20s${LightBlue}%60s${NC}\n"                            \
-                "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
-    STR4='[{"title": "pl-simpledsapp1", "plugin_name": "pl-simpledsapp", "plugin_version": "'
-    STR5='", "previous_index": null, "previous": null},{"title": "pl-simpledsapp2", "plugin_name":
-    "pl-simpledsapp", "plugin_version": "'
-    STR6='", "previous_index": 0, "previous": "pl-simpledsapp1"},{"title": "pl-simpledsapp3", "plugin_name":
-    "pl-simpledsapp", "plugin_version": "'
-    STR7='", "previous_index": 0, "previous": "pl-simpledsapp1"}]'
-    PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
-    windowBottom
-    docker compose -f docker-compose_dev.yml                        \
-        exec chris_store python pipelines/services/manager.py       \
-        add "${PIPELINE_NAME}" cubeadmin "${PLUGIN_TREE}" --unlock  &> dc.out
-    dc_check $? "PRINT"
-windowBottom
-
-rm -f dc.out ; title -d 1 "Automatically creating a locked pipeline in CUBE"       \
-        "(mutable by the owner and not available to other users)"
-    PIPELINE_NAME="s3retrieve_v${S3_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}_1"
-    printf "%20s${LightBlue}%60s${NC}\n"                            \
-                "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
     docker compose -f docker-compose_dev.yml                        \
@@ -606,6 +577,12 @@ rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE" 
     PIPELINE_NAME="simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}-simpledsapp_v${SIMPLEDS_PLUGIN_VER}"
     printf "%20s${LightBlue}%60s${NC}\n"                            \
                 "Creating pipeline..." "[ $PIPELINE_NAME ]"         | ./boxes.sh
+    STR4='[{"title": "pl-simpledsapp1", "plugin_name": "pl-simpledsapp", "plugin_version": "'
+    STR5='", "previous_index": null, "previous": null},{"title": "pl-simpledsapp2", "plugin_name":
+    "pl-simpledsapp", "plugin_version": "'
+    STR6='", "previous_index": 0, "previous": "pl-simpledsapp1"},{"title": "pl-simpledsapp3", "plugin_name":
+    "pl-simpledsapp", "plugin_version": "'
+    STR7='", "previous_index": 0, "previous": "pl-simpledsapp1"}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom
     docker compose -f docker-compose_dev.yml                        \
