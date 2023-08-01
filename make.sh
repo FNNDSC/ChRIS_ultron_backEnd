@@ -17,7 +17,7 @@ docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
 #
 # SYNPOSIS
 #
-#   make.sh                     [-h] [-i] [-s] [-U] [-I]        \
+#   make.sh                     [-h] [-o] [-i] [-s] [-U] [-I]        \
 #                               [-O <swarm|kubernetes>]         \
 #                               [-P <hostIp>]                   \
 #                               [-S <storeBase>]                \
@@ -82,6 +82,11 @@ docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
 #
 #       Optional print usage help.
 #
+#   -o
+#
+#       Optional execute the remote PFCON in out-of-network mode. Default is to execute
+#       PFCON in-network with Swift as the shared storage between CUBE and PFCON.
+#
 #   -O <swarm|kubernetes>
 #
 #       Explicitly set the orchestrator. Default is swarm.
@@ -140,6 +145,7 @@ declare -i b_norestartinteractive_chris_dev=0
 declare -i b_skipIntro=0
 declare -i b_skipUnitTests=0
 declare -i b_skipIntegrationTests=0
+declare -i b_pfconInNetwork=1
 
 ORCHESTRATOR=swarm
 HERE=$(pwd)
@@ -206,14 +212,16 @@ dc_check_code () {
 }
 
 print_usage () {
-    echo "Usage: ./make.sh [-h] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
+    echo "Usage: ./make.sh [-h] [-o] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
     exit 1
 }
 
-while getopts ":hisUIO:P:S:" opt; do
+while getopts ":hoisUIO:P:S:" opt; do
     case $opt in
         h) print_usage
            ;;
+        o) b_pfconInNetwork=0
+          ;;
         i) b_norestartinteractive_chris_dev=1
           ;;
         s) b_skipIntro=1
@@ -273,6 +281,13 @@ rm -f dc.out ; title -d 1 "Setting global exports"
     boxcenter "-= ORCHESTRATOR =-"
     boxcenter "$ORCHESTRATOR"                                                    LightCyan
     boxcenter ""
+    if (( b_pfconInNetwork )) ; then
+        echo -e "exporting PFCON_INNETWORK=true"                  | ./boxes.sh
+        export PFCON_INNETWORK=true
+    else
+        echo -e "exporting PFCON_INNETWORK=false"                  | ./boxes.sh
+        export PFCON_INNETWORK=false
+    fi
     if [[ $ORCHESTRATOR == kubernetes ]]; then
         echo -e "HOSTIP=$HOSTIP"                   | ./boxes.sh
         echo -e "exporting REMOTENETWORK=false "   | ./boxes.sh
@@ -546,6 +561,13 @@ fi
 
 # Setup users and plugins
 docker compose -f docker-compose_dev.yml run --rm chrisomatic
+
+# set compute resource 'host' to operate in-network (workaround until chrisomatic supports it)
+if (( b_pfconInNetwork )) ; then
+    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
+    'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
+
+fi
 
 
 STEP=$(expr $STEP + 4 )

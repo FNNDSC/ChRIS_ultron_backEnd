@@ -9,6 +9,8 @@ from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.conf import settings
 
+from pfconclient import client as pfcon
+
 from core.storage import connect_storage
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
@@ -55,9 +57,14 @@ class PluginInstanceManagerTests(TestCase):
         self.plugin_repr.update(self.plg_meta_data)
         self.plugin_repr['parameters'] = plugin_parameters
 
+        token = pfcon.Client.get_auth_token(COMPUTE_RESOURCE_URL + 'auth-token/', 'pfcon',
+                                            'pfcon1234')
+        pfcon_client = pfcon.Client(COMPUTE_RESOURCE_URL, token)
+        pfcon_client.get_server_info()
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user='pfcon',
-            compute_password='pfcon1234')
+            compute_password='pfcon1234', compute_innetwork=pfcon_client.pfcon_innetwork)
 
         # create a plugin
         data = self.plg_meta_data.copy()
@@ -164,12 +171,6 @@ class PluginInstanceManagerTests(TestCase):
     def test_integration_mananger_can_run_and_check_plugin_instance_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
-
-        NB: Note the directory overrides on input and output dirs! This
-            is file system space in the plugin container, and thus by hardcoding
-            this here we are relying on totally out-of-band knowledge! 
-
-            This must be fixed in later versions!
         """
         # upload a file to the Swift storage user's space
         user_space_path = '%s/uploads/' % self.username

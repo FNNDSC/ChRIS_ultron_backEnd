@@ -29,7 +29,7 @@ plugin_readonly_fields = [fld.name for fld in Plugin._meta.fields if
 
 class ComputeResourceAdmin(admin.ModelAdmin):
     readonly_fields = ['creation_date', 'modification_date']
-    list_display = ('name', 'compute_url', 'description', 'id')
+    list_display = ('name', 'compute_url', 'compute_innetwork', 'description', 'id')
     list_filter = ['name', 'creation_date', 'modification_date']
     search_fields = ['name', 'description']
 
@@ -38,8 +38,8 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         Overriden to only show the read/write fields in the add compute resource page.
         """
         self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
-                       'compute_password', 'compute_auth_token', 'description',
-                       'max_job_exec_seconds']
+                       'compute_password', 'compute_auth_token', 'compute_innetwork',
+                       'description', 'max_job_exec_seconds']
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -47,8 +47,9 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         Overriden to show all compute resources's fields in the compute resource page.
         """
         self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
-                       'compute_password', 'compute_auth_token', 'description',
-                       'max_job_exec_seconds', 'creation_date', 'modification_date']
+                       'compute_password', 'compute_auth_token', 'compute_innetwork',
+                       'description', 'max_job_exec_seconds', 'creation_date',
+                       'modification_date']
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
                                             extra_context)
 
@@ -325,8 +326,8 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
         # append write template
         template_data = {'name': '', 'compute_url': '', 'compute_auth_url': '',
                          'compute_user': '', 'compute_password': '',
-                         'compute_auth_token': '', 'description': '',
-                         'max_job_exec_seconds': ''}
+                         'compute_auth_token': '', 'compute_innetwork': '',
+                         'description': '', 'max_job_exec_seconds': ''}
         return services.append_collection_template(response, template_data)
 
 

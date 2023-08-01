@@ -42,6 +42,8 @@ class PluginManager(object):
         parser_add.add_argument('url', help="compute resource's url")
         parser_add.add_argument('--auth_url', help="compute resource's auth url")
         parser_add.add_argument('--auth_token', help="compute resource's auth token")
+        parser_add.add_argument('--innetwork', action='store_true',
+                                help="whether compute resource is in-network")
         parser_add.add_argument('--user', default='pfcon', help="compute resource's user")
         parser_add.add_argument('--password', default='pfcon1234',
                                 help="compute resource's password")
@@ -59,6 +61,8 @@ class PluginManager(object):
         parser_modify.add_argument('--url', help="compute resource's new url")
         parser_modify.add_argument('--auth_url', help="compute resource's auth url")
         parser_modify.add_argument('--auth_token', help="compute resource's auth token")
+        parser_modify.add_argument('--innetwork', action='store_true',
+                                help="whether compute resource is in-network")
         parser_modify.add_argument('--user', help="compute resource's user")
         parser_modify.add_argument('--password', help="compute resource's password")
         parser_modify.add_argument('--description', default='',
@@ -89,8 +93,8 @@ class PluginManager(object):
 
         self.parser = parser
 
-    def add_compute_resource(self, name, url, auth_url, auth_token, user, passw, desc,
-                             maxjobexecsec):
+    def add_compute_resource(self, name, url, auth_url, auth_token, innetwork, user,
+                             passw, desc, maxjobexecsec):
         """
         Add a new compute resource to the system.
         """
@@ -99,7 +103,9 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             data = {'name': name, 'compute_url': url, 'compute_user': user,
-                    'compute_password': passw, 'description': desc}
+                    'compute_password': passw, 'description': desc,
+                    'compute_innetwork': innetwork
+            }
             if auth_url:
                 data['compute_auth_url'] = auth_url
             if auth_token:
@@ -111,8 +117,8 @@ class PluginManager(object):
             cr = compute_resource_serializer.save()
         return cr
 
-    def modify_compute_resource(self, name, new_name, url, auth_url, auth_token, user,
-                                passw, desc, maxjobexecsec):
+    def modify_compute_resource(self, name, new_name, url, auth_url, auth_token,
+                                innetwork, user, passw, desc, maxjobexecsec):
         """
         Modify an existing compute resource and add the current date as a new
         modification date.
@@ -121,7 +127,7 @@ class PluginManager(object):
             cr = ComputeResource.objects.get(name=name)
         except ComputeResource.DoesNotExist:
             raise NameError("Compute resource '%s' does not exists" % name)
-        data = {}
+        data = {'compute_innetwork': innetwork}
         if new_name:
             data['name'] = new_name
         if url:
@@ -285,15 +291,16 @@ class PluginManager(object):
         options = self.parser.parse_args(args)
         if options.subparser_name == 'add':
             self.add_compute_resource(options.computeresource, options.url,
-                                      options.auth_url, options.auth_token, options.user,
+                                      options.auth_url, options.auth_token,
+                                      options.innetwork, options.user,
                                       options.password, options.description,
                                       options.maxjobexecseconds)
         elif options.subparser_name == 'modify':
             self.modify_compute_resource(options.computeresource, options.name,
                                          options.url, options.auth_url,
-                                         options.auth_token, options.user,
-                                         options.password, options.description,
-                                         options.maxjobexecseconds)
+                                         options.auth_token, options.innetwork,
+                                         options.user, options.password,
+                                         options.description, options.maxjobexecseconds)
         elif options.subparser_name == 'register':
             if options.pluginurl:
                 self.register_plugin_by_url(options.pluginurl, options.computeresource,

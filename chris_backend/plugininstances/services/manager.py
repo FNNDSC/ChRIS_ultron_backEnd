@@ -84,6 +84,7 @@ class PluginInstanceManager(object):
 
         cr = self.c_plugin_inst.compute_resource
         self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
+        self.pfcon_client.pfcon_innetwork = cr.compute_innetwork
 
         self.plugin_inst_output_files = set() # set of obj names in object storage
 
@@ -126,14 +127,6 @@ class PluginInstanceManager(object):
             # representing a comma-separated list of paths in obj storage
             inputdirs = inputdirs + path_param_value.split(',')
 
-        # create data file to transmit
-        try:
-            zip_file = self.create_zip_file(inputdirs)
-        except Exception:
-            self.c_plugin_inst.status = 'cancelled'  # giving up
-            self.save_plugin_instance_final_status()
-            return
-
         # create job description dictionary
         job_descriptors = {
             'entrypoint': self._assemble_exec(plugin.selfpath, plugin.selfexec, plugin.execshell),
@@ -148,12 +141,29 @@ class PluginInstanceManager(object):
             'type': plugin_type,
             'env': self._compute_env_vars()
         }
+
+        job_zip_file_content = None
+        job_timeout = 1000
+        if self.pfcon_client.pfcon_innetwork:
+            job_descriptors['input_dirs'] = inputdirs
+        else:
+            # create zip file to transmit
+            try:
+                job_zip_file = self.create_zip_file(inputdirs)
+            except Exception:
+                self.c_plugin_inst.status = 'cancelled'  # giving up
+                self.save_plugin_instance_final_status()
+                return
+            job_zip_file_content = job_zip_file.getvalue()
+            job_timeout = 9000
+
         job_id = self.str_job_id
         pfcon_url = self.pfcon_client.url
         logger.info(f'Submitting job {job_id} to pfcon url -->{pfcon_url}<--, '
                     f'description: {json.dumps(job_descriptors, indent=4)}')
         try:
-            d_resp = self._submit_job(job_id, job_descriptors, zip_file.getvalue())
+            d_resp = self._submit_job(job_id, job_descriptors, job_zip_file_content,
+                                      job_timeout)
         except PfconRequestException as e:
             logger.error(f'[CODE01,{job_id}]: Error submitting job to pfcon url '
                          f'-->{pfcon_url}<--, detail: {str(e)}')
@@ -208,7 +218,7 @@ class PluginInstanceManager(object):
             env.append(f'CHRIS_WORKFLOW_PLG_INSTANCES={workflow_instances_info[:-1]}')
         return env
 
-    def _submit_job(self, job_id, job_descriptors, dfile, timeout=9000):
+    def _submit_job(self, job_id, job_descriptors, dfile, timeout=1000):
         """
         Submit job to a remote pfcon service.
         """
@@ -512,8 +522,7 @@ class PluginInstanceManager(object):
 
     def unpack_zip_file(self, zip_file_content):
         """
-        Unpack job zip file from the remote into swift storage and register the
-        extracted files with the DB.
+        Unpack job zip file from the remote into swift storage.
         """
         job_id = self.str_job_id
         try:
@@ -540,6 +549,45 @@ class PluginInstanceManager(object):
                          f'detail: {str(e)}')
             self.c_plugin_inst.error_code = 'CODE04'
             raise
+
+    def check_files_from_json_exist(self, json_file_content):
+        """
+        Check whether all files listed in the job json file from the remote indeed
+        exist in storage.
+        """
+        job_id = self.str_job_id
+        plg_inst_output_path = self.c_plugin_inst.get_output_path()
+        job_output_path = json_file_content['job_output_path']
+
+        if  job_output_path != plg_inst_output_path:
+            err_msg = f'Received {job_output_path} != {plg_inst_output_path} output path'
+            logger.error(f'[CODE16,{job_id}]: Inconsistency between received '
+                         f'JSON file and storage, detail: {err_msg}')
+            self.c_plugin_inst.error_code = 'CODE16'
+            raise ValueError(err_msg)
+
+        files_from_json = set([os.path.join(job_output_path, p) for p in
+                               json_file_content['rel_file_paths']])
+
+        for i in range(60):  # check for 60 seconds at 1-sec intervals
+            try:
+                files_in_storage = set(self.swift_manager.ls(job_output_path))
+            except ClientException as e:
+                logger.error(f'[CODE15,{job_id}]: Error while listing swift '
+                             f'storage files in {job_output_path}, detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE15'
+                raise
+
+            if not files_from_json.issubset(files_in_storage):
+                if i == 59:
+                    nmissing = len(files_from_json.difference(files_in_storage))
+                    err_msg = f'Missing {nmissing} files in storage'
+                    logger.error(f'[CODE14,{job_id}]: Inconsistency between received '
+                                 f'JSON file and storage, detail: {err_msg}')
+                    self.c_plugin_inst.error_code = 'CODE14'
+                    raise ValueError(err_msg)
+                time.sleep(1)
+        self.plugin_inst_output_files = files_from_json
 
     def save_plugin_instance_final_status(self):
         """
@@ -639,13 +687,17 @@ class PluginInstanceManager(object):
             # only one concurrent async task should get here
             pfcon_url = self.pfcon_client.url
             job_id = self.str_job_id
-            logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
+            logger.info(f'Sending job data file request to pfcon url -->{pfcon_url}<-- '
                         f'for job {job_id}')
             try:
-                zip_content = self._get_job_zip_data(job_id)
+                if self.pfcon_client.pfcon_innetwork:
+                    job_output_path = self.c_plugin_inst.get_output_path()
+                    job_file_content = self._get_job_json_data(job_id, job_output_path)
+                else:
+                    job_file_content = self._get_job_zip_data(job_id)
             except PfconRequestException as e:
-                logger.error(f'[CODE03,{job_id}]: Error fetching zip from pfcon url '
-                             f'-->{pfcon_url}<--, detail: {str(e)}')
+                logger.error(f'[CODE03,{job_id}]: Error fetching data file from pfcon '
+                             f'url -->{pfcon_url}<--, detail: {str(e)}')
                 self.c_plugin_inst.error_code = 'CODE03'
                 self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
@@ -656,10 +708,18 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
 
-                logger.info('Copying output files for job %s into file storage', job_id)
                 try:
-                    self.unpack_zip_file(zip_content)  # upload files from remote
+                    if self.pfcon_client.pfcon_innetwork:
+                        logger.info('Checking that all remote output files for job %s '
+                                    'exist in file storage', job_id)
+                        self.check_files_from_json_exist(job_file_content)
+                    else:
+                        logger.info('Uploading remote output files for job %s to file '
+                                    'storage', job_id)
+                        self.unpack_zip_file(job_file_content)
 
+                    logger.info('Copying local output files for job %s in file storage',
+                                job_id)
                     # upload(copy) files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
@@ -677,6 +737,21 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.status = 'finishedSuccessfully'
             self.delete_plugin_instance_job_from_remote()
             self.save_plugin_instance_final_status()
+
+    def _get_job_json_data(self, job_id, job_output_path, timeout=1000):
+        """
+        Get job json data from a remote in-network pfcon service.
+        """
+        try:
+            json_content = self.pfcon_client.get_job_json_data(job_id, job_output_path,
+                                                              timeout)
+        except PfconRequestInvalidTokenException:
+            logger.info(f'Auth token has expired while getting json data for job'
+                        f' {job_id} from pfcon url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            json_content = self.pfcon_client.get_job_json_data(job_id, job_output_path,
+                                                               timeout)
+        return json_content
 
     def _get_job_zip_data(self, job_id, timeout=9000):
         """
@@ -705,14 +780,19 @@ class PluginInstanceManager(object):
             # only one concurrent async task should get here
             pfcon_url = self.pfcon_client.url
             job_id = self.str_job_id
-            logger.info(f'Sending zip file request to pfcon url -->{pfcon_url}<-- '
+            logger.info(f'Sending job data file request to pfcon url -->{pfcon_url}<-- '
                         f'for job {job_id}')
             try:
-                zip_content = self._get_job_zip_data(job_id)
+                if self.pfcon_client.pfcon_innetwork:
+                    job_output_path = self.c_plugin_inst.get_output_path()
+                    job_file_content = self._get_job_json_data(job_id, job_output_path)
+                else:
+                    job_file_content = self._get_job_zip_data(job_id)
             except PfconRequestException as e:
-                logger.error(f'[CODE03,{job_id}]: Error fetching zip from pfcon url '
-                             f'-->{pfcon_url}<--, detail: {str(e)}')
+                logger.error(f'[CODE03,{job_id}]: Error fetching data file from pfcon '
+                             f'url -->{pfcon_url}<--, detail: {str(e)}')
                 self.c_plugin_inst.error_code = 'CODE03'
+                self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
                 # data successfully downloaded so update summary and instance status
                 d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
@@ -721,9 +801,16 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.status = 'registeringFiles'
                 self.c_plugin_inst.save()  # inform FE about status change
 
-                logger.info('Copying output files for job %s into file storage', job_id)
                 try:
-                    self.unpack_zip_file(zip_content)  # upload files from remote
+                    if self.pfcon_client.pfcon_innetwork:
+                        logger.info('Checking that all remote output files for job %s '
+                                    'exist in file storage', job_id)
+                        self.check_files_from_json_exist(job_file_content)
+                    else:
+                        logger.info('Uploading remote output files for job %s to file '
+                                    'storage', job_id)
+                        self.unpack_zip_file(job_file_content)
+
                     self._register_output_files() # register output files in the DB
                 except Exception:
                     pass  # giving up
