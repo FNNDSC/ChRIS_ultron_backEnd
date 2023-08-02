@@ -236,6 +236,7 @@ services:
       - "8080:8080"
     networks:
       - local
+      - remote  # only needed for pfcon operating in-network
     labels:
       name: "Swift"
       role: "Swift object storage service"

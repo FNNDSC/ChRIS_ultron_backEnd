@@ -30,6 +30,7 @@ class ComputeResource(models.Model):
     name = models.CharField(max_length=100, unique=True)
     compute_url = models.URLField(max_length=300)
     compute_auth_url = models.URLField(max_length=350, blank=True)
+    compute_innetwork = models.BooleanField(blank=True, default=False)
     compute_user = models.CharField(max_length=32)
     compute_password = models.CharField(max_length=100)
     compute_auth_token = models.CharField(max_length=500, blank=True,

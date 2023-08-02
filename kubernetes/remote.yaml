@@ -47,6 +47,7 @@ spec:
           ports:
             - containerPort: 30005
           env:
+            # The SWIFT-related env variables are not needed/used when PFCON_INNETWORK is false
             - name: PFCON_USER
               value: "pfcon"
             - name: PFCON_PASSWORD
@@ -55,6 +56,16 @@ spec:
               value: "w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k"
             - name: COMPUTE_SERVICE_URL
               value: http://pman:5010/api/v1/
+            - name: PFCON_INNETWORK
+              value: ${PFCON_INNETWORK}
+            - name: SWIFT_AUTH_URL
+              value: http://${HOSTIP}:8080/auth/v1.0
+            - name: SWIFT_USERNAME
+              value: chris:chris1234
+            - name: SWIFT_KEY
+              value: testing
+            - name: SWIFT_CONTAINER_NAME
+              value: users
           command: ["gunicorn"]
           args: ["-w", "5", "-b", "0.0.0.0:30005", "-t",  "200", "pfcon.wsgi:application"]
           volumeMounts:

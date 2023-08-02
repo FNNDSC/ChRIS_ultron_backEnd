@@ -13,6 +13,7 @@ from django.conf import settings
 from rest_framework import status
 
 from celery.contrib.testing.worker import start_worker
+from pfconclient import client as pfcon
 
 from core.celery import app as celery_app
 from core.celery import task_routes
@@ -44,9 +45,15 @@ class ViewTests(TestCase):
 
         self.content_type = 'application/vnd.collection+json'
 
+        token = pfcon.Client.get_auth_token(COMPUTE_RESOURCE_URL + 'auth-token/', 'pfcon',
+                                            'pfcon1234')
+        pfcon_client = pfcon.Client(COMPUTE_RESOURCE_URL, token)
+        pfcon_client.get_server_info()
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
-            compute_password=self.compute_password)
+            compute_password=self.compute_password,
+            compute_innetwork=pfcon_client.pfcon_innetwork)
 
         # create the chris superuser and two additional users
         User.objects.create_user(username=self.chris_username,
@@ -107,9 +114,15 @@ class TasksViewTests(TransactionTestCase):
         self.compute_password = 'pfcon1234'
         self.content_type = 'application/vnd.collection+json'
 
+        token = pfcon.Client.get_auth_token(COMPUTE_RESOURCE_URL + 'auth-token/', 'pfcon',
+                                            'pfcon1234')
+        pfcon_client = pfcon.Client(COMPUTE_RESOURCE_URL, token)
+        pfcon_client.get_server_info()
+
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
-            compute_password=self.compute_password)
+            compute_password=self.compute_password,
+            compute_innetwork=pfcon_client.pfcon_innetwork)
 
         # create the chris superuser and two additional users
         User.objects.create_user(username=self.chris_username,
@@ -148,6 +161,7 @@ class PluginInstanceListViewTests(TasksViewTests):
 
     def setUp(self):
         super(PluginInstanceListViewTests, self).setUp()
+
         plugin = Plugin.objects.get(meta__name="pacspull")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.user_space_path = '%s/uploads/' % self.username
@@ -317,15 +331,11 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.plugin_repr.update(self.plg_meta_data)
         self.plugin_repr['parameters'] = plugin_parameters
 
-        (compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user=self.compute_user,
-            compute_password=self.compute_password)
-
         data = self.plg_meta_data.copy()
         (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
         data = self.plg_data.copy()
         (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
-        plugin.compute_resources.set([compute_resource])
+        plugin.compute_resources.set([self.compute_resource])
         plugin.save()
 
         # add plugin's parameters
