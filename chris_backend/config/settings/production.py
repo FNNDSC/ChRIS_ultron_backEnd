@@ -53,14 +53,14 @@ DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 
 
-# SWIFT SERVICE CONFIGURATION
+# STORAGE CONFIGURATION
 # ------------------------------------------------------------------------------
-DEFAULT_FILE_STORAGE = get_secret('DEFAULT_FILE_STORAGE')
+STORAGE_ENV = get_secret('STORAGE_ENV')
+if STORAGE_ENV not in ('swift', 'filesystem'):
+    raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
-if DEFAULT_FILE_STORAGE == 'django.core.files.storage.FileSystemStorage':
-    MEDIA_ROOT = get_secret('MEDIA_ROOT')
-    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE, MEDIA_ROOT=MEDIA_ROOT)
-elif DEFAULT_FILE_STORAGE == 'swift.storage.SwiftStorage':
+if STORAGE_ENV == 'swift':
+    DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
     SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
     SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
     SWIFT_KEY = get_secret('SWIFT_KEY')
@@ -73,6 +73,11 @@ elif DEFAULT_FILE_STORAGE == 'swift.storage.SwiftStorage':
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
+elif STORAGE_ENV == 'filesystem':
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    MEDIA_ROOT = get_secret('MEDIA_ROOT')
+    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
+                                                       MEDIA_ROOT=MEDIA_ROOT)
 else:
     verify_storage = lambda: verify_storage_connection()
 

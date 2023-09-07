@@ -151,11 +151,11 @@ class FileBrowserPathFileListViewTests(FileBrowserViewTests):
         super(FileBrowserPathFileListViewTests, self).setUp()
 
         # create a file in the DB "already uploaded" to the server)
-        self.swift_manager = connect_storage(settings)
-        # upload file to Swift storage
+        self.storage_manager = connect_storage(settings)
+        # upload file to storage
         self.upload_path = f'{self.username}/uploads/file2.txt'
         with io.StringIO("test file") as file1:
-            self.swift_manager.upload_obj(self.upload_path, file1.read(),
+            self.storage_manager.upload_obj(self.upload_path, file1.read(),
                                          content_type='text/plain')
         user = User.objects.get(username=self.username)
         uploadedfile = UploadedFile(owner=user)
@@ -166,8 +166,8 @@ class FileBrowserPathFileListViewTests(FileBrowserViewTests):
                                 kwargs={"path": f'{self.username}/uploads'})
 
     def tearDown(self):
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(self.upload_path)
+        # delete file from storage
+        self.storage_manager.delete_obj(self.upload_path)
 
         super(FileBrowserPathFileListViewTests, self).tearDown()
 

@@ -57,7 +57,6 @@ from django.conf import settings
 from django.db.utils import IntegrityError
 
 from core.storage import connect_storage
-from swiftclient.exceptions import ClientException
 from core.utils import json_zip2str
 from core.models import ChrisInstance
 from plugininstances.models import PluginInstance, PluginInstanceFile, PluginInstanceLock
@@ -88,7 +87,8 @@ class PluginInstanceManager(object):
 
         self.plugin_inst_output_files = set() # set of obj names in object storage
 
-        self.swift_manager = connect_storage(settings)
+        self.storage_manager = connect_storage(settings)
+        self.storage_env = settings.STORAGE_ENV
 
     def _refresh_compute_resource_auth_token(self):
         """
@@ -111,21 +111,22 @@ class PluginInstanceManager(object):
         plugin = self.c_plugin_inst.plugin
         plugin_type = plugin.meta.type
         inputdirs = []
-        try:
-            if plugin_type == 'ds':
-                inputdirs.append(self.get_previous_output_path())
-            else:
-                inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
-        except Exception:
-            self.c_plugin_inst.status = 'cancelled'  # giving up
-            self.save_plugin_instance_final_status()
-            return
 
         d_unextpath_params, d_path_params = self.get_plugin_instance_path_parameters()
         for path_param_value in [param_value for param_value in d_path_params.values()]:
             # the value of each parameter of type 'path' is a string
             # representing a comma-separated list of paths in obj storage
             inputdirs = inputdirs + path_param_value.split(',')
+
+        try:
+            if plugin_type == 'ds':
+                inputdirs.append(self.get_previous_output_path())
+            elif not inputdirs:
+                inputdirs.append(self.manage_plugin_instance_app_empty_inputdir())
+        except Exception:
+            self.c_plugin_inst.status = 'cancelled'  # giving up
+            self.save_plugin_instance_final_status()
+            return
 
         # create job description dictionary
         job_descriptors = {
@@ -144,8 +145,16 @@ class PluginInstanceManager(object):
 
         job_zip_file_content = None
         job_timeout = 1000
+
         if self.pfcon_client.pfcon_innetwork:
             job_descriptors['input_dirs'] = inputdirs
+
+            if self.storage_env == 'filesystem':
+                job_timeout = 200
+                output_dir = self.c_plugin_inst.get_output_path()
+                # remote pfcon requires both the input and output dirs to exist
+                os.makedirs(os.path.join(settings.MEDIA_ROOT, output_dir), exist_ok=True)
+                job_descriptors['output_dir'] = output_dir
         else:
             # create zip file to transmit
             try:
@@ -366,15 +375,15 @@ class PluginInstanceManager(object):
         fnames = [f.fname.name for f in previous.files.all()]
         for i in range(20):  # loop to deal with eventual consistency
             try:
-                l_ls = self.swift_manager.ls(output_path)
-            except ClientException as e:
-                logger.error(f'[CODE06,{job_id}]: Error while listing swift '
-                             f'storage files in {output_path}, detail: {str(e)}')
+                l_ls = self.storage_manager.ls(output_path)
+            except Exception as e:
+                logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
+                             f'in {output_path}, detail: {str(e)}')
             else:
                 if all(obj in l_ls for obj in fnames):
                     return output_path
             time.sleep(3)
-        logger.error(f'[CODE11,{job_id}]: Error while listing swift storage files in '
+        logger.error(f'[CODE11,{job_id}]: Error while listing storage files in '
                      f'{output_path}, detail: Presumable eventual consistency problem')
         self.c_plugin_inst.error_code = 'CODE11'
         raise NameError('Presumable eventual consistency problem.')
@@ -447,10 +456,10 @@ class PluginInstanceManager(object):
                 raise
             output_path = plg_inst.get_output_path()
             try:
-                l_ls = self.swift_manager.ls(output_path)
-            except ClientException as e:
-                logger.error(f'[CODE06,{job_id}]: Error while listing swift '
-                             f'storage files in {output_path}, detail: {str(e)}')
+                l_ls = self.storage_manager.ls(output_path)
+            except Exception as e:
+                logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
+                             f'in {output_path}, detail: {str(e)}')
                 self.c_plugin_inst.error_code = 'CODE06'
                 raise
             if (i < len(regexs)) and regexs[i]:
@@ -469,9 +478,9 @@ class PluginInstanceManager(object):
         is only a requirement for DS plugins. Nonetheless, the remote services do
         require some non-zero inputdir spec in order to operate correctly.
 
-        The hack here is to store data somewhere in swift and accessing it as a
+        The hack here is to store data somewhere in storage and accessing it as a
         "pseudo" inputdir for FS and TS plugins. We create a "dummy" inputdir with a
-        small dummy text file in swift storage. This is then transmitted as an 'inputdir'
+        small dummy text file in storage. This is then transmitted as an 'inputdir'
         to the compute environment and can be completely ignored by the plugin.
         """
         job_id = self.str_job_id
@@ -480,49 +489,49 @@ class PluginInstanceManager(object):
         str_squashFile = os.path.join(str_inputdir, 'squashEmptyDir.txt')
         str_squashMsg = 'Empty input dir.'
         try:
-            if not self.swift_manager.obj_exists(str_squashFile):
+            if not self.storage_manager.obj_exists(str_squashFile):
                 with io.StringIO(str_squashMsg) as f:
-                    self.swift_manager.upload_obj(str_squashFile, f.read(),
-                                                  content_type='text/plain')
-        except ClientException as e:
+                    self.storage_manager.upload_obj(str_squashFile, f.read(),
+                                                    content_type='text/plain')
+        except Exception as e:
             logger.error(f'[CODE07,{job_id}]: Error while uploading file '
-                         f'{str_squashFile} to swift storage, detail: {str(e)}')
+                         f'{str_squashFile} to storage, detail: {str(e)}')
             self.c_plugin_inst.error_code = 'CODE07'
             raise
         return str_inputdir
 
-    def create_zip_file(self, swift_paths):
+    def create_zip_file(self, storage_paths):
         """
-        Create job zip file ready for transmission to the remote from a list of swift
-        storage paths (prefixes).
+        Create job zip file ready for transmission to the remote from a list of storage
+        paths (prefixes).
         """
         job_id = self.str_job_id
         memory_zip_file = io.BytesIO()
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
-            for swift_path in swift_paths:
+            for storage_path in storage_paths:
                 try:
-                    l_ls = self.swift_manager.ls(swift_path)
-                except ClientException as e:
-                    logger.error(f'[CODE06,{job_id}]: Error while listing swift '
-                                 f'storage files in {swift_path}, detail: {str(e)}')
+                    l_ls = self.storage_manager.ls(storage_path)
+                except Exception as e:
+                    logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
+                                 f'in {storage_path}, detail: {str(e)}')
                     self.c_plugin_inst.error_code = 'CODE06'
                     raise
                 for obj_path in l_ls:
                     try:
-                        contents = self.swift_manager.download_obj(obj_path)
-                    except ClientException as e:
+                        contents = self.storage_manager.download_obj(obj_path)
+                    except Exception as e:
                         logger.error(f'[CODE08,{job_id}]: Error while downloading file '
-                                     f'{obj_path} from swift storage, detail: {str(e)}')
+                                     f'{obj_path} from storage, detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE08'
                         raise
-                    zip_path = obj_path.replace(swift_path, '', 1).lstrip('/')
+                    zip_path = obj_path.replace(storage_path, '', 1).lstrip('/')
                     job_data_zip.writestr(zip_path, contents)
         memory_zip_file.seek(0)
         return memory_zip_file
 
     def unpack_zip_file(self, zip_file_content):
         """
-        Unpack job zip file from the remote into swift storage.
+        Unpack job zip file from the remote into storage.
         """
         job_id = self.str_job_id
         try:
@@ -533,16 +542,16 @@ class PluginInstanceManager(object):
                 output_path = self.c_plugin_inst.get_output_path() + '/'
                 for fname in filenames:
                     content = job_zip.read(fname)
-                    swift_fname = output_path + fname.lstrip('/')
+                    storage_fname = output_path + fname.lstrip('/')
                     try:
-                        self.swift_manager.upload_obj(swift_fname, content)
-                    except ClientException as e:
+                        self.storage_manager.upload_obj(storage_fname, content)
+                    except Exception as e:
                         logger.error(f'[CODE07,{job_id}]: Error while uploading file '
-                                     f'{swift_fname} to swift storage, detail: {str(e)}')
+                                     f'{storage_fname} to storage, detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE07'
-                        raise
-                    self.plugin_inst_output_files.add(swift_fname)
-        except ClientException:
+                        raise ValueError(str(e))
+                    self.plugin_inst_output_files.add(storage_fname)
+        except ValueError:
             raise
         except Exception as e:
             logger.error(f'[CODE04,{job_id}]: Received bad zip file from remote, '
@@ -571,10 +580,10 @@ class PluginInstanceManager(object):
 
         for i in range(60):  # check for 60 seconds at 1-sec intervals
             try:
-                files_in_storage = set(self.swift_manager.ls(job_output_path))
-            except ClientException as e:
-                logger.error(f'[CODE15,{job_id}]: Error while listing swift '
-                             f'storage files in {job_output_path}, detail: {str(e)}')
+                files_in_storage = set(self.storage_manager.ls(job_output_path))
+            except Exception as e:
+                logger.error(f'[CODE15,{job_id}]: Error while listing storage files '
+                             f'in {job_output_path}, detail: {str(e)}')
                 self.c_plugin_inst.error_code = 'CODE15'
                 raise
 
@@ -605,13 +614,12 @@ class PluginInstanceManager(object):
         plugin instance app.
 
         NOTE:
-        Full swift path names are now preserved in the copy process, allowing
+        Full storage path names are now preserved in the copy process, allowing
         for each copy argument to be preserved in its own directory tree in the
         destination.
 
         NB: This preservation could exhaust DB string lengths!
         """
-        str_sourceTraceDir      : str = ''
         job_id                  : str = self.str_job_id
         outputdir               : str = self.c_plugin_inst.get_output_path()
 
@@ -620,10 +628,10 @@ class PluginInstanceManager(object):
             path_list = unextpath_parameters_dict[param_flag].split(',')
             for path in path_list:
                 try:
-                    obj_list = self.swift_manager.ls(path)
-                except ClientException as e:
-                    logger.error(f'[CODE06,{job_id}]: Error while listing swift '
-                                 f'storage files in {path}, detail: {str(e)}')
+                    obj_list = self.storage_manager.ls(path)
+                except Exception as e:
+                    logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
+                                 f'in {path}, detail: {str(e)}')
                     self.c_plugin_inst.error_code = 'CODE06'
                     raise
                 for obj in obj_list:
@@ -635,11 +643,11 @@ class PluginInstanceManager(object):
 
                     obj_output_path = outputdir + '/' + str_sourceTraceDir + '/' + '/'.join(obj.split('/')[2:])
                     try:
-                        if not self.swift_manager.obj_exists(obj_output_path):
-                            self.swift_manager.copy_obj(obj, obj_output_path)
-                    except ClientException as e:
+                        if not self.storage_manager.obj_exists(obj_output_path):
+                            self.storage_manager.copy_obj(obj, obj_output_path)
+                    except Exception as e:
                         logger.error(f'[CODE09,{job_id}]: Error while copying file '
-                                     f'from {obj} to {obj_output_path} in swift storage, '
+                                     f'from {obj} to {obj_output_path} in storage, '
                                      f'detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE09'
                         raise
@@ -663,11 +671,11 @@ class PluginInstanceManager(object):
             for obj in obj_list:
                 obj_output_path = obj.replace(plg_inst_output_path, plg_inst_outputdir, 1)
                 try:
-                    if not self.swift_manager.obj_exists(obj_output_path):
-                        self.swift_manager.copy_obj(obj, obj_output_path)
-                except ClientException as e:
+                    if not self.storage_manager.obj_exists(obj_output_path):
+                        self.storage_manager.copy_obj(obj, obj_output_path)
+                except Exception as e:
                     logger.error(f'[CODE09,{job_id}]: Error while copying file '
-                                 f'from {obj} to {obj_output_path} in swift storage, '
+                                 f'from {obj} to {obj_output_path} in storage, '
                                  f'detail: {str(e)}')
                     self.c_plugin_inst.error_code = 'CODE09'
                     raise

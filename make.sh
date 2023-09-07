@@ -17,8 +17,9 @@ docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
 #
 # SYNPOSIS
 #
-#   make.sh                     [-h] [-o] [-i] [-s] [-U] [-I]        \
+#   make.sh                     [-h] [-o] [-i] [-s] [-U] [-I]   \
 #                               [-O <swarm|kubernetes>]         \
+#                               [-F <swift|filesystem>]         \
 #                               [-P <hostIp>]                   \
 #                               [-S <storeBase>]                \
 #                               [local|fnndsc[:dev]]
@@ -55,6 +56,10 @@ docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
 #
 #  ./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
 #
+#    Run full CUBE instantiation using filesystem storage:
+#
+#  ./unmake.sh -F filesystem; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -F filesystem
+#
 #   Skip unit and integration tests and skip the intro
 #   (the "quick-n-dirty" way -- when you are deep in dev mode and
 #   restarting the system for the 50th time on a Monday morning):
@@ -86,6 +91,10 @@ docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
 #
 #       Optional execute the remote PFCON in out-of-network mode. Default is to execute
 #       PFCON in-network with Swift as the shared storage between CUBE and PFCON.
+#
+#   -F <swift|filesystem>]
+#
+#       Explicitly set the storage environment. Default is swift.
 #
 #   -O <swarm|kubernetes>
 #
@@ -148,6 +157,7 @@ declare -i b_skipIntegrationTests=0
 declare -i b_pfconInNetwork=1
 
 ORCHESTRATOR=swarm
+STORAGE_ENV=swift
 HERE=$(pwd)
 CREPO=fnndsc
 
@@ -212,11 +222,11 @@ dc_check_code () {
 }
 
 print_usage () {
-    echo "Usage: ./make.sh [-h] [-o] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
+    echo "Usage: ./make.sh [-h] [-o] [-i] [-s] [-U] [-I] [-O <swarm|kubernetes>] [-F <swift|filesystem>] [-P <hostIp>] [-S <storeBase>] [local|fnndsc[:dev]]"
     exit 1
 }
 
-while getopts ":hoisUIO:P:S:" opt; do
+while getopts ":hoisUIO:F:P:S:" opt; do
     case $opt in
         h) print_usage
            ;;
@@ -233,6 +243,12 @@ while getopts ":hoisUIO:P:S:" opt; do
         O) ORCHESTRATOR=$OPTARG
            if ! [[ "$ORCHESTRATOR" =~ ^(swarm|kubernetes)$ ]]; then
               echo "Invalid value for option -- O"
+              print_usage
+           fi
+           ;;
+        F) STORAGE_ENV=$OPTARG
+           if ! [[ "$STORAGE_ENV" =~ ^(swift|filesystem)$ ]]; then
+              echo "Invalid value for option -- F"
               print_usage
            fi
            ;;
@@ -281,13 +297,17 @@ rm -f dc.out ; title -d 1 "Setting global exports"
     boxcenter "-= ORCHESTRATOR =-"
     boxcenter "$ORCHESTRATOR"                                                    LightCyan
     boxcenter ""
+    boxcenter "exporting STORAGE_ENV=$STORAGE_ENV "
+    export STORAGE_ENV=$STORAGE_ENV
+    boxcenter ""
     if (( b_pfconInNetwork )) ; then
-        echo -e "exporting PFCON_INNETWORK=true"                  | ./boxes.sh
+        boxcenter "exporting PFCON_INNETWORK=true "
         export PFCON_INNETWORK=true
     else
-        echo -e "exporting PFCON_INNETWORK=false"                  | ./boxes.sh
+        boxcenter "exporting PFCON_INNETWORK=false "
         export PFCON_INNETWORK=false
     fi
+    boxcenter ""
     if [[ $ORCHESTRATOR == kubernetes ]]; then
         echo -e "HOSTIP=$HOSTIP"                   | ./boxes.sh
         echo -e "exporting REMOTENETWORK=false "   | ./boxes.sh
@@ -472,21 +492,38 @@ rm -f dc.out ; title -d 1 "Waiting for remote pfcon containers to start running 
     fi
 windowBottom
 
-rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
+if [[ $STORAGE_ENV == 'swift' ]]; then
+    rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
                         "./docker-compose_dev.yml"
-    echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
-    echo "$ docker compose -f docker-compose_dev.yml up -d --build" | ./boxes.sh LightCyan
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
+        echo "$ docker compose -f docker-compose_dev.yml up -d --build" | ./boxes.sh LightCyan
+        windowBottom
+        docker compose -f docker-compose_dev.yml up -d --build  >& dc.out
+        dc_check $? "PRINT"
     windowBottom
-    docker compose -f docker-compose_dev.yml up -d --build  >& dc.out
-    dc_check $? "PRINT"
-windowBottom
+elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+    rm -f dc.out ; title -d 1  "Starting CUBE containerized development environment using "            \
+                            "./docker-compose_noswift.yml"
+        echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
+        echo "$ docker compose -f docker-compose_noswift.yml up -d --build" | ./boxes.sh LightCyan
+        windowBottom
+        docker compose -f docker-compose_noswift.yml up -d --build  >& dc.out
+        dc_check $? "PRINT"
+    windowBottom
+fi
 
 rm -f dc.out ; title -d 1 "Waiting until ChRIS database server is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker compose -f docker-compose_dev.yml        \
-        exec chris_dev_db sh -c                     \
-        'while ! psql -U chris -d chris_dev -c "select 1" > dc.out 2> /dev/null; do sleep 5; done;'
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml        \
+            exec chris_dev_db sh -c                     \
+            'while ! psql -U chris -d chris_dev -c "select 1" > dc.out 2> /dev/null; do sleep 5; done;'
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml        \
+            exec chris_dev_db sh -c                     \
+            'while ! psql -U chris -d chris_dev -c "select 1" > dc.out 2> /dev/null; do sleep 5; done;'
+    fi
     dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     boxcenter "ChRIS database is ready to accept connections"                    LightGreen
@@ -496,10 +533,17 @@ windowBottom
 rm -f dc.out ; title -d 1 "Waiting until CUBE is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker compose -f docker-compose_dev.yml        \
-        exec chris_dev sh -c                        \
-        'while ! curl -sSf http://localhost:8000/api/v1/users/ >/dev/null 2>/dev/null ; do sleep 5; done;' \
-        > dc.out 2>&1
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml        \
+            exec chris_dev sh -c                        \
+            'while ! curl -sSf http://localhost:8000/api/v1/users/ >/dev/null 2>/dev/null ; do sleep 5; done;' \
+            > dc.out 2>&1
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml        \
+            exec chris_dev sh -c                        \
+            'while ! curl -sSf http://localhost:8000/api/v1/users/ >/dev/null 2>/dev/null ; do sleep 5; done;' \
+            > dc.out 2>&1
+    fi
     dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     boxcenter "CUBE API is ready to accept connections"                          LightGreen
@@ -509,11 +553,19 @@ windowBottom
 rm -f dc.out ; title -d 1 "Waiting until remote pfcon is ready to accept connections"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker compose -f docker-compose_dev.yml        \
-        exec chris_dev sh -c                        \
-        'while ! curl -sSf http://pfcon.remote:30005/api/v1/health/ 2> /dev/null; do
-        sleep 5; done;' \
-                                > dc.out
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml        \
+            exec chris_dev sh -c                        \
+            'while ! curl -sSf http://pfcon.remote:30005/api/v1/health/ 2> /dev/null; do
+            sleep 5; done;' \
+                                    > dc.out
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml        \
+            exec chris_dev sh -c                        \
+            'while ! curl -sSf http://pfcon.remote:30005/api/v1/health/ 2> /dev/null; do
+            sleep 5; done;' \
+                                    > dc.out
+    fi
     dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     echo ""                                                         | ./boxes.sh
@@ -525,9 +577,15 @@ if (( ! b_skipUnitTests )) ; then
     rm -f dc.out ; title -d 1 "Running CUBE Unit tests"
     echo "This might take a few minutes... please be patient."      | ./boxes.sh Yellow
     windowBottom
-    docker compose -f docker-compose_dev.yml    \
-        exec chris_dev python manage.py         \
-        test --exclude-tag integration
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml    \
+            exec chris_dev python manage.py         \
+            test --exclude-tag integration
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml    \
+            exec chris_dev python manage.py         \
+            test --exclude-tag integration
+    fi
     status=$?
     rm -f dc.out ; title -d 1 "CUBE Unit tests' results"
     if (( $status == 0 )) ; then
@@ -544,9 +602,15 @@ if (( ! b_skipIntegrationTests )) ; then
     rm -f dc.out ; title -d 1 "Running CUBE Integration tests"
     echo "This might take a while... please be patient."            | ./boxes.sh Yellow
     windowBottom
-    docker compose -f docker-compose_dev.yml    \
-        exec chris_dev python manage.py         \
-        test --tag integration
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml    \
+            exec chris_dev python manage.py         \
+            test --tag integration
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml    \
+            exec chris_dev python manage.py         \
+            test --tag integration
+    fi
     status=$?
     rm -f dc.out ; title -d 1 "CUBE Integration tests' results"
     if (( $status == 0 )) ; then
@@ -560,13 +624,22 @@ if (( ! b_skipIntegrationTests )) ; then
 fi
 
 # Setup users and plugins
-docker compose -f docker-compose_dev.yml run --rm chrisomatic
+if [[ $STORAGE_ENV == 'swift' ]]; then
+    docker compose -f docker-compose_dev.yml run --rm chrisomatic
+elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+    docker compose -f docker-compose_noswift.yml run --rm chrisomatic
+fi
 
 # set compute resource 'host' to operate in-network (workaround until chrisomatic supports it)
 if (( b_pfconInNetwork )) ; then
-    docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
-    'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
+            'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker-compose -f docker-compose_noswift.yml exec chris_dev /bin/bash -c \
+            'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
 
+    fi
 fi
 
 
@@ -587,10 +660,17 @@ rm -f dc.out ; title -d 1 "Automatically creating a locked pipeline in CUBE"    
     STR3='", "previous_index": 0, "previous": "pl-s3retrieve"}]'
     PLUGIN_TREE=${STR1}${S3_PLUGIN_VER}${STR2}${SIMPLEDS_PLUGIN_VER}${STR3}
     windowBottom
-    docker compose -f docker-compose_dev.yml                        \
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
                 cube "${PLUGIN_TREE}" >& dc.out
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml                        \
+        exec chris_dev                                              \
+        python pipelines/services/manager.py add "${PIPELINE_NAME}" \
+                cube "${PLUGIN_TREE}" >& dc.out
+    fi
     dc_check $? "PRINT"
 windowBottom
 
@@ -607,10 +687,17 @@ rm -f dc.out ; title -d 1 "Automatically creating an unlocked pipeline in CUBE" 
     STR7='", "previous_index": 0, "previous": "pl-simpledsapp1"}]'
     PLUGIN_TREE=${STR4}${SIMPLEDS_PLUGIN_VER}${STR5}${SIMPLEDS_PLUGIN_VER}${STR6}${SIMPLEDS_PLUGIN_VER}${STR7}
     windowBottom
+    if [[ $STORAGE_ENV == 'swift' ]]; then
     docker compose -f docker-compose_dev.yml                        \
         exec chris_dev                                              \
         python pipelines/services/manager.py add "${PIPELINE_NAME}" \
         cube "${PLUGIN_TREE}" --unlock >& dc.out
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+    docker compose -f docker-compose_noswift.yml                        \
+        exec chris_dev                                              \
+        python pipelines/services/manager.py add "${PIPELINE_NAME}" \
+        cube "${PLUGIN_TREE}" --unlock >& dc.out
+    fi
     dc_check $? "PRINT"
 windowBottom
 
@@ -618,7 +705,11 @@ rm -f dc.out ; title -d 1 "Restarting CUBE's Django development server"
     printf "${LightCyan}%40s${LightGreen}%40s\n"                \
                 "Restarting" "chris_dev"                        | ./boxes.sh
     windowBottom
-    docker compose -f docker-compose_dev.yml restart chris_dev >& dc.out
+    if [[ $STORAGE_ENV == 'swift' ]]; then
+        docker compose -f docker-compose_dev.yml restart chris_dev >& dc.out
+    elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+        docker compose -f docker-compose_noswift.yml restart chris_dev >& dc.out
+    fi
     dc_check $?
 windowBottom
 

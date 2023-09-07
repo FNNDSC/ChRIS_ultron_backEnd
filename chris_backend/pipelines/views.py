@@ -128,19 +128,19 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         """
-        Overriden to delete the pipeline's source file from swift storage.
+        Overriden to delete the pipeline's source file from storage.
         """
-        swift_path = ''
+        storage_path = ''
         if hasattr(instance, 'source_file'):
-            swift_path = instance.source_file.fname.name
+            storage_path = instance.source_file.fname.name
         instance.delete()
-        if swift_path:
-            swift_manager = connect_storage(settings)
+        if storage_path:
+            storage_manager = connect_storage(settings)
 
             try:
-                swift_manager.delete_obj(swift_path)
+                storage_manager.delete_obj(storage_path)
             except Exception as e:
-                logger.error('Swift storage error, detail: %s' % str(e))
+                logger.error('Storage error, detail: %s' % str(e))
 
 
 class PipelineCustomJsonDetail(generics.RetrieveAPIView):
