@@ -45,7 +45,7 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to associate a Swift storage path with the newly created pacs file.
+        Overriden to associate a storage path with the newly created pacs file.
         """
         # remove path as it is not part of the model and then compute fname
         path = validated_data.pop('path')
@@ -75,14 +75,14 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
         if not path.startswith('SERVICES/PACS/'):
             raise serializers.ValidationError(
                 ["File path must start with 'SERVICES/PACS/'."])
-        # verify that the file is indeed already in Swift
-        swift_manager = connect_storage(settings)
+        # verify that the file is indeed already in storage
+        storage_manager = connect_storage(settings)
         try:
-            swift_path_exists = swift_manager.obj_exists(path)
+            storage_path_exists = storage_manager.obj_exists(path)
         except Exception as e:
-            logger.error('Swift storage error, detail: %s' % str(e))
+            logger.error('Storage error, detail: %s' % str(e))
             raise serializers.ValidationError(["Could not find this path."])
-        if not swift_path_exists:
+        if not storage_path_exists:
             raise serializers.ValidationError(["Could not find this path."])
         return path
 

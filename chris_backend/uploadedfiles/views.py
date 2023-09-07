@@ -90,30 +90,28 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         """
-        Overriden to delete the old path in swift.
+        Overriden to delete the old path from storage.
         """
         user_file = self.get_object()
-        old_swift_path = user_file.fname.name
+        old_storage_path = user_file.fname.name
         serializer.save()
-        swift_manager = connect_storage(settings)
-
+        storage_manager = connect_storage(settings)
         try:
-            swift_manager.delete_obj(old_swift_path)
+            storage_manager.delete_obj(old_storage_path)
         except Exception as e:
-            logger.error('Swift storage error, detail: %s' % str(e))
+            logger.error('Storage error, detail: %s' % str(e))
 
     def perform_destroy(self, instance):
         """
-        Overriden to delete the file from swift storage.
+        Overriden to delete the file from storage.
         """
-        swift_path = instance.fname.name
+        storage_path = instance.fname.name
         instance.delete()
-        swift_manager = connect_storage(settings)
-
+        storage_manager = connect_storage(settings)
         try:
-            swift_manager.delete_obj(swift_path)
+            storage_manager.delete_obj(storage_path)
         except Exception as e:
-            logger.error('Swift storage error, detail: %s' % str(e))
+            logger.error('Storage error, detail: %s' % str(e))
 
 
 class UploadedFileResource(generics.GenericAPIView):

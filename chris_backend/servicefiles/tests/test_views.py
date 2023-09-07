@@ -35,20 +35,20 @@ class ServiceFileViewTests(TestCase):
         service.save()
 
         # create a service file in the DB "already registered" to the server)
-        self.swift_manager = connect_storage(settings)
+        self.storage_manager = connect_storage(settings)
 
-        # upload file to Swift storage
+        # upload file to storage
         self.path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
         with io.StringIO("test file") as file1:
-            self.swift_manager.upload_obj(self.path, file1.read(),
+            self.storage_manager.upload_obj(self.path, file1.read(),
                                           content_type='text/plain')
         service_file = ServiceFile(service=service)
         service_file.fname.name = self.path
         service_file.save()
 
     def tearDown(self):
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(self.path)
+        # delete file from storage
+        self.storage_manager.delete_obj(self.path)
         # re-enable logging
         logging.disable(logging.NOTSET)
 
@@ -76,9 +76,9 @@ class ServiceFileListViewTests(ServiceFileViewTests):
         User.objects.create_user(username=chris_username, password=chris_password)
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
 
-        # upload file to Swift storage
+        # upload file to storage
         with io.StringIO("test file") as file2:
-            self.swift_manager.upload_obj(path, file2.read(), content_type='text/plain')
+            self.storage_manager.upload_obj(path, file2.read(), content_type='text/plain')
 
         # make the POST request using the chris user
         self.client.login(username=chris_username, password=chris_password)
@@ -86,8 +86,8 @@ class ServiceFileListViewTests(ServiceFileViewTests):
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(path)
+        # delete file from storage
+        self.storage_manager.delete_obj(path)
 
     def test_servicefile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,

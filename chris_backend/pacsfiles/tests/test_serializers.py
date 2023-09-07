@@ -73,19 +73,19 @@ class PACSFileSerializerTests(TestCase):
         """
         pacsfiles_serializer = PACSFileSerializer()
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
-        swift_manager = connect_storage(settings)
-        # upload file to Swift storage
+        storage_manager = connect_storage(settings)
+        # upload file to storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
+            storage_manager.upload_obj(path, file1.read(), content_type='text/plain')
 
         for _ in range(20):
-            if swift_manager.obj_exists(path):
+            if storage_manager.obj_exists(path):
                 break
             time.sleep(0.2)
         self.assertEqual(pacsfiles_serializer.validate_path(path), path)
 
-        # delete file from Swift storage
-        swift_manager.delete_obj(path)
+        # delete file from storage
+        storage_manager.delete_obj(path)
 
     def test_validate_updates_validated_data(self):
         """

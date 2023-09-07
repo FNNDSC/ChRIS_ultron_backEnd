@@ -42,19 +42,19 @@ class UploadedFileViewTests(TestCase):
                                  password=self.password)
 
         # create a file in the DB "already uploaded" to the server)
-        self.swift_manager = connect_storage(settings)
-        # upload file to Swift storage
+        self.storage_manager = connect_storage(settings)
+        # upload file to storage
         self.upload_path = f'{self.username}/uploads/file1.txt'
         with io.StringIO("test file") as file1:
-            self.swift_manager.upload_obj(self.upload_path, file1.read(),
+            self.storage_manager.upload_obj(self.upload_path, file1.read(),
                                           content_type='text/plain')
             self.uploadedfile = UploadedFile(owner=user)
             self.uploadedfile.fname.name = self.upload_path
             self.uploadedfile.save()
 
     def tearDown(self):
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(self.upload_path)
+        # delete file from storage
+        self.storage_manager.delete_obj(self.upload_path)
         # re-enable logging
         logging.disable(logging.NOTSET)
 
@@ -83,8 +83,8 @@ class UploadedFileListViewTests(UploadedFileViewTests):
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(upload_path)
+        # delete file from storage
+        self.storage_manager.delete_obj(upload_path)
 
     def test_uploadedfile_create_failure_unauthenticated(self):
         upload_path = "{}/uploads/file2.txt".format(self.username)
@@ -140,10 +140,10 @@ class UploadedFileDetailViewTests(UploadedFileViewTests):
 
     def test_uploadedfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
-        swift_path = self.uploadedfile.fname.name
+        storage_path = self.uploadedfile.fname.name
         with mock_storage('uploadedfiles.views.settings') as storage_manager:
             response = self.client.delete(self.read_update_delete_url)
-            self.assertFalse(storage_manager.obj_exists(swift_path))
+            self.assertFalse(storage_manager.obj_exists(storage_path))
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
             self.assertEqual(UploadedFile.objects.count(), 0)
 

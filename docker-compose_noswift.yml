@@ -30,12 +30,6 @@ services:
     profiles:
       - tools
 
-  permission_workaround:
-    image: alpine
-    command: chmod 777 /var/chris
-    volumes:
-      - chris_files:/var/chris
-
   chris_dev:
     image: ${CHRISREPO}/chris:dev
     build:
@@ -46,11 +40,12 @@ services:
     tty: true        # docker run -t
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/var/chris
+      - ${STOREBASE:?}:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=on
       - DJANGO_COLLECTSTATIC=off
+      - STORAGE_ENV=filesystem
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
@@ -79,13 +74,14 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/var/chris
+      - ${STOREBASE:?}:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
       - CELERY_RDB_HOST=0.0.0.0
       - CELERY_RDB_PORT=6900
+      - STORAGE_ENV=filesystem
     command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     ports:
       - "6900-6905:6900-6905"
@@ -119,12 +115,13 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/var/chris
+      - ${STOREBASE:?}:/var/chris
 
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
+      - STORAGE_ENV=filesystem
     command: celery -A core worker -c 1 -l DEBUG -Q periodic
     depends_on:
       - chris_dev_db
@@ -143,11 +140,12 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/home/localuser/chris_backend:z
-      - chris_files:/var/chris
+      - ${STOREBASE:?}:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - DJANGO_DB_MIGRATE=off
       - DJANGO_COLLECTSTATIC=off
+      - STORAGE_ENV=filesystem
     command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       - chris_dev_db
@@ -240,4 +238,3 @@ volumes:
   chris_dev_db_data:
   chris_store_db_data:
   queue_data:
-  chris_files:

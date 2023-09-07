@@ -103,7 +103,7 @@ class TasksViewTests(TransactionTestCase):
 
     def setUp(self):
 
-        self.swift_manager = connect_storage(settings)
+        self.storage_manager = connect_storage(settings)
         self.chris_username = 'chris'
         self.chris_password = 'chris12'
         self.username = 'foo'
@@ -346,9 +346,9 @@ class PluginInstanceListViewTests(TasksViewTests):
             type=parameters[0]['type'],
             flag=parameters[0]['flag'])
 
-        # upload a file to the Swift storage user's space
+        # upload a file to the storage user's space
         with io.StringIO('Test file') as f:
-            self.swift_manager.upload_obj(self.user_space_path + 'test.txt', f.read(),
+            self.storage_manager.upload_obj(self.user_space_path + 'test.txt', f.read(),
                                           content_type='text/plain')
 
         # make POST API request to create a plugin instance
@@ -385,8 +385,8 @@ class PluginInstanceListViewTests(TasksViewTests):
             currentLoop += 1
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
-        # delete files from swift storage
-        self.swift_manager.delete_obj(self.user_space_path + 'test.txt')
+        # delete files from storage
+        self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
     @tag('integration')
     def test_integration_ts_plugin_instance_create_success(self):
@@ -396,10 +396,10 @@ class PluginInstanceListViewTests(TasksViewTests):
         (fs_plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
-        # upload FS plugin instace output file to Swift storage
+        # upload FS plugin instace output file to storage
         path = os.path.join(fs_plg_inst.get_output_path(), 'test.txt')
         with io.StringIO("test file") as test_file:
-            self.swift_manager.upload_obj(path, test_file.read(),
+            self.storage_manager.upload_obj(path, test_file.read(),
                                           content_type='text/plain')
         (fs_plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=fs_plg_inst)
         fs_plg_inst_file.fname.name = path
@@ -497,8 +497,8 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
         self.assertEqual(pl_inst.files.count(), 3)
 
-        # delete files from swift storage
-        self.swift_manager.delete_obj(path)
+        # delete files from storage
+        self.storage_manager.delete_obj(path)
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -591,10 +591,10 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             type=parameters[0]['type'],
             flag=parameters[0]['flag'])
 
-        # upload a file to the Swift storage user's space
+        # upload a file to the storage user's space
         user_space_path = '%s/uploads/' % self.username
         with io.StringIO('Test file') as f:
-            self.swift_manager.upload_obj(user_space_path + 'test.txt', f.read(),
+            self.storage_manager.upload_obj(user_space_path + 'test.txt', f.read(),
                                           content_type='text/plain')
 
         # create a plugin's instance
@@ -633,11 +633,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertContains(response, "finishedSuccessfully")
         self.assertContains(response, "simplefsapp")
 
-        # delete files from swift storage
-        self.swift_manager.delete_obj(user_space_path + 'test.txt')
-        # obj_paths = self.swift_manager.ls(pl_inst.get_output_path())
+        # delete files from storage
+        self.storage_manager.delete_obj(user_space_path + 'test.txt')
+        # obj_paths = self.storage_manager.ls(pl_inst.get_output_path())
         # for path in obj_paths:
-        #     self.swift_manager.delete_obj(path)
+        #     self.storage_manager.delete_obj(path)
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
@@ -955,11 +955,11 @@ class PluginInstanceFileViewTests(ViewTests):
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
         # create a plugin instance file associated to the plugin instance
-        self.swift_manager = connect_storage(settings)
-        # upload file to Swift storage
+        self.storage_manager = connect_storage(settings)
+        # upload file to storage
         self.path = 'tests/file1.txt'
         with io.StringIO("test file") as file1:
-            self.swift_manager.upload_obj(self.path, file1.read(),
+            self.storage_manager.upload_obj(self.path, file1.read(),
                                           content_type='text/plain')
         (self.plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(
             plugin_inst=self.plg_inst
@@ -974,8 +974,8 @@ class PluginInstanceFileViewTests(ViewTests):
         #     os.makedirs(self.test_dir)
 
     def tearDown(self):
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(self.path)
+        # delete file from storage
+        self.storage_manager.delete_obj(self.path)
         super().tearDown()
 
         # remove test directory

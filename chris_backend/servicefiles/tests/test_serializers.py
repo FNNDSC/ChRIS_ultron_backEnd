@@ -102,18 +102,18 @@ class ServiceFileSerializerTests(TestCase):
         data = {'service_name': 'MyService', 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
 
-        swift_manager = connect_storage(settings)
-        # upload file to Swift storage
+        storage_manager = connect_storage(settings)
+        # upload file to storage
         with io.StringIO("test file") as file1:
-            swift_manager.upload_obj(path, file1.read(), content_type='text/plain')
+            storage_manager.upload_obj(path, file1.read(), content_type='text/plain')
         for _ in range(20):
-            if swift_manager.obj_exists(path):
+            if storage_manager.obj_exists(path):
                 break
             time.sleep(0.2)
         self.assertEqual(servicefiles_serializer.validate(data).get('path'), path)
 
-        # delete file from Swift storage
-        swift_manager.delete_obj(path)
+        # delete file from storage
+        storage_manager.delete_obj(path)
 
     def test_validate_validates_path_has_not_already_been_registered(self):
         """

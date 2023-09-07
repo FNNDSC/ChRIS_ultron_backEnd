@@ -8,6 +8,7 @@ Local settings
 - Add django-extensions as app
 """
 
+import os
 import ldap
 from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
@@ -82,24 +83,27 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pi
         }
 
 # Storage Settings
-#
-# To use local storage:
-#DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-#MEDIA_ROOT = '/var/chris'
-#
-# Swift service settings
+STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
+if STORAGE_ENV not in ('swift', 'filesystem'):
+    raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
+
 DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
-SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'
+SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'  # Swift service settings
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
 SWIFT_CONTAINER_NAME = 'users'
 SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
                            'key': SWIFT_KEY,
                            'authurl': SWIFT_AUTH_URL}
+MEDIA_ROOT = None
+if STORAGE_ENV == 'filesystem':
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    MEDIA_ROOT = '/var/chris'  # local filesystem storage settings
+
 try:
     verify_storage_connection(
         DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
-        MEDIA_ROOT=globals().get('MEDIA_ROOT', None),
+        MEDIA_ROOT=MEDIA_ROOT,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )

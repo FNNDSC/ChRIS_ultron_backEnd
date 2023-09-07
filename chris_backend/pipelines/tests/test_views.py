@@ -341,9 +341,9 @@ class PipelineSourceFileViewTests(PipelineViewTests):
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fpath = f'PIPELINES/{self.username}/test_pipeline0000001.yaml'
-        # delete file from Swift storage
-        swift_manager = connect_storage(settings)
-        swift_manager.delete_obj(fpath)
+        # delete file from storage
+        storage_manager = connect_storage(settings)
+        storage_manager.delete_obj(fpath)
 
     def test_pipelinesourcefile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data={"fname": {}})

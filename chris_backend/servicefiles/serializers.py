@@ -43,7 +43,7 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to associate a Swift storage path with the newly created pacs file.
+        Overriden to associate a storage path with the newly created pacs file.
         """
         # remove path as it is not part of the model and compute fname
         path = validated_data.pop('path')
@@ -84,14 +84,14 @@ class ServiceFileSerializer(serializers.HyperlinkedModelSerializer):
         if not path.startswith(prefix):
             error_msg = "File path must start with '%s'." % prefix
             raise serializers.ValidationError([error_msg])
-        # verify that the file is indeed already in Swift
-        swift_manager = connect_storage(settings)
+        # verify that the file is indeed already in storage
+        storage_manager = connect_storage(settings)
         try:
-            swift_path_exists = swift_manager.obj_exists(path)
+            storage_path_exists = storage_manager.obj_exists(path)
         except Exception as e:
-            logger.error('Swift storage error, detail: %s' % str(e))
+            logger.error('Storage error, detail: %s' % str(e))
             raise serializers.ValidationError({'path': ["Could not find this path."]})
-        if not swift_path_exists:
+        if not storage_path_exists:
             raise serializers.ValidationError({'path': ["Could not find this path."]})
         # verify that the file has not already been registered
         try:

@@ -8,6 +8,7 @@
 #
 #   unmake.sh                     [-h]
 #                                 [-O <swarm|kubernetes>]
+#                                 [-F <swift|filesystem>]   \
 #                                 [-S <storeBase>]
 #
 #
@@ -18,9 +19,13 @@
 #
 # TYPICAL CASES:
 #
-#   Destroy chris_dev instance with remote ancillary services running on Swarm:
+#   Destroy chris_dev instance with remote ancillary services running on Swarm with Swift storage:
 #
 #       unmake.sh
+#
+#   Destroy chris_dev instance running with filesystem storage:
+#
+#       unmake.sh -F filesystem
 #
 #   Destroy chris_dev instance with remote ancillary services running on Kubernetes:
 #
@@ -37,6 +42,10 @@
 #
 #       Explicitly set the orchestrator. Default is swarm.
 #
+#   -F <swift|filesystem>]
+#
+#       Explicitly set the storage environment. Default is swift.
+#
 #   -S <storeBase>
 #
 #       Explicitly set the STOREBASE dir to <storeBase>. This is the remote ChRIS
@@ -48,6 +57,7 @@ source ./decorate.sh
 
 declare -i STEP=0
 ORCHESTRATOR=swarm
+STORAGE_ENV=swift
 
 dc_check () {
     STATUS=$1
@@ -61,17 +71,23 @@ dc_check () {
 }
 
 print_usage () {
-    echo "Usage: ./unmake.sh [-h] [-O <swarm|kubernetes>] [-S <storeBase>]"
+    echo "Usage: ./unmake.sh [-h] [-O <swarm|kubernetes>] [-F <swift|filesystem>] [-S <storeBase>]"
     exit 1
 }
 
-while getopts ":hO:S:" opt; do
+while getopts ":hO:F:S:" opt; do
     case $opt in
         h) print_usage
            ;;
         O) ORCHESTRATOR=$OPTARG
            if ! [[ "$ORCHESTRATOR" =~ ^(swarm|kubernetes)$ ]]; then
               echo "Invalid value for option -- O"
+              print_usage
+           fi
+           ;;
+        F) STORAGE_ENV=$OPTARG
+           if ! [[ "$STORAGE_ENV" =~ ^(swift|filesystem)$ ]]; then
+              echo "Invalid value for option -- F"
               print_usage
            fi
            ;;
@@ -90,6 +106,9 @@ shift $(($OPTIND - 1))
 title -d 1 "Setting global exports"
     boxcenter "-= ORCHESTRATOR =-"
     boxcenter "$ORCHESTRATOR"                                                    LightCyan
+    boxcenter ""
+    boxcenter "exporting STORAGE_ENV=$STORAGE_ENV "
+    export STORAGE_ENV=$STORAGE_ENV
     boxcenter ""
     if [ -z ${STOREBASE+x} ]; then
         STOREBASE=$(pwd)/CHRIS_REMOTE_FS
@@ -126,29 +145,55 @@ title -d 1 "Destroying remote pfcon containerized environment on " \
     rm -fr $STOREBASE
 windowBottom
 
-title -d 1 "Destroying CUBE containerized development environment" \
+if [[ $STORAGE_ENV == 'swift' ]]; then
+    title -d 1 "Destroying CUBE containerized development environment" \
                         "from  ./docker-compose_dev.yml"
-    echo "Do you want to also remove persistent volumes? [y/n]"     | ./boxes.sh White
+        echo "Do you want to also remove persistent volumes? [y/n]"     | ./boxes.sh White
+        windowBottom
+        old_stty_cfg=$(stty -g)
+        stty raw -echo ; REPLY=$(head -c 1) ; stty $old_stty_cfg
+        echo -en "\033[2A\033[2K"
+        # read -p  " " -n 1 -r REPLY
+        if [[ $REPLY =~ ^[Yy]$ ]] ; then
+            boxcenter ""
+            echo "Removing persistent volumes... please be patient."    | ./boxes.sh Yellow
+            boxcenter ""
+            echo "$ docker compose -f docker-compose_dev.yml down -v"   | ./boxes.sh LightCyan
+            windowBottom
+            docker compose -f docker-compose_dev.yml down -v >& dc.out
+            dc_check $?
+        else
+            echo "Keeping persistent volumes... please be patient."     | ./boxes.sh Yellow
+            windowBottom
+            docker compose -f docker-compose_dev.yml down >& dc.out
+            dc_check $?
+        fi
     windowBottom
-    old_stty_cfg=$(stty -g)
-    stty raw -echo ; REPLY=$(head -c 1) ; stty $old_stty_cfg
-    echo -en "\033[2A\033[2K"
-    # read -p  " " -n 1 -r REPLY
-    if [[ $REPLY =~ ^[Yy]$ ]] ; then
-        boxcenter ""
-        echo "Removing persistent volumes... please be patient."    | ./boxes.sh Yellow
-        boxcenter ""
-        echo "$ docker compose -f docker-compose_dev.yml down -v"   | ./boxes.sh LightCyan
+elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+    title -d 1 "Destroying CUBE containerized development environment" \
+                        "from  ./docker-compose_noswift.yml"
+        echo "Do you want to also remove persistent volumes? [y/n]"     | ./boxes.sh White
         windowBottom
-        docker compose -f docker-compose_dev.yml down -v >& dc.out
-        dc_check $?
-    else
-        echo "Keeping persistent volumes... please be patient."     | ./boxes.sh Yellow
-        windowBottom
-        docker compose -f docker-compose_dev.yml down >& dc.out
-        dc_check $?
-    fi
-windowBottom
+        old_stty_cfg=$(stty -g)
+        stty raw -echo ; REPLY=$(head -c 1) ; stty $old_stty_cfg
+        echo -en "\033[2A\033[2K"
+        # read -p  " " -n 1 -r REPLY
+        if [[ $REPLY =~ ^[Yy]$ ]] ; then
+            boxcenter ""
+            echo "Removing persistent volumes... please be patient."    | ./boxes.sh Yellow
+            boxcenter ""
+            echo "$ docker compose -f docker-compose_noswift.yml down -v"   | ./boxes.sh LightCyan
+            windowBottom
+            docker compose -f docker-compose_noswift.yml down -v >& dc.out
+            dc_check $?
+        else
+            echo "Keeping persistent volumes... please be patient."     | ./boxes.sh Yellow
+            windowBottom
+            docker compose -f docker-compose_noswift.yml down >& dc.out
+            dc_check $?
+        fi
+    windowBottom
+fi
 
 if [[ $ORCHESTRATOR == swarm ]]; then
     title -d 1 "Removing overlay network: remote"

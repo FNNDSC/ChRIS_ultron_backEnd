@@ -836,11 +836,11 @@ class FeedFileListViewTests(ViewTests):
 
         # create two files in the DB "already uploaded" to the server from two different
         # plugin instances that write to the same feed
-        self.swift_manager = connect_storage(settings)
+        self.storage_manager = connect_storage(settings)
         plg_inst = PluginInstance.objects.all()[0]
         self.path1 = 'tests/file1.txt'
         with io.StringIO("test file1") as file1:
-            self.swift_manager.upload_obj(self.path1, file1.read(),
+            self.storage_manager.upload_obj(self.path1, file1.read(),
                                           content_type='text/plain')
         (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
         plg_inst_file.fname.name = self.path1
@@ -854,16 +854,16 @@ class FeedFileListViewTests(ViewTests):
             compute_resource=plugin.compute_resources.all()[0])
         self.path2 = 'tests/file2.txt'
         with io.StringIO("test file2") as file2:
-            self.swift_manager.upload_obj(self.path2, file2.read(),
+            self.storage_manager.upload_obj(self.path2, file2.read(),
                                           content_type='text/plain')
         (plg_inst_file, tf) = PluginInstanceFile.objects.get_or_create(plugin_inst=plg_inst)
         plg_inst_file.fname.name = self.path2
         plg_inst_file.save()
 
     def tearDown(self):
-        # delete file from Swift storage
-        self.swift_manager.delete_obj(self.path1)
-        self.swift_manager.delete_obj(self.path2)
+        # delete file from storage
+        self.storage_manager.delete_obj(self.path1)
+        self.storage_manager.delete_obj(self.path2)
         super().tearDown()
 
     def test_feedfile_list_success(self):

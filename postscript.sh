@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Once a ChRIS/CUBE ecosystem has been fully instantiated from a run of the
 # 'make.sh' script, the system will by default only have a few test/dummy
@@ -11,4 +11,30 @@
 # more.
 #
 
-docker compose -f docker-compose_dev.yml run --rm chrisomatic chrisomatic postscript.yml
+G_SYNOPSIS="
+  NAME
+    postscript.sh
+
+  SYNOPSIS
+    postscript.sh [swift|filesystem]
+
+  ARGS
+    [swift|filesystem]
+    Denotes the storage environment.
+
+  DESCRIPTION
+    postscript.sh script can be used to add plugins to an instantiated system.
+"
+
+if [[ "$#" -eq 0 ]] || [[ "$#" -gt 1 ]]; then
+    echo "$G_SYNOPSIS"
+    exit 1
+fi
+
+STORAGE_ENV=$1
+
+if [[ $STORAGE_ENV == 'swift' ]]; then
+    docker compose -f docker-compose_dev.yml run --rm chrisomatic chrisomatic postscript.yml
+elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+    docker compose -f docker-compose_noswift.yml run --rm chrisomatic chrisomatic postscript.yml
+fi

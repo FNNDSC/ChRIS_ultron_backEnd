@@ -38,11 +38,11 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         email = validated_data.get('email')
         password = validated_data.get('password')
         user = User.objects.create_user(username, email, password)
-        swift_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
         welcome_file_path = '%s/uploads/welcome.txt' % username
         try:
             with io.StringIO('Welcome to ChRIS!') as f:
-                swift_manager.upload_obj(welcome_file_path, f.read(),
+                storage_manager.upload_obj(welcome_file_path, f.read(),
                                          content_type='text/plain')
             welcome_file = UploadedFile(owner=user)
             welcome_file.fname.name = welcome_file_path

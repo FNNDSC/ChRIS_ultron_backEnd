@@ -343,7 +343,7 @@ def validate_paths(user, string):
     Custom function to check that a user is allowed to access the provided object storage
     paths.
     """
-    swift_manager = connect_storage(settings)
+    storage_manager = connect_storage(settings)
     path_list = [s.strip() for s in string.split(',')]
     for path in path_list:
         path_parts = pathlib.Path(path).parts
@@ -367,11 +367,11 @@ def validate_paths(user, string):
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
         else:
-            # check whether path exists in swift
+            # check whether path exists in storage
             try:
-                path_exists = swift_manager.path_exists(path)
+                path_exists = storage_manager.path_exists(path)
             except Exception as e:
-                logger.error('Swift storage error, detail: %s' % str(e))
+                logger.error('Storage error, detail: %s' % str(e))
                 raise serializers.ValidationError(
                     ["Could not validate this path."])
             if not path_exists:

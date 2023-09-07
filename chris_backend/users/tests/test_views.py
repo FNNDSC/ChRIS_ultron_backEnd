@@ -71,9 +71,9 @@ class UserCreateViewTests(UserViewTests):
         self.assertEqual(welcome_file.fname.name, welcome_file_path)
 
         # delete welcome file
-        swift_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
 
-        swift_manager.delete_obj(welcome_file_path)
+        storage_manager.delete_obj(welcome_file_path)
 
     def test_user_create_failure_already_exists(self):
         User.objects.create_user(username=self.username,
