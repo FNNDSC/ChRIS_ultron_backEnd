@@ -337,6 +337,8 @@ rm -f dc.out ; title -d 1 "Setting global exports"
     boxcenter "-= STOREBASE =-"
     echo "${STOREBASEdisp}"                                               | ./boxes.sh LightCyan
     export STOREBASE=$STOREBASE
+
+    export UID=$(id -u) GID=$(id -g)
 windowBottom
 
 rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"      \

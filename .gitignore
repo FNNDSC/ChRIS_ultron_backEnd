@@ -14,3 +14,4 @@ celerybeat.pid
 swarm/prod/secrets/
 kubernetes/prod/base/secrets/
 venv
+chris_backend/.config

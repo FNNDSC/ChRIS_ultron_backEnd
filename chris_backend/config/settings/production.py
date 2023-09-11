@@ -119,11 +119,6 @@ LOGGING = {
 }
 
 
-# STATIC FILES (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.0/howto/static-files/
-STATIC_ROOT = get_secret('STATIC_ROOT')
-
-
 # CORSHEADERS
 # ------------------------------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = get_secret('DJANGO_CORS_ALLOW_ALL_ORIGINS', env.bool)

@@ -3,7 +3,6 @@ django-filter==22.1
 djangorestframework==3.13.1
 django-cors-headers==3.13.0
 psycopg2==2.9.3
-mod-wsgi==4.9.3
 environs==9.5.0
 python-swiftclient==4.1.0
 django-storage-swift==1.2.19
@@ -13,3 +12,4 @@ python-chrisstoreclient==1.0.0
 python-pfconclient==3.2.0
 django-auth-ldap==4.1.0
 PyYAML==6.0.1
+whitenoise[brotli]==6.5.0
