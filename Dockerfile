@@ -49,3 +49,6 @@ LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
     org.opencontainers.image.documentation="https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/" \
     org.opencontainers.image.version="" \
     org.opencontainers.image.licenses="MIT"
+
+HEALTHCHECK --interval=30s --timeout=5s \
+    CMD curl -f http://localhost:8000/api/v1/users/ || exit 1
