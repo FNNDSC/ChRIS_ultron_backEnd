@@ -36,7 +36,8 @@ COPY --chown=default:root ./requirements/ /tmp/requirements
 ARG ENVIRONMENT=production
 RUN pip install -r /tmp/requirements/$ENVIRONMENT.txt && rm -rf /tmp/requirements
 COPY chris_backend/ ./
-RUN env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic
+RUN if [ "$ENVIRONMENT" = "production" ]; then \
+    env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; fi
 
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "4", "config.wsgi:application"]
 
