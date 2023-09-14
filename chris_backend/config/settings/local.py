@@ -175,12 +175,12 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 
 
 # LDAP auth configuration
-AUTH_LDAP = False
+AUTH_LDAP = True
 if AUTH_LDAP:
-    AUTH_LDAP_SERVER_URI = 'ldap://192.168.0.29:389'
-    AUTH_LDAP_BIND_DN = 'cn=admin,dc=fnndsc,dc=org'
-    AUTH_LDAP_BIND_PASSWORD = 'admin1234'
-    AUTH_LDAP_USER_SEARCH_ROOT = 'dc=fnndsc,dc=org'
+    AUTH_LDAP_SERVER_URI = 'ldap://lldap:3890'
+    AUTH_LDAP_BIND_DN = 'uid=admin,ou=people,dc=example,dc=org'
+    AUTH_LDAP_BIND_PASSWORD = 'chris1234'
+    AUTH_LDAP_USER_SEARCH_ROOT = 'ou=people,dc=example,dc=org'
 
     AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
                                        '(uid=%(user)s)')

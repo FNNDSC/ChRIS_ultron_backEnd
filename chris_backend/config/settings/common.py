@@ -27,7 +27,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'django_celery_beat',
-    'mod_wsgi.server',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
@@ -75,6 +74,7 @@ MIDDLEWARE = [
     'core.middleware.ResponseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -152,6 +152,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+# https://whitenoise.readthedocs.io/en/stable/django.html
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# `./manage.py collectstatic` is run during build
+STATIC_ROOT = '/opt/app-root/var/staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
