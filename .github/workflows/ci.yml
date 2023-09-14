@@ -46,12 +46,12 @@ jobs:
           dock_image=$repo:$tag
           echo $dock_image
           echo "dock_image=$dock_image" >> $GITHUB_OUTPUT
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v2
       - uses: docker/setup-buildx-action@v2
         id: buildx
       - name: Cache Docker layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -84,7 +84,7 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache
 
       - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v2
+        uses: peter-evans/dockerhub-description@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
