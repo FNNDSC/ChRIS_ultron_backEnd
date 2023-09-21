@@ -19,20 +19,20 @@ from core.storage import verify_storage_connection
 from django.core.exceptions import ImproperlyConfigured
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/4.0/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/4.2/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/4.0/topics/logging/ for
+# See https://docs.djangoproject.com/en/4.2/topics/logging/ for
 # more details on how to customize your logging configuration.
 LOGGING = {
     'version': 1,
@@ -87,7 +87,7 @@ STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
 if STORAGE_ENV not in ('swift', 'filesystem'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
-DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
+STORAGES['default'] = {'BACKEND': 'swift.storage.SwiftStorage'}
 SWIFT_AUTH_URL = 'http://swift_service:8080/auth/v1.0'  # Swift service settings
 SWIFT_USERNAME = 'chris:chris1234'
 SWIFT_KEY = 'testing'
@@ -97,12 +97,12 @@ SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
                            'authurl': SWIFT_AUTH_URL}
 MEDIA_ROOT = None
 if STORAGE_ENV == 'filesystem':
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = '/var/chris'  # local filesystem storage settings
 
 try:
     verify_storage_connection(
-        DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
+        DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
         MEDIA_ROOT=MEDIA_ROOT,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
@@ -114,7 +114,7 @@ except Exception as e:
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
 # Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'

@@ -161,7 +161,7 @@ services:
       role: "Backend development periodic tasks scheduler"
 
   chris_dev_db:
-    image: postgres:13
+    image: postgres:16
     volumes:
       - chris_dev_db_data:/var/lib/postgresql/data
     environment:
@@ -214,7 +214,7 @@ services:
       role: "Chris store service"
 
   chris_store_db:
-    image: postgres:13
+    image: postgres:16
     volumes:
       - chris_store_db_data:/var/lib/postgresql/data
     environment:
