@@ -30,7 +30,7 @@ def get_secret(setting, secret_type=env):
 
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/4.0/ref/settings/#secret-key
+# See: https://docs.djangoproject.com/en/4.2/ref/settings/#secret-key
 # Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not in os.environ
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
@@ -38,14 +38,13 @@ SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/4.0/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/4.2/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
 
 # DATABASE CONFIGURATION
 # ------------------------------------------------------------------------------
-# Raises ImproperlyConfigured exception if DATABASE_URL not set
 DATABASES['default']['NAME'] = get_secret('POSTGRES_DB')
 DATABASES['default']['USER'] = get_secret('POSTGRES_USER')
 DATABASES['default']['PASSWORD'] = get_secret('POSTGRES_PASSWORD')
@@ -60,7 +59,7 @@ if STORAGE_ENV not in ('swift', 'filesystem'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
 if STORAGE_ENV == 'swift':
-    DEFAULT_FILE_STORAGE = 'swift.storage.SwiftStorage'
+    STORAGES['default'] = {'BACKEND': 'swift.storage.SwiftStorage'}
     SWIFT_AUTH_URL = get_secret('SWIFT_AUTH_URL')
     SWIFT_USERNAME = get_secret('SWIFT_USERNAME')
     SWIFT_KEY = get_secret('SWIFT_KEY')
@@ -69,14 +68,14 @@ if STORAGE_ENV == 'swift':
                                'key': SWIFT_KEY,
                                'authurl': SWIFT_AUTH_URL}
     verify_storage = lambda: verify_storage_connection(
-        DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
+        DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
 elif STORAGE_ENV == 'filesystem':
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = get_secret('MEDIA_ROOT')
-    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=DEFAULT_FILE_STORAGE,
+    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
                                                        MEDIA_ROOT=MEDIA_ROOT)
 else:
     verify_storage = lambda: verify_storage_connection()
@@ -92,7 +91,7 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/4.0/topics/logging/ for
+# See https://docs.djangoproject.com/en/4.2/topics/logging/ for
 # more details on how to customize your logging configuration.
 ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
 LOGGING = {

@@ -347,7 +347,7 @@ rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"   
     printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
             "$ docker pull" " library/postgres"                     | ./boxes.sh
     windowBottom
-    docker pull postgres:13 >& dc.out
+    docker pull postgres:16 >& dc.out
     dc_check $? "PRINT"
     echo ""                                                         | ./boxes.sh
     printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
