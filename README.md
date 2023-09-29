@@ -7,7 +7,8 @@ _ChRIS_ is an open-source platform for containerized medical compute.
 The _ChRIS_ backend, a.k.a. _ChRIS Ultron Backend_ or _**CUBE**_ for short,
 is a component of the _ChRIS_ system.
 
-![Architecture Diagram](https://raw.githubusercontent.com/FNNDSC/CHRIS_docs/5212b2bab9f575986a800bdc677399664009dc14/images/ChRIS%20architecture.svg)
+![Architecture Diagram](https://chrisproject.org/img/figures/ChRIS_architecture.svg#gh-light-mode-only)
+![Architecture Diagram](https://chrisproject.org/img/figures/ChRIS_architecture_dark.svg#gh-dark-mode-only)
 
 The core backend service for the ChRIS distributed software platform, also known by the anacronym _CUBE_. Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
 
