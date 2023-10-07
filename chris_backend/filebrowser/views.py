@@ -8,11 +8,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.utils import filter_files_by_n_slashes
-from plugininstances.models import PluginInstanceFile
 from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
                           FileBrowserPathFileSerializer)
 from .services import (get_path_folders, get_path_file_queryset,
-                       get_path_file_model_class, get_shared_feed_creators_set,
+                       get_path_file_model_class,
                        get_unauthenticated_user_path_folders,
                        get_unauthenticated_user_path_file_queryset)
 
@@ -43,15 +42,12 @@ class FileBrowserPathList(generics.ListAPIView):
         path (empty path).
         """
         user = self.request.user
+        path = ''
         if user.is_authenticated:
-            subfolders = ['PIPELINES', 'SERVICES', user.username]
-            shared_feed_creators = get_shared_feed_creators_set(user)
+            subfolders = get_path_folders(path, user)
         else:
-            subfolders = ['PIPELINES']
-            shared_feed_creators = get_shared_feed_creators_set()
-        for creator in shared_feed_creators:
-            subfolders.append(creator.username)
-        objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
+            subfolders = get_unauthenticated_user_path_folders(path)
+        objects = [{'path': '', 'subfolders': json.dumps(subfolders)}]
         return self.filter_queryset(objects)
 
 
@@ -69,26 +65,15 @@ class FileBrowserPathListQuerySearch(generics.ListAPIView):
         user = self.request.user
         path = self.request.GET.get('path', '')
         path = path.strip('/')
-        if not path:
+        try:
             if user.is_authenticated:
-                subfolders = ['PIPELINES', 'SERVICES', user.username]
-                shared_feed_creators = get_shared_feed_creators_set(user)
+                subfolders = get_path_folders(path, user)  # already sorted
             else:
-                subfolders = ['PIPELINES']
-                shared_feed_creators = get_shared_feed_creators_set()
-            for creator in shared_feed_creators:
-                subfolders.append(creator.username)
-            objects = [{'path': '', 'subfolders': json.dumps(sorted(subfolders))}]
+                subfolders = get_unauthenticated_user_path_folders(path)
+        except ValueError:
+            objects = []
         else:
-            try:
-                if user.is_authenticated:
-                    subfolders = get_path_folders(path, user)  # already sorted
-                else:
-                    subfolders = get_unauthenticated_user_path_folders(path)
-            except ValueError:
-                objects = []
-            else:
-                objects = [{'path': path, 'subfolders': json.dumps(subfolders)}]
+            objects = [{'path': path, 'subfolders': json.dumps(subfolders)}]
         return self.filter_queryset(objects)
 
     def get_serializer_class(self, *args, **kwargs):
@@ -168,11 +153,7 @@ class FileBrowserPathFileList(generics.ListAPIView):
         Overriden to return the serializer class that should be used for serializing
         output.
         """
-        user = self.request.user
         path = self.kwargs.get('path')
-        if user.is_authenticated:
-            model_class = get_path_file_model_class(path, user)
-        else:
-            model_class = PluginInstanceFile
+        model_class = get_path_file_model_class(path)
         FileBrowserPathFileSerializer.Meta.model = model_class
         return FileBrowserPathFileSerializer

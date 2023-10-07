@@ -8,7 +8,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from core.storage import connect_storage
-from uploadedfiles.models import UploadedFile
+from userfiles.models import UserFile
 
 
 logger = logging.getLogger(__name__)
@@ -39,12 +39,12 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         password = validated_data.get('password')
         user = User.objects.create_user(username, email, password)
         storage_manager = connect_storage(settings)
-        welcome_file_path = '%s/uploads/welcome.txt' % username
+        welcome_file_path = 'home/%s/welcome.txt' % username
         try:
             with io.StringIO('Welcome to ChRIS!') as f:
                 storage_manager.upload_obj(welcome_file_path, f.read(),
                                          content_type='text/plain')
-            welcome_file = UploadedFile(owner=user)
+            welcome_file = UserFile(owner=user)
             welcome_file.fname.name = welcome_file_path
             welcome_file.save()
         except Exception as e:
@@ -54,13 +54,13 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_username(self, username):
         """
-        Overriden to check that the username does not contain forward slashes and it is
-        not 'chris' or 'SERVICES' or 'PIPELINES' special identifiers.
+        Overriden to check that the username does not contain forward slashes and is
+        not the 'chris' special username.
         """
         if '/' in username:
             raise serializers.ValidationError(
                 ["This field may not contain forward slashes."])
-        if username in ('chris', 'SERVICES', 'PIPELINES'):
+        if username == 'chris':
             raise serializers.ValidationError(
                 ["Username %s is not available." % username])
         return username

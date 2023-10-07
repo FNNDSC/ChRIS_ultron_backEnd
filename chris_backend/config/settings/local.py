@@ -74,7 +74,7 @@ LOGGING = {
 }
 
 for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pipelines',
-            'pipelineinstances', 'uploadedfiles', 'pacsfiles', 'servicefiles', 'users',
+            'pipelineinstances', 'userfiles', 'pacsfiles', 'servicefiles', 'users',
             'filebrowser', 'workflows']:
     LOGGING['loggers'][app] = {
             'level': 'DEBUG',

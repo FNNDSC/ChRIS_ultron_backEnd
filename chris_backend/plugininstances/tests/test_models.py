@@ -164,10 +164,8 @@ class PluginInstanceModelTests(ModelTests):
             compute_resource=plugin_fs.compute_resources.all()[0])
         # 'fs' plugins will output files to:
         # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
-        fs_output_path = '{0}/feed_{1}/{2}_{3}/data'.format( self.username,
-                                                             pl_inst_fs.feed.id,
-                                                             pl_inst_fs.plugin.meta.name,
-                                                             pl_inst_fs.id) 
+        fs_output_path = (f'home/{self.username}/feeds/feed_'
+                          f'{pl_inst_fs.feed.id}/{pl_inst_fs.plugin.meta.name}_{ pl_inst_fs.id}/data')
         self.assertEqual(pl_inst_fs.get_output_path(), fs_output_path)
 
         # create a 'ds' plugin instance 

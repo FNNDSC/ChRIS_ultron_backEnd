@@ -81,7 +81,8 @@ here=$(pwd)
 cd $PUSHDIR
 for FILE in *${EXT} ; do
     printf "%s\n" $FILE
-    http -a chris:chris1234 -f POST http://${CUBEIP}:${CUBEPORT}/api/v1/uploadedfiles/ upload_path=/${UPLOADPATHPREFIX}/$FILE fname@$FILE
+    http -a chris:chris1234 -f POST http://${CUBEIP}:${CUBEPORT}/api/v1/userfiles/
+    upload_path=/${UPLOADPATHPREFIX}/$FILE fname@$FILE
 done
 cd $here
 

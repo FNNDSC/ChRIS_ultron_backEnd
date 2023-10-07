@@ -10,7 +10,7 @@ from plugininstances import views as plugininstance_views
 from pipelines import views as pipeline_views
 from pipelineinstances import views as pipelineinstance_views
 from workflows import views as workflow_views
-from uploadedfiles import views as uploadedfile_views
+from userfiles import views as userfile_views
 from pacsfiles import views as pacsfile_views
 from servicefiles import views as servicefile_views
 from filebrowser import views as filebrowser_views
@@ -326,21 +326,21 @@ urlpatterns = format_suffix_patterns([
          name='workflow-plugininstance-list'),
 
 
-    path('v1/uploadedfiles/',
-        uploadedfile_views.UploadedFileList.as_view(),
-        name='uploadedfile-list'),
+    path('v1/userfiles/',
+        userfile_views.UserFileList.as_view(),
+        name='userfile-list'),
 
-    path('v1/uploadedfiles/search/',
-        uploadedfile_views.UploadedFileListQuerySearch.as_view(),
-        name='uploadedfile-list-query-search'),
+    path('v1/userfiles/search/',
+        userfile_views.UserFileListQuerySearch.as_view(),
+        name='userfile-list-query-search'),
 
-    path('v1/uploadedfiles/<int:pk>/',
-        uploadedfile_views.UploadedFileDetail.as_view(),
-        name='uploadedfile-detail'),
+    path('v1/userfiles/<int:pk>/',
+        userfile_views.UserFileDetail.as_view(),
+        name='userfile-detail'),
 
-    re_path(r'^v1/uploadedfiles/(?P<pk>[0-9]+)/.*$',
-        uploadedfile_views.UploadedFileResource.as_view(),
-        name='uploadedfile-resource'),
+    re_path(r'^v1/userfiles/(?P<pk>[0-9]+)/.*$',
+        userfile_views.UserFileResource.as_view(),
+        name='userfile-resource'),
 
 
     path('v1/pacsfiles/',

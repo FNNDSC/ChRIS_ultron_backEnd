@@ -6,15 +6,9 @@ from django_filters.rest_framework import FilterSet
 from core.utils import filter_files_by_n_slashes
 
 
-def uploaded_file_path(instance, filename):
-    # file will be stored to Swift at:
-    # SWIFT_CONTAINER_NAME/<username>/uploads/<upload_path>
-    return instance.owner.upload_path
-
-
-class UploadedFile(models.Model):
+class UserFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=512, upload_to=uploaded_file_path, unique=True)
+    fname = models.FileField(max_length=1024, unique=True)
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
@@ -24,7 +18,7 @@ class UploadedFile(models.Model):
         return self.fname.name
 
 
-class UploadedFileFilter(FilterSet):
+class UserFileFilter(FilterSet):
     min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
                                                          lookup_expr='gte')
     max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
@@ -40,7 +34,7 @@ class UploadedFileFilter(FilterSet):
                                                lookup_expr='exact')
 
     class Meta:
-        model = UploadedFile
+        model = UserFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
                   'fname_icontains', 'fname_nslashes', 'owner_username']
 

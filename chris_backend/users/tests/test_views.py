@@ -9,7 +9,7 @@ from django.conf import settings
 
 from rest_framework import status
 
-from uploadedfiles.models import UploadedFile
+from userfiles.models import UserFile
 from core.storage.helpers import mock_storage, connect_storage
 
 
@@ -54,7 +54,7 @@ class UserCreateViewTests(UserViewTests):
             self.assertEqual(response.data["username"], self.username)
             self.assertEqual(response.data["email"], self.email)
 
-            welcome_file_path = '%s/uploads/welcome.txt' % self.username
+            welcome_file_path = 'home/%s/welcome.txt' % self.username
             self.assertTrue(storage_manager.obj_exists(welcome_file_path))
 
     @tag('integration')
@@ -66,8 +66,8 @@ class UserCreateViewTests(UserViewTests):
         self.assertEqual(response.data["email"], self.email)
 
         user = User.objects.get(username=self.username)
-        welcome_file_path = '%s/uploads/welcome.txt' % self.username
-        welcome_file = UploadedFile.objects.get(owner=user)
+        welcome_file_path = 'home/%s/welcome.txt' % self.username
+        welcome_file = UserFile.objects.get(owner=user)
         self.assertEqual(welcome_file.fname.name, welcome_file_path)
 
         # delete welcome file

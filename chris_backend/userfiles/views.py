@@ -10,21 +10,21 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from core.storage import connect_storage
 
-from .models import UploadedFile, UploadedFileFilter
-from .serializers import UploadedFileSerializer
+from .models import UserFile, UserFileFilter
+from .serializers import UserFileSerializer
 from .permissions import IsOwnerOrChris
 
 
 logger = logging.getLogger(__name__)
 
 
-class UploadedFileList(generics.ListCreateAPIView):
+class UserFileList(generics.ListCreateAPIView):
     """
-    A view for the collection of uploaded user files.
+    A view for the collection of user files.
     """
     http_method_names = ['get', 'post']
-    queryset = UploadedFile.objects.all()
-    serializer_class = UploadedFileSerializer
+    queryset = UserFile.objects.all()
+    serializer_class = UserFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
     def get_queryset(self):
@@ -35,48 +35,54 @@ class UploadedFileList(generics.ListCreateAPIView):
         user = self.request.user
         # if the user is chris then return all the files in the sandboxed filesystem
         if user.username == 'chris':
-            return UploadedFile.objects.all()
-        return UploadedFile.objects.filter(owner=user)
+            return UserFile.objects.all()
+        return UserFile.objects.filter(owner=user)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate an owner with the file before first saving to the DB.
+        """
+        serializer.save(owner=self.request.user)
 
     def list(self, request, *args, **kwargs):
         """
         Overriden to append document-level link relations and a collection+json
         template to the response.
         """
-        response = super(UploadedFileList, self).list(request, *args, **kwargs)
+        response = super(UserFileList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('uploadedfile-list-query-search', request=request)]
+        query_list = [reverse('userfile-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
         template_data = {'upload_path': "", 'fname': ""}
         return services.append_collection_template(response, template_data)
 
 
-class UploadedFileListQuerySearch(generics.ListAPIView):
+class UserFileListQuerySearch(generics.ListAPIView):
     """
-    A view for the collection of uploaded files resulting from a query search.
+    A view for the collection of user files resulting from a query search.
     """
     http_method_names = ['get']
-    serializer_class = UploadedFileSerializer
-    queryset = UploadedFile.objects.all()
+    serializer_class = UserFileSerializer
+    queryset = UserFile.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    filterset_class = UploadedFileFilter
+    filterset_class = UserFileFilter
 
 
-class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
+class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
     """
-    An uploaded file view.
+    A user file view.
     """
     http_method_names = ['get', 'put', 'delete']
-    queryset = UploadedFile.objects.all()
-    serializer_class = UploadedFileSerializer
+    queryset = UserFile.objects.all()
+    serializer_class = UserFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
-        response = super(UploadedFileDetail, self).retrieve(request, *args, **kwargs)
+        response = super(UserFileDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"upload_path": ""}
         return services.append_collection_template(response, template_data)
 
@@ -86,7 +92,7 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         user_file = self.get_object()
         request.data['fname'] = user_file.fname.file  # fname required in the serializer
-        return super(UploadedFileDetail, self).update(request, *args, **kwargs)
+        return super(UserFileDetail, self).update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         """
@@ -114,12 +120,12 @@ class UploadedFileDetail(generics.RetrieveUpdateDestroyAPIView):
             logger.error('Storage error, detail: %s' % str(e))
 
 
-class UploadedFileResource(generics.GenericAPIView):
+class UserFileResource(generics.GenericAPIView):
     """
     A view to enable downloading of a file resource .
     """
     http_method_names = ['get']
-    queryset = UploadedFile.objects.all()
+    queryset = UserFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
 

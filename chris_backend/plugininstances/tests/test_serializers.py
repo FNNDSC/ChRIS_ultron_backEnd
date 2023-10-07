@@ -334,22 +334,22 @@ class PathParameterSerializerTests(SerializerTests):
             plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.owner.set([user1, user])
         path_parm_serializer = PathParameterSerializer(user=user)
-        value = "{}, {}/feed_{} ".format(self.username, self.other_username,
-                                         pl_inst.feed.id)
+        value = "home/{}, home/{}/feeds/feed_{} ".format(self.username,
+                                                        self.other_username,
+                                                         pl_inst.feed.id)
         with mock_storage('plugininstances.serializers.settings') as storage_manager:
             storage_manager.upload_obj(
-                f'{self.username}/uploads/dummy_data.txt',
+                f'home/{self.username}/uploads/dummy_data.txt',
                 b'dummy data'
             )
             storage_manager.upload_obj(
-                f'{self.other_username}/feed_{pl_inst.feed.id}/'
+                f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}/'
                 f'{pl_inst.plugin.meta.name}_{pl_inst.id}/data/dummy_data.txt',
                 b'dummy data'
             )
             returned_value = path_parm_serializer.validate_value(value)
-            self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
-                                                                    self.other_username,
-                                                                    pl_inst.feed.id))
+            self.assertEqual(returned_value, "home/{},home/{}/feeds/feed_{}".format(
+                self.username, self.other_username, pl_inst.feed.id))
 
 
 class UnextpathParameterSerializerTests(SerializerTests):
@@ -435,20 +435,20 @@ class UnextpathParameterSerializerTests(SerializerTests):
             plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.owner.set([user1, user])
         path_parm_serializer = UnextpathParameterSerializer(user=user)
-        value = "{}, {}/feed_{} ".format(self.username, self.other_username,
-                                         pl_inst.feed.id)
+        value = "home/{}, home/{}/feeds/feed_{} ".format(self.username,
+                                                        self.other_username,
+                                                         pl_inst.feed.id)
         with mock_storage('plugininstances.serializers.settings') as storage_manager:
             storage_manager.upload_obj(
-                f'{self.username}/uploads/dummy_data.txt',
+                f'home/{self.username}/uploads/dummy_data.txt',
                 b'dummy data'
             )
             storage_manager.upload_obj(
-                f'{self.other_username}/feed_{pl_inst.feed.id}/'
+                f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}/'
                 f'{pl_inst.plugin.meta.name}_{pl_inst.id}/data/dummy_data.txt',
                 b'dummy data'
             )
 
             returned_value = path_parm_serializer.validate_value(value)
-            self.assertEqual(returned_value, "{},{}/feed_{}".format(self.username,
-                                                                    self.other_username,
-                                                                    pl_inst.feed.id))
+            self.assertEqual(returned_value, "home/{},home/{}/feeds/feed_{}".format(
+                self.username, self.other_username, pl_inst.feed.id))
