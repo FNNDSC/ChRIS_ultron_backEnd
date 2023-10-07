@@ -12,7 +12,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from core.storage import connect_storage
-from uploadedfiles.models import UploadedFile
+from userfiles.models import UserFile
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance, PluginInstanceFile
 
@@ -57,9 +57,56 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, 'path')
         self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
-                         sorted(['PIPELINES', 'SERVICES', self.username]))
+                         sorted(['home', 'PIPELINES', 'SERVICES']))
 
-    def test_filebrowserpath_list_success_shared_feed(self):
+
+class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):
+    """
+    Test the 'filebrowserpath-list-query-search' view.
+    """
+
+    def setUp(self):
+        super(FileBrowserPathListQuerySearchViewTests, self).setUp()
+
+        # create a file in the DB "already uploaded" to the server)
+        user = User.objects.get(username=self.username)
+        upload_path = f'home/{self.username}/uploads/myfolder/file1.txt'
+        userfile = UserFile(owner=user)
+        userfile.fname.name = upload_path
+        userfile.save()
+        self.read_url = reverse('filebrowserpath-list-query-search') + f'?path=home/{self.username}/uploads/'
+
+    def test_filebrowserpath_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, f'home/{self.username}/uploads')
+        self.assertIn('myfolder', json.loads(response.data['results'][0]['subfolders']))
+
+
+class FileBrowserPathViewTests(FileBrowserViewTests):
+    """
+    Test the filebrowserpath view.
+    """
+
+    def setUp(self):
+        super(FileBrowserPathViewTests, self).setUp()
+
+        # create a file in the DB "already uploaded" to the server)
+        user = User.objects.get(username=self.username)
+        upload_path = f'home/{self.username}/uploads/myfolder/file1.txt'
+        userfile = UserFile(owner=user)
+        userfile.fname.name = upload_path
+        userfile.save()
+
+        self.read_url = reverse("filebrowserpath", kwargs={"path": f'home/{self.username}/uploads'})
+
+    def test_filebrowserpath_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, f'home/{self.username}/uploads')
+        self.assertIn('myfolder', json.loads(response.data['subfolders']))
+
+    def test_filebrowserpath_success_shared_feed(self):
         user = User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
         # create compute resource
@@ -80,57 +127,11 @@ class FileBrowserPathListViewTests(FileBrowserViewTests):
         pl_inst.feed.owner.add(User.objects.get(username=self.username))
 
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
-        self.assertEqual(json.loads(response.data['results'][0]['subfolders']),
-                         sorted(['PIPELINES', 'SERVICES', self.username,
-                                 self.other_username]))
-
-
-class FileBrowserPathListQuerySearchViewTests(FileBrowserViewTests):
-    """
-    Test the 'filebrowserpath-list-query-search' view.
-    """
-
-    def setUp(self):
-        super(FileBrowserPathListQuerySearchViewTests, self).setUp()
-
-        # create a file in the DB "already uploaded" to the server)
-        user = User.objects.get(username=self.username)
-        upload_path = f'{self.username}/uploads/myfolder/file1.txt'
-        uploadedfile = UploadedFile(owner=user)
-        uploadedfile.fname.name = upload_path
-        uploadedfile.save()
-        self.read_url = reverse('filebrowserpath-list-query-search') + f'?path={self.username}/uploads/'
-
-    def test_filebrowserpath_list_query_search_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
-        self.assertContains(response, f'{self.username}/uploads')
-        self.assertIn('myfolder', json.loads(response.data['results'][0]['subfolders']))
-
-
-class FileBrowserPathViewTests(FileBrowserViewTests):
-    """
-    Test the filebrowserpath view.
-    """
-
-    def setUp(self):
-        super(FileBrowserPathViewTests, self).setUp()
-
-        # create a file in the DB "already uploaded" to the server)
-        user = User.objects.get(username=self.username)
-        upload_path = f'{self.username}/uploads/myfolder/file1.txt'
-        uploadedfile = UploadedFile(owner=user)
-        uploadedfile.fname.name = upload_path
-        uploadedfile.save()
-
-        self.read_url = reverse("filebrowserpath", kwargs={"path": f'{self.username}/uploads'})
-
-    def test_filebrowserpath_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
-        self.assertContains(response, f'{self.username}/uploads')
-        self.assertIn('myfolder', json.loads(response.data['subfolders']))
+        read_url = reverse("filebrowserpath", kwargs={"path": f'home'})
+        response = self.client.get(read_url)
+        #import pdb;pdb.set_trace()
+        self.assertEqual(json.loads(response.data['subfolders']),
+                         sorted([self.username, self.other_username]))
 
     def test_filebrowserpath_failure_not_found(self):
         self.client.login(username=self.username, password=self.password)
@@ -153,17 +154,17 @@ class FileBrowserPathFileListViewTests(FileBrowserViewTests):
         # create a file in the DB "already uploaded" to the server)
         self.storage_manager = connect_storage(settings)
         # upload file to storage
-        self.upload_path = f'{self.username}/uploads/file2.txt'
+        self.upload_path = f'home/{self.username}/uploads/file2.txt'
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(self.upload_path, file1.read(),
                                          content_type='text/plain')
         user = User.objects.get(username=self.username)
-        uploadedfile = UploadedFile(owner=user)
-        uploadedfile.fname.name = self.upload_path
-        uploadedfile.save()
+        userfile = UserFile(owner=user)
+        userfile.fname.name = self.upload_path
+        userfile.save()
 
         self.read_url = reverse("filebrowserpathfile-list",
-                                kwargs={"path": f'{self.username}/uploads'})
+                                kwargs={"path": f'home/{self.username}/uploads'})
 
     def tearDown(self):
         # delete file from storage

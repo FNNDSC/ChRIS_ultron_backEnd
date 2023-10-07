@@ -12,13 +12,13 @@ from django.urls import reverse
 from rest_framework import status
 
 from core.storage.helpers import connect_storage, mock_storage
-from uploadedfiles.models import UploadedFile, uploaded_file_path
-from uploadedfiles import views
+from userfiles.models import UserFile
+from userfiles import views
 
 
-class UploadedFileViewTests(TestCase):
+class UserFileViewTests(TestCase):
     """
-    Generic uploadedfile view tests' setup and tearDown.
+    Generic userfile view tests' setup and tearDown.
     """
 
     def setUp(self):
@@ -44,13 +44,13 @@ class UploadedFileViewTests(TestCase):
         # create a file in the DB "already uploaded" to the server)
         self.storage_manager = connect_storage(settings)
         # upload file to storage
-        self.upload_path = f'{self.username}/uploads/file1.txt'
+        self.upload_path = f'home/{self.username}/uploads/file1.txt'
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(self.upload_path, file1.read(),
                                           content_type='text/plain')
-            self.uploadedfile = UploadedFile(owner=user)
-            self.uploadedfile.fname.name = self.upload_path
-            self.uploadedfile.save()
+            self.userfile = UserFile(owner=user)
+            self.userfile.fname.name = self.upload_path
+            self.userfile.save()
 
     def tearDown(self):
         # delete file from storage
@@ -59,24 +59,24 @@ class UploadedFileViewTests(TestCase):
         logging.disable(logging.NOTSET)
 
 
-class UploadedFileListViewTests(UploadedFileViewTests):
+class UserFileListViewTests(UserFileViewTests):
     """
-    Test the uploadedfile-list view.
+    Test the userfile-list view.
     """
 
     def setUp(self):
-        super(UploadedFileListViewTests, self).setUp()
-        self.create_read_url = reverse("uploadedfile-list")
+        super(UserFileListViewTests, self).setUp()
+        self.create_read_url = reverse("userfile-list")
 
     def tearDown(self):
-        super(UploadedFileListViewTests, self).tearDown()
+        super(UserFileListViewTests, self).tearDown()
 
     @tag('integration')
-    def test_integration_uploadedfile_create_success(self):
+    def test_integration_userfile_create_success(self):
 
         # POST request using multipart/form-data to be able to upload file
         self.client.login(username=self.username, password=self.password)
-        upload_path = f'{self.username}/uploads/file2.txt'
+        upload_path = f'home/{self.username}/uploads/file2.txt'
 
         with io.StringIO("test file") as f:
             post = {"fname": f, "upload_path": upload_path}
@@ -86,101 +86,101 @@ class UploadedFileListViewTests(UploadedFileViewTests):
         # delete file from storage
         self.storage_manager.delete_obj(upload_path)
 
-    def test_uploadedfile_create_failure_unauthenticated(self):
-        upload_path = "{}/uploads/file2.txt".format(self.username)
+    def test_userfile_create_failure_unauthenticated(self):
+        upload_path = f'home/{self.username}/uploads/file2.txt'
         response = self.client.post(self.create_read_url,
                                     data={"fname": {}, "upload_path": upload_path})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_uploadedfile_list_success(self):
+    def test_userfile_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "file1.txt")
 
-    def test_uploadedfile_list_failure_unauthenticated(self):
+    def test_userfile_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class UploadedFileDetailViewTests(UploadedFileViewTests):
+class UserFileDetailViewTests(UserFileViewTests):
     """
-    Test the uploadedfile-detail view.
+    Test the userfile-detail view.
     """
 
     def setUp(self):
-        super(UploadedFileDetailViewTests, self).setUp()
-        self.read_update_delete_url = reverse("uploadedfile-detail",
-                                              kwargs={"pk": self.uploadedfile.id})
-        upload_path = "{}/uploads/myfolder/myfile1.txt".format(self.username)
+        super(UserFileDetailViewTests, self).setUp()
+        self.read_update_delete_url = reverse("userfile-detail",
+                                              kwargs={"pk": self.userfile.id})
+        upload_path = f'home/{self.username}/uploads/myfolder/myfile1.txt'
         self.put = json.dumps({
             "template": {"data": [{"name": "upload_path", "value": upload_path}]}})
 
-    def test_uploadedfile_detail_success(self):
+    def test_userfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "file1.txt")
 
-    def test_uploadedfile_detail_success_user_chris(self):
+    def test_userfile_detail_success_user_chris(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "file1.txt")
 
-    def test_uploadedfile_detail_failure_unauthenticated(self):
+    def test_userfile_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_uploadedfile_update_failure_unauthenticated(self):
+    def test_userfile_update_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_uploadedfile_update_failure_access_denied(self):
+    def test_userfile_update_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_uploadedfile_delete_success(self):
+    def test_userfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
-        storage_path = self.uploadedfile.fname.name
-        with mock_storage('uploadedfiles.views.settings') as storage_manager:
+        storage_path = self.userfile.fname.name
+        with mock_storage('userfiles.views.settings') as storage_manager:
             response = self.client.delete(self.read_update_delete_url)
             self.assertFalse(storage_manager.obj_exists(storage_path))
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-            self.assertEqual(UploadedFile.objects.count(), 0)
+            self.assertEqual(UserFile.objects.count(), 0)
 
-    def test_uploadedfile_delete_failure_unauthenticated(self):
+    def test_userfile_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_uploadedfile_delete_failure_access_denied(self):
+    def test_userfile_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class UploadedFileResourceViewTests(UploadedFileViewTests):
+class UserFileResourceViewTests(UserFileViewTests):
     """
-    Test the uploadedfile-resource view.
+    Test the userfile-resource view.
     """
 
     def setUp(self):
-        super(UploadedFileResourceViewTests, self).setUp()
-        self.download_url = reverse("uploadedfile-resource",
-                                    kwargs={"pk": self.uploadedfile.id}) + 'file1.txt'
+        super(UserFileResourceViewTests, self).setUp()
+        self.download_url = reverse("userfile-resource",
+                                    kwargs={"pk": self.userfile.id}) + 'file1.txt'
 
     def tearDown(self):
-        super(UploadedFileResourceViewTests, self).tearDown()
+        super(UserFileResourceViewTests, self).tearDown()
 
-    def test_uploadedfileresource_get(self):
-        uploadedfile = self.uploadedfile
+    def test_userfileresource_get(self):
+        userfile = self.userfile
         fileresource_view_inst = mock.Mock()
-        fileresource_view_inst.get_object = mock.Mock(return_value=uploadedfile)
+        fileresource_view_inst.get_object = mock.Mock(return_value=userfile)
         request_mock = mock.Mock()
-        with mock.patch('uploadedfiles.views.FileResponse') as response_mock:
-            views.UploadedFileResource.get(fileresource_view_inst, request_mock)
-            response_mock.assert_called_with(uploadedfile.fname)
+        with mock.patch('userfiles.views.FileResponse') as response_mock:
+            views.UserFileResource.get(fileresource_view_inst, request_mock)
+            response_mock.assert_called_with(userfile.fname)
 
     @tag('integration')
-    def test_integration_uploadedfileresource_download_success(self):
+    def test_integration_userfileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
         self.assertEqual(response.status_code, 200)

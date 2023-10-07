@@ -340,8 +340,8 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 def validate_paths(user, string):
     """
-    Custom function to check that a user is allowed to access the provided object storage
-    paths.
+    Custom function to check whether a user is allowed to access the provided object
+    storage paths.
     """
     storage_manager = connect_storage(settings)
     path_list = [s.strip() for s in string.split(',')]
@@ -351,14 +351,23 @@ def validate_paths(user, string):
             # trying to access the root of the storage
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
-        if path_parts[0] not in (user.username, 'SERVICES', 'PIPELINES'):
-            if len(path_parts) == 1 or path_parts[1] == 'uploads':
+        if len(path_parts) == 1 and path_parts[0] not in ('SERVICES', 'PIPELINES'):
+            # trying to access the home folder or an unknown folder within the root folder
+            raise serializers.ValidationError(
+                ["You do not have permission to access this path."])
+        if path_parts[0] == 'home' and path_parts[1] != user.username:
+            if len(path_parts) <= 3:
                 # trying to access another user's root or personal space
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
             try:
-                # file paths should be of the form <username>/feed_<id>/..
-                feed_id = path_parts[1].split('_')[-1]
+                # file paths should be of the form home/<username>/feeds/feed_<id>/..
+                str_l = path_parts[3].split('_')
+                if len(str_l) != 2:
+                    raise ValueError()
+                if str_l[0] != 'feed':
+                    raise ValueError()
+                feed_id = str_l[-1]
                 feed = Feed.objects.get(pk=feed_id)
             except (ValueError, Feed.DoesNotExist):
                 raise serializers.ValidationError(
@@ -367,11 +376,11 @@ def validate_paths(user, string):
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
         else:
-            # check whether path exists in storage
+            # check whether path exists in swift
             try:
                 path_exists = storage_manager.path_exists(path)
             except Exception as e:
-                logger.error('Storage error, detail: %s' % str(e))
+                logger.error('Swift storage error, detail: %s' % str(e))
                 raise serializers.ValidationError(
                     ["Could not validate this path."])
             if not path_exists:
