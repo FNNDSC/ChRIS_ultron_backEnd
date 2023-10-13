@@ -17,7 +17,7 @@ version: '3.9'
 
 services:
   chrisomatic:
-    image: ghcr.io/fnndsc/chrisomatic:0.5.0
+    image: ghcr.io/fnndsc/chrisomatic:0.7.0
     volumes:
       - "./chrisomatic:/etc/chrisomatic:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:rw"

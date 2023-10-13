@@ -1,4 +1,4 @@
-version: 1.1
+version: 1.2
 
 on:
   cube_url: http://chrisdev.local:8000/api/v1/
@@ -19,6 +19,7 @@ cube:
       username: pfcon
       password: pfcon1234
       description: host Description
+      innetwork: false
 
   plugins:
     - name: pl-simplefsapp
