@@ -13,5 +13,3 @@ class IsOwnerOrChris(permissions.BasePermission):
         if hasattr(obj.owner, 'all'):
             return (request.user in obj.owner.all()) or (request.user.username == 'chris')
         return (obj.owner == request.user) or (request.user.username == 'chris')
-
-

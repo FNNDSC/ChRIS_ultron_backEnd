@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from servicefiles.models import ServiceFile, Service
 from pacsfiles.models import PACSFile
-from uploadedfiles.models import UploadedFile
+from userfiles.models import UserFile
 from plugininstances.models import PluginInstanceFile
 from pipelines.models import PipelineSourceFile
 from filebrowser import services
@@ -40,28 +40,28 @@ class ServiceTests(TestCase):
         username = self.username
 
         path = 'PIPELINES'
-        model_class = services.get_path_file_model_class(path, username)
+        model_class = services.get_path_file_model_class(path)
         self.assertEqual(model_class, PipelineSourceFile)
 
         path = 'SERVICES/PACS'
-        model_class = services.get_path_file_model_class(path, username)
+        model_class = services.get_path_file_model_class(path)
         self.assertEqual(model_class, PACSFile)
 
         path = 'SERVICES'
-        model_class = services.get_path_file_model_class(path, username)
+        model_class = services.get_path_file_model_class(path)
         self.assertEqual(model_class, ServiceFile)
 
-        path = f'{username}/uploads'
-        model_class = services.get_path_file_model_class(path, username)
-        self.assertEqual(model_class, UploadedFile)
+        path = f'home/{username}/uploads'
+        model_class = services.get_path_file_model_class(path)
+        self.assertEqual(model_class, UserFile)
 
-        path = f'{username}'
-        model_class = services.get_path_file_model_class(path, username)
+        path = f'home/{username}/feeds'
+        model_class = services.get_path_file_model_class(path)
         self.assertEqual(model_class, PluginInstanceFile)
 
         path = 'SOR'
-        model_class = services.get_path_file_model_class(path, username)
-        self.assertIs(model_class, PluginInstanceFile)
+        model_class = services.get_path_file_model_class(path)
+        self.assertIs(model_class, UserFile)
 
     def test_get_path_file_queryset(self):
         """
@@ -74,11 +74,11 @@ class ServiceTests(TestCase):
         with self.assertRaises(ValueError):
             services.get_path_file_queryset(path, user)
 
-        path = f'{username}/crazypath1234567890'
+        path = f'home/{username}/crazypath1234567890'
         with self.assertRaises(ValueError):
             services.get_path_file_queryset(path, user)
 
-        path = f'{username}/uploads'
+        path = f'home/{username}'
         qs = services.get_path_file_queryset(path, user)
         self.assertTrue(qs.count() >= 0)
 
@@ -90,9 +90,9 @@ class ServiceTests(TestCase):
         username = self.username
         user = User.objects.get(username=self.username)
 
-        path = f'{username}'
+        path = f'home/{username}'
         folders = services.get_path_folders(path, user)
-        self.assertIn('uploads', folders)
+        self.assertIn('feeds', folders)
 
         path = 'SERVICES'
         # create a service's files in the DB

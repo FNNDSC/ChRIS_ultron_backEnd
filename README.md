@@ -211,7 +211,7 @@ After running the Integration tests the ``./CHRIS_REMOTE_FS`` directory **must**
 Make sure the ``chris_backend/`` dir is world writable. Then type:
 
 ```bash
-docker compose -f docker-compose_dev.yml exec chris_dev coverage run --source=feeds,plugins,uploadedfiles,users manage.py test
+docker compose -f docker-compose_dev.yml exec chris_dev coverage run --source=feeds,plugins,userfiles,users manage.py test
 docker compose -f docker-compose_dev.yml exec chris_dev coverage report
 ```
 

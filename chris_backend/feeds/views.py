@@ -313,7 +313,7 @@ class FeedList(generics.ListAPIView):
                  'tags': reverse('tag-list', request=request),
                  'pipelinesourcefiles': reverse('pipelinesourcefile-list',
                                                 request=request),
-                 'uploadedfiles': reverse('uploadedfile-list', request=request),
+                 'userfiles': reverse('userfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),
                  'filebrowser': reverse('filebrowserpath-list', request=request)}

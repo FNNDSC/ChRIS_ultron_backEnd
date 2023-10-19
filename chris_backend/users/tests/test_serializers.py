@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from rest_framework import serializers
 
-from uploadedfiles.models import UploadedFile
+from userfiles.models import UserFile
 from users.serializers import UserSerializer
 from core.storage.helpers import mock_storage
 
@@ -43,25 +43,21 @@ class UserSerializerTests(TestCase):
             self.assertNotEqual(user.password, self.password)
             self.assertTrue(user.check_password(self.password))
 
-            welcome_file_path = '%s/uploads/welcome.txt' % self.username
-            welcome_file = UploadedFile.objects.get(owner=user)
+            welcome_file_path = 'home/%s/welcome.txt' % self.username
+            welcome_file = UserFile.objects.get(owner=user)
             self.assertEqual(welcome_file.fname.name, welcome_file_path)
             self.assertTrue(storage_manager.obj_exists(welcome_file_path))
 
     def test_validate_username(self):
         """
         Test whether overriden validate_username method raises a
-        serializers.ValidationError when the username contains forward slashes or it is
-        'chris' or 'SERVICES' or 'PIPELINES' special identifiers.
+        serializers.ValidationError when the username contains forward slashes or is
+        the 'chris' special user.
         """
         user_serializer = UserSerializer()
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('user/')
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('chris')
-        with self.assertRaises(serializers.ValidationError):
-            user_serializer.validate_username('SERVICES')
-        with self.assertRaises(serializers.ValidationError):
-            user_serializer.validate_username('PIPELINES')
         username = user_serializer.validate_username(self.username)
         self.assertEqual(username, self.username)

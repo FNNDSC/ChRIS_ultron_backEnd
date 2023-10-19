@@ -133,10 +133,11 @@ class PluginInstance(models.Model):
         the plugin instance object.
         """
         # 'fs' plugins will output files to:
-        # SWIFT_CONTAINER_NAME/<username>/feed_<id>/plugin_name_plugin_inst_<id>/data
+        # SWIFT_CONTAINER_NAME/home/<username>/feeds/feed_<id>/<plugin_name>_
+        # <plugin_inst_id>/data
         # 'ds' and 'ts' plugins will output files to:
-        # SWIFT_CONTAINER_NAME/<username>/feed_<id>/...
-        #/previous_plugin_name_plugin_inst_<id>/plugin_name_plugin_inst_<id>/data
+        # SWIFT_CONTAINER_NAME/home/<username>/feeds/feed_<id>/...
+        #/<previous_plugin_name>_<plugin_inst_id>/<plugin_name>_<plugin_inst_id>/data
         current = self
         path = '/{0}_{1}/data'.format(current.plugin.meta.name, current.id)
         while not current.plugin.meta.type == 'fs':
@@ -145,7 +146,7 @@ class PluginInstance(models.Model):
         feed = current.feed
         #username = self.owner.username
         username = feed.get_creator().username  # use creator of the feed for shared feeds
-        output_path = '{0}/feed_{1}'.format(username, feed.id) + path
+        output_path = 'home/{0}/feeds/feed_{1}'.format(username, feed.id) + path
         return output_path
 
     def get_parameter_instances(self):
