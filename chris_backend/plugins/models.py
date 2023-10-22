@@ -224,6 +224,7 @@ class PluginFilter(FilterSet):
     category = django_filters.CharFilter(field_name='meta__category',
                                          lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='meta__type', lookup_expr='exact')
+    public_repo = django_filters.CharFilter(field_name='meta__public_repo', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
     name_title_category = django_filters.CharFilter(method='search_name_title_category')
@@ -245,7 +246,7 @@ class PluginFilter(FilterSet):
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
                   'min_creation_date', 'max_creation_date', 'title',  'description',
-                  'name_title_category', 'compute_resource_id']
+                  'name_title_category', 'compute_resource_id', 'public_repo']
 
 
 class PluginParameter(models.Model):
