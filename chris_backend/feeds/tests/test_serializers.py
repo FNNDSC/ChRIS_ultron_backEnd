@@ -142,15 +142,21 @@ class FeedSerializerTests(SerializerTests):
     def test_validate_name(self):
         """
         Test whether overriden validate_name method raises a serializers.ValidationError
-        when the feed name contains forward slashes or it is the special 'uploads'
+        when the feed name is the special 'uploads'
         identifier.
         """
-        with self.assertRaises(serializers.ValidationError):
-            self.feed_serializer.validate_name('myfeed/')
         with self.assertRaises(serializers.ValidationError):
             self.feed_serializer.validate_name('uploads')
         name = self.feed_serializer.validate_name('myfeed')
         self.assertEqual(name, 'myfeed')
+
+    def test_validate_name_with_forward_slash(self):
+        """
+        Test whether overriden validate_name method works when feed name contains
+        forward slash
+        """
+        name = self.feed_serializer.validate_name('myfeed/')
+        self.assertEqual(name, 'myfeed/')
 
     def test_validate_new_owner(self):
         """

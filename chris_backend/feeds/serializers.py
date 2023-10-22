@@ -120,12 +120,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_name(self, name):
         """
-        Overriden to check that the feed's name does not contain forward slashes and
-        is not the special 'uploads' identifier.
+        Overriden to check that the feed's name is not the special 'uploads' identifier.
         """
-        if '/' in name:
-            raise serializers.ValidationError(
-                ["This field may not contain forward slashes."])
         if name == 'uploads':
             raise serializers.ValidationError(
                 ["Forbidden feed name 'uploads'."])
