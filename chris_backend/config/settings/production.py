@@ -4,6 +4,7 @@ Production Configurations
 
 """
 
+import sys
 import ldap
 from django_auth_ldap.config import LDAPSearch
 from .common import *  # noqa
@@ -106,6 +107,7 @@ LOGGING = {
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
             'formatter': 'console',
         },
     },
@@ -113,6 +115,7 @@ LOGGING = {
         '': {  # root logger
             'level': 'INFO',
             'handlers': ['console'],
+            'propagate': True,
         }
     }
 }
