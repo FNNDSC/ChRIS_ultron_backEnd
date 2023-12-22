@@ -1,24 +1,20 @@
 
-from django.http import FileResponse
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError
 
 from collectionjson import services
-from core.renderers import BinaryFileRenderer
 from plugins.models import Plugin
 
 from .models import PluginInstance, PluginInstanceFilter, PluginInstanceSplit
-from .models import PluginInstanceFile, PluginInstanceFileFilter
 from .models import StrParameter, FloatParameter, IntParameter
 from .models import BoolParameter, PathParameter, UnextpathParameter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializer
-from .serializers import PluginInstanceSerializer, PluginInstanceFileSerializer
+from .serializers import PluginInstanceSerializer
 from .permissions import (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
-                          IsOwnerOrReadOnly, IsRelatedFeedOwnerOrPublicReadOnlyOrChris,
-                          IsAuthenticatedReadOnlyOrPublicReadOnly,
+                          IsOwnerOrReadOnly, IsAuthenticatedReadOnlyOrPublicReadOnly,
                           IsNotDeleteFSPluginInstance)
 from .tasks import run_plugin_instance, cancel_plugin_instance
 from .utils import run_if_ready
@@ -325,117 +321,6 @@ class PluginInstanceSplitDetail(generics.RetrieveAPIView):
     queryset = PluginInstanceSplit.objects.all()
     serializer_class = PluginInstanceSplitSerializer
     permission_classes = (permissions.IsAuthenticated,)
-
-
-class PluginInstanceFileList(generics.ListAPIView):
-    """
-    A view for the collection of files written by a plugin instance.
-    """
-    http_method_names = ['get']
-    serializer_class = PluginInstanceFileSerializer
-    queryset = PluginInstance.objects.all()
-    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
-
-    def list(self, request, *args, **kwargs):
-        """
-        Overriden to return a list of the files created by the queried plugin instance.
-        Document-level link relations are also added to the response.
-        """
-        queryset = self.get_files_queryset()
-        response = services.get_list_response(self, queryset)
-        instance = self.get_object()
-        feed = instance.feed
-        links = {'feed': reverse('feed-detail', request=request,
-                             kwargs={"pk": feed.id}),
-                 'plugin_inst': reverse('plugininstance-detail', request=request,
-                                                 kwargs={"pk": instance.id})}
-        return services.append_collection_links(response, links)
-
-    def get_files_queryset(self):
-        """
-        Custom method to get the actual files queryset.
-        """
-        instance = self.get_object()
-        return self.filter_queryset(instance.files.all())
-
-
-class AllPluginInstanceFileList(generics.ListAPIView):
-    """
-    A view for the collection of all plugin instance files written to all the feeds the
-    the authenticated user owns.
-    """
-    http_method_names = ['get']
-    serializer_class = PluginInstanceFileSerializer
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def list(self, request, *args, **kwargs):
-        """
-        Overriden to add a query list to the response.
-        """
-        response = super(AllPluginInstanceFileList, self).list(request, *args, **kwargs)
-        # append query list
-        query_list = [reverse('allplugininstancefile-list-query-search', request=request)]
-        return services.append_collection_querylist(response, query_list)
-
-    def get_queryset(self):
-        """
-        Overriden to return a custom queryset that is only comprised by the feed files
-        written to feeds owned by the currently authenticated user.
-        """
-        user = self.request.user
-        # if the user is chris then return all the files in the system
-        if user.username == 'chris':
-            return PluginInstanceFile.objects.all()
-        return PluginInstanceFile.objects.filter(plugin_inst__feed__owner=user)
-
-
-class AllPluginInstanceFileListQuerySearch(generics.ListAPIView):
-    """
-    A view for the collection of plugin instance files written to all the feeds the
-    the authenticated user owns and resulting from a query search.
-    """
-    http_method_names = ['get']
-    serializer_class = PluginInstanceFileSerializer
-    permission_classes = (permissions.IsAuthenticated,)
-    filterset_class = PluginInstanceFileFilter
-
-    def get_queryset(self):
-        """
-        Overriden to return a custom queryset that is only comprised by the feed files
-        written to feeds owned by the currently authenticated user.
-        """
-        user = self.request.user
-        # if the user is chris then return all the files in the system
-        if user.username == 'chris':
-            return PluginInstanceFile.objects.all()
-        return PluginInstanceFile.objects.filter(plugin_inst__feed__owner=user)
-
-
-class PluginInstanceFileDetail(generics.RetrieveAPIView):
-    """
-    A view for a file written by a plugin instance.
-    """
-    http_method_names = ['get']
-    queryset = PluginInstanceFile.objects.all()
-    serializer_class = PluginInstanceFileSerializer
-    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
-
-
-class FileResource(generics.GenericAPIView):
-    """
-    A view to enable downloading of a file resource.
-    """
-    http_method_names = ['get']
-    queryset = PluginInstanceFile.objects.all()
-    renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (IsRelatedFeedOwnerOrPublicReadOnlyOrChris,)
-
-    def get(self, request, *args, **kwargs):
-        """
-        Overriden to be able to make a GET request to an actual file resource.
-        """
-        plg_inst_file = self.get_object()
-        return FileResponse(plg_inst_file.fname)
 
 
 class PluginInstanceParameterList(generics.ListAPIView):

@@ -1,31 +1,44 @@
 
+
+import os
+
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
+from core.models import ChrisFolder
 
 from .models import UserFile
 
 
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
-    file_resource = ItemLinkField('get_file_link')
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     upload_path = serializers.CharField(write_only=True)
+    owner_username = serializers.ReadOnlyField(source='owner.username')
+    file_resource = ItemLinkField('get_file_link')
+    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                        read_only=True)
+    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = UserFile
         fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize',
-                  'file_resource', 'owner')
+                  'owner_username', 'file_resource', 'parent_folder', 'owner')
 
     def create(self, validated_data):
         """
-        Overriden to set the file's saving path.
+        Overriden to set the file's saving path and parent folder.
         """
         # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
         # where <upload_path> must start with home/<username>/
         upload_path = validated_data.pop('upload_path')
+        folder_path = os.path.dirname(upload_path)
+        owner = validated_data['owner']
+
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                               owner=owner)
+        validated_data['parent_folder'] = parent_folder
         user_file = UserFile(**validated_data)
         user_file.fname.name = upload_path
         user_file.save()

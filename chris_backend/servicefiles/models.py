@@ -1,8 +1,11 @@
 
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from core.models import ChrisFolder
 from core.utils import filter_files_by_n_slashes
 
 
@@ -11,15 +14,25 @@ REGISTERED_SERVICES = ['PACS']
 
 class Service(models.Model):
     identifier = models.CharField(max_length=20, unique=True)
+    # top folder
+    folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
+                                      related_name='service')
 
     def __str__(self):
         return self.identifier
 
 
+@receiver(post_delete, sender=Service)
+def auto_delete_service_folder_with_service(sender, instance, **kwargs):
+    instance.folder.delete()
+
+
 class ServiceFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=512, unique=True)
-    service = models.ForeignKey(Service, db_index=True, on_delete=models.CASCADE)
+    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
+                                      related_name='service_files')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
         ordering = ('-fname',)
@@ -40,12 +53,11 @@ class ServiceFileFilter(FilterSet):
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
     service_identifier = django_filters.CharFilter(field_name='service__identifier',
                                                    lookup_expr='exact')
-    service_id = django_filters.CharFilter(field_name='service_id', lookup_expr='exact')
 
     class Meta:
         model = ServiceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_nslashes', 'service_identifier', 'service_id']
+                  'fname_icontains', 'fname_nslashes', 'service_identifier']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """

@@ -35,6 +35,51 @@ urlpatterns = format_suffix_patterns([
          core_views.ChrisInstanceDetail.as_view(), name='chrisinstance-detail'),
 
 
+    path('v1/folders/',
+         core_views.ChrisFolderList.as_view(),
+         name='chrisfolder-list'),
+
+    path('v1/folders/search/',
+         core_views.ChrisFolderListQuerySearch.as_view(),
+         name='chrisfolder-list-query-search'),
+
+    path('v1/folders/<int:pk>/',
+         core_views.ChrisFolderDetail.as_view(),
+         name='chrisfolder-detail'),
+
+    path('v1/folders/<int:pk>/children/',
+         core_views.ChrisFolderChildList.as_view(),
+         name='chrisfolder-child-list'),
+
+    path('v1/folders/<int:pk>/userfiles/',
+         core_views.ChrisFolderUserFileList.as_view(),
+         name='chrisfolder-userfile-list'),
+
+    path('v1/folders/<int:pk>/pacsfiles/',
+         core_views.ChrisFolderPACSFileList.as_view(),
+         name='chrisfolder-pacsfile-list'),
+
+    path('v1/folders/<int:pk>/servicefiles/',
+         core_views.ChrisFolderServiceFileList.as_view(),
+         name='chrisfolder-servicefile-list'),
+
+    path('v1/folders/<int:pk>/pipelinesourcefiles/',
+         core_views.ChrisFolderPipelineSourceFileList.as_view(),
+         name='chrisfolder-pipelinesourcefile-list'),
+
+    path('v1/folders/<int:pk>/linkfiles/',
+         core_views.ChrisLinkFileList.as_view(),
+         name='chrislinkfile-list'),
+
+    path('v1/folders/linkfiles/<int:pk>/',
+         core_views.ChrisLinkFileDetail.as_view(),
+         name='chrislinkfile-detail'),
+
+    re_path(r'^v1/folders/linkfiles/(?P<pk>[0-9]+)/.*$',
+            core_views.ChrisLinkFileResource.as_view(),
+            name='chrislinkfile-resource'),
+
+
     path('v1/',
         feed_views.FeedList.as_view(), name='feed-list'),
 
@@ -55,9 +100,6 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/comments/<int:pk>/',
         feed_views.CommentDetail.as_view(), name='comment-detail'),
-
-    path('v1/<int:pk>/files/',
-        feed_views.FeedFileList.as_view(), name='feedfile-list'),
 
     path('v1/<int:pk>/plugininstances/',
         feed_views.FeedPluginInstanceList.as_view(), name='feed-plugininstance-list'),
@@ -234,26 +276,6 @@ urlpatterns = format_suffix_patterns([
     path('v1/plugins/instances/<int:pk>/descendants/',
         plugininstance_views.PluginInstanceDescendantList.as_view(),
         name='plugininstance-descendant-list'),
-
-    path('v1/plugins/instances/<int:pk>/files/',
-        plugininstance_views.PluginInstanceFileList.as_view(),
-        name='plugininstancefile-list'),
-
-    path('v1/files/',
-        plugininstance_views.AllPluginInstanceFileList.as_view(),
-        name='allplugininstancefile-list'),
-
-    path('v1/files/search/',
-        plugininstance_views.AllPluginInstanceFileListQuerySearch.as_view(),
-        name='allplugininstancefile-list-query-search'),
-
-    path('v1/files/<int:pk>/',
-        plugininstance_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    re_path(r'^v1/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
 
     path('v1/plugins/instances/<int:pk>/parameters/',
         plugininstance_views.PluginInstanceParameterList.as_view(),

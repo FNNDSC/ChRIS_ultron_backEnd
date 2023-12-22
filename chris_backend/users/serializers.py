@@ -7,6 +7,7 @@ from django.conf import settings
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from core.models import ChrisFolder
 from core.storage import connect_storage
 from userfiles.models import UserFile
 
@@ -38,13 +39,15 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         email = validated_data.get('email')
         password = validated_data.get('password')
         user = User.objects.create_user(username, email, password)
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=f'home/{username}',
+                                                               owner=user)
         storage_manager = connect_storage(settings)
-        welcome_file_path = 'home/%s/welcome.txt' % username
+        welcome_file_path = f'home/{username}/welcome.txt'
         try:
             with io.StringIO('Welcome to ChRIS!') as f:
                 storage_manager.upload_obj(welcome_file_path, f.read(),
-                                         content_type='text/plain')
-            welcome_file = UserFile(owner=user)
+                                           content_type='text/plain')
+            welcome_file = UserFile(parent_folder=parent_folder, owner=user)
             welcome_file.fname.name = welcome_file_path
             welcome_file.save()
         except Exception as e:

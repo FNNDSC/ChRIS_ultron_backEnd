@@ -46,8 +46,8 @@ class UserFileList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append document-level link relations, a query list and a
+        collection+json template to the response.
         """
         response = super(UserFileList, self).list(request, *args, **kwargs)
         # append query list
@@ -122,7 +122,7 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class UserFileResource(generics.GenericAPIView):
     """
-    A view to enable downloading of a file resource .
+    A view to enable downloading of a file resource.
     """
     http_method_names = ['get']
     queryset = UserFile.objects.all()

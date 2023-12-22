@@ -6,7 +6,6 @@ from feeds.models import Feed
 from servicefiles.models import ServiceFile
 from pacsfiles.models import PACSFile
 from userfiles.models import UserFile
-from plugininstances.models import PluginInstanceFile
 from pipelines.models import PipelineSourceFile
 
 
@@ -24,8 +23,6 @@ def get_path_file_model_class(path):
             model_class = PACSFile
         else:
             model_class = ServiceFile
-    elif len(path_tokens) > 2 and path_tokens[0] == 'home' and path_tokens[2] == 'feeds':
-        model_class = PluginInstanceFile
     return model_class
 
 
@@ -42,7 +39,7 @@ def get_path_file_queryset(path, user):
         if len(path_tokens) > 1:
             if path_tokens[1] == username:
                 if len(path_tokens) > 2 and path_tokens[2] == 'feeds':
-                    model_class = PluginInstanceFile
+                    model_class = UserFile
             else:
                 if path_tokens[1] not in get_shared_feed_creators_set(user):
                     if username != 'chris': # chris special case (can see others' not shared feeds)
@@ -56,7 +53,7 @@ def get_path_file_queryset(path, user):
                                               shared_feeds_qs .all()]:
                         if username != 'chris':
                             raise ValueError('Path not found.')
-                model_class = PluginInstanceFile
+                model_class = UserFile
         else:
             return UserFile.objects.none()
 

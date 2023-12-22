@@ -59,7 +59,8 @@ from django.db.utils import IntegrityError
 from core.storage import connect_storage
 from core.utils import json_zip2str
 from core.models import ChrisInstance
-from plugininstances.models import PluginInstance, PluginInstanceFile, PluginInstanceLock
+from plugininstances.models import PluginInstance, PluginInstanceLock
+from userfiles.models import UserFile
 
 if settings.DEBUG:
     import pdb, pudb, rpudb
@@ -847,11 +848,11 @@ class PluginInstanceManager(object):
         files = []
         for obj_name in self.plugin_inst_output_files:
             logger.info(f'Registering file -->{obj_name}<-- for job {job_id}')
-            plg_inst_file = PluginInstanceFile(plugin_inst=self.c_plugin_inst)
+            plg_inst_file = UserFile(plugin_inst=self.c_plugin_inst)
             plg_inst_file.fname.name = obj_name
             files.append(plg_inst_file)
 
-        db_files = PluginInstanceFile.objects.bulk_create(files)
+        db_files = UserFile.objects.bulk_create(files)
 
         total_size = 0
         for plg_inst_file in db_files:

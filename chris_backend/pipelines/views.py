@@ -3,6 +3,7 @@ import logging
 
 from django.conf import settings
 from django.http import FileResponse
+from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
@@ -19,8 +20,8 @@ from .serializers import (PipelineSerializer, PipelineCustomJsonSerializer,
                           PipelineSourceFileSerializer, PluginPipingSerializer)
 from .serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from .serializers import GenericDefaultPipingParameterSerializer
-from .permissions import IsChrisOrOwnerOrNotLockedReadOnly, IsChrisOrOwnerOrNotLocked
-from .permissions import IsChrisOrOwnerAndLockedOrNotLockedReadOnly
+from .permissions import (IsChrisOrOwnerOrNotLockedReadOnly,
+                          IsChrisOrOwnerAndLockedOrNotLockedReadOnly)
 
 
 logger = logging.getLogger(__name__)
@@ -164,10 +165,11 @@ class PipelineSourceFileList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner with the pipeline source file before first
-        saving to the DB.
+        Overriden to associate an uploader and owner with the pipeline source file
+        before first saving to the DB.
         """
-        serializer.save(owner=self.request.user)
+        chris_user = User.objects.get(username='chris')
+        serializer.save(uploader=self.request.user, owner=chris_user)
 
     def list(self, request, *args, **kwargs):
         """
@@ -310,7 +312,7 @@ class PluginPipingDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
-    permission_classes = (IsChrisOrOwnerOrNotLocked,)
+    permission_classes = (IsChrisOrOwnerOrNotLockedReadOnly,)
 
 
 class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
