@@ -299,7 +299,6 @@ class FeedList(generics.ListAPIView):
         links = {'chrisinstance': reverse('chrisinstance-detail', request=request,
                                           kwargs={"pk": 1}),
                  'public_feeds': reverse('publicfeed-list', request=request),
-                 'folders': reverse('chrisfolder-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request),
                  'plugins': reverse('plugin-list', request=request),
@@ -314,7 +313,7 @@ class FeedList(generics.ListAPIView):
                  'userfiles': reverse('userfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),
-                 'filebrowser': reverse('filebrowserpath-list', request=request)}
+                 'filebrowser': reverse('chrisfolder-list', request=request)}
 
         user = self.request.user
         if user.is_authenticated:

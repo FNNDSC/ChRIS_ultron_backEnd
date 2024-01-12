@@ -35,51 +35,6 @@ urlpatterns = format_suffix_patterns([
          core_views.ChrisInstanceDetail.as_view(), name='chrisinstance-detail'),
 
 
-    path('v1/folders/',
-         core_views.ChrisFolderList.as_view(),
-         name='chrisfolder-list'),
-
-    path('v1/folders/search/',
-         core_views.ChrisFolderListQuerySearch.as_view(),
-         name='chrisfolder-list-query-search'),
-
-    path('v1/folders/<int:pk>/',
-         core_views.ChrisFolderDetail.as_view(),
-         name='chrisfolder-detail'),
-
-    path('v1/folders/<int:pk>/children/',
-         core_views.ChrisFolderChildList.as_view(),
-         name='chrisfolder-child-list'),
-
-    path('v1/folders/<int:pk>/userfiles/',
-         core_views.ChrisFolderUserFileList.as_view(),
-         name='chrisfolder-userfile-list'),
-
-    path('v1/folders/<int:pk>/pacsfiles/',
-         core_views.ChrisFolderPACSFileList.as_view(),
-         name='chrisfolder-pacsfile-list'),
-
-    path('v1/folders/<int:pk>/servicefiles/',
-         core_views.ChrisFolderServiceFileList.as_view(),
-         name='chrisfolder-servicefile-list'),
-
-    path('v1/folders/<int:pk>/pipelinesourcefiles/',
-         core_views.ChrisFolderPipelineSourceFileList.as_view(),
-         name='chrisfolder-pipelinesourcefile-list'),
-
-    path('v1/folders/<int:pk>/linkfiles/',
-         core_views.ChrisLinkFileList.as_view(),
-         name='chrislinkfile-list'),
-
-    path('v1/folders/linkfiles/<int:pk>/',
-         core_views.ChrisLinkFileDetail.as_view(),
-         name='chrislinkfile-detail'),
-
-    re_path(r'^v1/folders/linkfiles/(?P<pk>[0-9]+)/.*$',
-            core_views.ChrisLinkFileResource.as_view(),
-            name='chrislinkfile-resource'),
-
-
     path('v1/',
         feed_views.FeedList.as_view(), name='feed-list'),
 
@@ -400,20 +355,24 @@ urlpatterns = format_suffix_patterns([
 
 
     path('v1/filebrowser/',
-         filebrowser_views.FileBrowserPathList.as_view(),
-         name='filebrowserpath-list'),
+         filebrowser_views.FileBrowserFolderList.as_view(),
+         name='chrisfolder-list'),
 
     path('v1/filebrowser/search/',
-         filebrowser_views.FileBrowserPathListQuerySearch.as_view(),
-         name='filebrowserpath-list-query-search'),
+         filebrowser_views.FileBrowserFolderListQuerySearch.as_view(),
+         name='chrisfolder-list-query-search'),
 
-    path('v1/filebrowser/<path:path>/',
-         filebrowser_views.FileBrowserPath.as_view(),
-         name='filebrowserpath'),
+    path('v1/filebrowser/<int:pk>/',
+         filebrowser_views.FileBrowserFolderDetail.as_view(),
+         name='chrisfolder-detail'),
 
-    path('v1/filebrowser-files/<path:path>/',
-         filebrowser_views.FileBrowserPathFileList.as_view(),
-         name='filebrowserpathfile-list'),
+    path('v1/filebrowser/<int:pk>/children/',
+         filebrowser_views.FileBrowserFolderChildList.as_view(),
+         name='chrisfolder-child-list'),
+
+    path('v1/filebrowser/<int:pk>/files/',
+         filebrowser_views.FileBrowserFolderFileList.as_view(),
+         name='chrisfolder-file-list'),
 
 ])
 

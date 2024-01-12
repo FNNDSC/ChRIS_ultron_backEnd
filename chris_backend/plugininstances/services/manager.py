@@ -58,7 +58,7 @@ from django.db.utils import IntegrityError
 
 from core.storage import connect_storage
 from core.utils import json_zip2str
-from core.models import ChrisInstance
+from core.models import ChrisInstance, ChrisFolder
 from plugininstances.models import PluginInstance, PluginInstanceLock
 from userfiles.models import UserFile
 
@@ -845,10 +845,21 @@ class PluginInstanceManager(object):
         job_id = self.str_job_id
         logger.info('Registering output files with job %s', job_id)
 
+        owner = self.c_plugin_inst.owner
         files = []
+        folders = {}
+
         for obj_name in self.plugin_inst_output_files:
             logger.info(f'Registering file -->{obj_name}<-- for job {job_id}')
-            plg_inst_file = UserFile(plugin_inst=self.c_plugin_inst)
+
+            folder_path = os.path.dirname(obj_name)
+            parent_folder = folders.get(folder_path)
+            if parent_folder is None:
+                (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                       owner=owner)
+                folders[folder_path] = parent_folder
+
+            plg_inst_file = UserFile(owner=owner, parent_folder=parent_folder)
             plg_inst_file.fname.name = obj_name
             files.append(plg_inst_file)
 

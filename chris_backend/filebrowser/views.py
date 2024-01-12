@@ -1,37 +1,40 @@
 
-import json
+import logging
 
 from django.http import Http404
-from rest_framework import generics
+from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
-from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from core.utils import filter_files_by_n_slashes
-from .serializers import (FileBrowserPathListSerializer, FileBrowserPathSerializer,
-                          FileBrowserPathFileSerializer)
-from .services import (get_path_folders, get_path_file_queryset,
-                       get_path_file_model_class,
-                       get_unauthenticated_user_path_folders,
-                       get_unauthenticated_user_path_file_queryset)
+from core.models import ChrisFolder
+from collectionjson import services
+
+from .serializers import FileBrowserFolderSerializer
+from .services import (get_folder_file_queryset, get_folder_file_serializer_class,
+                       get_authenticated_user_folder_queryset,
+                       get_unauthenticated_user_folder_queryset,
+                       get_authenticated_user_folder_children,
+                       get_unauthenticated_user_folder_children)
 
 
-class FileBrowserPathList(generics.ListAPIView):
+logger = logging.getLogger(__name__)
+
+
+class FileBrowserFolderList(generics.ListAPIView):
     """
-    A view for the initial page of the collection of file browser paths. The returned
+    A view for the initial page of the collection of file browser folders. The returned
     collection only has a single element.
     """
     http_method_names = ['get']
-    serializer_class = FileBrowserPathListSerializer
+    serializer_class = FileBrowserFolderSerializer
 
     def list(self, request, *args, **kwargs):
         """
         Overriden to append a query list to the response.
         """
-        response = super(FileBrowserPathList, self).list(request, *args, **kwargs)
+        response = super(FileBrowserFolderList, self).list(request, *args, **kwargs)
         # append query list
-        query_url = reverse('filebrowserpath-list-query-search', request=request)
-        data = [{'name': 'path', 'value': ''}]
+        query_url = reverse('chrisfolder-list-query-search', request=request)
+        data = [{'name': 'id', 'value': ''}, {'name': 'path', 'value': ''}]
         queries = [{'href': query_url, 'rel': 'search', 'data': data}]
         response.data['queries'] = queries
         return response
@@ -41,119 +44,139 @@ class FileBrowserPathList(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the initial
         path (empty path).
         """
-        user = self.request.user
-        path = ''
-        if user.is_authenticated:
-            subfolders = get_path_folders(path, user)
-        else:
-            subfolders = get_unauthenticated_user_path_folders(path)
-        objects = [{'path': '', 'subfolders': json.dumps(subfolders)}]
-        return self.filter_queryset(objects)
+        return ChrisFolder.objects.filter(path='')
 
 
-class FileBrowserPathListQuerySearch(generics.ListAPIView):
+class FileBrowserFolderListQuerySearch(generics.ListAPIView):
     """
-    A view for the collection of file browser paths resulting from a query search.
+    A view for the collection of file browser folders resulting from a query search.
     The returned collection only has at most one element.
     """
     http_method_names = ['get']
+    serializer_class = FileBrowserFolderSerializer
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset.
+        Overriden to return a custom queryset of at most one element.
         """
         user = self.request.user
-        path = self.request.GET.get('path', '')
-        path = path.strip('/')
-        try:
-            if user.is_authenticated:
-                subfolders = get_path_folders(path, user)  # already sorted
-            else:
-                subfolders = get_unauthenticated_user_path_folders(path)
-        except ValueError:
-            objects = []
-        else:
-            objects = [{'path': path, 'subfolders': json.dumps(subfolders)}]
-        return self.filter_queryset(objects)
-
-    def get_serializer_class(self, *args, **kwargs):
-        """
-        Overriden to return the serializer class that should be used for serializing
-        output.
-        """
-        path = self.request.GET.get('path', '')
-        path = path.strip('/')
-        if not path:
-            return FileBrowserPathListSerializer
-        self.kwargs['path'] = path
-        return FileBrowserPathSerializer
+        id = self.request.GET.get('id')
+        pk_dict = {'id': id}
+        if id is None:
+            path = self.request.GET.get('path', '')
+            path = path.strip('/')
+            pk_dict = {'path': path}
+        if user.is_authenticated:
+            return get_authenticated_user_folder_queryset(pk_dict, user)
+        return get_unauthenticated_user_folder_queryset(pk_dict)
 
 
-class FileBrowserPath(APIView):
+class FileBrowserFolderDetail(generics.RetrieveAPIView):
     """
-    A file browser path view.
+    A ChRIS folder view.
     """
     http_method_names = ['get']
+    queryset = ChrisFolder.objects.all()
+    serializer_class = FileBrowserFolderSerializer
 
-    def get(self, request, *args, **kwargs):
+    def retrieve(self, request, *args, **kwargs):
         """
-        Overriden to be able to make a GET request to an actual file resource.
+        Overriden to get the collection of file browser paths directly under a path.
         """
         user = request.user
-        path = kwargs.get('path')
-        try:
-            if user.is_authenticated:
-                subfolders = get_path_folders(path, user)  # already sorted
-            else:
-                subfolders = get_unauthenticated_user_path_folders(path)
-        except ValueError:
+        id = kwargs.get('pk')
+        pk_dict = {'id': id}
+
+        if user.is_authenticated:
+            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+        else:
+            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+
+        if qs.count() == 0:
             raise Http404('Not found.')
-        object = {'path': path, 'subfolders': json.dumps(subfolders)}
-        serializer = self.get_serializer(object)
-        return Response(serializer.data)
 
-    def get_serializer(self, *args, **kwargs):
-        """
-        Return the serializer instance that should be used for serializing output.
-        """
-        kwargs.setdefault('context', self.get_serializer_context())
-        return FileBrowserPathSerializer(*args, **kwargs)
+        return super(FileBrowserFolderDetail, self).retrieve(request, *args, **kwargs)
 
-    def get_serializer_context(self):
-        """
-        Extra context provided to the serializer class.
-        """
-        return {'request': self.request, 'view': self}
-
-
-class FileBrowserPathFileList(generics.ListAPIView):
+class FileBrowserFolderChildList(generics.ListAPIView):
     """
-    A view for the collection of a file browser path's files.
+    A view for the collection of folders that are the children of this folder.
     """
     http_method_names = ['get']
+    queryset = ChrisFolder.objects.all()
+    serializer_class = FileBrowserFolderSerializer
 
-    def get_queryset(self):
+    def list(self, request, *args, **kwargs):
         """
-        Overriden to return a custom queryset.
+        Overriden to return a list of the children ChRIS folders.
+        """
+        user = request.user
+        id = kwargs.get('pk')
+        pk_dict = {'id': id}
+
+        if user.is_authenticated:
+            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+        else:
+            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+
+        if qs.count() == 0:
+            raise Http404('Not found.')
+
+        queryset = self.get_children_queryset()
+        return services.get_list_response(self, queryset)
+
+    def get_children_queryset(self):
+        """
+        Custom method to get the actual queryset of the children.
         """
         user = self.request.user
-        path = self.kwargs.get('path')
-        try:
-            if user.is_authenticated:
-                qs = get_path_file_queryset(path, user)
-            else:
-                qs = get_unauthenticated_user_path_file_queryset(path)
-        except ValueError:
+        folder = self.get_object()
+        if user.is_authenticated:
+            children = get_authenticated_user_folder_children(folder, user)
+        else:
+            children = get_unauthenticated_user_folder_children(folder)
+        return self.filter_queryset(children)
+
+
+class FileBrowserFolderFileList(generics.ListAPIView):
+    """
+    A view for the collection of all the files directly under this folder.
+    """
+    http_method_names = ['get']
+    queryset = ChrisFolder.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list with all the files directly under this folder.
+        """
+        user = request.user
+        id = kwargs.get('pk')
+        pk_dict = {'id': id}
+
+        if user.is_authenticated:
+            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+        else:
+            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+
+        if qs.count() == 0:
             raise Http404('Not found.')
-        n_slashes = path.count('/') + 1
-        return filter_files_by_n_slashes(qs, str(n_slashes))
+
+        queryset = self.get_files_queryset()
+        response = services.get_list_response(self, queryset)
+        return response
+
+    def get_files_queryset(self):
+        """
+        Custom method to get a queryset with all the files directly under this folder.
+        """
+        user = self.request.user
+        folder = self.get_object()
+        return get_folder_file_queryset(folder, user)
 
     def get_serializer_class(self):
         """
         Overriden to return the serializer class that should be used for serializing
         output.
         """
-        path = self.kwargs.get('path')
-        model_class = get_path_file_model_class(path)
-        FileBrowserPathFileSerializer.Meta.model = model_class
-        return FileBrowserPathFileSerializer
+        folder = self.get_object()
+        serializer_class = get_folder_file_serializer_class(folder)
+        return serializer_class

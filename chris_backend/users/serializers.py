@@ -33,21 +33,24 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     def create(self, validated_data):
         """
         Overriden to take care of the password hashing and create a welcome file
-        for the user in its personal storage space.
+        and a feeds folder for the user in its personal storage space.
         """
         username = validated_data.get('username')
         email = validated_data.get('email')
         password = validated_data.get('password')
         user = User.objects.create_user(username, email, password)
-        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=f'home/{username}',
-                                                               owner=user)
+
+        home_path = f'home/{username}'
+        (home_folder, _) = ChrisFolder.objects.get_or_create(path=home_path, owner=user)
+        (feeds_folder, _) = ChrisFolder.objects.get_or_create(path=f'{home_path}/feeds',
+                                                              owner=user)
         storage_manager = connect_storage(settings)
-        welcome_file_path = f'home/{username}/welcome.txt'
+        welcome_file_path = f'{home_path}/welcome.txt'
         try:
             with io.StringIO('Welcome to ChRIS!') as f:
                 storage_manager.upload_obj(welcome_file_path, f.read(),
                                            content_type='text/plain')
-            welcome_file = UserFile(parent_folder=parent_folder, owner=user)
+            welcome_file = UserFile(parent_folder=home_folder, owner=user)
             welcome_file.fname.name = welcome_file_path
             welcome_file.save()
         except Exception as e:

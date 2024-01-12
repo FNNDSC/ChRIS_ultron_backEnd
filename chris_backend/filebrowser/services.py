@@ -1,198 +1,204 @@
 
 from django.db import models
-from django.contrib.auth.models import User
 
+from core.models import ChrisFolder
 from feeds.models import Feed
-from servicefiles.models import ServiceFile
-from pacsfiles.models import PACSFile
 from userfiles.models import UserFile
-from pipelines.models import PipelineSourceFile
+from servicefiles.serializers import ServiceFileSerializer
+from pacsfiles.serializers import PACSFileSerializer
+from userfiles.serializers import UserFileSerializer
+from pipelines.serializers import PipelineSourceFileSerializer
 
 
-def get_path_file_model_class(path):
+FILE_TYPES = {'user_files': UserFileSerializer, 'pacs_files': PACSFileSerializer,
+              'pipeline_source_files': PipelineSourceFileSerializer,
+              'service_files': ServiceFileSerializer}
+
+
+def get_folder_file_type(folder):
     """
-    Convenience function to get the file model class associated to a path.
+    Convenience function to get the file type for the files directly under a folder.
     """
-    path_tokens = path.split('/', 3)
-    model_class = UserFile
-
-    if path_tokens[0] == 'PIPELINES':
-        model_class = PipelineSourceFile
-    elif path_tokens[0] == 'SERVICES':
-        if len(path_tokens) > 1 and path_tokens[1] == 'PACS':
-            model_class = PACSFile
-        else:
-            model_class = ServiceFile
-    return model_class
+    for file_type in FILE_TYPES:
+        if getattr(folder, file_type).count() > 0:
+            return file_type
 
 
-def get_path_file_queryset(path, user):
+def get_folder_file_serializer_class(folder):
     """
-    Convenience function to get the file queryset associated with a path. Raises
-    ValueError if the path is not found.
+    Convenience function to get the file serializer class for the files directly under
+    a folder.
+    """
+    file_type = get_folder_file_type(folder)
+    if file_type is None:
+        return UserFileSerializer
+    return FILE_TYPES[file_type]
+
+
+def get_folder_file_queryset(folder, user):
+    """
+    Convenience function to get the file queryset for the files directly under
+    a folder.
+    """
+    file_type = get_folder_file_type(folder)
+    if file_type is None:
+        return UserFile.objects.none()
+    return getattr(folder, file_type).all()
+
+
+def get_authenticated_user_folder_queryset(pk_dict, user):
+    """
+    Convenience function to get a folder queryset for the authenticated user.
+    """
+    try:
+        folder = ChrisFolder.objects.get(**pk_dict)
+    except ChrisFolder.DoesNotExist:
+        return ChrisFolder.objects.none()
+
+    qs = ChrisFolder.objects.filter(**pk_dict)
+    username = user.username
+
+    if username == 'chris':  # chris user can see every existing folder
+        return qs
+
+    path = folder.path
+    if path in ('', 'home') or path.startswith(('PIPELINES', 'SERVICES')):
+        return qs
+
+    path_tokens = path.split('/', 4)
+    if path_tokens[1] == username:
+        return qs
+
+    shared_feed_creators = get_shared_feed_creators_set(user)
+
+    if path_tokens[1] in shared_feed_creators:
+        if len(path_tokens) == 2:
+            return qs
+        if path_tokens[2] == 'feeds':
+            if len(path_tokens) == 3:
+                return qs
+            if path_tokens[3] in [f'feed_{f.id}' for f in Feed.objects.filter(
+                    owner__username=path_tokens[1]).filter(
+                models.Q(owner=user) | models.Q(public=True))]:
+                return qs
+    return ChrisFolder.objects.none()
+
+
+def get_unauthenticated_user_folder_queryset(pk_dict):
+    """
+    Convenience function to get a folder queryset for the unauthenticated user.
+    """
+    try:
+        folder = ChrisFolder.objects.get(**pk_dict)
+    except ChrisFolder.DoesNotExist:
+        return ChrisFolder.objects.none()
+
+    qs = ChrisFolder.objects.filter(**pk_dict)
+
+    path = folder.path
+    if path in ('', 'home') or path.startswith('PIPELINES'):
+        return qs
+
+    path_tokens = path.split('/', 4)
+    public_feed_creators = get_shared_feed_creators_set()
+
+    if path_tokens[1] in public_feed_creators:
+        if len(path_tokens) == 2:
+            return qs
+        if path_tokens[2] == 'feeds':
+            if len(path_tokens) == 3:
+                return qs
+            if path_tokens[3] in [f'feed_{f.id}' for f in Feed.objects.filter(
+                    owner__username=path_tokens[1]).filter(public=True)]:
+                return qs
+    return ChrisFolder.objects.none()
+
+
+def get_authenticated_user_folder_children(folder, user):
+    """
+    Convenience function to get the list of the immediate subfolders under a folder
+    for the authenticated user.
     """
     username = user.username
-    model_class = UserFile
-    path_tokens = path.split('/', 4)
+    if username == 'chris':  # chris user can see every existing folder
+        return list(folder.children.all())
 
-    if path_tokens[0] == 'home':
-        if len(path_tokens) > 1:
-            if path_tokens[1] == username:
-                if len(path_tokens) > 2 and path_tokens[2] == 'feeds':
-                    model_class = UserFile
-            else:
-                if path_tokens[1] not in get_shared_feed_creators_set(user):
-                    if username != 'chris': # chris special case (can see others' not shared feeds)
-                        raise ValueError('Path not found.')
+    path = folder.path
+    if path == '' or path.startswith(('PIPELINES', 'SERVICES')):
+        return list(folder.children.all())
 
-                if len(path_tokens) > 3 and path_tokens[2] == 'feeds':
-                    shared_feeds_qs = Feed.objects.filter(
-                        owner__username=path_tokens[1]).filter(
-                        models.Q(owner=user) | models.Q(public=True))
-                    if path_tokens[3] not in [f'feed_{feed.id}' for feed in
-                                              shared_feeds_qs .all()]:
-                        if username != 'chris':
-                            raise ValueError('Path not found.')
-                model_class = UserFile
+    shared_feed_creators = set()
+    computed_shared_feed_creators = False
+    shared_feeds = []
+    computed_shared_feeds = False
+    children = []
+
+    for child_folder in folder.children.all():
+        path = child_folder.path
+        path_tokens = path.split('/', 4)
+
+        if path_tokens[1] == username:
+            children.append(child_folder)
         else:
-            return UserFile.objects.none()
+            if not computed_shared_feed_creators:
+                shared_feed_creators = get_shared_feed_creators_set(user)
+                computed_shared_feed_creators = True
 
-    elif path_tokens[0] == 'PIPELINES':
-        model_class = PipelineSourceFile
+            if path_tokens[1] in shared_feed_creators:
+                if len(path_tokens) == 2:
+                    children.append(child_folder)
+                elif path_tokens[2] == 'feeds':
+                    if len(path_tokens) == 3:
+                        children.append(child_folder)
+                    else:
+                        if not computed_shared_feeds:
+                            shared_feeds = [f'feed_{f.id}' for f in Feed.objects.filter(
+                            owner__username=path_tokens[1]).filter(
+                                models.Q(owner=user) | models.Q(public=True))]
+                            computed_shared_feeds = True
 
-    elif path_tokens[0] == 'SERVICES':
-        model_class = ServiceFile
-        if len(path_tokens) > 1:
-            if path_tokens[1] == 'PACS':
-                model_class = PACSFile
-
-    qs = model_class.objects.filter(fname__startswith=path)
-    try:
-        qs[0]
-    except IndexError:
-        if path not in ('PIPELINES', 'SERVICES', 'SERVICES/PACS', 'home',
-                        f'home/{username}', f'home/{username}/feeds'):
-            raise ValueError('Path not found.')
-    return qs
+                        if path_tokens[3] in shared_feeds:
+                            children.append(child_folder)
+    return children
 
 
-def get_unauthenticated_user_path_file_queryset(path):
+def get_unauthenticated_user_folder_children(folder):
     """
-    Convenience function to get the file queryset associated to a path for unauthenticated
-    users. Raises ValueError if the path is not found.
+    Convenience function to get the list of the immediate subfolders under a folder
+    for the unauthenticated user.
     """
-    model_class = PipelineSourceFile
-    path_tokens = path.split('/', 4)
+    path = folder.path
+    if path == '':
+        return list(folder.children.filter(
+            models.Q(path='home') | models.Q(path='PIPELINES')))
 
-    if path_tokens[0] == 'home':
-        if len(path_tokens) > 1:
-            if path_tokens[1] not in get_shared_feed_creators_set():
-                raise ValueError('Path not found.')
-            if len(path_tokens) > 3 and path_tokens[2] == 'feeds':
-                public_feeds_qs = Feed.objects.filter(
-                    public=True).filter(owner__username=path_tokens[1])
-                if path_tokens[3] not in [f'feed_{feed.id}' for feed in
-                                          public_feeds_qs.all()]:
-                    raise ValueError('Path not found.')
-        else:
-            return UserFile.objects.none()
-        model_class = PluginInstanceFile
+    if path.startswith('PIPELINES'):
+        return list(folder.children.all())
 
-    qs = model_class.objects.filter(fname__startswith=path)
-    try:
-        qs[0]
-    except IndexError:
-        if path not in ('PIPELINES', 'home'):
-            raise ValueError('Path not found.')
-    return qs
+    public_feed_creators = get_shared_feed_creators_set()
+    public_feeds = []
+    computed_public_feeds = False
+    children = []
 
+    for child_folder in folder.children.all():
+        path = child_folder.path
+        path_tokens = path.split('/', 4)
 
-def get_path_folders(path, user):
-    """
-    Convenience function to get the immediate subfolders under a path.
-    """
-    username = user.username
-    if not path:
-        return ['PIPELINES', 'SERVICES', 'home']
+        if path_tokens[1] in public_feed_creators:
+            if len(path_tokens) == 2:
+                children.append(child_folder)
+            elif path_tokens[2] == 'feeds':
+                if len(path_tokens) == 3:
+                    children.append(child_folder)
+                else:
+                    if not computed_public_feeds:
+                        public_feeds = [f'feed_{f.id}' for f in Feed.objects.filter(
+                        owner__username=path_tokens[1]).filter(public=True)]
+                        computed_public_feeds = True
 
-    path_tokens = path.split('/', 3)
-    if len(path_tokens) == 3 and path_tokens[0] == 'home' and path_tokens[2] == 'feeds':
-        if path_tokens[1] != username and username != 'chris':
-            return sorted([f'feed_{f.id}' for f in Feed.objects.filter(
-                owner__username=path_tokens[1]).filter(
-                models.Q(owner=user) | models.Q(public=True))])
-
-    hash_set = set()
-    if path_tokens[0] == 'home':
-        if path == 'home':
-            if username == 'chris':
-                return sorted([u.username for u in User.objects.all() if u.feed.count()])
-            shared_feed_creators = get_shared_feed_creators_set(user)
-            shared_feed_creators.add(username)
-            return sorted(shared_feed_creators)
-        if path == f'home/{username}':
-            hash_set.add('feeds')
-    elif path == 'SERVICES':
-        hash_set.add('PACS')
-
-    qs = get_path_file_queryset(path, user)
-
-    existing_path = False
-    for obj in qs:
-        name = obj.fname.name
-        if name.startswith(path + '/'):
-            existing_path = True
-            folder = name.replace(path + '/', '', 1)
-            try:
-                first_slash_ix = folder.index('/')
-            except ValueError:
-                pass  # no folders under this path (only files)
-            else:
-                folder = folder[:first_slash_ix]
-                hash_set.add(folder)
-
-    if len(qs) and not existing_path:
-        raise ValueError('Path not found.')
-    return sorted(hash_set)
-
-
-def get_unauthenticated_user_path_folders(path):
-    """
-    Convenience function to get the immediate subfolders under a path for unauthenticated
-    users.
-    """
-    if not path:
-        return ['PIPELINES', 'home']
-
-    if path == 'home':
-        public_feed_creators = get_shared_feed_creators_set()
-        return sorted(public_feed_creators)
-
-    path_tokens = path.split('/', 3)
-    if len(path_tokens) == 3 and path_tokens[0] == 'home' and path_tokens[2] == 'feeds':
-        return sorted([f'feed_{f.id}' for f in Feed.objects.filter(public=True).filter(
-            owner__username=path_tokens[1])])
-
-    qs = get_unauthenticated_user_path_file_queryset(path)
-
-    hash_set = set()
-    existing_path = False
-    for obj in qs:
-        name = obj.fname.name
-        if name.startswith(path + '/'):
-            existing_path = True
-            folder = name.replace(path + '/', '', 1)
-            try:
-                first_slash_ix = folder.index('/')
-            except ValueError:
-                pass  # no folders under this path (only files)
-            else:
-                folder = folder[:first_slash_ix]
-                hash_set.add(folder)
-
-    if len(qs) and not existing_path:
-        raise ValueError('Path not found.')
-    return sorted(hash_set)
+                    if path_tokens[3] in public_feeds:
+                        children.append(child_folder)
+    return children
 
 
 def get_shared_feed_creators_set(user=None):

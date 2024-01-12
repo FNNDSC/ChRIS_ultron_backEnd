@@ -12,7 +12,7 @@ from core.storage import connect_storage
 
 from .models import UserFile, UserFileFilter
 from .serializers import UserFileSerializer
-from .permissions import IsOwnerOrChris
+from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = UserFile.objects.all()
     serializer_class = UserFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -127,7 +127,7 @@ class UserFileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = UserFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
     def get(self, request, *args, **kwargs):
         """

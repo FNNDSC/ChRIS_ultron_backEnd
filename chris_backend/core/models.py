@@ -83,20 +83,11 @@ class ChrisFolder(models.Model):
 
 
 class ChrisFolderFilter(FilterSet):
-    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='gte')
-    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
-                                                         lookup_expr='lte')
-    path = django_filters.CharFilter(field_name='path', lookup_expr='startswith')
-    path_exact = django_filters.CharFilter(field_name='path', lookup_expr='exact')
-    path_icontains = django_filters.CharFilter(field_name='path', lookup_expr='icontains')
-    owner_username = django_filters.CharFilter(field_name='owner__username',
-                                               lookup_expr='exact')
+    path = django_filters.CharFilter(field_name='path')
 
     class Meta:
         model = ChrisFolder
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'path', 'path_exact',
-                  'path_icontains', 'owner_username']
+        fields = ['id', 'path']
 
 
 class ChrisLinkFile(models.Model):

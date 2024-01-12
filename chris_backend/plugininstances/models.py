@@ -48,8 +48,7 @@ class PluginInstance(models.Model):
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE,
                              related_name='plugin_instances')
-
-    output_folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
+    output_folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE, null=True,
                                          related_name='plugin_inst')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
     compute_resource = models.ForeignKey(ComputeResource, null=True,
@@ -86,9 +85,10 @@ class PluginInstance(models.Model):
                 self.feed = self.previous.feed
 
         self._set_compute_defaults()
+
         super(PluginInstance, self).save(*args, **kwargs)
 
-        if not hasattr(self, 'output_folder'):
+        if self.output_folder is None:
             self.output_folder = self._save_output_folder()
             self.save()
 
