@@ -2,7 +2,7 @@
 import logging
 
 from django.http import Http404
-from rest_framework import generics, permissions
+from rest_framework import generics
 from rest_framework.reverse import reverse
 
 from core.models import ChrisFolder
@@ -168,9 +168,8 @@ class FileBrowserFolderFileList(generics.ListAPIView):
         """
         Custom method to get a queryset with all the files directly under this folder.
         """
-        user = self.request.user
         folder = self.get_object()
-        return get_folder_file_queryset(folder, user)
+        return get_folder_file_queryset(folder)
 
     def get_serializer_class(self):
         """

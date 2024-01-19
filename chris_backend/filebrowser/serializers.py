@@ -4,7 +4,6 @@ from core.models import ChrisFolder
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
-    size = serializers.ReadOnlyField()
     parent = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
     children = serializers.HyperlinkedIdentityField(
@@ -14,5 +13,5 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ChrisFolder
-        fields = ('url', 'id', 'creation_date', 'path', 'size', 'parent', 'children',
+        fields = ('url', 'id', 'creation_date', 'path', 'parent', 'children',
                   'files', 'owner')

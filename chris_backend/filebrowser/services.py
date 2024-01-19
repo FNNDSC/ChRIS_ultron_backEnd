@@ -35,7 +35,7 @@ def get_folder_file_serializer_class(folder):
     return FILE_TYPES[file_type]
 
 
-def get_folder_file_queryset(folder, user):
+def get_folder_file_queryset(folder):
     """
     Convenience function to get the file queryset for the files directly under
     a folder.

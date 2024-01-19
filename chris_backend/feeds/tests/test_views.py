@@ -1,7 +1,6 @@
 
 import logging
 import json
-import io
 
 from django.test import TestCase
 from django.urls import reverse
@@ -10,9 +9,8 @@ from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin, ComputeResource
-from plugininstances.models import PluginInstance, PluginInstanceFile
+from plugininstances.models import PluginInstance
 from feeds.models import Note, Tag, Tagging, Feed, Comment
-from core.storage import connect_storage
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -24,9 +22,13 @@ class ViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.content_type='application/vnd.collection+json'
+        # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris12'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username, password=self.chris_password)
+
+        self.content_type='application/vnd.collection+json'
+
         self.username = 'foo'
         self.password = 'bar'
         self.other_username = 'boo'
@@ -43,9 +45,7 @@ class ViewTests(TestCase):
 
         # create basic models
         
-        # create the chris user and two other users
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        # create users
         User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
         user = User.objects.create_user(username=self.username,

@@ -17,7 +17,6 @@ class ChrisInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class ChrisFolderSerializer(serializers.HyperlinkedModelSerializer):
-    size = serializers.ReadOnlyField()
     parent = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
     children = serializers.HyperlinkedIdentityField(view_name='chrisfolder-child-list')
@@ -35,7 +34,7 @@ class ChrisFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ChrisFolder
-        fields = ('url', 'id', 'creation_date', 'path', 'size', 'parent', 'children',
+        fields = ('url', 'id', 'creation_date', 'path', 'parent', 'children',
                   'user_files', 'pacs_files', 'service_files', 'chris_link_files',
                   'pipeline_source_files', 'owner')
 

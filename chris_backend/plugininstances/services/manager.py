@@ -373,7 +373,10 @@ class PluginInstanceManager(object):
         job_id = self.str_job_id
         previous = self.c_plugin_inst.previous
         output_path = previous.get_output_path()
-        fnames = [f.fname.name for f in previous.files.all()]
+        output_folders = previous.output_folder.get_descendants()
+        fnames = []
+        for folder in output_folders:
+            fnames.extend([f.fname.name for f in folder.user_files.all()])
         for i in range(20):  # loop to deal with eventual consistency
             try:
                 l_ls = self.storage_manager.ls(output_path)

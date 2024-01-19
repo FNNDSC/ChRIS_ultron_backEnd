@@ -52,7 +52,6 @@ class ChrisInstance(models.Model):
 class ChrisFolder(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     path = models.CharField(max_length=1024, unique=True)
-    size = models.BigIntegerField(default=0)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True,
                                related_name='children')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
@@ -80,6 +79,19 @@ class ChrisFolder(models.Model):
         if self.path in ('', 'home') or self.path.startswith(('PIPELINES', 'SERVICES')):
             self.owner = User.objects.get(username='chris')
         super(ChrisFolder, self).save(*args, **kwargs)
+
+    def get_descendants(self):
+        """
+        Custom method to return all the folders that are a descendant of this
+        folder.
+        """
+        descendants = []
+        queue = [self]
+        while len(queue) > 0:
+            visited = queue.pop()
+            queue.extend(list(visited.children.all()))
+            descendants.append(visited)
+        return descendants
 
 
 class ChrisFolderFilter(FilterSet):

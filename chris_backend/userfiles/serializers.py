@@ -1,14 +1,19 @@
 
-
+import logging
 import os
 
+from django.conf import settings
 from rest_framework import serializers
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
 from core.models import ChrisFolder
+from core.storage import connect_storage
 
 from .models import UserFile
+
+
+logger = logging.getLogger(__name__)
 
 
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
@@ -43,6 +48,36 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         user_file.fname.name = upload_path
         user_file.save()
         return user_file
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to set the file's saving path and parent folder and  delete the old
+        path from storage.
+        """
+        # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
+        # where <upload_path> must start with home/<username>/
+        upload_path = validated_data.pop('upload_path')
+        old_storage_path = instance.fname.name
+
+        storage_manager = connect_storage(settings)
+        try:
+            storage_manager.copy_obj(old_storage_path, upload_path)
+        except Exception as e:
+            logger.error('Storage error, detail: %s' % str(e))
+
+        folder_path = os.path.dirname(upload_path)
+        owner = instance.owner
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                               owner=owner)
+        instance.parent_folder = parent_folder
+        instance.fname.name = upload_path
+        instance.save()
+
+        try:
+            storage_manager.delete_obj(old_storage_path)
+        except Exception as e:
+            logger.error('Storage error, detail: %s' % str(e))
+        return instance
 
     def get_file_link(self, obj):
         """

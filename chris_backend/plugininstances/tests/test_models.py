@@ -11,7 +11,7 @@ from feeds.models import Feed
 from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter
-from plugininstances.models import PluginInstance, PluginInstanceFile
+from plugininstances.models import PluginInstance
 from plugininstances.models import PluginInstanceFilter
 
 
@@ -23,6 +23,12 @@ class ModelTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
 
         self.plugin_fs_name = "simplecopyapp"
         self.plugin_fs_parameters = {'dir': {'type': 'string', 'optional': True,

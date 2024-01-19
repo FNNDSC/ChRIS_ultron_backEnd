@@ -94,19 +94,6 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         request.data['fname'] = user_file.fname.file  # fname required in the serializer
         return super(UserFileDetail, self).update(request, *args, **kwargs)
 
-    def perform_update(self, serializer):
-        """
-        Overriden to delete the old path from storage.
-        """
-        user_file = self.get_object()
-        old_storage_path = user_file.fname.name
-        serializer.save()
-        storage_manager = connect_storage(settings)
-        try:
-            storage_manager.delete_obj(old_storage_path)
-        except Exception as e:
-            logger.error('Storage error, detail: %s' % str(e))
-
     def perform_destroy(self, instance):
         """
         Overriden to delete the file from storage.

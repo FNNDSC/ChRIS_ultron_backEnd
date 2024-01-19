@@ -2,6 +2,7 @@
 import logging
 import json
 import io
+import os
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -11,6 +12,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
+from core.models import ChrisFolder
 from core.storage import connect_storage
 from servicefiles.models import Service, ServiceFile
 from servicefiles import views
@@ -25,13 +27,25 @@ class ServiceFileViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
         self.content_type = 'application/vnd.collection+json'
         self.username = 'test'
         self.password = 'testpass'
 
         User.objects.create_user(username=self.username, password=self.password)
 
-        service = Service(identifier='MyService')
+
+        self.service_name = 'MyService'
+        folder_path = f'SERVICES/{self.service_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (service_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                             owner=owner)
+        service = Service(folder=service_folder, identifier='MyService')
         service.save()
 
         # create a service file in the DB "already registered" to the server)
@@ -42,7 +56,11 @@ class ServiceFileViewTests(TestCase):
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(self.path, file1.read(),
                                           content_type='text/plain')
-        service_file = ServiceFile(service=service)
+
+        folder_path = os.path.dirname(self.path)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+        service_file = ServiceFile(owner=owner, parent_folder=file_parent_folder)
         service_file.fname.name = self.path
         service_file.save()
 
@@ -71,9 +89,6 @@ class ServiceFileListViewTests(ServiceFileViewTests):
 
     @tag('integration')
     def test_integration_servicefile_create_success(self):
-        chris_username = 'chris'
-        chris_password = 'chris1234'
-        User.objects.create_user(username=chris_username, password=chris_password)
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
 
         # upload file to storage
@@ -81,7 +96,7 @@ class ServiceFileListViewTests(ServiceFileViewTests):
             self.storage_manager.upload_obj(path, file2.read(), content_type='text/plain')
 
         # make the POST request using the chris user
-        self.client.login(username=chris_username, password=chris_password)
+        self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -95,15 +110,17 @@ class ServiceFileListViewTests(ServiceFileViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_servicefile_create_failure_already_exists(self):
-        chris_username = 'chris'
-        chris_password = 'chris1234'
-        User.objects.create_user(username=chris_username, password=chris_password)
-        self.client.login(username=chris_username, password=chris_password)
+        self.client.login(username=self.chris_username, password=self.chris_password)
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file2.dcm'
-        service = Service.objects.get(identifier='MyService')
-        service_file = ServiceFile(service=service)
+        owner = User.objects.get(username=self.chris_username)
+
+        folder_path = os.path.dirname(path)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+        service_file = ServiceFile(owner=owner, parent_folder=file_parent_folder)
         service_file.fname.name = path
         service_file.save()
+
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -131,8 +148,7 @@ class ServiceFileDetailViewTests(ServiceFileViewTests):
 
     def setUp(self):
         super(ServiceFileDetailViewTests, self).setUp()
-        service = Service.objects.get(identifier='MyService')
-        service_file = ServiceFile.objects.get(service=service)
+        service_file = ServiceFile.objects.get(fname=self.path)
         self.read_url = reverse("servicefile-detail",
                                 kwargs={"pk": service_file.id})
 
@@ -153,8 +169,7 @@ class ServiceFileResourceViewTests(ServiceFileViewTests):
 
     def setUp(self):
         super(ServiceFileResourceViewTests, self).setUp()
-        service = Service.objects.get(identifier='MyService')
-        service_file = ServiceFile.objects.get(service=service)
+        service_file = ServiceFile.objects.get(fname=self.path)
         self.download_url = reverse("servicefile-resource",
                                     kwargs={"pk": service_file.id}) + 'file1.dcm'
 
@@ -162,8 +177,7 @@ class ServiceFileResourceViewTests(ServiceFileViewTests):
         super(ServiceFileResourceViewTests, self).tearDown()
 
     def test_servicefileresource_get(self):
-        service = Service.objects.get(identifier='MyService')
-        service_file = ServiceFile.objects.get(service=service)
+        service_file = ServiceFile.objects.get(fname=self.path)
         fileresource_view_inst = mock.Mock()
         fileresource_view_inst.get_object = mock.Mock(return_value=service_file)
         request_mock = mock.Mock()
