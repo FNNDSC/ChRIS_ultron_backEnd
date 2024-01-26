@@ -9,9 +9,11 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
     children = serializers.HyperlinkedIdentityField(
         view_name='chrisfolder-child-list')
     files = serializers.HyperlinkedIdentityField(view_name='chrisfolder-file-list')
+    link_files = serializers.HyperlinkedIdentityField(
+        view_name='chrisfolder-linkfile-list')
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisFolder
         fields = ('url', 'id', 'creation_date', 'path', 'parent', 'children',
-                  'files', 'owner')
+                  'files', 'link_files', 'owner')

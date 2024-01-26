@@ -116,18 +116,23 @@ class ChrisLinkFile(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to create and save the associated link file the first time the link is
+        Overriden to create and save the associated link file when the link is
         saved.
         """
         path = kwargs['path']  # pointed path
-        name = os.path.basename(path)
+        name = kwargs.pop('name')  # must provide a name for the link
         link_file_path = os.path.join(self.parent_folder.path, f'{name}.chrislink')
         is_folder = kwargs['is_folder']
+
         link_file_contents = f'd, {path}'
         if not is_folder:
             link_file_contents = f'f, {path}'
+
         storage_manager = connect_storage(settings)
+
         with io.StringIO(link_file_contents) as f:
+            if storage_manager.obj_exists(link_file_path):
+                storage_manager.delete_obj(link_file_path)
             storage_manager.upload_obj(link_file_path, f.read(),
                                        content_type='text/plain')
         self.fname.name = link_file_path

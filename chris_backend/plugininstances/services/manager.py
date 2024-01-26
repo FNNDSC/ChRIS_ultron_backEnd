@@ -65,7 +65,6 @@ from userfiles.models import UserFile
 if settings.DEBUG:
     import pdb, pudb, rpudb
     from celery.contrib import rdb
-    from pudb.remote    import set_trace
 
 
 logger = logging.getLogger(__name__)

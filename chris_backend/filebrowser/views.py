@@ -1,11 +1,13 @@
 
 import logging
 
-from django.http import Http404
+from django.http import Http404, FileResponse
 from rest_framework import generics
 from rest_framework.reverse import reverse
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, ChrisLinkFile
+from core.serializers import ChrisLinkFileSerializer
+from core.renderers import BinaryFileRenderer
 from collectionjson import services
 
 from .serializers import FileBrowserFolderSerializer
@@ -14,6 +16,7 @@ from .services import (get_folder_file_queryset, get_folder_file_serializer_clas
                        get_unauthenticated_user_folder_queryset,
                        get_authenticated_user_folder_children,
                        get_unauthenticated_user_folder_children)
+from .permissions import IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly
 
 
 logger = logging.getLogger(__name__)
@@ -179,3 +182,67 @@ class FileBrowserFolderFileList(generics.ListAPIView):
         folder = self.get_object()
         serializer_class = get_folder_file_serializer_class(folder)
         return serializer_class
+
+
+class FileBrowserFolderLinkFileList(generics.ListAPIView):
+    """
+    A view for the collection of all the ChRIS link files directly under this folder.
+    """
+    http_method_names = ['get']
+    queryset = ChrisFolder.objects.all()
+    serializer_class = ChrisLinkFileSerializer
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return a list with all the link files directly under this folder.
+        """
+        user = request.user
+        id = kwargs.get('pk')
+        pk_dict = {'id': id}
+
+        if user.is_authenticated:
+            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+        else:
+            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+
+        if qs.count() == 0:
+            raise Http404('Not found.')
+
+        queryset = self.get_link_files_queryset()
+        response = services.get_list_response(self, queryset)
+        return response
+
+    def get_link_files_queryset(self):
+        """
+        Custom method to get a queryset with all the link files directly under this
+        folder.
+        """
+        folder = self.get_object()
+        return folder.chris_link_files.all()
+
+
+class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
+    """
+    A ChRIS link view.
+    """
+    http_method_names = ['get']
+    queryset = ChrisLinkFile.objects.all()
+    serializer_class = ChrisLinkFileSerializer
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+
+
+class FileBrowserLinkFileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource.
+    """
+    http_method_names = ['get']
+    queryset = ChrisLinkFile.objects.all()
+    renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Overriden to be able to make a GET request to an actual file resource.
+        """
+        chris_link_file = self.get_object()
+        return FileResponse(chris_link_file.fname)

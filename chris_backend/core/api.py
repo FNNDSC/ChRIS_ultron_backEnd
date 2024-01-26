@@ -374,6 +374,18 @@ urlpatterns = format_suffix_patterns([
          filebrowser_views.FileBrowserFolderFileList.as_view(),
          name='chrisfolder-file-list'),
 
+    path('v1/filebrowser/<int:pk>/linkfiles/',
+         filebrowser_views.FileBrowserFolderLinkFileList.as_view(),
+         name='chrisfolder-linkfile-list'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/',
+         filebrowser_views.FileBrowserLinkFileDetail.as_view(),
+         name='chrisfolder-linkfile-detail'),
+
+    re_path(r'^v1/filebrowser/linkfiles/(?P<pk>[0-9]+)/.*$',
+            filebrowser_views.FileBrowserLinkFileResource.as_view(),
+            name='chrisfolder-linkfile-resource')
+
 ])
 
 # Login and logout views for Djangos' browsable API

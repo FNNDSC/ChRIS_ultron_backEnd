@@ -1,5 +1,4 @@
 
-import logging
 import os
 
 from django.conf import settings
@@ -11,9 +10,6 @@ from core.models import ChrisFolder
 from core.storage import connect_storage
 
 from .models import UserFile
-
-
-logger = logging.getLogger(__name__)
 
 
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
@@ -60,10 +56,10 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         old_storage_path = instance.fname.name
 
         storage_manager = connect_storage(settings)
-        try:
-            storage_manager.copy_obj(old_storage_path, upload_path)
-        except Exception as e:
-            logger.error('Storage error, detail: %s' % str(e))
+        if storage_manager.obj_exists(upload_path):
+            storage_manager.delete_obj(upload_path)
+        storage_manager.copy_obj(old_storage_path, upload_path)
+        storage_manager.delete_obj(old_storage_path)
 
         folder_path = os.path.dirname(upload_path)
         owner = instance.owner
@@ -72,11 +68,6 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         instance.parent_folder = parent_folder
         instance.fname.name = upload_path
         instance.save()
-
-        try:
-            storage_manager.delete_obj(old_storage_path)
-        except Exception as e:
-            logger.error('Storage error, detail: %s' % str(e))
         return instance
 
     def get_file_link(self, obj):
