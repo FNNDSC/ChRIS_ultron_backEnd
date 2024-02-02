@@ -58,7 +58,7 @@ from django.db.utils import IntegrityError
 
 from core.storage import connect_storage
 from core.utils import json_zip2str
-from core.models import ChrisInstance, ChrisFolder
+from core.models import ChrisInstance, ChrisFolder, ChrisLinkFile
 from plugininstances.models import PluginInstance, PluginInstanceLock
 from userfiles.models import UserFile
 
@@ -437,6 +437,7 @@ class PluginInstanceManager(object):
         # extract the 'ts' plugin's special parameters from the DB
         plg_inst_ids = regexs = []
         group_by_instance = False
+
         if self.c_plugin_inst.plugin.meta.type == 'ts':
             for param_inst in self.l_plugin_inst_param_instances:
                 if param_inst.plugin_param.name == 'plugininstances':
@@ -447,6 +448,7 @@ class PluginInstanceManager(object):
                     regexs = param_inst.value.split(',') if param_inst.value else []
                 elif param_inst.plugin_param.name == 'groupByInstance':
                     group_by_instance = param_inst.value
+
         d_objs = {}
         for i, inst_id in enumerate(plg_inst_ids):
             try:
@@ -457,21 +459,20 @@ class PluginInstanceManager(object):
                              f"plugin instance with id {self.c_plugin_inst.id}")
                 self.c_plugin_inst.error_code = 'CODE05'
                 raise
+
             output_path = plg_inst.get_output_path()
-            try:
-                l_ls = self.storage_manager.ls(output_path)
-            except Exception as e:
-                logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
-                             f'in {output_path}, detail: {str(e)}')
-                self.c_plugin_inst.error_code = 'CODE06'
-                raise
+            all_obj_paths = set()
+            visited_paths = set()
+            self.find_all_storage_object_paths(output_path, all_obj_paths, visited_paths)
+
             if (i < len(regexs)) and regexs[i]:
                 r = re.compile(regexs[i])
                 d_objs[plg_inst.id] = {'output_path': output_path,
-                                       'objs': [obj for obj in l_ls if r.search(obj)]}
+                                       'objs': [obj for obj in all_obj_paths if
+                                                r.search(obj)]}
             else:
                 d_objs[plg_inst.id] = {'output_path': output_path,
-                                       'objs': l_ls}
+                                       'objs': all_obj_paths}
         return d_objs, group_by_instance
 
     def manage_plugin_instance_app_empty_inputdir(self):
@@ -503,32 +504,63 @@ class PluginInstanceManager(object):
             raise
         return str_inputdir
 
+    def find_all_storage_object_paths(self, storage_path, all_obj_paths, visited_paths):
+        """
+        Find all object storage paths from the passed storage path (prefix) by
+        recursively following ChRIS links. The resulting set of object paths is given
+        by the all_obj_paths set argument.
+        """
+        if storage_path not in visited_paths:  # avoid infinite loops
+            visited_paths.add(storage_path)
+
+            job_id = self.str_job_id
+            try:
+                l_ls = self.storage_manager.ls(storage_path)
+            except Exception as e:
+                logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
+                             f'in {storage_path}, detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE06'
+                raise
+
+            for obj_path in l_ls:
+                if obj_path.endswith('.chrislink'):
+                    try:
+                        linked_path = self.storage_manager.download_obj(obj_path).decode()
+                    except Exception as e:
+                        logger.error(f'[CODE08,{job_id}]: Error while downloading file '
+                                     f'{obj_path} from storage, detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE08'
+                        raise
+                    self.find_all_storage_object_paths(linked_path, all_obj_paths,
+                                                       visited_paths)  # recursive call
+                else:
+                    all_obj_paths.add(obj_path)
+
     def create_zip_file(self, storage_paths):
         """
         Create job zip file ready for transmission to the remote from a list of storage
         paths (prefixes).
         """
         job_id = self.str_job_id
+        all_obj_paths = set()
+        visited_paths = set()
         memory_zip_file = io.BytesIO()
+
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for storage_path in storage_paths:
+                self.find_all_storage_object_paths(storage_path, all_obj_paths,
+                                                   visited_paths)
+            for obj_path in all_obj_paths:
                 try:
-                    l_ls = self.storage_manager.ls(storage_path)
+                    contents = self.storage_manager.download_obj(obj_path)
                 except Exception as e:
-                    logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
-                                 f'in {storage_path}, detail: {str(e)}')
-                    self.c_plugin_inst.error_code = 'CODE06'
+                    logger.error(f'[CODE08,{job_id}]: Error while downloading file '
+                                 f'{obj_path} from storage, detail: {str(e)}')
+                    self.c_plugin_inst.error_code = 'CODE08'
                     raise
-                for obj_path in l_ls:
-                    try:
-                        contents = self.storage_manager.download_obj(obj_path)
-                    except Exception as e:
-                        logger.error(f'[CODE08,{job_id}]: Error while downloading file '
-                                     f'{obj_path} from storage, detail: {str(e)}')
-                        self.c_plugin_inst.error_code = 'CODE08'
-                        raise
-                    zip_path = obj_path.replace(storage_path, '', 1).lstrip('/')
-                    job_data_zip.writestr(zip_path, contents)
+                zip_path = obj_path.replace(storage_path, '', 1).lstrip('/')
+                job_data_zip.writestr(zip_path, contents)
+
         memory_zip_file.seek(0)
         return memory_zip_file
 
@@ -617,6 +649,51 @@ class PluginInstanceManager(object):
         plugin instance app.
 
         NOTE:
+        Full storage path names are given to the link file names, allowing
+        for each copy argument to have its own link file in the output directory.
+
+        NB: This preservation could exhaust DB string lengths!
+        """
+        job_id                  : str = self.str_job_id
+        outputdir               : str = self.c_plugin_inst.get_output_path()
+        owner = self.c_plugin_inst.owner
+
+        (link_parent_folder, _) = ChrisFolder.objects.get_or_create(
+            path=outputdir, owner=owner)
+
+        for param_flag in unextpath_parameters_dict:
+            # each parameter value is a string of one or more paths separated by comma
+            path_list = unextpath_parameters_dict[param_flag].split(',')
+
+            for path in path_list:
+                str_sourceTraceDir = path.rstrip('/').replace('/', '_')
+                try:
+                    ChrisFolder.objects.get(path=path)
+                except ChrisFolder.DoesNotExist:
+                    try:
+                        if self.storage_manager.obj_exists(path):  # path is a file
+                            link_file = ChrisLinkFile(path=path, owner=owner,
+                                                      parent_folder=link_parent_folder)
+                            link_file.save(name=str_sourceTraceDir)
+                            self.plugin_inst_output_files.add(link_file.fname.name)
+                    except Exception as e:
+                        logger.error(f'[CODE09,{job_id}]: Error while creating link file '
+                                     f'to {path} from {outputdir} in storage, '
+                                     f'detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE09'
+                        raise
+                else:  # path is a folder
+                    link_file = ChrisLinkFile(path=path, owner=owner,
+                                              parent_folder=link_parent_folder)
+                    link_file.save(name=str_sourceTraceDir)
+                    self.plugin_inst_output_files.add(link_file.fname.name)
+
+    def _handle_app_unextpath_parameters_innetwork_filesystem(self, unextpath_parameters_dict):
+        """
+        Internal method to handle parameters of type 'unextpath' passed to the
+        plugin instance app.
+
+        NOTE:
         Full storage path names are now preserved in the copy process, allowing
         for each copy argument to be preserved in its own directory tree in the
         destination.
@@ -629,6 +706,7 @@ class PluginInstanceManager(object):
         for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
             path_list = unextpath_parameters_dict[param_flag].split(',')
+
             for path in path_list:
                 try:
                     obj_list = self.storage_manager.ls(path)
@@ -643,8 +721,8 @@ class PluginInstanceManager(object):
                     # Note, you might need to change the term_size on an ad-hoc manner
                     # set_trace(host = "0.0.0.0", port = 6900, term_size = (223, 60))
                     str_sourceTraceDir = path.rstrip('/').replace('/', '_')
-
                     obj_output_path = outputdir + '/' + str_sourceTraceDir + '/' + '/'.join(obj.split('/')[2:])
+
                     try:
                         if not self.storage_manager.obj_exists(obj_output_path):
                             self.storage_manager.copy_obj(obj, obj_output_path)
@@ -654,8 +732,7 @@ class PluginInstanceManager(object):
                                      f'detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE09'
                         raise
-                    else:
-                        self.plugin_inst_output_files.add(obj_output_path)
+                    self.plugin_inst_output_files.add(obj_output_path)
 
     def _handle_app_ts_unextracted_input_objs(self, d_ts_input_objs, group_by_instance):
         """
@@ -669,8 +746,10 @@ class PluginInstanceManager(object):
             plg_inst_output_path = d_ts_input_objs[plg_inst_id]['output_path']
             obj_list = d_ts_input_objs[plg_inst_id]['objs']
             plg_inst_outputdir = outputdir
+
             if group_by_instance:
                 plg_inst_outputdir = os.path.join(outputdir, str(plg_inst_id))
+
             for obj in obj_list:
                 obj_output_path = obj.replace(plg_inst_output_path, plg_inst_outputdir, 1)
                 try:
@@ -734,7 +813,12 @@ class PluginInstanceManager(object):
                     # upload(copy) files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
-                        self._handle_app_unextpath_parameters(d_unextpath_params)
+                        if (self.pfcon_client.pfcon_innetwork and self.storage_env ==
+                                'filesystem'):
+                            self._handle_app_unextpath_parameters_innetwork_filesystem(
+                                d_unextpath_params)
+                        else:
+                            self._handle_app_unextpath_parameters(d_unextpath_params)
 
                     # upload(copy) files from filtered input instance paths ('ts' plugins)
                     if self.c_plugin_inst.plugin.meta.type == 'ts':

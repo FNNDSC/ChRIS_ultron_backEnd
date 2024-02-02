@@ -53,11 +53,11 @@ G_SYNOPSIS="
           | |   The path prefix to use for swift storage. Note that to conform 
           | |   to CUBE-style conventions, this must be
           | |   
-          | |           <cubeUser>/uploads
+          | |           home/<cubeUser>/uploads
           | |           
           | |   so the path in swift is:
           | |   
-          | |           <cubeUser>/uploads/<uploadPathPrefix>
+          | |           home/<cubeUser>/uploads/<uploadPathPrefix>
           | |
           | +---> pull:
           | 

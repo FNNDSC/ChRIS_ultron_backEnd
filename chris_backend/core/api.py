@@ -380,11 +380,11 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/filebrowser/linkfiles/<int:pk>/',
          filebrowser_views.FileBrowserLinkFileDetail.as_view(),
-         name='chrisfolder-linkfile-detail'),
+         name='chrislinkfile-detail'),
 
     re_path(r'^v1/filebrowser/linkfiles/(?P<pk>[0-9]+)/.*$',
             filebrowser_views.FileBrowserLinkFileResource.as_view(),
-            name='chrisfolder-linkfile-resource')
+            name='chrislinkfile-resource')
 
 ])
 

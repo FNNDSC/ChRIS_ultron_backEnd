@@ -104,8 +104,7 @@ class ChrisFolderFilter(FilterSet):
 
 class ChrisLinkFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    path = models.CharField(max_length=1024)
-    is_folder = models.BooleanField()
+    path = models.CharField(max_length=1024, db_index=True)
     fname = models.FileField(max_length=1024, unique=True)
     parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
                                       related_name='chris_link_files')
@@ -119,14 +118,10 @@ class ChrisLinkFile(models.Model):
         Overriden to create and save the associated link file when the link is
         saved.
         """
-        path = kwargs['path']  # pointed path
+        path = self.path  # pointed path
         name = kwargs.pop('name')  # must provide a name for the link
         link_file_path = os.path.join(self.parent_folder.path, f'{name}.chrislink')
-        is_folder = kwargs['is_folder']
-
-        link_file_contents = f'd, {path}'
-        if not is_folder:
-            link_file_contents = f'f, {path}'
+        link_file_contents = f'{path}'
 
         storage_manager = connect_storage(settings)
 

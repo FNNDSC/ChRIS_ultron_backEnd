@@ -6,11 +6,10 @@ from rest_framework import generics
 from rest_framework.reverse import reverse
 
 from core.models import ChrisFolder, ChrisLinkFile
-from core.serializers import ChrisLinkFileSerializer
 from core.renderers import BinaryFileRenderer
 from collectionjson import services
 
-from .serializers import FileBrowserFolderSerializer
+from .serializers import FileBrowserFolderSerializer, FileBrowserChrisLinkFileSerializer
 from .services import (get_folder_file_queryset, get_folder_file_serializer_class,
                        get_authenticated_user_folder_queryset,
                        get_unauthenticated_user_folder_queryset,
@@ -190,7 +189,7 @@ class FileBrowserFolderLinkFileList(generics.ListAPIView):
     """
     http_method_names = ['get']
     queryset = ChrisFolder.objects.all()
-    serializer_class = ChrisLinkFileSerializer
+    serializer_class = FileBrowserChrisLinkFileSerializer
 
     def list(self, request, *args, **kwargs):
         """
@@ -227,7 +226,7 @@ class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
     """
     http_method_names = ['get']
     queryset = ChrisLinkFile.objects.all()
-    serializer_class = ChrisLinkFileSerializer
+    serializer_class = FileBrowserChrisLinkFileSerializer
     permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
 
