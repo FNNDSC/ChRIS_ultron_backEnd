@@ -472,7 +472,7 @@ class PluginInstanceManager(object):
                                                 r.search(obj)]}
             else:
                 d_objs[plg_inst.id] = {'output_path': output_path,
-                                       'objs': all_obj_paths}
+                                       'objs': list(all_obj_paths)}
         return d_objs, group_by_instance
 
     def manage_plugin_instance_app_empty_inputdir(self):
@@ -531,10 +531,22 @@ class PluginInstanceManager(object):
                                      f'{obj_path} from storage, detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE08'
                         raise
+
+                    output_dir = self.c_plugin_inst.get_output_path()
+
+                    if f'{output_dir}/'.startswith(linked_path.rstrip('/') + '/'):
+                        # link files are not allowed to point to the output dir or any
+                        # of its ancestors
+                        logger.error(
+                            f'[CODE17,{job_id}]: Found invalid input path {linked_path} '
+                            f'pointing to an ancestor of the output dir: '
+                            f'{output_dir}')
+                        self.c_plugin_inst.error_code = 'CODE17'
+                        raise ValueError(f'Invalid input path: {linked_path}')
+
                     self.find_all_storage_object_paths(linked_path, all_obj_paths,
                                                        visited_paths)  # recursive call
-                else:
-                    all_obj_paths.add(obj_path)
+                all_obj_paths.add(obj_path)
 
     def create_zip_file(self, storage_paths):
         """
@@ -654,19 +666,29 @@ class PluginInstanceManager(object):
 
         NB: This preservation could exhaust DB string lengths!
         """
-        job_id                  : str = self.str_job_id
-        outputdir               : str = self.c_plugin_inst.get_output_path()
+        job_id: str = self.str_job_id
+        output_dir: str = self.c_plugin_inst.get_output_path()
         owner = self.c_plugin_inst.owner
 
         (link_parent_folder, _) = ChrisFolder.objects.get_or_create(
-            path=outputdir, owner=owner)
+            path=output_dir, owner=owner)
 
         for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
             path_list = unextpath_parameters_dict[param_flag].split(',')
 
             for path in path_list:
-                str_sourceTraceDir = path.rstrip('/').replace('/', '_')
+                if f'{output_dir}/'.startswith(path.rstrip('/') + '/'):
+                    # paths are not allowed to point to the output dir or any
+                    # of its ancestors
+                    logger.error(f'[CODE17,{job_id}]: Found invalid input path {path} '
+                                 f'pointing to an ancestor of the output dir: '
+                                 f'{output_dir}')
+                    self.c_plugin_inst.error_code = 'CODE17'
+                    raise ValueError(f'Invalid input path: {path}')
+
+            for path in path_list:
+                str_source_trace_dir = path.rstrip('/').replace('/', '_')
                 try:
                     ChrisFolder.objects.get(path=path)
                 except ChrisFolder.DoesNotExist:
@@ -674,18 +696,18 @@ class PluginInstanceManager(object):
                         if self.storage_manager.obj_exists(path):  # path is a file
                             link_file = ChrisLinkFile(path=path, owner=owner,
                                                       parent_folder=link_parent_folder)
-                            link_file.save(name=str_sourceTraceDir)
+                            link_file.save(name=str_source_trace_dir)
                             self.plugin_inst_output_files.add(link_file.fname.name)
                     except Exception as e:
                         logger.error(f'[CODE09,{job_id}]: Error while creating link file '
-                                     f'to {path} from {outputdir} in storage, '
+                                     f'to {path} from {output_dir} in storage, '
                                      f'detail: {str(e)}')
                         self.c_plugin_inst.error_code = 'CODE09'
                         raise
                 else:  # path is a folder
                     link_file = ChrisLinkFile(path=path, owner=owner,
                                               parent_folder=link_parent_folder)
-                    link_file.save(name=str_sourceTraceDir)
+                    link_file.save(name=str_source_trace_dir)
                     self.plugin_inst_output_files.add(link_file.fname.name)
 
     def _handle_app_unextpath_parameters_innetwork_filesystem(self, unextpath_parameters_dict):
@@ -715,13 +737,16 @@ class PluginInstanceManager(object):
                                  f'in {path}, detail: {str(e)}')
                     self.c_plugin_inst.error_code = 'CODE06'
                     raise
+
+                str_source_trace_dir = path.rstrip('/').replace('/', '_')
+
                 for obj in obj_list:
                     # Uncomment the following to fire up a trace event, accessible via
                     #                   telnet localhot 6900
                     # Note, you might need to change the term_size on an ad-hoc manner
                     # set_trace(host = "0.0.0.0", port = 6900, term_size = (223, 60))
-                    str_sourceTraceDir = path.rstrip('/').replace('/', '_')
-                    obj_output_path = outputdir + '/' + str_sourceTraceDir + '/' + '/'.join(obj.split('/')[2:])
+                    obj_output_path = outputdir + '/' + str_source_trace_dir + '/' + obj.replace(
+                        path, '', 1).lstrip('/')
 
                     try:
                         if not self.storage_manager.obj_exists(obj_output_path):
@@ -751,7 +776,8 @@ class PluginInstanceManager(object):
                 plg_inst_outputdir = os.path.join(outputdir, str(plg_inst_id))
 
             for obj in obj_list:
-                obj_output_path = obj.replace(plg_inst_output_path, plg_inst_outputdir, 1)
+                obj_output_path = os.path.join(plg_inst_outputdir, obj.replace(
+                    plg_inst_output_path, '', 1).lstrip('/'))
                 try:
                     if not self.storage_manager.obj_exists(obj_output_path):
                         self.storage_manager.copy_obj(obj, obj_output_path)

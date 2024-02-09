@@ -297,13 +297,17 @@ rm -f dc.out ; title -d 1 "Setting global exports"
     boxcenter "-= ORCHESTRATOR =-"
     boxcenter "$ORCHESTRATOR"                                                    LightCyan
     boxcenter ""
-    boxcenter "exporting STORAGE_ENV=$STORAGE_ENV "
-    export STORAGE_ENV=$STORAGE_ENV
-    boxcenter ""
+
     if (( b_pfconInNetwork )) ; then
+        boxcenter "exporting STORAGE_ENV=$STORAGE_ENV "
+        export STORAGE_ENV=$STORAGE_ENV
+        boxcenter ""
         boxcenter "exporting PFCON_INNETWORK=true "
         export PFCON_INNETWORK=true
     else
+        boxcenter "-= STORAGE_ENV =-"
+        boxcenter "$STORAGE_ENV"                                                    LightCyan
+        boxcenter ""
         boxcenter "exporting PFCON_INNETWORK=false "
         export PFCON_INNETWORK=false
     fi

@@ -85,11 +85,17 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         upload_path = upload_path.strip(' ').strip('/')
         user = self.context['request'].user
         prefix = f'home/{user.username}/'
+
         if upload_path.startswith(prefix + 'feeds/'):
             error_msg = f"Invalid file path. Uploading files to a path under the " \
                         f"feed's directory '{prefix + 'feeds/'}' is not allowed."
             raise serializers.ValidationError([error_msg])
+
         if not upload_path.startswith(prefix):
             error_msg = f"Invalid file path. Path must start with '{prefix}'."
+            raise serializers.ValidationError([error_msg])
+
+        if upload_path.endswith('.chrislink'):
+            error_msg = 'Invalid file path. Uploading ChRIS link files is not allowed.'
             raise serializers.ValidationError([error_msg])
         return upload_path
