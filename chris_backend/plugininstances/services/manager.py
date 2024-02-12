@@ -211,8 +211,12 @@ class PluginInstanceManager(object):
         plugin_inst = self.c_plugin_inst
         plugin = plugin_inst.plugin
         plugin_type = plugin.meta.type
+        username = plugin_inst.owner.username
+        email = plugin_inst.owner.email
 
-        env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={plugin_inst.id}']
+        env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={plugin_inst.id}',
+               f'CHRIS_USER_USERNAME={username}', f'CHRIS_USER_EMAIL={email}']
+
         if plugin_type != 'fs':
             prev_id = plugin_inst.previous.id
             env.append(f'CHRIS_PREV_PLG_INST_ID={prev_id}')
@@ -504,16 +508,17 @@ class PluginInstanceManager(object):
             raise
         return str_inputdir
 
-    def find_all_storage_object_paths(self, storage_path, all_obj_paths, visited_paths):
+    def find_all_storage_object_paths(self, storage_path, obj_paths, visited_paths):
         """
         Find all object storage paths from the passed storage path (prefix) by
         recursively following ChRIS links. The resulting set of object paths is given
-        by the all_obj_paths set argument.
+        by the obj_paths set argument.
         """
-        if storage_path not in visited_paths:  # avoid infinite loops
+        if not storage_path.startswith(tuple(visited_paths)):  # avoid infinite loops
             visited_paths.add(storage_path)
-
             job_id = self.str_job_id
+            output_dir = self.c_plugin_inst.get_output_path()
+
             try:
                 l_ls = self.storage_manager.ls(storage_path)
             except Exception as e:
@@ -532,8 +537,6 @@ class PluginInstanceManager(object):
                         self.c_plugin_inst.error_code = 'CODE08'
                         raise
 
-                    output_dir = self.c_plugin_inst.get_output_path()
-
                     if f'{output_dir}/'.startswith(linked_path.rstrip('/') + '/'):
                         # link files are not allowed to point to the output dir or any
                         # of its ancestors
@@ -544,9 +547,9 @@ class PluginInstanceManager(object):
                         self.c_plugin_inst.error_code = 'CODE17'
                         raise ValueError(f'Invalid input path: {linked_path}')
 
-                    self.find_all_storage_object_paths(linked_path, all_obj_paths,
+                    self.find_all_storage_object_paths(linked_path, obj_paths,
                                                        visited_paths)  # recursive call
-                all_obj_paths.add(obj_path)
+                obj_paths.add(obj_path)
 
     def create_zip_file(self, storage_paths):
         """
@@ -554,24 +557,28 @@ class PluginInstanceManager(object):
         paths (prefixes).
         """
         job_id = self.str_job_id
-        all_obj_paths = set()
-        visited_paths = set()
         memory_zip_file = io.BytesIO()
+        all_obj_paths = set()
 
         with zipfile.ZipFile(memory_zip_file, 'w', zipfile.ZIP_DEFLATED) as job_data_zip:
             for storage_path in storage_paths:
-                self.find_all_storage_object_paths(storage_path, all_obj_paths,
+                obj_paths = set()
+                visited_paths = set()
+
+                self.find_all_storage_object_paths(storage_path, obj_paths,
                                                    visited_paths)
-            for obj_path in all_obj_paths:
-                try:
-                    contents = self.storage_manager.download_obj(obj_path)
-                except Exception as e:
-                    logger.error(f'[CODE08,{job_id}]: Error while downloading file '
-                                 f'{obj_path} from storage, detail: {str(e)}')
-                    self.c_plugin_inst.error_code = 'CODE08'
-                    raise
-                zip_path = obj_path.replace(storage_path, '', 1).lstrip('/')
-                job_data_zip.writestr(zip_path, contents)
+                for obj_path in obj_paths:
+                    if obj_path not in all_obj_paths:  # add a file to the zip only once
+                        try:
+                            contents = self.storage_manager.download_obj(obj_path)
+                        except Exception as e:
+                            logger.error(f'[CODE08,{job_id}]: Error while downloading file '
+                                         f'{obj_path} from storage, detail: {str(e)}')
+                            self.c_plugin_inst.error_code = 'CODE08'
+                            raise
+                        zip_path = obj_path.replace(storage_path, '', 1).lstrip('/')
+                        job_data_zip.writestr(zip_path, contents)
+                        all_obj_paths.add(obj_path)
 
         memory_zip_file.seek(0)
         return memory_zip_file
