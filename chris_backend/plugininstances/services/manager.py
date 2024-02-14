@@ -530,7 +530,8 @@ class PluginInstanceManager(object):
             for obj_path in l_ls:
                 if obj_path.endswith('.chrislink'):
                     try:
-                        linked_path = self.storage_manager.download_obj(obj_path).decode()
+                        linked_path = self.storage_manager.download_obj(
+                            obj_path).decode().strip()
                     except Exception as e:
                         logger.error(f'[CODE08,{job_id}]: Error while downloading file '
                                      f'{obj_path} from storage, detail: {str(e)}')
@@ -695,7 +696,8 @@ class PluginInstanceManager(object):
                     raise ValueError(f'Invalid input path: {path}')
 
             for path in path_list:
-                str_source_trace_dir = path.rstrip('/').replace('/', '_')
+                path = path.rstrip('/')
+                str_source_trace_dir = path.replace('/', '_')
                 try:
                     ChrisFolder.objects.get(path=path)
                 except ChrisFolder.DoesNotExist:
@@ -745,16 +747,21 @@ class PluginInstanceManager(object):
                     self.c_plugin_inst.error_code = 'CODE06'
                     raise
 
-                str_source_trace_dir = path.rstrip('/').replace('/', '_')
+                if len(obj_list) == 1 and obj_list[0] == path:  # path was a file
+                    path = os.path.dirname(path)
+                    str_source_trace_dir = path.replace('/', '_')
+                else:
+                    str_source_trace_dir = path.rstrip('/').replace('/', '_')
+
+                obj_output_path_prefix = outputdir + '/' + str_source_trace_dir
 
                 for obj in obj_list:
                     # Uncomment the following to fire up a trace event, accessible via
                     #                   telnet localhot 6900
                     # Note, you might need to change the term_size on an ad-hoc manner
                     # set_trace(host = "0.0.0.0", port = 6900, term_size = (223, 60))
-                    obj_output_path = outputdir + '/' + str_source_trace_dir + '/' + obj.replace(
+                    obj_output_path = obj_output_path_prefix + '/' + obj.replace(
                         path, '', 1).lstrip('/')
-
                     try:
                         if not self.storage_manager.obj_exists(obj_output_path):
                             self.storage_manager.copy_obj(obj, obj_output_path)

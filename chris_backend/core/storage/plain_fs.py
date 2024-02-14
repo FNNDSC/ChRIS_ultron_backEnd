@@ -22,6 +22,8 @@ class FilesystemManager(StorageManager):
         self.__base.mkdir(exist_ok=True, parents=True)
 
     def ls(self, path_prefix: str) -> List[str]:
+        if self.obj_exists(path_prefix):
+            return [path_prefix]
         all_paths = (self.__base / path_prefix).rglob('*')
         return [str(p.relative_to(self.__base)) for p in all_paths if p.is_file()]
 
