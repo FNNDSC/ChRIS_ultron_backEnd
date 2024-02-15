@@ -147,14 +147,15 @@ class PluginInstanceManager(object):
         job_timeout = 1000
 
         if self.pfcon_client.pfcon_innetwork:
+            output_dir = self.c_plugin_inst.get_output_path()
+
             job_descriptors['input_dirs'] = inputdirs
+            job_descriptors['output_dir'] = output_dir
 
             if self.storage_env == 'filesystem':
                 job_timeout = 200
-                output_dir = self.c_plugin_inst.get_output_path()
                 # remote pfcon requires both the input and output dirs to exist
                 os.makedirs(os.path.join(settings.MEDIA_ROOT, output_dir), exist_ok=True)
-                job_descriptors['output_dir'] = output_dir
         else:
             # create zip file to transmit
             try:
