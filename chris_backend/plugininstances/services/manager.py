@@ -152,10 +152,12 @@ class PluginInstanceManager(object):
             job_descriptors['input_dirs'] = inputdirs
             job_descriptors['output_dir'] = output_dir
 
-            if self.storage_env == 'filesystem':
-                job_timeout = 200
+            if self.storage_env in ('filesystem', 'fslink'):
                 # remote pfcon requires both the input and output dirs to exist
                 os.makedirs(os.path.join(settings.MEDIA_ROOT, output_dir), exist_ok=True)
+
+                if self.storage_env == 'filesystem':
+                    job_timeout = 200
         else:
             # create zip file to transmit
             try:
