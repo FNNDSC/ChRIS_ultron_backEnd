@@ -670,14 +670,7 @@ class PluginInstanceManager(object):
         """
         Internal method to handle parameters of type 'unextpath' passed to the
         plugin instance app.
-
-        NOTE:
-        Full storage path names are given to the link file names, allowing
-        for each copy argument to have its own link file in the output directory.
-
-        NB: This preservation could exhaust DB string lengths!
         """
-        job_id: str = self.str_job_id
         output_dir: str = self.c_plugin_inst.get_output_path()
         owner = self.c_plugin_inst.owner
 
@@ -689,38 +682,65 @@ class PluginInstanceManager(object):
             path_list = unextpath_parameters_dict[param_flag].split(',')
 
             for path in path_list:
-                if f'{output_dir}/'.startswith(path.rstrip('/') + '/'):
-                    # paths are not allowed to point to the output dir or any
-                    # of its ancestors
-                    logger.error(f'[CODE17,{job_id}]: Found invalid input path {path} '
-                                 f'pointing to an ancestor of the output dir: '
-                                 f'{output_dir}')
-                    self.c_plugin_inst.error_code = 'CODE17'
-                    raise ValueError(f'Invalid input path: {path}')
+                self._create_chris_link_file(path, link_parent_folder)
 
-            for path in path_list:
-                path = path.rstrip('/')
-                str_source_trace_dir = path.replace('/', '_')
-                try:
-                    ChrisFolder.objects.get(path=path)
-                except ChrisFolder.DoesNotExist:
-                    try:
-                        if self.storage_manager.obj_exists(path):  # path is a file
-                            link_file = ChrisLinkFile(path=path, owner=owner,
-                                                      parent_folder=link_parent_folder)
-                            link_file.save(name=str_source_trace_dir)
-                            self.plugin_inst_output_files.add(link_file.fname.name)
-                    except Exception as e:
-                        logger.error(f'[CODE09,{job_id}]: Error while creating link file '
-                                     f'to {path} from {output_dir} in storage, '
-                                     f'detail: {str(e)}')
-                        self.c_plugin_inst.error_code = 'CODE09'
-                        raise
-                else:  # path is a folder
+    def _create_chris_link_file(self, linked_path, parent_folder):
+        """
+        Internal method to create output ChRIS link files generated for the plugin
+        instance.
+
+        NOTE:
+        Full storage path names are given to the link file names, allowing
+        for each copy argument to have its own link file in the output directory.
+
+        NB: This preservation could exhaust DB string lengths!
+        """
+        job_id: str = self.str_job_id
+        output_dir: str = self.c_plugin_inst.get_output_path()
+        owner = self.c_plugin_inst.owner
+        path = linked_path.rstrip('/')
+
+        if f'{output_dir}/'.startswith(path + '/'):
+            # paths are not allowed to point to the output dir or any
+            # of its ancestors
+            logger.error(f'[CODE17,{job_id}]: Found invalid input path {linked_path} '
+                         f'pointing to an ancestor of the output dir: '
+                         f'{output_dir}')
+            self.c_plugin_inst.error_code = 'CODE17'
+            raise ValueError(f'Invalid input path: {linked_path}')
+
+        str_source_trace_dir = path.replace('/', '_')
+        try:
+            ChrisFolder.objects.get(path=path)
+        except ChrisFolder.DoesNotExist:
+            try:
+                if self.storage_manager.obj_exists(path):  # path is a file
                     link_file = ChrisLinkFile(path=path, owner=owner,
-                                              parent_folder=link_parent_folder)
+                                              parent_folder=parent_folder)
                     link_file.save(name=str_source_trace_dir)
-                    self.plugin_inst_output_files.add(link_file.fname.name)
+                    logger.info(f'Creating link file -->'
+                                f'{link_file.fname.name}<-- for job {job_id}')
+                    self.c_plugin_inst.size += link_file.fname.size
+            except Exception as e:
+                logger.error(f'[CODE09,{job_id}]: Error while creating link file '
+                             f'to {path} from {parent_folder.path} in storage, '
+                             f'detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE09'
+                raise
+        else:  # path is a folder
+            try:
+                link_file = ChrisLinkFile(path=path, owner=owner,
+                                          parent_folder=parent_folder)
+                link_file.save(name=str_source_trace_dir)
+                logger.info(f'Creating link file -->'
+                            f'{link_file.fname.name}<-- for job {job_id}')
+                self.c_plugin_inst.size += link_file.fname.size
+            except Exception as e:
+                logger.error(f'[CODE09,{job_id}]: Error while creating link file '
+                             f'to {path} from {parent_folder.path} in storage, '
+                             f'detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE09'
+                raise
 
     def _handle_app_unextpath_parameters_innetwork_filesystem(self, unextpath_parameters_dict):
         """
@@ -783,6 +803,8 @@ class PluginInstanceManager(object):
         """
         job_id = self.str_job_id
         outputdir = self.c_plugin_inst.get_output_path()
+        owner = self.c_plugin_inst.owner
+        link_folders = {}
 
         for plg_inst_id in d_ts_input_objs:
             plg_inst_output_path = d_ts_input_objs[plg_inst_id]['output_path']
@@ -795,16 +817,40 @@ class PluginInstanceManager(object):
             for obj in obj_list:
                 obj_output_path = os.path.join(plg_inst_outputdir, obj.replace(
                     plg_inst_output_path, '', 1).lstrip('/'))
-                try:
-                    if not self.storage_manager.obj_exists(obj_output_path):
-                        self.storage_manager.copy_obj(obj, obj_output_path)
-                except Exception as e:
-                    logger.error(f'[CODE09,{job_id}]: Error while copying file '
-                                 f'from {obj} to {obj_output_path} in storage, '
-                                 f'detail: {str(e)}')
-                    self.c_plugin_inst.error_code = 'CODE09'
-                    raise
-                self.plugin_inst_output_files.add(obj_output_path)
+
+                if obj.endswith('.chrislink'):
+                    try:
+                        path = self.storage_manager.download_obj(obj).decode().strip()
+                    except Exception as e:
+                        logger.error(f'[CODE08,{job_id}]: Error while downloading file '
+                                     f'{obj} from storage, detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE08'
+                        raise
+
+                    folder_path = os.path.dirname(obj_output_path)
+                    parent_folder = link_folders.get(folder_path)
+
+                    if parent_folder is None:
+                        (parent_folder, _) = ChrisFolder.objects.get_or_create(
+                            path=folder_path,
+                            owner=owner)
+                        link_folders[folder_path] = parent_folder
+
+                    try:
+                        ChrisLinkFile.objects.get(path=path, parent_folder=parent_folder)
+                    except ChrisLinkFile.DoesNotExist:
+                        self._create_chris_link_file(path, parent_folder)
+                else:
+                    try:
+                        if not self.storage_manager.obj_exists(obj_output_path):
+                            self.storage_manager.copy_obj(obj, obj_output_path)
+                    except Exception as e:
+                        logger.error(f'[CODE09,{job_id}]: Error while copying file '
+                                     f'from {obj} to {obj_output_path} in storage, '
+                                     f'detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE09'
+                        raise
+                    self.plugin_inst_output_files.add(obj_output_path)
 
     def _handle_finished_successfully_status(self):
         """
@@ -853,7 +899,7 @@ class PluginInstanceManager(object):
 
                     logger.info('Copying local output files for job %s in file storage',
                                 job_id)
-                    # upload(copy) files from unextracted path parameters
+                    # upload files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
                         if (self.pfcon_client.pfcon_innetwork and self.storage_env ==
@@ -863,7 +909,7 @@ class PluginInstanceManager(object):
                         else:
                             self._handle_app_unextpath_parameters(d_unextpath_params)
 
-                    # upload(copy) files from filtered input instance paths ('ts' plugins)
+                    # upload files from filtered input instance paths ('ts' plugins)
                     if self.c_plugin_inst.plugin.meta.type == 'ts':
                         d_ts_input_objs, tf = self.get_ts_plugin_instance_input_objs()
                         self._handle_app_ts_unextracted_input_objs(d_ts_input_objs, tf)

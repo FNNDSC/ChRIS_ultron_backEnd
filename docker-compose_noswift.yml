@@ -41,7 +41,7 @@ services:
       - ${STOREBASE:?}:/var/chris
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: python manage.py migrate --noinput
     user: ${UID}:${GID}
     depends_on:
@@ -64,7 +64,7 @@ services:
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
@@ -102,7 +102,7 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - CELERY_RDB_HOST=0.0.0.0
       - CELERY_RDB_PORT=6900
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     ports:
       - "6900-6905:6900-6905"
@@ -142,7 +142,7 @@ services:
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core worker -c 1 -l DEBUG -Q periodic
     depends_on:
       db_migrate:
@@ -167,7 +167,7 @@ services:
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
       db_migrate:

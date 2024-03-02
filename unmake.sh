@@ -8,7 +8,7 @@
 #
 #   unmake.sh                     [-h]
 #                                 [-O <swarm|kubernetes>]
-#                                 [-F <swift|filesystem>]   \
+#                                 [-F <swift|fslink|filesystem>]   \
 #                                 [-S <storeBase>]
 #
 #
@@ -27,6 +27,11 @@
 #
 #       unmake.sh -F filesystem
 #
+#   Destroy chris_dev instance running with fslink storage:
+#
+#       unmake.sh -F fslink
+#
+#
 #   Destroy chris_dev instance with remote ancillary services running on Kubernetes:
 #
 #       unmake.sh -O kubernetes
@@ -42,7 +47,7 @@
 #
 #       Explicitly set the orchestrator. Default is swarm.
 #
-#   -F <swift|filesystem>]
+#   -F <swift|fslink|filesystem>]
 #
 #       Explicitly set the storage environment. Default is swift.
 #
@@ -71,7 +76,8 @@ dc_check () {
 }
 
 print_usage () {
-    echo "Usage: ./unmake.sh [-h] [-O <swarm|kubernetes>] [-F <swift|filesystem>] [-S <storeBase>]"
+    echo "Usage: ./unmake.sh [-h] [-O <swarm|kubernetes>] [-F <swift|fslink|filesystem>]
+    [-S <storeBase>]"
     exit 1
 }
 
@@ -86,7 +92,7 @@ while getopts ":hO:F:S:" opt; do
            fi
            ;;
         F) STORAGE_ENV=$OPTARG
-           if ! [[ "$STORAGE_ENV" =~ ^(swift|filesystem)$ ]]; then
+           if ! [[ "$STORAGE_ENV" =~ ^(swift|fslink|filesystem)$ ]]; then
               echo "Invalid value for option -- F"
               print_usage
            fi
@@ -169,7 +175,7 @@ if [[ $STORAGE_ENV == 'swift' ]]; then
             dc_check $?
         fi
     windowBottom
-elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+elif [[ $STORAGE_ENV =~ ^(fslink|filesystem)$ ]]; then
     title -d 1 "Destroying CUBE containerized development environment" \
                         "from  ./docker-compose_noswift.yml"
         echo "Do you want to also remove persistent volumes? [y/n]"     | ./boxes.sh White
