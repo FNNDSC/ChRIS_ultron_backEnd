@@ -51,7 +51,7 @@ class ChrisInstance(models.Model):
 
 class ChrisFolder(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    path = models.CharField(max_length=1024, unique=True)
+    path = models.CharField(max_length=1024, unique=True)  # folder's path
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True,
                                related_name='children')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
@@ -104,7 +104,7 @@ class ChrisFolderFilter(FilterSet):
 
 class ChrisLinkFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    path = models.CharField(max_length=1024, db_index=True)
+    path = models.CharField(max_length=1024, db_index=True)  # pointed path
     fname = models.FileField(max_length=1024, unique=True)
     parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
                                       related_name='chris_link_files')

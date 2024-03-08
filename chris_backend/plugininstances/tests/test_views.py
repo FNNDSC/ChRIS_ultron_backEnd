@@ -171,6 +171,8 @@ class PluginInstanceListViewTests(TasksViewTests):
         plugin = Plugin.objects.get(meta__name="pacspull")
         self.create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
         self.user_space_path = f'home/{self.username}/uploads/'
+        user = User.objects.get(username=self.username)
+        ChrisFolder.objects.get_or_create(path=self.user_space_path.rstrip('/'), owner=user)
         self.post = json.dumps(
             {"template": {"data": [{"name": "dir", "value": self.user_space_path},
                                    {"name": "title", "value": 'test1'}]}})
@@ -389,23 +391,130 @@ class PluginInstanceListViewTests(TasksViewTests):
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
             currentLoop += 1
+
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
+        # make sure output file was created in storage
+        self.assertTrue(self.storage_manager.obj_exists(pl_inst.output_folder.path +
+                                                        '/test.txt'))
+
         # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
+
+    @tag('integration')
+    def test_integration_plugin_instance_create_output_chris_link_success(self):
+
+        # add an FS plugin with unextpath parameter to the system
+        plugin_parameters = [{'name': 'dir', 'type': 'unextpath', 'action': 'store',
+                              'optional': False, 'flag': '--dir', 'short_flag': '-d',
+                              'help': 'test plugin', 'ui_exposed': True}]
+
+        plg_data = {'description': 'A simple chris dircopy app demo',
+                    'version': '0.1',
+                    'dock_image': 'fnndsc/pl-dircopy',
+                    'execshell': 'python3',
+                    'selfpath': '/usr/local/bin',
+                    'selfexec': 'dircopy'}
+
+        plg_meta_data = {'name': 'dircopy',
+                         'title': 'Dir plugin',
+                         'license': 'MIT',
+                         'type': 'fs',
+                         'icon': 'http://github.com/plugin',
+                         'category': 'Dir',
+                         'stars': 0,
+                         'authors': 'FNNDSC (dev@babyMRI.org)'}
+
+        plugin_repr = plg_data.copy()
+        plugin_repr.update(plg_meta_data)
+        plugin_repr['parameters'] = plugin_parameters
+
+        data = plg_meta_data.copy()
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(**data)
+        data = plg_data.copy()
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, **data)
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+
+        # add plugin's parameters
+        parameters = plugin_parameters
+        PluginParameter.objects.get_or_create(
+            plugin=plugin,
+            name=parameters[0]['name'],
+            type=parameters[0]['type'],
+            flag=parameters[0]['flag'])
+
+        # upload a file to the storage user's space
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(self.user_space_path + 'test.txt', f.read(),
+                                            content_type='text/plain')
+
+        # make POST API request to create a plugin instance
+        create_read_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # instance must be 'started' before checking its status
+        pl_inst = PluginInstance.objects.get(pk=response.data['id'])
+        for _ in range(10):
+            time.sleep(3)
+            pl_inst.refresh_from_db()
+            if pl_inst.status == 'started': break
+        self.assertEqual(pl_inst.status, 'started')  # instance must be started
+
+        # In the following we keep checking the status until the job ends with
+        # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
+        # max number of attempts at 10 second intervals.
+        plg_inst_manager = PluginInstanceManager(pl_inst)
+        maxLoopTries = 10
+        currentLoop = 1
+        b_checkAgain = True
+        time.sleep(10)
+        while b_checkAgain:
+            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
+            if str_responseStatus == 'finishedSuccessfully':
+                b_checkAgain = False
+            elif currentLoop < maxLoopTries:
+                time.sleep(10)
+            if currentLoop == maxLoopTries:
+                b_checkAgain = False
+            currentLoop += 1
+
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
+
+        # make sure output ChRIS link file was created in storage
+        link_file = pl_inst.output_folder.chris_link_files.first()
+        self.assertTrue(self.storage_manager.obj_exists(link_file.fname.name))
+
+        # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
         self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
     @tag('integration')
     def test_integration_ts_plugin_instance_create_success(self):
+        # upload a file to the storage user's space
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(self.user_space_path + 'test.txt', f.read(),
+                                            content_type='text/plain')
         # create an FS plugin instance
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name="pacspull")
         (fs_plg_inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
-        # upload FS plugin instace output file to storage
-        path = os.path.join(fs_plg_inst.get_output_path(), 'test.txt')
-        with io.StringIO("test file") as test_file:
-            self.storage_manager.upload_obj(path, test_file.read(),
+        # upload FS plugin instace output link file to storage
+        str_source_trace_dir = self.user_space_path.rstrip('/').replace('/', '_')
+        path = os.path.join(fs_plg_inst.get_output_path(), f'{str_source_trace_dir}.chrislink')
+
+        with io.StringIO(self.user_space_path.rstrip('/')) as test_link_file:
+            self.storage_manager.upload_obj(path, test_link_file.read(),
                                           content_type='text/plain')
 
         folder_path = os.path.dirname(path)
@@ -505,11 +614,22 @@ class PluginInstanceListViewTests(TasksViewTests):
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
             currentLoop += 1
+
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
-        self.assertEqual(pl_inst.output_folder.user_files.count(), 3)
+        output_user_files = UserFile.objects.filter(
+            fname__startswith=pl_inst.output_folder.path)
+        self.assertEqual(output_user_files.count(), 3)
+
+        # make sure output ChRIS link file was created in storage
+        link_file = pl_inst.output_folder.chris_link_files.first()
+        self.assertTrue(self.storage_manager.obj_exists(link_file.fname.name))
 
         # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
         self.storage_manager.delete_obj(path)
+        self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
     def test_plugin_instance_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -641,14 +761,15 @@ class PluginInstanceDetailViewTests(TasksViewTests):
             if currentLoop == maxLoopTries:
                 b_checkAgain = False
             currentLoop += 1
+
         self.assertContains(response, "finishedSuccessfully")
         self.assertContains(response, "simplefsapp")
 
         # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
-        # obj_paths = self.storage_manager.ls(pl_inst.get_output_path())
-        # for path in obj_paths:
-        #     self.storage_manager.delete_obj(path)
 
     def test_plugin_instance_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)

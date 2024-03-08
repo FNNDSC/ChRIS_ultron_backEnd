@@ -222,7 +222,7 @@ class PluginInstanceManagerTests(TestCase):
         self.assertTrue(self.storage_manager.obj_exists(str_fileCreatedByPlugin))
 
         # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
-        # obj_paths = self.storage_manager.ls(pl_inst.get_output_path())
-        # for path in obj_paths:
-        #     self.storage_manager.delete_obj(path)

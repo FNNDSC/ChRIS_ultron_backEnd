@@ -115,9 +115,12 @@ def get_unauthenticated_user_folder_queryset(pk_dict):
     except ChrisFolder.DoesNotExist:
         return ChrisFolder.objects.none()
 
+    path = folder.path
+    if path.startswith('SERVICES'):
+        return ChrisFolder.objects.none()
+
     qs = ChrisFolder.objects.filter(**pk_dict)
 
-    path = folder.path
     if path in ('', 'home') or path.startswith('PIPELINES'):
         return qs
 
