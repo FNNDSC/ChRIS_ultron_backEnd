@@ -104,7 +104,6 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
     taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
-    files = serializers.HyperlinkedIdentityField(view_name='feedfile-list')
     plugin_instances = serializers.HyperlinkedIdentityField(
         view_name='feed-plugininstance-list')
     owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
@@ -116,19 +115,15 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                   'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
                   'started_jobs', 'registering_jobs', 'finished_jobs', 'errored_jobs',
                   'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
-                  'files', 'plugin_instances')
+                  'plugin_instances')
 
     def validate_name(self, name):
         """
-        Overriden to check that the feed's name does not contain forward slashes and
-        is not the special 'uploads' identifier.
+        Overriden to check that the feed's name does not contain forward slashes.
         """
         if '/' in name:
             raise serializers.ValidationError(
                 ["This field may not contain forward slashes."])
-        if name == 'uploads':
-            raise serializers.ValidationError(
-                ["Forbidden feed name 'uploads'."])
         return name
 
     def validate_new_owner(self, username):

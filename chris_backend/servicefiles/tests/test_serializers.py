@@ -2,14 +2,17 @@
 import logging
 import time
 import io
+import os
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.test import TestCase, tag
 from django.conf import settings
 from rest_framework import serializers
 
 from servicefiles.models import Service, ServiceFile
 from servicefiles.serializers import ServiceFileSerializer
+from core.models import ChrisFolder
 from core.storage.helpers import connect_storage, mock_storage
 
 class ServiceFileSerializerTests(TestCase):
@@ -17,6 +20,12 @@ class ServiceFileSerializerTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
 
     def tearDown(self):
         # re-enable logging
@@ -36,27 +45,18 @@ class ServiceFileSerializerTests(TestCase):
         Test whether overriden validate_name method successfully returns a valid
         unregistered service name.
         """
-        Service.objects.get_or_create(identifier='NewService')
+        service_name = 'NewService'
+        folder_path = f'SERVICES/{service_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (service_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                owner=owner)
+
+        Service.objects.get_or_create(folder=service_folder, identifier=service_name)
         servicefiles_serializer = ServiceFileSerializer()
         self.assertEqual(servicefiles_serializer.validate_service_name('MyService'),
                          'MyService')
         self.assertEqual(servicefiles_serializer.validate_service_name('NewService'),
                          'NewService')
-
-    def test_validate_updates_validated_data(self):
-        """
-        Test whether overriden validate method updates validated data with the descriptors
-        embedded in the path string.
-        """
-        path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
-        data = {'service_name': 'MyService', 'path': path}
-        servicefiles_serializer = ServiceFileSerializer()
-        with mock_storage('servicefiles.serializers.settings') as storage_manager:
-            storage_manager.upload_obj(path, b'dummy data')
-            new_data = servicefiles_serializer.validate(data)
-            self.assertIn('service', new_data)
-            self.assertNotIn('service_name', new_data)
-            self.assertEqual(new_data.get('path'), path.strip(' ').strip('/'))
 
     def test_validate_failure_path_does_not_start_with_SERVICES_PACS(self):
         """
@@ -121,11 +121,21 @@ class ServiceFileSerializerTests(TestCase):
         has not been already registered.
         """
         path = 'SERVICES/MyService/123456-crazy/brain_crazy_study/brain_crazy_mri/file1.dcm'
-        data = {'service_name': 'MyService', 'path': path}
+        service_name = 'MyService'
+        data = {'service_name': service_name, 'path': path}
         servicefiles_serializer = ServiceFileSerializer()
-        service = Service(identifier='MyService')
+
+        folder_path = f'SERVICES/{service_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (service_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                owner=owner)
+        service = Service(folder=service_folder, identifier=service_name)
         service.save()
-        service_file = ServiceFile(service=service)
+
+        folder_path = os.path.dirname(path)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+        service_file = ServiceFile(owner=owner, parent_folder=file_parent_folder)
         service_file.fname.name = path
         service_file.save()
         with self.assertRaises(serializers.ValidationError):

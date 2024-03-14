@@ -2,6 +2,7 @@
 import logging
 import json
 import io
+import os
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -11,6 +12,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
+from core.models import ChrisFolder
 from core.storage.helpers import connect_storage, mock_storage
 from userfiles.models import UserFile
 from userfiles import views
@@ -25,17 +27,20 @@ class UserFileViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.content_type = 'application/vnd.collection+json'
+        # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chrispass'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
+        self.content_type = 'application/vnd.collection+json'
+
         self.username = 'test'
         self.password = 'testpass'
         self.other_username = 'boo'
         self.other_password = 'far'
 
-        # create the chris superuser and two additional users
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        # create users
         User.objects.create_user(username=self.other_username,
                                  password=self.other_password)
         user = User.objects.create_user(username=self.username,
@@ -48,7 +53,10 @@ class UserFileViewTests(TestCase):
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(self.upload_path, file1.read(),
                                           content_type='text/plain')
-            self.userfile = UserFile(owner=user)
+            folder_path = os.path.dirname(self.upload_path)
+            (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                        owner=user)
+            self.userfile = UserFile(owner=user, parent_folder=file_parent_folder)
             self.userfile.fname.name = self.upload_path
             self.userfile.save()
 
@@ -140,12 +148,18 @@ class UserFileDetailViewTests(UserFileViewTests):
 
     def test_userfile_delete_success(self):
         self.client.login(username=self.username, password=self.password)
+
         storage_path = self.userfile.fname.name
-        with mock_storage('userfiles.views.settings') as storage_manager:
+        storage_manager_mock = mock.Mock()
+        storage_manager_mock.delete_obj = mock.Mock()
+
+        with mock.patch('userfiles.views.connect_storage') as connect_storage_mock:
+            connect_storage_mock.return_value=storage_manager_mock
             response = self.client.delete(self.read_update_delete_url)
-            self.assertFalse(storage_manager.obj_exists(storage_path))
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
             self.assertEqual(UserFile.objects.count(), 0)
+            connect_storage_mock.assert_called_with(settings)
+            storage_manager_mock.delete_obj.assert_called_with(storage_path)
 
     def test_userfile_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_update_delete_url)

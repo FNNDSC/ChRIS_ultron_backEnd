@@ -12,7 +12,7 @@ from core.storage import connect_storage
 
 from .models import UserFile, UserFileFilter
 from .serializers import UserFileSerializer
-from .permissions import IsOwnerOrChris
+from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly
 
 
 logger = logging.getLogger(__name__)
@@ -46,8 +46,8 @@ class UserFileList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append document-level link relations, a query list and a
+        collection+json template to the response.
         """
         response = super(UserFileList, self).list(request, *args, **kwargs)
         # append query list
@@ -76,7 +76,7 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = UserFile.objects.all()
     serializer_class = UserFileSerializer
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -94,19 +94,6 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         request.data['fname'] = user_file.fname.file  # fname required in the serializer
         return super(UserFileDetail, self).update(request, *args, **kwargs)
 
-    def perform_update(self, serializer):
-        """
-        Overriden to delete the old path from storage.
-        """
-        user_file = self.get_object()
-        old_storage_path = user_file.fname.name
-        serializer.save()
-        storage_manager = connect_storage(settings)
-        try:
-            storage_manager.delete_obj(old_storage_path)
-        except Exception as e:
-            logger.error('Storage error, detail: %s' % str(e))
-
     def perform_destroy(self, instance):
         """
         Overriden to delete the file from storage.
@@ -122,12 +109,12 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class UserFileResource(generics.GenericAPIView):
     """
-    A view to enable downloading of a file resource .
+    A view to enable downloading of a file resource.
     """
     http_method_names = ['get']
     queryset = UserFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrChris)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
     def get(self, request, *args, **kwargs):
         """

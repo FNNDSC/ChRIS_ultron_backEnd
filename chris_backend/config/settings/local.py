@@ -84,7 +84,7 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances', 'pi
 
 # Storage Settings
 STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
-if STORAGE_ENV not in ('swift', 'filesystem'):
+if STORAGE_ENV not in ('swift', 'fslink', 'filesystem'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
 STORAGES['default'] = {'BACKEND': 'swift.storage.SwiftStorage'}
@@ -96,7 +96,7 @@ SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
                            'key': SWIFT_KEY,
                            'authurl': SWIFT_AUTH_URL}
 MEDIA_ROOT = None
-if STORAGE_ENV == 'filesystem':
+if STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = '/var/chris'  # local filesystem storage settings
 

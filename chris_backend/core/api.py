@@ -56,9 +56,6 @@ urlpatterns = format_suffix_patterns([
     path('v1/comments/<int:pk>/',
         feed_views.CommentDetail.as_view(), name='comment-detail'),
 
-    path('v1/<int:pk>/files/',
-        feed_views.FeedFileList.as_view(), name='feedfile-list'),
-
     path('v1/<int:pk>/plugininstances/',
         feed_views.FeedPluginInstanceList.as_view(), name='feed-plugininstance-list'),
 
@@ -235,26 +232,6 @@ urlpatterns = format_suffix_patterns([
         plugininstance_views.PluginInstanceDescendantList.as_view(),
         name='plugininstance-descendant-list'),
 
-    path('v1/plugins/instances/<int:pk>/files/',
-        plugininstance_views.PluginInstanceFileList.as_view(),
-        name='plugininstancefile-list'),
-
-    path('v1/files/',
-        plugininstance_views.AllPluginInstanceFileList.as_view(),
-        name='allplugininstancefile-list'),
-
-    path('v1/files/search/',
-        plugininstance_views.AllPluginInstanceFileListQuerySearch.as_view(),
-        name='allplugininstancefile-list-query-search'),
-
-    path('v1/files/<int:pk>/',
-        plugininstance_views.PluginInstanceFileDetail.as_view(),
-        name='plugininstancefile-detail'),
-
-    re_path(r'^v1/files/(?P<pk>[0-9]+)/.*$',
-        plugininstance_views.FileResource.as_view(),
-        name='plugininstancefile-resource'),
-
     path('v1/plugins/instances/<int:pk>/parameters/',
         plugininstance_views.PluginInstanceParameterList.as_view(),
         name='plugininstance-parameter-list'),
@@ -378,20 +355,36 @@ urlpatterns = format_suffix_patterns([
 
 
     path('v1/filebrowser/',
-         filebrowser_views.FileBrowserPathList.as_view(),
-         name='filebrowserpath-list'),
+         filebrowser_views.FileBrowserFolderList.as_view(),
+         name='chrisfolder-list'),
 
     path('v1/filebrowser/search/',
-         filebrowser_views.FileBrowserPathListQuerySearch.as_view(),
-         name='filebrowserpath-list-query-search'),
+         filebrowser_views.FileBrowserFolderListQuerySearch.as_view(),
+         name='chrisfolder-list-query-search'),
 
-    path('v1/filebrowser/<path:path>/',
-         filebrowser_views.FileBrowserPath.as_view(),
-         name='filebrowserpath'),
+    path('v1/filebrowser/<int:pk>/',
+         filebrowser_views.FileBrowserFolderDetail.as_view(),
+         name='chrisfolder-detail'),
 
-    path('v1/filebrowser-files/<path:path>/',
-         filebrowser_views.FileBrowserPathFileList.as_view(),
-         name='filebrowserpathfile-list'),
+    path('v1/filebrowser/<int:pk>/children/',
+         filebrowser_views.FileBrowserFolderChildList.as_view(),
+         name='chrisfolder-child-list'),
+
+    path('v1/filebrowser/<int:pk>/files/',
+         filebrowser_views.FileBrowserFolderFileList.as_view(),
+         name='chrisfolder-file-list'),
+
+    path('v1/filebrowser/<int:pk>/linkfiles/',
+         filebrowser_views.FileBrowserFolderLinkFileList.as_view(),
+         name='chrisfolder-linkfile-list'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/',
+         filebrowser_views.FileBrowserLinkFileDetail.as_view(),
+         name='chrislinkfile-detail'),
+
+    re_path(r'^v1/filebrowser/linkfiles/(?P<pk>[0-9]+)/.*$',
+            filebrowser_views.FileBrowserLinkFileResource.as_view(),
+            name='chrislinkfile-resource')
 
 ])
 

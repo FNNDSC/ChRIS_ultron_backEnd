@@ -31,11 +31,11 @@ G_SYNOPSIS="
         The upload prefix to use for swift storage. Note that the backend
         prepends the following pattern to <uploadPathPrefix>:
         
-                <cubeUser>/uploads
+                home/<cubeUser>/uploads
                 
         so the path in swift is:
         
-                <cubeUser>/uploads/<uploadPathPrefix>
+                home/<cubeUser>/uploads/<uploadPathPrefix>
 
         DO NOT PREPEND THIS PATH WITH A '/'!
         

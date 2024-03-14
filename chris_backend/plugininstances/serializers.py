@@ -8,12 +8,11 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
-from core.utils import get_file_resource_link
 from core.storage import connect_storage
 from plugins.models import TYPES, Plugin
 from feeds.models import Feed
 
-from .models import PluginInstance, PluginInstanceSplit, PluginInstanceFile
+from .models import PluginInstance, PluginInstanceSplit
 from .models import FloatParameter, IntParameter, BoolParameter
 from .models import PathParameter, UnextpathParameter, StrParameter
 
@@ -34,7 +33,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     workflow_id = serializers.ReadOnlyField(source='workflow.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
-    output_path = serializers.SerializerMethodField()
+    output_path = serializers.ReadOnlyField(source='output_folder.path')
     summary = serializers.ReadOnlyField()
     raw = serializers.ReadOnlyField()
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -43,13 +42,14 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     previous = serializers.HyperlinkedRelatedField(
         view_name='plugininstance-detail', read_only=True
     )
+    output_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                        read_only=True)
     descendants = serializers.HyperlinkedIdentityField(
         view_name='plugininstance-descendant-list'
     )
     parameters = serializers.HyperlinkedIdentityField(
         view_name='plugininstance-parameter-list'
     )
-    files = serializers.HyperlinkedIdentityField(view_name='plugininstancefile-list')
     plugin = serializers.HyperlinkedRelatedField(
         view_name='plugin-detail', read_only=True
     )
@@ -72,15 +72,10 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'feed_id', 'start_date', 'end_date', 'output_path', 'status',
                   'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'workflow_id',
                   'summary', 'raw', 'owner_username', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit', 'size', 'error_code', 'previous',
-                  'feed', 'plugin', 'workflow', 'pipeline_inst', 'compute_resource',
-                  'descendants', 'files', 'parameters',  'splits')
-
-    def get_output_path(self, obj):
-        """
-        Overriden to get the plugin instance's output path.
-        """
-        return obj.get_output_path()
+                  'number_of_workers', 'gpu_limit', 'size', 'error_code',
+                  'output_folder', 'previous', 'output_folder', 'feed', 'plugin',
+                  'workflow', 'pipeline_inst', 'compute_resource', 'descendants',
+                  'parameters', 'splits')
 
     def validate_previous(self, previous_id):
         """
@@ -222,27 +217,6 @@ class PluginInstanceSplitSerializer(serializers.HyperlinkedModelSerializer):
                                                f" been registered with compute resource"
                                                f" '{compute_resource_name}'."])
         return compute_resource_name
-
-
-class PluginInstanceFileSerializer(serializers.HyperlinkedModelSerializer):
-    plugin_inst = serializers.HyperlinkedRelatedField(view_name='plugininstance-detail',
-                                                      read_only=True)
-    file_resource = ItemLinkField('get_file_link')
-    fname = serializers.FileField(use_url=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
-    feed_id = serializers.ReadOnlyField(source='plugin_inst.feed.id')
-    plugin_inst_id = serializers.ReadOnlyField(source='plugin_inst.id')
-
-    class Meta:
-        model = PluginInstanceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'feed_id',
-                  'plugin_inst_id', 'file_resource', 'plugin_inst')
-
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)
 
 
 class StrParameterSerializer(serializers.HyperlinkedModelSerializer):

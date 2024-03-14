@@ -486,15 +486,22 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
 class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
+    uploader_username = serializers.ReadOnlyField(source='uploader.username')
+    owner_username = serializers.ReadOnlyField(source='owner.username')
+    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
     file_resource = ItemLinkField('get_file_link')
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
+    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                        read_only=True)
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = PipelineSourceFile
         fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'type', 'file_resource',
-                  'pipeline', 'owner')
+                  'uploader_username', 'owner_username', 'pipeline_id', 'pipeline',
+                  'parent_folder',
+                  'owner')
 
     def get_file_link(self, obj):
         """

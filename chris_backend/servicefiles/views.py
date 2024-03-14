@@ -40,6 +40,12 @@ class ServiceFileList(generics.ListCreateAPIView):
         self.request.data.pop('fname', None)
         return super(ServiceFileList, self).create(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        """
+        Overriden to associate the owner (chris user) with the Service file
+        before first saving to the DB.
+        """
+        serializer.save(owner=self.request.user)
 
 class ServiceFileListQuerySearch(generics.ListAPIView):
     """

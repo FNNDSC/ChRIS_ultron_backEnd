@@ -2,6 +2,7 @@
 import logging
 import json
 import io
+import os
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -11,6 +12,7 @@ from django.urls import reverse
 
 from rest_framework import status
 
+from core.models import ChrisFolder
 from core.storage import connect_storage
 from pacsfiles.models import PACS, PACSFile
 from pacsfiles import views
@@ -25,6 +27,12 @@ class PACSFileViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
         self.content_type = 'application/vnd.collection+json'
         self.username = 'test'
         self.password = 'testpass'
@@ -38,8 +46,19 @@ class PACSFileViewTests(TestCase):
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(self.path, file1.read(),
                                           content_type='text/plain')
-        pacs = PACS(identifier='MyPACS')
+
+        self.pacs_name = 'MyPACS'
+        folder_path = f'SERVICES/PACS/{self.pacs_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (pacs_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                             owner=owner)
+        pacs = PACS(folder=pacs_folder, identifier=self.pacs_name)
         pacs.save()
+
+        folder_path = os.path.dirname(self.path)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+
         pacs_file = PACSFile(PatientID='123456',
                              PatientName='crazy',
                              PatientSex='O',
@@ -48,7 +67,8 @@ class PACSFileViewTests(TestCase):
                              StudyDescription='brain_crazy_study',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
                              SeriesDescription='SAG T1 MPRAGE',
-                             pacs=pacs)
+                             owner=owner,
+                             parent_folder=file_parent_folder)
         pacs_file.fname.name = self.path
         pacs_file.save()
 
@@ -87,17 +107,13 @@ class PACSFileListViewTests(PACSFileViewTests):
 
     @tag('integration')
     def test_integration_pacsfile_create_success(self):
-        chris_username = 'chris'
-        chris_password = 'chris1234'
-        User.objects.create_user(username=chris_username, password=chris_password)
-
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
         # upload file to storage
         with io.StringIO("test file") as file1:
             self.storage_manager.upload_obj(path, file1.read(), content_type='text/plain')
 
         # make the POST request using the chris user
-        self.client.login(username=chris_username, password=chris_password)
+        self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.post(self.create_read_url, data=self.post,
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -111,17 +127,20 @@ class PACSFileListViewTests(PACSFileViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_pacsfile_create_failure_already_exists(self):
-        chris_username = 'chris'
-        chris_password = 'chris1234'
-        User.objects.create_user(username=chris_username, password=chris_password)
-        self.client.login(username=chris_username, password=chris_password)
+        self.client.login(username=self.chris_username, password=self.chris_password)
         path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file2.dcm'
-        pacs = PACS.objects.get(identifier='MyPACS')
+
+        folder_path = os.path.dirname(path)
+        owner = User.objects.get(username=self.chris_username)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+
         pacs_file = PACSFile(PatientID='123456',
                              StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
-                             pacs=pacs)
+                             owner=owner,
+                             parent_folder=file_parent_folder)
         pacs_file.fname.name = path
         pacs_file.save()
         response = self.client.post(self.create_read_url, data=self.post,

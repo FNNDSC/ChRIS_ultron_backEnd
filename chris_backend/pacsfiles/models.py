@@ -1,16 +1,27 @@
 
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from core.models import ChrisFolder
 from core.utils import filter_files_by_n_slashes
 
 
 class PACS(models.Model):
     identifier = models.CharField(max_length=20, unique=True)
+    # top folder
+    folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
+                                  related_name='pacs')
 
     def __str__(self):
         return self.identifier
+
+
+@receiver(post_delete, sender=PACS)
+def auto_delete_pacs_folder_with_pacs(sender, instance, **kwargs):
+    instance.folder.delete()
 
 
 class PACSFile(models.Model):
@@ -20,8 +31,8 @@ class PACSFile(models.Model):
     PatientName = models.CharField(max_length=150, blank=True)
     PatientBirthDate = models.DateField(blank=True, null=True)
     PatientAge = models.IntegerField(blank=True, null=True)
-    PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')],
-                                  blank=True)
+    PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'),
+                                                         ('O', 'Other')], blank=True)
     StudyDate = models.DateField(db_index=True)
     AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
     Modality = models.CharField(max_length=15, blank=True)
@@ -30,7 +41,9 @@ class PACSFile(models.Model):
     StudyDescription = models.CharField(max_length=400, blank=True)
     SeriesInstanceUID = models.CharField(max_length=100)
     SeriesDescription = models.CharField(max_length=400, blank=True)
-    pacs = models.ForeignKey(PACS, on_delete=models.CASCADE)
+    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
+                                      related_name='pacs_files')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
         ordering = ('-fname',)
@@ -59,8 +72,6 @@ class PACSFileFilter(FilterSet):
                                                  lookup_expr='icontains')
     SeriesDescription = django_filters.CharFilter(field_name='SeriesDescription',
                                                  lookup_expr='icontains')
-    pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
-                                                lookup_expr='exact')
     min_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
                                                  lookup_expr='gte')
     max_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
@@ -73,8 +84,7 @@ class PACSFileFilter(FilterSet):
                   'PatientID', 'PatientName', 'PatientSex', 'PatientAge',
                   'min_PatientAge', 'max_PatientAge', 'PatientBirthDate', 'StudyDate',
                   'AccessionNumber', 'ProtocolName', 'StudyInstanceUID',
-                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription',
-                  'pacs_identifier']
+                  'StudyDescription', 'SeriesInstanceUID', 'SeriesDescription']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """

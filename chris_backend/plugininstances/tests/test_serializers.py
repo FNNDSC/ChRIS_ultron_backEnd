@@ -24,6 +24,12 @@ class SerializerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
         self.username = 'foo'
         self.password = 'foopassword'
         self.plugin_name = "simplefsapp"
@@ -280,10 +286,10 @@ class PathParameterSerializerTests(SerializerTests):
         """
         path_parm_serializer = PathParameterSerializer(user=self.user)
         with self.assertRaises(serializers.ValidationError):
-            value = "{}/uploads, anotheruser".format(self.username)
+            value = "home/{}/uploads, anotheruser".format(self.username)
             path_parm_serializer.validate_value(value)
         with self.assertRaises(serializers.ValidationError):
-            value = "{}, anotheruser/uploads".format(self.username, self.username)
+            value = "home/{}, home/anotheruser/uploads".format(self.username)
             path_parm_serializer.validate_value(value)
 
     def test_validate_value_fail_invalid_feed_path(self):
@@ -381,10 +387,10 @@ class UnextpathParameterSerializerTests(SerializerTests):
         """
         path_parm_serializer = UnextpathParameterSerializer(user=self.user)
         with self.assertRaises(serializers.ValidationError):
-            value = "{}/uploads, anotheruser".format(self.username)
+            value = "home/{}/uploads, anotheruser".format(self.username)
             path_parm_serializer.validate_value(value)
         with self.assertRaises(serializers.ValidationError):
-            value = "{}, anotheruser/uploads".format(self.username, self.username)
+            value = "home/{}, home/anotheruser/uploads".format(self.username)
             path_parm_serializer.validate_value(value)
 
     def test_validate_value_fail_invalid_feed_path(self):

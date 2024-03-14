@@ -4,9 +4,7 @@ from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
 from collectionjson import services
-from plugininstances.models import PluginInstance, PluginInstanceFile
 from plugininstances.serializers import PluginInstanceSerializer
-from plugininstances.serializers import PluginInstanceFileSerializer
 
 from .models import Feed, FeedFilter
 from .models import Tag, TagFilter
@@ -301,7 +299,6 @@ class FeedList(generics.ListAPIView):
         links = {'chrisinstance': reverse('chrisinstance-detail', request=request,
                                           kwargs={"pk": 1}),
                  'public_feeds': reverse('publicfeed-list', request=request),
-                 'files': reverse('allplugininstancefile-list', request=request),
                  'compute_resources': reverse('computeresource-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request),
                  'plugins': reverse('plugin-list', request=request),
@@ -316,7 +313,7 @@ class FeedList(generics.ListAPIView):
                  'userfiles': reverse('userfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'servicefiles': reverse('servicefile-list', request=request),
-                 'filebrowser': reverse('filebrowserpath-list', request=request)}
+                 'filebrowser': reverse('chrisfolder-list', request=request)}
 
         user = self.request.user
         if user.is_authenticated:
@@ -506,34 +503,6 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
         response = super(CommentDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)
-
-
-class FeedFileList(generics.ListAPIView):
-    """
-    A view for the collection of all files in a feed.
-    """
-    http_method_names = ['get']
-    queryset = Feed.objects.all()
-    serializer_class = PluginInstanceFileSerializer
-    permission_classes = (IsFeedOwnerOrChrisOrPublicReadOnly,)
-
-    def list(self, request, *args, **kwargs):
-        """
-        Overriden to return a list of the files for the queried feed and
-        append document-level link relations.
-        """
-        queryset = self.get_feedfiles_queryset()
-        response = services.get_list_response(self, queryset)
-        feed = self.get_object()
-        links = {'feed': reverse('feed-detail', request=request, kwargs={"pk": feed.id})}
-        return services.append_collection_links(response, links)
-
-    def get_feedfiles_queryset(self):
-        """
-        Custom method to get the actual feed files queryset.
-        """
-        feed = self.get_object()
-        return PluginInstanceFile.objects.filter(plugin_inst__feed=feed)
 
 
 class FeedPluginInstanceList(generics.ListAPIView):

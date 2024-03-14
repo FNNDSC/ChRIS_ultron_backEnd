@@ -27,6 +27,12 @@ class PluginInstanceManagerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
         self.storage_manager = connect_storage(settings)
 
         self.plugin_fs_name = "simplefsapp"
@@ -173,7 +179,7 @@ class PluginInstanceManagerTests(TestCase):
         Test whether the manager can check a plugin's app execution status.
         """
         # upload a file to the storage user's space
-        user_space_path = '%s/uploads/' % self.username
+        user_space_path = 'home/%s/uploads/' % self.username
         with io.StringIO('Test file') as f:
             self.storage_manager.upload_obj(user_space_path + 'test.txt', f.read(),
                                           content_type='text/plain')
@@ -216,7 +222,7 @@ class PluginInstanceManagerTests(TestCase):
         self.assertTrue(self.storage_manager.obj_exists(str_fileCreatedByPlugin))
 
         # delete files from storage
+        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
+        for obj in files_in_storage:
+            self.storage_manager.delete_obj(obj)
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
-        # obj_paths = self.storage_manager.ls(pl_inst.get_output_path())
-        # for path in obj_paths:
-        #     self.storage_manager.delete_obj(path)

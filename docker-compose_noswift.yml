@@ -17,7 +17,7 @@ version: '3.9'
 
 services:
   chrisomatic:
-    image: ghcr.io/fnndsc/chrisomatic:0.7.0
+    image: ghcr.io/fnndsc/chrisomatic:0.8.0a1
     volumes:
       - "./chrisomatic:/etc/chrisomatic:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:rw"
@@ -30,6 +30,26 @@ services:
     profiles:
       - tools
 
+  db_migrate:
+    image: ${CHRISREPO}/chris:dev
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
+    volumes:
+      - ./chris_backend:/opt/app-root/src:z
+      - ${STOREBASE:?}:/var/chris
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.local
+      - STORAGE_ENV
+    command: python manage.py migrate --noinput
+    user: ${UID}:${GID}
+    depends_on:
+      chris_dev_db:
+        condition: service_healthy
+    networks:
+      local:
+
   chris_dev:
     image: ${CHRISREPO}/chris:dev
     build:
@@ -39,20 +59,22 @@ services:
     stdin_open: true # docker run -i
     tty: true        # docker run -t
     volumes:
-      - ./chris_backend:/home/localuser/chris_backend:z
+      - ./chris_backend:/opt/app-root/src:z
       - ${STOREBASE:?}:/var/chris
+    user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - DJANGO_DB_MIGRATE=on
-      - DJANGO_COLLECTSTATIC=off
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
-    depends_on: 
-      - chris_dev_db
-      - queue
-      - chris_store
+    depends_on:
+      db_migrate:
+        condition: service_completed_successfully
+      queue:
+        condition: service_started
+      chris_store:
+        condition: service_started
     networks:
       local:
         aliases:
@@ -73,21 +95,22 @@ services:
       args:
         ENVIRONMENT: local
     volumes:
-      - ./chris_backend:/home/localuser/chris_backend:z
+      - ./chris_backend:/opt/app-root/src:z
       - ${STOREBASE:?}:/var/chris
+    user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - DJANGO_DB_MIGRATE=off
-      - DJANGO_COLLECTSTATIC=off
       - CELERY_RDB_HOST=0.0.0.0
       - CELERY_RDB_PORT=6900
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core worker -c 3 -l DEBUG -Q main1,main2
     ports:
       - "6900-6905:6900-6905"
     depends_on:
-      - chris_dev_db
-      - queue
+      db_migrate:
+        condition: service_completed_successfully
+      queue:
+        condition: service_started
       # service also depends on pfcon service defined in swarm/docker-compose_remote.yml
     networks:
       - local
@@ -114,18 +137,18 @@ services:
       args:
         ENVIRONMENT: local
     volumes:
-      - ./chris_backend:/home/localuser/chris_backend:z
+      - ./chris_backend:/opt/app-root/src:z
       - ${STOREBASE:?}:/var/chris
-
+    user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - DJANGO_DB_MIGRATE=off
-      - DJANGO_COLLECTSTATIC=off
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core worker -c 1 -l DEBUG -Q periodic
     depends_on:
-      - chris_dev_db
-      - queue
+      db_migrate:
+        condition: service_completed_successfully
+      queue:
+        condition: service_started
     networks:
       - local
     labels:
@@ -139,17 +162,18 @@ services:
       args:
         ENVIRONMENT: local
     volumes:
-      - ./chris_backend:/home/localuser/chris_backend:z
+      - ./chris_backend:/opt/app-root/src:z
       - ${STOREBASE:?}:/var/chris
+    user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
-      - DJANGO_DB_MIGRATE=off
-      - DJANGO_COLLECTSTATIC=off
-      - STORAGE_ENV=filesystem
+      - STORAGE_ENV
     command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     depends_on:
-      - chris_dev_db
-      - queue
+      db_migrate:
+        condition: service_completed_successfully
+      queue:
+        condition: service_started
     # restart until Django DB migrations are ready
     deploy:
       restart_policy:
@@ -173,6 +197,12 @@ services:
     labels:
       name: "ChRIS_ultron_backEnd PostgreSQL Database"
       role: "Backend development database"
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 2s
+      timeout: 4s
+      retries: 3
+      start_period: 60s
 
   queue:
     image: rabbitmq:3
@@ -227,6 +257,23 @@ services:
       name: "ChRIS_store PostgreSQL Database"
       role: "Chris store database"
 
+  lldap:
+    image: nitnelave/lldap:stable
+    ports:
+      - "3890:3890"
+      - "17170:17170"
+    volumes:
+      - "lldap_data:/data"
+    environment:
+      - UID=10100
+      - GID=10100
+      - TZ=America/New_York
+      - LLDAP_JWT_SECRET=super_secret_random_string
+      - LLDAP_LDAP_USER_PASS=chris1234
+      - LLDAP_LDAP_BASE_DN=dc=example,dc=org
+    networks:
+      local:
+
 networks:
   local:
   remote:
@@ -238,3 +285,4 @@ volumes:
   chris_dev_db_data:
   chris_store_db_data:
   queue_data:
+  lldap_data:

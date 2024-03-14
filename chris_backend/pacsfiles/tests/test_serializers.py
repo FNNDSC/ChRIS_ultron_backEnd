@@ -2,13 +2,16 @@
 import logging
 import time
 import io
+import os
 
+from django.contrib.auth.models import User
 from django.test import TestCase, tag
 from django.conf import settings
 from rest_framework import serializers
 
 from pacsfiles.models import PACS, PACSFile
 from pacsfiles.serializers import PACSFileSerializer
+from core.models import ChrisFolder
 from core.storage.helpers import connect_storage, mock_storage
 
 
@@ -17,6 +20,12 @@ class PACSFileSerializerTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
 
     def tearDown(self):
         # re-enable logging
@@ -87,23 +96,6 @@ class PACSFileSerializerTests(TestCase):
         # delete file from storage
         storage_manager.delete_obj(path)
 
-    def test_validate_updates_validated_data(self):
-        """
-        Test whether overriden validate method updates validated data with a PACS object.
-        """
-        path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE/file1.dcm'
-        data = {'PatientID': '123456', 'PatientName': 'crazy',
-                'StudyDate': '2020-07-15',
-                'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
-                'PatientSex':'O',
-                'StudyDescription': 'brain_crazy_study',
-                'SeriesDescription': 'SAG T1 MPRAGE',
-                'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
-                'pacs_name': 'MyPACS', 'path': path}
-        pacsfiles_serializer = PACSFileSerializer()
-        new_data = pacsfiles_serializer.validate(data)
-        self.assertIn('pacs', new_data)
-
     def test_validate_validates_path_has_not_already_been_registered(self):
         """
         Test whether overriden validate method validates that the submitted path
@@ -117,13 +109,25 @@ class PACSFileSerializerTests(TestCase):
                 'SeriesDescription': 'SAG T1 MPRAGE',
                 'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
                 'pacs_name': 'MyPACS', 'path': path}
-        pacs = PACS(identifier='MyPACS')
+
+        pacs_name = 'MyPACS'
+        folder_path = f'SERVICES/PACS/{pacs_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (pacs_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                             owner=owner)
+        pacs = PACS(folder=pacs_folder, identifier=pacs_name)
         pacs.save()
+
+        folder_path = os.path.dirname(path)
+        (file_parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                    owner=owner)
+
         pacs_file = PACSFile(PatientID='123456',
                              StudyDate='2020-07-15',
                              StudyInstanceUID='1.1.3432.54.6545674765.765434',
                              SeriesInstanceUID='2.4.3432.54.845674765.763345',
-                             pacs=pacs)
+                             owner=owner,
+                             parent_folder=file_parent_folder)
         pacs_file.fname.name = path
         pacs_file.save()
         with self.assertRaises(serializers.ValidationError):

@@ -22,6 +22,12 @@ class SerializerTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
+
         self.username = 'foo'
         self.password = 'bar'
         self.feedname = "Feed1"
@@ -142,13 +148,10 @@ class FeedSerializerTests(SerializerTests):
     def test_validate_name(self):
         """
         Test whether overriden validate_name method raises a serializers.ValidationError
-        when the feed name contains forward slashes or it is the special 'uploads'
-        identifier.
+        when the feed name contains forward slashes.
         """
         with self.assertRaises(serializers.ValidationError):
             self.feed_serializer.validate_name('myfeed/')
-        with self.assertRaises(serializers.ValidationError):
-            self.feed_serializer.validate_name('uploads')
         name = self.feed_serializer.validate_name('myfeed')
         self.assertEqual(name, 'myfeed')
 

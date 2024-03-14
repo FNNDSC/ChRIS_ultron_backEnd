@@ -2,6 +2,7 @@
 import logging
 
 from django.test import TestCase
+from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
@@ -18,6 +19,12 @@ class UserSerializerTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
 
         self.username = 'cube'
         self.password = 'cubepass'

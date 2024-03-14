@@ -1,8 +1,12 @@
 
-from rest_framework import generics, permissions
+import logging
 
+from rest_framework import generics, permissions
 from .models import ChrisInstance
 from .serializers import ChrisInstanceSerializer
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChrisInstanceDetail(generics.RetrieveAPIView):

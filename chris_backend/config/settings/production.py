@@ -55,7 +55,7 @@ DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 # STORAGE CONFIGURATION
 # ------------------------------------------------------------------------------
 STORAGE_ENV = get_secret('STORAGE_ENV')
-if STORAGE_ENV not in ('swift', 'filesystem'):
+if STORAGE_ENV not in ('swift', 'fslink', 'filesystem'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
 if STORAGE_ENV == 'swift':
@@ -72,7 +72,7 @@ if STORAGE_ENV == 'swift':
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
-elif STORAGE_ENV == 'filesystem':
+elif STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = get_secret('MEDIA_ROOT')
     verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],

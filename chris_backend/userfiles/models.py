@@ -3,12 +3,15 @@ from django.db import models
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from core.models import ChrisFolder
 from core.utils import filter_files_by_n_slashes
 
 
 class UserFile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     fname = models.FileField(max_length=1024, unique=True)
+    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
+                                      related_name='user_files')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
     class Meta:
@@ -51,7 +54,7 @@ class UserFileFilter(FilterSet):
         """
         Custom method to return the files containing all the substrings from the queried
         string (which in turn represents a white-space-separated list of query strings)
-        case insensitive anywhere in their fname.
+        case-insensitive anywhere in their fname.
         """
         # assume value is a string representing a white-space-separated list
         # of query strings

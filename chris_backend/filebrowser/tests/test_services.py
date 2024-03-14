@@ -5,11 +5,9 @@ from unittest import mock, skip
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from servicefiles.models import ServiceFile, Service
-from pacsfiles.models import PACSFile
+from core.models import ChrisFolder
 from userfiles.models import UserFile
-from plugininstances.models import PluginInstanceFile
-from pipelines.models import PipelineSourceFile
+from userfiles.serializers import UserFileSerializer
 from filebrowser import services
 
 
@@ -22,90 +20,136 @@ class ServiceTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.username = 'testfoo'
-        self.password = 'testfoopass'
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = 'chris1234'
+        User.objects.create_user(username=self.chris_username,
+                                 password=self.chris_password)
 
-        # create a user
-        User.objects.create_user(username=self.username, password=self.password)
+
+        # create users
+        self.username = 'foo'
+        self.password = 'foopass'
+        self.another_username = 'boo'
+        self.another_password = 'boopass'
+        user = User.objects.create_user(username=self.username, password=self.password)
+        User.objects.create_user(username=self.another_username, password=self.another_password)
+
+        # create a folder in the user space
+        path = f'home/{self.username}/uploads'
+        (self.folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=user)
+
+        # create a file in the DB "already uploaded" to the server)
+        upload_path = f'{path}/file1.txt'
+        userfile = UserFile(owner=user, parent_folder=self.folder)
+        userfile.fname.name = upload_path
+        userfile.save()
 
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
 
-    def test_get_path_file_model_class(self):
+
+    def test_get_folder_file_type(self):
         """
-        Test whether services.get_path_file_model_class function gets the correct file
-        model class associated to a path.
+        Test whether the services.get_folder_file_type function gets the correct file
+        type associated to a folder.
         """
-        username = self.username
-
-        path = 'PIPELINES'
-        model_class = services.get_path_file_model_class(path)
-        self.assertEqual(model_class, PipelineSourceFile)
-
-        path = 'SERVICES/PACS'
-        model_class = services.get_path_file_model_class(path)
-        self.assertEqual(model_class, PACSFile)
-
-        path = 'SERVICES'
-        model_class = services.get_path_file_model_class(path)
-        self.assertEqual(model_class, ServiceFile)
-
-        path = f'home/{username}/uploads'
-        model_class = services.get_path_file_model_class(path)
-        self.assertEqual(model_class, UserFile)
-
-        path = f'home/{username}/feeds'
-        model_class = services.get_path_file_model_class(path)
-        self.assertEqual(model_class, PluginInstanceFile)
-
-        path = 'SOR'
-        model_class = services.get_path_file_model_class(path)
-        self.assertIs(model_class, UserFile)
-
-    def test_get_path_file_queryset(self):
-        """
-        Test whether services.get_path_file_queryset function correctly returns the
-        queryset associated to a path or Raises ValueError if the path is not found.
-        """
-        username = self.username
         user = User.objects.get(username=self.username)
-        path = 'SOR'
-        with self.assertRaises(ValueError):
-            services.get_path_file_queryset(path, user)
+        path = f'home/{self.username}/uploads/lolo'
+        (folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=user)
+        file_type = services.get_folder_file_type(folder)
+        self.assertIs(file_type, None)
+        file_type = services.get_folder_file_type(self.folder)
+        self.assertEqual(file_type, 'user_files')
 
-        path = f'home/{username}/crazypath1234567890'
-        with self.assertRaises(ValueError):
-            services.get_path_file_queryset(path, user)
-
-        path = f'home/{username}'
-        qs = services.get_path_file_queryset(path, user)
-        self.assertTrue(qs.count() >= 0)
-
-    def test_get_path_folders(self):
+    def test_get_folder_file_serializer_class(self):
         """
-        Test whether services.get_path_folders function correctly returns a path's
-        list of folders.
+        Test whether the services.get_folder_file_serializer_class function gets the
+        correct file serializer class associated to a folder.
         """
-        username = self.username
         user = User.objects.get(username=self.username)
+        path = f'home/{self.username}/uploads/lolo'
+        (folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=user)
+        file_serializer_class = services.get_folder_file_serializer_class(folder)
+        self.assertIs(file_serializer_class, UserFileSerializer)
+        file_serializer_class = services.get_folder_file_serializer_class(self.folder)
+        self.assertEqual(file_serializer_class, UserFileSerializer)
 
-        path = f'home/{username}'
-        folders = services.get_path_folders(path, user)
-        self.assertIn('feeds', folders)
+    def test_get_folder_file_queryset(self):
+        """
+        Test whether the services.get_folder_file_queryset function gets the correct file
+        queryset associated to a path.
+        """
+        upload_path = f'{self.folder.path}/file1.txt'
+        qs = services.get_folder_file_queryset(self.folder)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().fname.name, upload_path)
 
-        path = 'SERVICES'
-        # create a service's files in the DB
-        service = Service(identifier='lolo')
-        service.save()
-        f1 = ServiceFile(service=service)
-        f1.fname.name = 'SERVICES/lolo/lele/a.txt'
-        f1.save()
-        f2 = ServiceFile(service=service)
-        f2.fname.name = 'SERVICES/lolo/b.txt'
-        f2.save()
-        f3 = ServiceFile(service=service)
-        f3.fname.name = 'SERVICES/lili/c.txt'
-        f3.save()
-        folders = services.get_path_folders(path, user)
-        self.assertEqual(sorted(folders), ['PACS', 'lili', 'lolo'])
+    def test_get_authenticated_user_folder_queryset_folder_does_not_exist(self):
+        """
+        Test whether the services.get_authenticated_user_folder_queryset function returns
+        an empty queryset for an authenticated user if a folder doesn't exist.
+        """
+        user = User.objects.get(username=self.username)
+        path = f'home/{self.username}/uploads/crazyfolder'
+        pk_dict = {'path': path}
+        qs = services.get_authenticated_user_folder_queryset(pk_dict, user)
+        self.assertEqual(qs.count(), 0)
+
+    def test_get_authenticated_user_folder_queryset_from_user_for_chris_user(self):
+        """
+        Test whether the services.get_authenticated_user_folder_queryset function
+        allows the chris user to see any existing folder.
+        """
+        chris_user = User.objects.get(username=self.chris_username)
+        path = f'home/{self.username}/uploads'
+        pk_dict = {'path': path}
+        qs = services.get_authenticated_user_folder_queryset(pk_dict, chris_user)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().path, pk_dict['path'])
+
+    def test_get_authenticated_user_folder_queryset_from_user_prevent_another_user(self):
+        """
+        Test whether the services.get_authenticated_user_folder_queryset function
+        doesn't allow a user to see other user's existing private folders.
+        """
+        another_user = User.objects.get(username=self.another_username)
+        path = f'home/{self.username}/uploads'
+        pk_dict = {'path': path}
+        qs = services.get_authenticated_user_folder_queryset(pk_dict, another_user)
+        self.assertEqual(qs.count(), 0)
+
+    def test_get_authenticated_user_folder_queryset_top_level_folders(self):
+        """
+        Test whether the services.get_authenticated_user_folder_queryset function
+        returns the appropriate queryset for top-level folders for any user.
+        """
+        chris_user = User.objects.get(username=self.chris_username)
+        ChrisFolder.objects.get_or_create(path='PIPELINES', owner=chris_user)
+        ChrisFolder.objects.get_or_create(path='SERVICES', owner=chris_user)
+
+        user = User.objects.get(username=self.username)
+        another_user = User.objects.get(username=self.another_username)
+
+        for path in ('', 'home', 'PIPELINES', 'SERVICES'):
+            pk_dict = {'path': path}
+            qs = services.get_authenticated_user_folder_queryset(pk_dict, user)
+            self.assertEqual(qs.count(), 1)
+            self.assertEqual(qs.first().path, pk_dict['path'])
+            qs = services.get_authenticated_user_folder_queryset(pk_dict, another_user)
+            self.assertEqual(qs.count(), 1)
+            self.assertEqual(qs.first().path, pk_dict['path'])
+
+    def test_get_authenticated_user_folder_queryset_user_space(self):
+        """
+        Test whether the services.get_authenticated_user_folder_queryset function
+        allows the chris user to see any existing folder.
+        """
+        user = User.objects.get(username=self.username)
+        path = f'home/{self.username}'
+        pk_dict = {'path': path}
+        qs = services.get_authenticated_user_folder_queryset(pk_dict, user)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs.first().path, pk_dict['path'])
+
