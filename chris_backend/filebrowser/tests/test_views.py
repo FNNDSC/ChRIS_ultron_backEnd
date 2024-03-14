@@ -804,6 +804,67 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_fileBrowserfile_list_success_shared_feed(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        file_path = f'{pl_inst.output_folder.path}/file3.txt'
+        with io.StringIO("test file") as file3:
+            self.storage_manager.upload_obj(file_path, file3.read(),
+                                         content_type='text/plain')
+
+        userfile = UserFile(owner=other_user, parent_folder=pl_inst.output_folder)
+        userfile.fname.name = file_path
+        userfile.save()
+
+        read_url = reverse("chrisfolder-file-list",
+                           kwargs={"pk": pl_inst.output_folder.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, file_path)
+
+        self.storage_manager.delete_obj(file_path)
+
+    def test_fileBrowserfile_list_failure_not_found_shared_feed_unauthenticated(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        file_path = f'{pl_inst.output_folder.path}/file3.txt'
+        with io.StringIO("test file") as file3:
+            self.storage_manager.upload_obj(file_path, file3.read(),
+                                         content_type='text/plain')
+
+        userfile = UserFile(owner=other_user, parent_folder=pl_inst.output_folder)
+        userfile.fname.name = file_path
+        userfile.save()
+
+        read_url = reverse("chrisfolder-file-list",
+                           kwargs={"pk": pl_inst.output_folder.id})
+
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.storage_manager.delete_obj(file_path)
+
+
 class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
     """
     Test the 'chrisfolder-linkfile-list' view.
@@ -811,6 +872,8 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserFolderLinkFileListViewTests, self).setUp()
+
+        self.storage_manager = connect_storage(settings)
 
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -839,7 +902,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
 
     def tearDown(self):
         super(FileBrowserFolderLinkFileListViewTests, self).tearDown()
-        self.storage_manager = connect_storage(settings)
         self.storage_manager.delete_obj(self.link_path)
 
     def test_filebrowserfolderlinkfile_list_success(self):
@@ -902,6 +964,59 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_fileBrowserlinkfile_list_success_shared_feed(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        read_url = reverse("chrisfolder-linkfile-list", kwargs={"pk": pl_inst.output_folder.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, link_path)
+
+        self.storage_manager.delete_obj(link_path)
+
+    def test_fileBrowserlinkfile_list_failure_not_found_shared_feed_unauthenticated(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        read_url = reverse("chrisfolder-linkfile-list", kwargs={"pk": pl_inst.output_folder.id})
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.storage_manager.delete_obj(link_path)
+
 class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
     """
     Test the chrislinkfile-detail view.
@@ -909,6 +1024,8 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserLinkFileDetailViewTests, self).setUp()
+
+        self.storage_manager = connect_storage(settings)
 
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -940,7 +1057,6 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
 
     def tearDown(self):
         super(FileBrowserLinkFileDetailViewTests, self).tearDown()
-        self.storage_manager = connect_storage(settings)
         self.storage_manager.delete_obj(self.link_path)
 
     def test_fileBrowserlinkfile_detail_success(self):
@@ -967,6 +1083,59 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, self.link_path)
 
+    def test_fileBrowserlinkfile_detail_success_shared_feed(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        read_url = reverse("chrislinkfile-detail", kwargs={"pk": link_file.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, link_path)
+
+        self.storage_manager.delete_obj(link_path)
+
+    def test_fileBrowserlinkfile_detail_failure_unauthorized_shared_feed_unauthenticated(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        read_url = reverse("chrislinkfile-detail", kwargs={"pk": link_file.id})
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.storage_manager.delete_obj(link_path)
+
 
 class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
     """
@@ -975,6 +1144,8 @@ class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserLinkFileResourceViewTests, self).setUp()
+
+        self.storage_manager = connect_storage(settings)
 
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -1007,7 +1178,6 @@ class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
 
     def tearDown(self):
         super(FileBrowserLinkFileResourceViewTests, self).tearDown()
-        self.storage_manager = connect_storage(settings)
         self.storage_manager.delete_obj(self.link_path)
 
     def test_fileBrowserlinkfile_resource_success(self):
@@ -1039,3 +1209,62 @@ class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
         self.assertEqual(response.status_code, 200)
         content = [c for c in response.streaming_content][0].decode('utf-8')
         self.assertEqual(content, 'SERVICES/PACS')
+
+    def test_fileBrowserlinkfile_resource_success_shared_feed(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        download_url = reverse("chrislinkfile-resource",
+                               kwargs={"pk": link_file.id}) + 'SERVICES_PACS.chrislink'
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, 200)
+        content = [c for c in response.streaming_content][0].decode('utf-8')
+        self.assertEqual(content, 'SERVICES/PACS')
+
+        self.storage_manager.delete_obj(link_path)
+
+    def test_fileBrowserlinkfile_resource_failure_unauthorized_shared_feed_unauthenticated(self):
+        other_user = User.objects.get(username=self.other_username)
+        plugin = self.plugin
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
+                                                title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = 'shared_feed'
+        pl_inst.feed.save()
+        pl_inst.feed.owner.add(User.objects.get(username=self.username))
+
+        # create link file in the output folder
+        link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
+
+        link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
+                                  parent_folder=pl_inst.output_folder)
+        link_file.save(name='SERVICES_PACS')
+
+        download_url = reverse("chrislinkfile-resource",
+                               kwargs={"pk": link_file.id}) + 'SERVICES_PACS.chrislink'
+
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.storage_manager.delete_obj(link_path)
