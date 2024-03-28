@@ -50,7 +50,7 @@ class UserSerializerTests(TestCase):
             self.assertNotEqual(user.password, self.password)
             self.assertTrue(user.check_password(self.password))
 
-            welcome_file_path = 'home/%s/welcome.txt' % self.username
+            welcome_file_path = f'home/{self.username}/uploads/welcome.txt'
             welcome_file = UserFile.objects.get(owner=user)
             self.assertEqual(welcome_file.fname.name, welcome_file_path)
             self.assertTrue(storage_manager.obj_exists(welcome_file_path))

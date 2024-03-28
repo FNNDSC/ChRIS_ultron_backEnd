@@ -41,21 +41,24 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         user = User.objects.create_user(username, email, password)
 
         home_path = f'home/{username}'
-        (home_folder, _) = ChrisFolder.objects.get_or_create(path=home_path, owner=user)
-        (feeds_folder, _) = ChrisFolder.objects.get_or_create(path=f'{home_path}/feeds',
-                                                              owner=user)
+        uploads_path = f'{home_path}/uploads'
+        feeds_path = f'{home_path}/feeds'
+
+        (uploads_folder, _) = ChrisFolder.objects.get_or_create(path=uploads_path,
+                                                                owner=user)
+        (feeds_folder, _) = ChrisFolder.objects.get_or_create(path=feeds_path, owner=user)
+
         storage_manager = connect_storage(settings)
-        welcome_file_path = f'{home_path}/welcome.txt'
+        welcome_file_path = f'{uploads_path}/welcome.txt'
         try:
             with io.StringIO('Welcome to ChRIS!') as f:
                 storage_manager.upload_obj(welcome_file_path, f.read(),
                                            content_type='text/plain')
-            welcome_file = UserFile(parent_folder=home_folder, owner=user)
+            welcome_file = UserFile(parent_folder=uploads_folder, owner=user)
             welcome_file.fname.name = welcome_file_path
             welcome_file.save()
         except Exception as e:
-            logger.error('Could not create welcome file in user space, detail: %s' %
-                         str(e))
+            logger.error(f'Could not create welcome file in user space, detail: {str(e)}')
         return user
 
     def validate_username(self, username):

@@ -4,6 +4,8 @@ from django.db import models
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from userfiles.models import UserFile
+
 
 class Feed(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
@@ -79,9 +81,24 @@ class FeedFilter(FilterSet):
         # of query strings
         value_l = value.split()
         qs_l = []
-        for val in value_l:
-            qs_l.append(queryset.filter(plugin_instances__files__fname__icontains=val))
-        return queryset.intersection(*qs_l)
+
+        for feed in queryset:
+            qs = UserFile.objects.filter(fname__contains=f'/feeds/feed_{feed.id}/')
+            for val in value_l:
+                qs = qs.filter(fname__icontains=val)
+            qs_l.append(qs)
+
+        files_qs = UserFile.objects.none().union(*qs_l)
+
+        feed_ids = set()
+        for f in files_qs:
+            path = f.fname.name
+            path_tokens = path.split('/', 4)
+            if path_tokens[2] == 'feeds':
+                feed_id = int(path_tokens[3].split('_')[1])
+                feed_ids.add(feed_id)
+
+        return queryset.filter(pk__in=list(feed_ids))
 
 
 class Note(models.Model):
