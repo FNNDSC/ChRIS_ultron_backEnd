@@ -60,7 +60,7 @@ class UserCreateViewTests(UserViewTests):
             self.assertEqual(response.data["username"], self.username)
             self.assertEqual(response.data["email"], self.email)
 
-            welcome_file_path = 'home/%s/welcome.txt' % self.username
+            welcome_file_path = f'home/{self.username}/uploads/welcome.txt'
             self.assertTrue(storage_manager.obj_exists(welcome_file_path))
 
     @tag('integration')
@@ -72,7 +72,7 @@ class UserCreateViewTests(UserViewTests):
         self.assertEqual(response.data["email"], self.email)
 
         user = User.objects.get(username=self.username)
-        welcome_file_path = 'home/%s/welcome.txt' % self.username
+        welcome_file_path = f'home/{self.username}/uploads/welcome.txt'
         welcome_file = UserFile.objects.get(owner=user)
         self.assertEqual(welcome_file.fname.name, welcome_file_path)
 

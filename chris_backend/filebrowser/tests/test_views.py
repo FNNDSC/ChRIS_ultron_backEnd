@@ -934,6 +934,8 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
         self.assertContains(response, 'file_resource')
         self.assertContains(response, link_path)
 
+        self.storage_manager.delete_obj(link_path)
+
     def test_filebrowserfolderlinkfile_list_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

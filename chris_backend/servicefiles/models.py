@@ -51,13 +51,11 @@ class ServiceFileFilter(FilterSet):
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
     fname_nslashes = django_filters.CharFilter(method='filter_by_n_slashes')
-    service_identifier = django_filters.CharFilter(field_name='service__identifier',
-                                                   lookup_expr='exact')
 
     class Meta:
         model = ServiceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'fname_nslashes', 'service_identifier']
+                  'fname_icontains', 'fname_nslashes']
 
     def filter_by_n_slashes(self, queryset, name, value):
         """
