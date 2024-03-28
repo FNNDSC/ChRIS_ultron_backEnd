@@ -92,6 +92,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     creator_username = serializers.SerializerMethodField()
+    folder_path = serializers.ReadOnlyField(source='folder.path')
     created_jobs = serializers.SerializerMethodField()
     waiting_jobs = serializers.SerializerMethodField()
     scheduled_jobs = serializers.SerializerMethodField()
@@ -100,6 +101,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     finished_jobs = serializers.SerializerMethodField()
     errored_jobs = serializers.SerializerMethodField()
     cancelled_jobs = serializers.SerializerMethodField()
+    folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                 read_only=True)
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
     tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
     taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
@@ -112,10 +115,10 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'public',
-                  'creator_username', 'created_jobs', 'waiting_jobs', 'scheduled_jobs',
-                  'started_jobs', 'registering_jobs', 'finished_jobs', 'errored_jobs',
-                  'cancelled_jobs', 'owner', 'note', 'tags', 'taggings', 'comments',
-                  'plugin_instances')
+                  'creator_username', 'folder_path', 'created_jobs', 'waiting_jobs',
+                  'scheduled_jobs', 'started_jobs', 'registering_jobs',
+                  'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'folder', 'note',
+                  'tags', 'taggings', 'comments', 'plugin_instances', 'owner')
 
     def validate_name(self, name):
         """

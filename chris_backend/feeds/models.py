@@ -1,9 +1,12 @@
 
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 import django_filters
 from django_filters.rest_framework import FilterSet
 
+from core.models import ChrisFolder
 from userfiles.models import UserFile
 
 
@@ -12,6 +15,8 @@ class Feed(models.Model):
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=200, blank=True, db_index=True)
     public = models.BooleanField(blank=True, default=False, db_index=True)
+    folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE, null=True,
+                                  related_name='feed')
     owner = models.ManyToManyField('auth.User', related_name='feed')
 
     class Meta:
@@ -51,6 +56,11 @@ class Feed(models.Model):
         return self.plugin_instances.filter(status=status).count()
 
 
+@receiver(post_delete, sender=Feed)
+def auto_delete_folder_with_feed(sender, instance, **kwargs):
+    instance.folder.delete()
+
+
 class FeedFilter(FilterSet):
     min_id = django_filters.NumberFilter(field_name="id", lookup_expr='gte')
     max_id = django_filters.NumberFilter(field_name="id", lookup_expr='lte')
@@ -83,7 +93,7 @@ class FeedFilter(FilterSet):
         qs_l = []
 
         for feed in queryset:
-            qs = UserFile.objects.filter(fname__contains=f'/feeds/feed_{feed.id}/')
+            qs = UserFile.objects.filter(fname__startswith=feed.folder.path)
             for val in value_l:
                 qs = qs.filter(fname__icontains=val)
             qs_l.append(qs)
@@ -94,9 +104,8 @@ class FeedFilter(FilterSet):
         for f in files_qs:
             path = f.fname.name
             path_tokens = path.split('/', 4)
-            if path_tokens[2] == 'feeds':
-                feed_id = int(path_tokens[3].split('_')[1])
-                feed_ids.add(feed_id)
+            feed_id = int(path_tokens[3].split('_')[1])
+            feed_ids.add(feed_id)
 
         return queryset.filter(pk__in=list(feed_ids))
 
