@@ -2,9 +2,11 @@
 from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
+from core.views import TokenAuthSupportQueryString
 
 from .models import ServiceFile, ServiceFileFilter
 from .serializers import ServiceFileSerializer
@@ -76,6 +78,8 @@ class ServiceFileResource(generics.GenericAPIView):
     queryset = ServiceFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
+    authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
+                              SessionAuthentication)
 
     def get(self, request, *args, **kwargs):
         """

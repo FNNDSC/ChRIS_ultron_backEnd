@@ -1,16 +1,23 @@
 
+import logging
 import uuid
 import io
 import os
 
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.conf import settings
 from django.contrib.auth.models import User
+
 import django_filters
 from django_filters.rest_framework import FilterSet
 
 from .storage import connect_storage
 #from django.core.files.base import ContentFile
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChrisInstance(models.Model):
@@ -132,3 +139,14 @@ class ChrisLinkFile(models.Model):
                                        content_type='text/plain')
         self.fname.name = link_file_path
         super(ChrisLinkFile, self).save(*args, **kwargs)
+
+
+@receiver(post_delete, sender=ChrisLinkFile)
+def auto_delete_file_from_storage(sender, instance, **kwargs):
+    storage_path = instance.fname.name
+    storage_manager = connect_storage(settings)
+    try:
+        if storage_manager.obj_exists(storage_path):
+            storage_manager.delete_obj(storage_path)
+    except Exception as e:
+        logger.error('Storage error, detail: %s' % str(e))

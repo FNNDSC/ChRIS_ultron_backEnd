@@ -1,10 +1,20 @@
 
+import logging
+
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+from django.conf import settings
+
 import django_filters
 from django_filters.rest_framework import FilterSet
 
 from core.models import ChrisFolder
 from core.utils import filter_files_by_n_slashes
+from core.storage import connect_storage
+
+
+logger = logging.getLogger(__name__)
 
 
 class UserFile(models.Model):
@@ -19,6 +29,17 @@ class UserFile(models.Model):
 
     def __str__(self):
         return self.fname.name
+
+
+@receiver(post_delete, sender=UserFile)
+def auto_delete_file_from_storage(sender, instance, **kwargs):
+    storage_path = instance.fname.name
+    storage_manager = connect_storage(settings)
+    try:
+        if storage_manager.obj_exists(storage_path):
+            storage_manager.delete_obj(storage_path)
+    except Exception as e:
+        logger.error('Storage error, detail: %s' % str(e))
 
 
 class UserFileFilter(FilterSet):
