@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 
-from .models import ChrisInstance, ChrisFolder
+from .models import ChrisInstance, ChrisFolder, FileDownloadToken
 
 
 class ChrisInstanceSerializer(serializers.HyperlinkedModelSerializer):
@@ -50,4 +50,15 @@ class ChrisFolderSerializer(serializers.HyperlinkedModelSerializer):
         if not path.startswith(prefix):
             error_msg = f"Invalid file path. Path must start with '{prefix}'."
             raise serializers.ValidationError([error_msg])
+
         return path
+
+
+class FileDownloadTokenSerializer(serializers.HyperlinkedModelSerializer):
+    token = serializers.CharField(required=False)
+    owner_username = serializers.ReadOnlyField(source='owner.username')
+    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
+
+    class Meta:
+        model = FileDownloadToken
+        fields = ('url', 'id', 'creation_date', 'token', 'owner_username', 'owner')

@@ -4,9 +4,11 @@ import logging
 from django.http import Http404, FileResponse
 from rest_framework import generics
 from rest_framework.reverse import reverse
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 
 from core.models import ChrisFolder, ChrisLinkFile
 from core.renderers import BinaryFileRenderer
+from core.views import TokenAuthSupportQueryString
 from collectionjson import services
 
 from .serializers import FileBrowserFolderSerializer, FileBrowserChrisLinkFileSerializer
@@ -15,7 +17,8 @@ from .services import (get_folder_file_queryset, get_folder_file_serializer_clas
                        get_unauthenticated_user_folder_queryset,
                        get_authenticated_user_folder_children,
                        get_unauthenticated_user_folder_children)
-from .permissions import IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly
+from .permissions import (IsOwnerOrChrisOrReadOnly,
+                          IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly)
 
 
 logger = logging.getLogger(__name__)
@@ -73,13 +76,14 @@ class FileBrowserFolderListQuerySearch(generics.ListAPIView):
         return get_unauthenticated_user_folder_queryset(pk_dict)
 
 
-class FileBrowserFolderDetail(generics.RetrieveAPIView):
+class FileBrowserFolderDetail(generics.RetrieveDestroyAPIView):
     """
     A ChRIS folder view.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'delete']
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderSerializer
+    permission_classes = (IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -238,6 +242,8 @@ class FileBrowserLinkFileResource(generics.GenericAPIView):
     queryset = ChrisLinkFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
+                              SessionAuthentication)
 
     def get(self, request, *args, **kwargs):
         """

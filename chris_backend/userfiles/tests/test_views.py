@@ -8,11 +8,13 @@ from unittest import mock
 from django.test import TestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django.urls import reverse
 
 from rest_framework import status
+import jwt
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, FileDownloadToken
 from core.storage.helpers import connect_storage, mock_storage
 from userfiles.models import UserFile
 from userfiles import views
@@ -153,7 +155,7 @@ class UserFileDetailViewTests(UserFileViewTests):
         storage_manager_mock = mock.Mock()
         storage_manager_mock.delete_obj = mock.Mock()
 
-        with mock.patch('userfiles.views.connect_storage') as connect_storage_mock:
+        with mock.patch('userfiles.models.connect_storage') as connect_storage_mock:
             connect_storage_mock.return_value=storage_manager_mock
             response = self.client.delete(self.read_update_delete_url)
             self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -197,6 +199,18 @@ class UserFileResourceViewTests(UserFileViewTests):
     def test_integration_userfileresource_download_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.download_url)
+        self.assertEqual(response.status_code, 200)
+        content = [c for c in response.streaming_content][0].decode('utf-8')
+        self.assertEqual(content, "test file")
+
+    @tag('integration')
+    def test_integration_userfileresource_download_with_token_success(self):
+        user = User.objects.get(username=self.chris_username)
+        dt = timezone.now() + timezone.timedelta(minutes=10)
+        token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
+                           algorithm='HS256')
+        FileDownloadToken.objects.get_or_create(token=token, owner=user)
+        response = self.client.get(f'{self.download_url}?download_token={token}')
         self.assertEqual(response.status_code, 200)
         content = [c for c in response.streaming_content][0].decode('utf-8')
         self.assertEqual(content, "test file")

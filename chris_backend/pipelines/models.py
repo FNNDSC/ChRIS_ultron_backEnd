@@ -1,14 +1,22 @@
 
+import logging
 from collections import deque
 
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
 import django_filters
 from django_filters.rest_framework import FilterSet
 
 from core.models import ChrisFolder
+from core.storage import connect_storage
 from plugins.models import Plugin, PluginParameter
+
+
+logger = logging.getLogger(__name__)
 
 
 PIPELINE_SOURCE_FILE_TYPE_CHOICES = [('yaml', 'YAML file'), ('json', 'JSON file')]
@@ -222,6 +230,17 @@ class PipelineSourceFile(models.Model):
 
     def __str__(self):
         return self.fname.name
+
+
+@receiver(post_delete, sender=PipelineSourceFile)
+def auto_delete_file_from_storage(sender, instance, **kwargs):
+    storage_path = instance.fname.name
+    storage_manager = connect_storage(settings)
+    try:
+        if storage_manager.obj_exists(storage_path):
+            storage_manager.delete_obj(storage_path)
+    except Exception as e:
+        logger.error('Storage error, detail: %s' % str(e))
 
 
 class PipelineSourceFileFilter(FilterSet):

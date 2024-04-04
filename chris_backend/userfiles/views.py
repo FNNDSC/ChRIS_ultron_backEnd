@@ -1,21 +1,16 @@
 
-import logging
-
-from django.conf import settings
 from django.http import FileResponse
+
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
-from core.storage import connect_storage
-
+from core.views import TokenAuthSupportQueryString
 from .models import UserFile, UserFileFilter
 from .serializers import UserFileSerializer
 from .permissions import IsOwnerOrChris, IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly
-
-
-logger = logging.getLogger(__name__)
 
 
 class UserFileList(generics.ListCreateAPIView):
@@ -94,18 +89,6 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         request.data['fname'] = user_file.fname.file  # fname required in the serializer
         return super(UserFileDetail, self).update(request, *args, **kwargs)
 
-    def perform_destroy(self, instance):
-        """
-        Overriden to delete the file from storage.
-        """
-        storage_path = instance.fname.name
-        instance.delete()
-        storage_manager = connect_storage(settings)
-        try:
-            storage_manager.delete_obj(storage_path)
-        except Exception as e:
-            logger.error('Storage error, detail: %s' % str(e))
-
 
 class UserFileResource(generics.GenericAPIView):
     """
@@ -115,6 +98,8 @@ class UserFileResource(generics.GenericAPIView):
     queryset = UserFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
+                              SessionAuthentication)
 
     def get(self, request, *args, **kwargs):
         """
