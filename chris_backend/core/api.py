@@ -31,6 +31,19 @@ urlpatterns = format_suffix_patterns([
         user_views.UserDetail.as_view(), name='user-detail'),
 
 
+    path('v1/downloadtokens/',
+         core_views.FileDownloadTokenList.as_view(),
+         name='filedownloadtoken-list'),
+
+    path('v1/downloadtokens/search/',
+         core_views.FileDownloadTokenListQuerySearch.as_view(),
+         name='filedownloadtoken-list-query-search'),
+
+    path('v1/downloadtokens/<int:pk>/',
+         core_views.FileDownloadTokenDetail.as_view(),
+         name='filedownloadtoken-detail'),
+
+
     path('v1/chrisinstance/<int:pk>/',
          core_views.ChrisInstanceDetail.as_view(), name='chrisinstance-detail'),
 

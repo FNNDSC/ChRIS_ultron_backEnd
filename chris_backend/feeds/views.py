@@ -316,8 +316,11 @@ class FeedList(generics.ListAPIView):
                  'filebrowser': reverse('chrisfolder-list', request=request)}
 
         user = self.request.user
+
         if user.is_authenticated:
+            links['download_tokens'] = reverse('filedownloadtoken-list', request=request)
             links['user'] = reverse('user-detail', request=request, kwargs={"pk": user.id})
+
             if user.is_staff:
                 links['admin'] = reverse('admin-plugin-list', request=request)
         return services.append_collection_links(response, links)

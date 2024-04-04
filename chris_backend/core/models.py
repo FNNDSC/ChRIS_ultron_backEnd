@@ -150,3 +150,22 @@ def auto_delete_file_from_storage(sender, instance, **kwargs):
             storage_manager.delete_obj(storage_path)
     except Exception as e:
         logger.error('Storage error, detail: %s' % str(e))
+
+
+class FileDownloadToken(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    token = models.CharField(max_length=300, db_index=True)
+
+    class Meta:
+        ordering = ('owner', 'creation_date')
+
+    def __str__(self):
+        return str(self.token)
+
+
+class FileDownloadTokenFilter(FilterSet):
+
+    class Meta:
+        model = FileDownloadToken
+        fields = ['id']
