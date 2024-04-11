@@ -26,7 +26,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to set the file's saving path and parent folder.
+        Overriden to set the parent folder.
         """
         path = validated_data.get('path')
         parent_path = os.path.dirname(path)
@@ -48,14 +48,21 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         prefix = f'home/{user.username}/'
 
         if path.startswith(prefix + 'feeds/'):
-            error_msg = f"Invalid file path. Creating folders with a path under the " \
+            error_msg = f"Invalid field value. Creating folders with a path under the " \
                         f"feed's directory '{prefix + 'feeds/'}' is not allowed."
             raise serializers.ValidationError([error_msg])
 
         if not path.startswith(prefix):
-            error_msg = f"Invalid file path. Path must start with '{prefix}'."
+            error_msg = f"Invalid field value. Path must start with '{prefix}'."
             raise serializers.ValidationError([error_msg])
 
+        try:
+            ChrisFolder.objects.get(path=path)
+        except ChrisFolder.DoesNotExist:
+            pass
+        else:
+            error_msg = f"Folder with path '{path}' already exists."
+            raise serializers.ValidationError([error_msg])
         return path
 
 
