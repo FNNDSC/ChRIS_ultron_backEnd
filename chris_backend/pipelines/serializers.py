@@ -1,4 +1,5 @@
 
+import os
 import json
 from collections import deque
 
@@ -11,12 +12,13 @@ from rest_framework.reverse import reverse
 
 from core.graph import Graph
 from core.utils import get_file_resource_link
+from core.models import ChrisFolder
 from collectionjson.fields import ItemLinkField
 from plugins.models import Plugin, TYPES
 from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 
-from .models import Pipeline, PipelineSourceFile, PluginPiping
+from .models import Pipeline, PluginPiping, PipelineSourceFile, PipelineSourceFileMeta
 from .models import DefaultPipingFloatParameter, DefaultPipingIntParameter
 from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
 
@@ -50,19 +52,16 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         view_name='pipeline-pluginpiping-list')
     default_parameters = serializers.HyperlinkedIdentityField(
         view_name='pipeline-defaultparameter-list')
-    instances = serializers.HyperlinkedIdentityField(view_name='pipelineinstance-list')
     workflows = serializers.HyperlinkedIdentityField(view_name='workflow-list')
     json_repr = serializers.HyperlinkedIdentityField(
         view_name='pipeline-customjson-detail')
-    source_file = serializers.HyperlinkedRelatedField(
-        view_name='pipelinesourcefile-detail', read_only=True)
 
     class Meta:
         model = Pipeline
         fields = ('url', 'id', 'name', 'locked', 'authors', 'category', 'description',
                   'plugin_tree', 'plugin_inst_id', 'owner_username', 'creation_date',
                   'modification_date', 'plugins', 'plugin_pipings', 'default_parameters',
-                  'instances', 'workflows', 'json_repr', 'source_file')
+                  'workflows', 'json_repr')
 
     def create(self, validated_data):
         """
@@ -486,22 +485,22 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
 class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
-    uploader_username = serializers.ReadOnlyField(source='uploader.username')
+    ftype = serializers.ReadOnlyField(source='meta.type')
+    type = serializers.CharField(write_only=True, required=False)
+    uploader_username = serializers.ReadOnlyField(source='meta.uploader.username')
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    pipeline_id = serializers.ReadOnlyField(source='pipeline.id')
+    pipeline_id = serializers.ReadOnlyField(source='meta.pipeline.id')
+    pipeline_name = serializers.ReadOnlyField(source='meta.pipeline.name')
     file_resource = ItemLinkField('get_file_link')
-    pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
-                                                   read_only=True)
     parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                         read_only=True)
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = PipelineSourceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'type', 'file_resource',
-                  'uploader_username', 'owner_username', 'pipeline_id', 'pipeline',
-                  'parent_folder',
-                  'owner')
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'type',
+                  'ftype', 'uploader_username', 'owner_username', 'pipeline_id',
+                  'pipeline_name', 'file_resource', 'parent_folder', 'owner')
 
     def get_file_link(self, obj):
         """
@@ -511,14 +510,36 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to create the pipeline from the source file data.
+        Overriden to create the pipeline from the source file data, set the file's saving
+        path, parent folder and meta info.
         """
-        pipeline_repr = validated_data.get('pipeline')
+        owner = validated_data.get('owner')
+        uploader = validated_data.pop('uploader')
+        type = validated_data.pop('type', 'yaml')
+
+        # create pipeline
+        pipeline_repr = validated_data.pop('pipeline')
         pipeline_serializer = PipelineSerializer(data=pipeline_repr)
         pipeline_serializer.is_valid(raise_exception=True)
-        pipeline = pipeline_serializer.save(owner=validated_data['owner'])
-        validated_data['pipeline'] = pipeline
-        return super(PipelineSourceFileSerializer, self).create(validated_data)
+        pipeline = pipeline_serializer.save(owner=owner)
+
+        # file will be stored to Swift at:
+        # SWIFT_CONTAINER_NAME/PIPELINES/<uploader_username>/<filename>
+        folder_path = f'PIPELINES/{uploader.username}'
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                               owner=owner)
+        fname = validated_data['fname']
+        filename = os.path.basename(fname.name)
+        validated_data['parent_folder'] = parent_folder
+        source_file = PipelineSourceFile(**validated_data)
+        source_file.fname.name = f'{folder_path}/{filename}'
+        source_file.save()
+
+        # create file's meta info
+        PipelineSourceFileMeta.objects.get_or_create(type=type, pipeline=pipeline,
+                                                     source_file=source_file,
+                                                     uploader=uploader)
+        return source_file
 
     def validate(self, data):
         """

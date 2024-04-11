@@ -7,7 +7,6 @@ from django.contrib.auth.models import User
 
 from core.models import ChrisFolder
 from userfiles.models import UserFile
-from userfiles.serializers import UserFileSerializer
 from filebrowser import services
 
 
@@ -48,43 +47,6 @@ class ServiceTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
-
-
-    def test_get_folder_file_type(self):
-        """
-        Test whether the services.get_folder_file_type function gets the correct file
-        type associated to a folder.
-        """
-        user = User.objects.get(username=self.username)
-        path = f'home/{self.username}/uploads/lolo'
-        (folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=user)
-        file_type = services.get_folder_file_type(folder)
-        self.assertIs(file_type, None)
-        file_type = services.get_folder_file_type(self.folder)
-        self.assertEqual(file_type, 'user_files')
-
-    def test_get_folder_file_serializer_class(self):
-        """
-        Test whether the services.get_folder_file_serializer_class function gets the
-        correct file serializer class associated to a folder.
-        """
-        user = User.objects.get(username=self.username)
-        path = f'home/{self.username}/uploads/lolo'
-        (folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=user)
-        file_serializer_class = services.get_folder_file_serializer_class(folder)
-        self.assertIs(file_serializer_class, UserFileSerializer)
-        file_serializer_class = services.get_folder_file_serializer_class(self.folder)
-        self.assertEqual(file_serializer_class, UserFileSerializer)
-
-    def test_get_folder_file_queryset(self):
-        """
-        Test whether the services.get_folder_file_queryset function gets the correct file
-        queryset associated to a path.
-        """
-        upload_path = f'{self.folder.path}/file1.txt'
-        qs = services.get_folder_file_queryset(self.folder)
-        self.assertEqual(qs.count(), 1)
-        self.assertEqual(qs.first().fname.name, upload_path)
 
     def test_get_authenticated_user_folder_queryset_folder_does_not_exist(self):
         """

@@ -2,18 +2,18 @@
 import logging
 
 from django.http import Http404, FileResponse
-from rest_framework import generics
+from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 
-from core.models import ChrisFolder, ChrisLinkFile
+from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
 from core.renderers import BinaryFileRenderer
 from core.views import TokenAuthSupportQueryString
 from collectionjson import services
 
-from .serializers import FileBrowserFolderSerializer, FileBrowserChrisLinkFileSerializer
-from .services import (get_folder_file_queryset, get_folder_file_serializer_class,
-                       get_authenticated_user_folder_queryset,
+from .serializers import (FileBrowserFolderSerializer, FileBrowserChrisFileSerializer,
+                          FileBrowserChrisLinkFileSerializer)
+from .services import (get_authenticated_user_folder_queryset,
                        get_unauthenticated_user_folder_queryset,
                        get_authenticated_user_folder_children,
                        get_unauthenticated_user_folder_children)
@@ -24,17 +24,24 @@ from .permissions import (IsOwnerOrChrisOrReadOnly,
 logger = logging.getLogger(__name__)
 
 
-class FileBrowserFolderList(generics.ListAPIView):
+class FileBrowserFolderList(generics.ListCreateAPIView):
     """
     A view for the initial page of the collection of file browser folders. The returned
     collection only has a single element.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'post']
     serializer_class = FileBrowserFolderSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate an owner with the folder before first saving to the DB.
+        """
+        serializer.save(owner=self.request.user)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append a query list to the response.
+        Overriden to append a query list and a collection+json template to the response.
         """
         response = super(FileBrowserFolderList, self).list(request, *args, **kwargs)
         # append query list
@@ -42,7 +49,10 @@ class FileBrowserFolderList(generics.ListAPIView):
         data = [{'name': 'id', 'value': ''}, {'name': 'path', 'value': ''}]
         queries = [{'href': query_url, 'rel': 'search', 'data': data}]
         response.data['queries'] = queries
-        return response
+
+        # append write template
+        template_data = {'path': ''}
+        return services.append_collection_template(response, template_data)
 
     def get_queryset(self):
         """
@@ -149,6 +159,7 @@ class FileBrowserFolderFileList(generics.ListAPIView):
     """
     http_method_names = ['get']
     queryset = ChrisFolder.objects.all()
+    serializer_class = FileBrowserChrisFileSerializer
 
     def list(self, request, *args, **kwargs):
         """
@@ -175,16 +186,36 @@ class FileBrowserFolderFileList(generics.ListAPIView):
         Custom method to get a queryset with all the files directly under this folder.
         """
         folder = self.get_object()
-        return get_folder_file_queryset(folder)
+        return folder.chris_files.all()
 
-    def get_serializer_class(self):
+
+class FileBrowserFileDetail(generics.RetrieveAPIView):
+    """
+    A ChRIS file view.
+    """
+    http_method_names = ['get']
+    queryset = ChrisFile.get_base_queryset()
+    serializer_class = FileBrowserChrisFileSerializer
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+
+
+class FileBrowserFileResource(generics.GenericAPIView):
+    """
+    A view to enable downloading of a file resource.
+    """
+    http_method_names = ['get']
+    queryset = ChrisFile.get_base_queryset()
+    renderer_classes = (BinaryFileRenderer,)
+    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
+                              SessionAuthentication)
+
+    def get(self, request, *args, **kwargs):
         """
-        Overriden to return the serializer class that should be used for serializing
-        output.
+        Overriden to be able to make a GET request to an actual file resource.
         """
-        folder = self.get_object()
-        serializer_class = get_folder_file_serializer_class(folder)
-        return serializer_class
+        chris_file = self.get_object()
+        return FileResponse(chris_file.fname)
 
 
 class FileBrowserFolderLinkFileList(generics.ListAPIView):
@@ -226,7 +257,7 @@ class FileBrowserFolderLinkFileList(generics.ListAPIView):
 
 class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
     """
-    A ChRIS link view.
+    A ChRIS link file view.
     """
     http_method_names = ['get']
     queryset = ChrisLinkFile.objects.all()

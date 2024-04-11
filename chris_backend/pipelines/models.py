@@ -11,7 +11,7 @@ from django.core.exceptions import ObjectDoesNotExist
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, ChrisFile
 from core.storage import connect_storage
 from plugins.models import Plugin, PluginParameter
 
@@ -201,36 +201,19 @@ class PipelineFilter(FilterSet):
                   'authors', 'min_creation_date', 'max_creation_date']
 
 
-
-def source_file_path(instance, filename):
-    # file will be stored to Swift at:
-    # SWIFT_CONTAINER_NAME/PIPELINES/<uploader_username>/<filename>
-    parent_folder_path = f'PIPELINES/{instance.uploader.username}'
-    (parent_folder, _) = ChrisFolder.objects.get_or_create(path=parent_folder_path,
-                                                      owner=instance.owner)
-    instance.parent_folder = parent_folder
-    return f'{parent_folder_path}/{filename}'
-
-
-class PipelineSourceFile(models.Model):
-    creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=512, upload_to=source_file_path, unique=True)
-    type = models.CharField(choices=PIPELINE_SOURCE_FILE_TYPE_CHOICES, default='yaml',
-                            max_length=8, blank=True)
-    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
-                                      related_name='pipeline_source_files')
-    pipeline = models.OneToOneField(Pipeline, on_delete=models.CASCADE,
-                                    related_name='source_file')
-    uploader = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL,
-                                 related_name='uploaded_pipeline_source_files')
-    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+class PipelineSourceFile(ChrisFile):
 
     class Meta:
         ordering = ('-fname',)
+        proxy = True
 
-    def __str__(self):
-        return self.fname.name
-
+    @classmethod
+    def get_base_queryset(cls):
+        """
+        Custom method to return a queryset that is only comprised by the files
+        in the PIPELINES space tree.
+        """
+        return cls.objects.filter(fname__startswith='PIPELINES/')
 
 @receiver(post_delete, sender=PipelineSourceFile)
 def auto_delete_file_from_storage(sender, instance, **kwargs):
@@ -252,13 +235,35 @@ class PipelineSourceFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
-    uploader_username = django_filters.CharFilter(field_name='uploader__username',
-                                               lookup_expr='exact')
+    uploader_username = django_filters.CharFilter(field_name='meta__uploader__username',
+                                                  lookup_expr='exact')
 
     class Meta:
         model = PipelineSourceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'type', 'uploader_username']
+                  'fname_icontains', 'uploader_username']
+
+
+class PipelineSourceFileMeta(models.Model):
+    type = models.CharField(choices=PIPELINE_SOURCE_FILE_TYPE_CHOICES, default='yaml',
+                            max_length=8, blank=True)
+    pipeline = models.OneToOneField(Pipeline, on_delete=models.CASCADE,
+                                    related_name='source_file_meta')
+    source_file = models.OneToOneField(PipelineSourceFile, on_delete=models.CASCADE,
+                                    related_name='meta')
+    uploader = models.ForeignKey('auth.User', null=True, on_delete=models.SET_NULL,
+                                 related_name='uploaded_pipeline_source_file_metas')
+
+    class Meta:
+        ordering = ('uploader',)
+
+    def __str__(self):
+        return self.id
+
+
+@receiver(post_delete, sender=PipelineSourceFileMeta)
+def auto_delete_source_file_with_meta(sender, instance, **kwargs):
+    instance.source_file.delete()
 
 
 class PluginPiping(models.Model):

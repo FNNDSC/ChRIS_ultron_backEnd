@@ -1,7 +1,6 @@
 
 import logging
 
-from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.conf import settings
@@ -9,7 +8,7 @@ from django.conf import settings
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, ChrisFile
 from core.utils import filter_files_by_n_slashes
 from core.storage import connect_storage
 
@@ -17,18 +16,19 @@ from core.storage import connect_storage
 logger = logging.getLogger(__name__)
 
 
-class UserFile(models.Model):
-    creation_date = models.DateTimeField(auto_now_add=True)
-    fname = models.FileField(max_length=1024, unique=True)
-    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
-                                      related_name='user_files')
-    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+class UserFile(ChrisFile):
 
     class Meta:
         ordering = ('-fname',)
+        proxy = True
 
-    def __str__(self):
-        return self.fname.name
+    @classmethod
+    def get_base_queryset(cls):
+        """
+        Custom method to return a queryset that is only comprised by the files
+        in the user space tree.
+        """
+        return cls.objects.filter(fname__startswith='home/')
 
 
 @receiver(post_delete, sender=UserFile)
