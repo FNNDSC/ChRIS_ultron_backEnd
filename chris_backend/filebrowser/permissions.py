@@ -32,6 +32,9 @@ class IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly(permissions.BasePermissio
         path = obj.fname.name
         path_tokens = path.split('/', 4)
 
+        if  path_tokens[0] == 'PIPELINES':  # accessible to everybody
+            return True
+
         if not user.is_authenticated:
             if (len(path_tokens) > 3 and path_tokens[0] == 'home' and path_tokens[2] ==
                     'feeds'):
@@ -39,6 +42,9 @@ class IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly(permissions.BasePermissio
                 feed = Feed.objects.get(id=feed_id)
                 return request.method in permissions.SAFE_METHODS and feed.public
             return False
+
+        if  path_tokens[0] == 'SERVICES':  # accessible to all authenticated users
+            return True
 
         if request.user.username == 'chris' or obj.owner == request.user:
             return True

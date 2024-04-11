@@ -36,10 +36,8 @@ INSTALLED_APPS = [
     'plugins',
     'plugininstances',
     'pipelines',
-    'pipelineinstances',
     'userfiles',
     'pacsfiles',
-    'servicefiles',
     'filebrowser',
     'users',
     'workflows'

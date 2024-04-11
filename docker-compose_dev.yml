@@ -11,7 +11,7 @@
 # Docker needs :z volume mount options to provide a context label.
 # See man docker-run
 
-version: '3.9'
+#version: '3.9'
 
 services:
   chrisomatic:

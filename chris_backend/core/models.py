@@ -92,13 +92,8 @@ class ChrisFolder(models.Model):
         Custom method to return all the folders that are a descendant of this
         folder.
         """
-        descendants = []
-        queue = [self]
-        while len(queue) > 0:
-            visited = queue.pop()
-            queue.extend(list(visited.children.all()))
-            descendants.append(visited)
-        return descendants
+        path = self.path.rstrip('/') + '/'
+        return list(ChrisFolder.objects.filter(path__startswith=path))
 
 
 class ChrisFolderFilter(FilterSet):
@@ -107,6 +102,38 @@ class ChrisFolderFilter(FilterSet):
     class Meta:
         model = ChrisFolder
         fields = ['id', 'path']
+
+
+class ChrisFile(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    fname = models.FileField(max_length=1024, unique=True)
+    parent_folder = models.ForeignKey(ChrisFolder, on_delete=models.CASCADE,
+                                      related_name='chris_files')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('-fname',)
+
+    def __str__(self):
+        return self.fname.name
+
+    @classmethod
+    def get_base_queryset(cls):
+        """
+        Custom method to return a queryset that is only comprised by all files
+        registered in storage.
+        """
+        return cls.objects.all()
+
+@receiver(post_delete, sender=ChrisFile)
+def auto_delete_file_from_storage(sender, instance, **kwargs):
+    storage_path = instance.fname.name
+    storage_manager = connect_storage(settings)
+    try:
+        if storage_manager.obj_exists(storage_path):
+            storage_manager.delete_obj(storage_path)
+    except Exception as e:
+        logger.error('Storage error, detail: %s' % str(e))
 
 
 class ChrisLinkFile(models.Model):

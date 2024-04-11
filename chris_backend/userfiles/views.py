@@ -28,10 +28,10 @@ class UserFileList(generics.ListCreateAPIView):
         owned by the currently authenticated user.
         """
         user = self.request.user
-        # if the user is chris then return all the files in the sandboxed filesystem
+        # if the user is chris then return all the files in the user space
         if user.username == 'chris':
-            return UserFile.objects.all()
-        return UserFile.objects.filter(owner=user)
+            return UserFile.get_base_queryset()
+        return UserFile.get_base_queryset().filter(owner=user)
 
     def perform_create(self, serializer):
         """
@@ -59,7 +59,7 @@ class UserFileListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = UserFileSerializer
-    queryset = UserFile.objects.all()
+    queryset = UserFile.get_base_queryset()
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = UserFileFilter
 
@@ -69,7 +69,7 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
     A user file view.
     """
     http_method_names = ['get', 'put', 'delete']
-    queryset = UserFile.objects.all()
+    queryset = UserFile.get_base_queryset()
     serializer_class = UserFileSerializer
     permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
 
@@ -95,7 +95,7 @@ class UserFileResource(generics.GenericAPIView):
     A view to enable downloading of a file resource.
     """
     http_method_names = ['get']
-    queryset = UserFile.objects.all()
+    queryset = UserFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,

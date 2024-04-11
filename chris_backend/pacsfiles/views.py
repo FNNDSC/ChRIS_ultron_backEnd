@@ -7,31 +7,30 @@ from rest_framework.authentication import BasicAuthentication, SessionAuthentica
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from core.views import TokenAuthSupportQueryString
-from .models import PACSFile, PACSFileFilter
-from .serializers import PACSFileSerializer
+from .models import PACSSeries, PACSSeriesFilter, PACSFile, PACSFileFilter
+from .serializers import PACSSeriesSerializer, PACSFileSerializer
 from .permissions import IsChrisOrReadOnly
 
 
-class PACSFileList(generics.ListCreateAPIView):
+class PACSSeriesList(generics.ListCreateAPIView):
     """
-    A view for the collection of PACS files.
+    A view for the collection of PACS Series.
     """
     http_method_names = ['get', 'post']
-    queryset = PACSFile.objects.all()
-    serializer_class = PACSFileSerializer
+    queryset = PACSSeries.objects.all()
+    serializer_class = PACSSeriesSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations and a collection+json
-        template to the response.
+        Overriden to append a query list and a collection+json template to the response.
         """
-        response = super(PACSFileList, self).list(request, *args, **kwargs)
+        response = super(PACSSeriesList, self).list(request, *args, **kwargs)
         # append query list
-        query_list = [reverse('pacsfile-list-query-search', request=request)]
+        query_list = [reverse('pacsseries-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
         # append write template
-        template_data = {'path': '', 'PatientID': '', 'PatientName': '',
+        template_data = {'path': '', 'ndicom': '', 'PatientID': '', 'PatientName': '',
                          'PatientBirthDate': '', 'PatientAge': '', 'PatientSex': '',
                          'StudyDate': '', 'AccessionNumber': '', 'Modality': '',
                          'ProtocolName': '', 'StudyInstanceUID': '',
@@ -39,19 +38,53 @@ class PACSFileList(generics.ListCreateAPIView):
                          'SeriesDescription': '', 'pacs_name': ''}
         return services.append_collection_template(response, template_data)
 
-    def create(self, request, *args, **kwargs):
-        """
-        Overriden to remove computed descriptors from the request if submitted.
-        """
-        self.request.data.pop('fname', None)
-        return super(PACSFileList, self).create(request, *args, **kwargs)
-
     def perform_create(self, serializer):
         """
-        Overriden to associate the owner (chris user) with the PACS file
+        Overriden to associate the owner (chris user) with the PACS files for the Series
         before first saving to the DB.
         """
         serializer.save(owner=self.request.user)
+
+
+class PACSSeriesListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of PACS Series resulting from a query search.
+    """
+    http_method_names = ['get']
+    serializer_class = PACSSeriesSerializer
+    queryset = PACSSeries.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = PACSSeriesFilter
+
+
+class PACSSeriesDetail(generics.RetrieveAPIView):
+    """
+    A PACS Series view.
+    """
+    http_method_names = ['get']
+    queryset = PACSSeries.objects.all()
+    serializer_class = PACSSeriesSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+
+class PACSFileList(generics.ListAPIView):
+    """
+    A view for the collection of PACS files.
+    """
+    http_method_names = ['get', 'post']
+    queryset = PACSFile.get_base_queryset()
+    serializer_class = PACSFileSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to append document-level link relations and a query list to the
+        response.
+        """
+        response = super(PACSFileList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('pacsfile-list-query-search', request=request)]
+        return services.append_collection_querylist(response, query_list)
 
 
 class PACSFileListQuerySearch(generics.ListAPIView):
@@ -60,7 +93,7 @@ class PACSFileListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = PACSFileSerializer
-    queryset = PACSFile.objects.all()
+    queryset = PACSFile.get_base_queryset()
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PACSFileFilter
 
@@ -70,7 +103,7 @@ class PACSFileDetail(generics.RetrieveAPIView):
     A PACS file view.
     """
     http_method_names = ['get']
-    queryset = PACSFile.objects.all()
+    queryset = PACSFile.get_base_queryset()
     serializer_class = PACSFileSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -80,7 +113,7 @@ class PACSFileResource(generics.GenericAPIView):
     A view to enable downloading of a file resource .
     """
     http_method_names = ['get']
-    queryset = PACSFile.objects.all()
+    queryset = PACSFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,

@@ -304,15 +304,13 @@ class FeedList(generics.ListAPIView):
                  'plugins': reverse('plugin-list', request=request),
                  'plugin_instances': reverse('allplugininstance-list', request=request),
                  'pipelines': reverse('pipeline-list', request=request),
-                 'pipeline_instances': reverse('allpipelineinstance-list',
-                                               request=request),
                  'workflows': reverse('allworkflow-list', request=request),
                  'tags': reverse('tag-list', request=request),
                  'pipelinesourcefiles': reverse('pipelinesourcefile-list',
                                                 request=request),
                  'userfiles': reverse('userfile-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
-                 'servicefiles': reverse('servicefile-list', request=request),
+                 'pacsseries': reverse('pacsseries-list', request=request),
                  'filebrowser': reverse('chrisfolder-list', request=request)}
 
         user = self.request.user

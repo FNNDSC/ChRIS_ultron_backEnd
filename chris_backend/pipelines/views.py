@@ -1,14 +1,12 @@
 
 import logging
 
-from django.conf import settings
 from django.http import FileResponse
 from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 
-from core.storage import connect_storage
 from core.renderers import BinaryFileRenderer
 from collectionjson import services
 from plugins.serializers import PluginSerializer
@@ -128,22 +126,6 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
     #         return Response(status=status.HTTP_304_NOT_MODIFIED)
     #     return super(PipelineDetail, self).destroy(request, *args, **kwargs)
 
-    def perform_destroy(self, instance):
-        """
-        Overriden to delete the pipeline's source file from storage.
-        """
-        storage_path = ''
-        if hasattr(instance, 'source_file'):
-            storage_path = instance.source_file.fname.name
-        instance.delete()
-        if storage_path:
-            storage_manager = connect_storage(settings)
-
-            try:
-                storage_manager.delete_obj(storage_path)
-            except Exception as e:
-                logger.error('Storage error, detail: %s' % str(e))
-
 
 class PipelineCustomJsonDetail(generics.RetrieveAPIView):
     """
@@ -160,7 +142,7 @@ class PipelineSourceFileList(generics.ListCreateAPIView):
     A view for the collection of pipeline source files.
     """
     http_method_names = ['get', 'post']
-    queryset = PipelineSourceFile.objects.all()
+    queryset = PipelineSourceFile.get_base_queryset()
     serializer_class = PipelineSourceFileSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
@@ -191,8 +173,8 @@ class PipelineSourceFileListQuerySearch(generics.ListAPIView):
     A view for the collection of pipeline source files resulting from a query search.
     """
     http_method_names = ['get']
+    queryset = PipelineSourceFile.get_base_queryset()
     serializer_class = PipelineSourceFileSerializer
-    queryset = PipelineSourceFile.objects.all()
     filterset_class = PipelineSourceFileFilter
 
 
@@ -201,7 +183,7 @@ class PipelineSourceFileDetail(generics.RetrieveAPIView):
     A pipeline source file view.
     """
     http_method_names = ['get']
-    queryset = PipelineSourceFile.objects.all()
+    queryset = PipelineSourceFile.get_base_queryset()
     serializer_class = PipelineSourceFileSerializer
 
 
@@ -210,7 +192,7 @@ class PipelineSourceFileResource(generics.GenericAPIView):
     A view to enable downloading of a pipeline's source file resource.
     """
     http_method_names = ['get']
-    queryset = PipelineSourceFile.objects.all()
+    queryset = PipelineSourceFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
 
     def get(self, request, *args, **kwargs):

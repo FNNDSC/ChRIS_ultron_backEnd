@@ -30,7 +30,6 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin_type = serializers.ReadOnlyField(source='plugin.meta.type')
     pipeline_id = serializers.ReadOnlyField(source='workflow.pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='workflow.pipeline.name')
-    pipeline_inst_id = serializers.ReadOnlyField(source='pipeline_inst.id')
     workflow_id = serializers.ReadOnlyField(source='workflow.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     output_path = serializers.ReadOnlyField(source='output_folder.path')
@@ -53,9 +52,6 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     plugin = serializers.HyperlinkedRelatedField(
         view_name='plugin-detail', read_only=True
     )
-    pipeline_inst = serializers.HyperlinkedRelatedField(
-        view_name='pipelineinstance-detail', read_only=True
-    )
     workflow = serializers.HyperlinkedRelatedField(
         view_name='workflow-detail', read_only=True
     )
@@ -70,12 +66,11 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
                   'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
                   'feed_id', 'start_date', 'end_date', 'output_path', 'status',
-                  'pipeline_id', 'pipeline_name', 'pipeline_inst_id', 'workflow_id',
-                  'summary', 'raw', 'owner_username', 'cpu_limit', 'memory_limit',
-                  'number_of_workers', 'gpu_limit', 'size', 'error_code',
-                  'output_folder', 'previous', 'output_folder', 'feed', 'plugin',
-                  'workflow', 'pipeline_inst', 'compute_resource', 'descendants',
-                  'parameters', 'splits')
+                  'pipeline_id', 'pipeline_name', 'workflow_id', 'summary', 'raw',
+                  'owner_username', 'cpu_limit', 'memory_limit', 'number_of_workers',
+                  'gpu_limit', 'size', 'error_code', 'output_folder', 'previous',
+                  'output_folder', 'feed', 'plugin', 'workflow', 'compute_resource',
+                  'descendants', 'parameters', 'splits')
 
     def validate_previous(self, previous_id):
         """

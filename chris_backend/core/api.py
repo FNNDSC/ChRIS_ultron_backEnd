@@ -8,11 +8,9 @@ from feeds import views as feed_views
 from plugins import views as plugin_views
 from plugininstances import views as plugininstance_views
 from pipelines import views as pipeline_views
-from pipelineinstances import views as pipelineinstance_views
 from workflows import views as workflow_views
 from userfiles import views as userfile_views
 from pacsfiles import views as pacsfile_views
-from servicefiles import views as servicefile_views
 from filebrowser import views as filebrowser_views
 from users import views as user_views
 
@@ -274,27 +272,6 @@ urlpatterns = format_suffix_patterns([
          name='unextpathparameter-detail'),
 
 
-    path('v1/pipelines/<int:pk>/instances/',
-        pipelineinstance_views.PipelineInstanceList.as_view(),
-        name='pipelineinstance-list'),
-
-    path('v1/pipelines/instances/',
-        pipelineinstance_views.AllPipelineInstanceList.as_view(),
-        name='allpipelineinstance-list'),
-
-    path('v1/pipelines/instances/search/',
-        pipelineinstance_views.AllPipelineInstanceListQuerySearch.as_view(),
-        name='allpipelineinstance-list-query-search'),
-
-    path('v1/pipelines/instances/<int:pk>/',
-        pipelineinstance_views.PipelineInstanceDetail.as_view(),
-        name='pipelineinstance-detail'),
-
-    path('v1/pipelines/instances/<int:pk>/plugininstances/',
-        pipelineinstance_views.PipelineInstancePluginInstanceList.as_view(),
-        name='pipelineinstance-plugininstance-list'),
-
-
     path('v1/pipelines/<int:pk>/workflows/',
          workflow_views.WorkflowList.as_view(),
          name='workflow-list'),
@@ -333,38 +310,33 @@ urlpatterns = format_suffix_patterns([
         name='userfile-resource'),
 
 
-    path('v1/pacsfiles/',
+    path('v1/pacs/series/',
+         pacsfile_views.PACSSeriesList.as_view(),
+         name='pacsseries-list'),
+
+    path('v1/pacs/series/search/',
+         pacsfile_views.PACSSeriesListQuerySearch.as_view(),
+         name='pacsseries-list-query-search'),
+
+    path('v1/pacs/series/<int:pk>/',
+         pacsfile_views.PACSSeriesDetail.as_view(),
+         name='pacsseries-detail'),
+
+    path('v1/pacs/files/',
         pacsfile_views.PACSFileList.as_view(),
         name='pacsfile-list'),
 
-    path('v1/pacsfiles/search/',
+    path('v1/pacs/files/search/',
         pacsfile_views.PACSFileListQuerySearch.as_view(),
         name='pacsfile-list-query-search'),
 
-    path('v1/pacsfiles/<int:pk>/',
+    path('v1/pacs/files/<int:pk>/',
         pacsfile_views.PACSFileDetail.as_view(),
         name='pacsfile-detail'),
 
-    re_path(r'^v1/pacsfiles/(?P<pk>[0-9]+)/.*$',
+    re_path(r'^v1/pacs/files/(?P<pk>[0-9]+)/.*$',
         pacsfile_views.PACSFileResource.as_view(),
         name='pacsfile-resource'),
-
-
-    path('v1/servicefiles/',
-        servicefile_views.ServiceFileList.as_view(),
-        name='servicefile-list'),
-
-    path('v1/servicefiles/search/',
-        servicefile_views.ServiceFileListQuerySearch.as_view(),
-        name='servicefile-list-query-search'),
-
-    path('v1/servicefiles/<int:pk>/',
-        servicefile_views.ServiceFileDetail.as_view(),
-        name='servicefile-detail'),
-
-    re_path(r'^v1/servicefiles/(?P<pk>[0-9]+)/.*$',
-        servicefile_views.ServiceFileResource.as_view(),
-        name='servicefile-resource'),
 
 
     path('v1/filebrowser/',
@@ -390,6 +362,14 @@ urlpatterns = format_suffix_patterns([
     path('v1/filebrowser/<int:pk>/linkfiles/',
          filebrowser_views.FileBrowserFolderLinkFileList.as_view(),
          name='chrisfolder-linkfile-list'),
+
+    path('v1/filebrowser/files/<int:pk>/',
+         filebrowser_views.FileBrowserFileDetail.as_view(),
+         name='chrisfile-detail'),
+
+    re_path(r'^v1/filebrowser/files/(?P<pk>[0-9]+)/.*$',
+            filebrowser_views.FileBrowserFileResource.as_view(),
+            name='chrisfile-resource'),
 
     path('v1/filebrowser/linkfiles/<int:pk>/',
          filebrowser_views.FileBrowserLinkFileDetail.as_view(),

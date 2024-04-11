@@ -14,7 +14,6 @@ from feeds.models import Feed
 from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
-from pipelineinstances.models import PipelineInstance
 from workflows.models import Workflow
 
 if settings.DEBUG:
@@ -54,9 +53,6 @@ class PluginInstance(models.Model):
     compute_resource = models.ForeignKey(ComputeResource, null=True,
                                          on_delete=models.SET_NULL,
                                          related_name='plugin_instances')
-    pipeline_inst = models.ForeignKey(PipelineInstance, null=True,
-                                      on_delete=models.SET_NULL,
-                                      related_name='plugin_instances')
     workflow = models.ForeignKey(Workflow, null=True,
                                  on_delete=models.SET_NULL,
                                  related_name='plugin_instances')
@@ -214,8 +210,6 @@ class PluginInstanceFilter(FilterSet):
     root_id = django_filters.CharFilter(method='filter_by_root_id')
     previous_id = django_filters.CharFilter(method='filter_by_previous_id')
     plugin_id = django_filters.CharFilter(field_name='plugin_id', lookup_expr='exact')
-    pipeline_inst_id = django_filters.CharFilter(field_name='pipeline_inst_id',
-                                                 lookup_expr='exact')
     workflow_id = django_filters.CharFilter(field_name='workflow_id', lookup_expr='exact')
     plugin_name = django_filters.CharFilter(field_name='plugin__meta__name',
                                             lookup_expr='icontains')
@@ -229,8 +223,7 @@ class PluginInstanceFilter(FilterSet):
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
                   'max_end_date', 'root_id', 'previous_id', 'title', 'status',
                   'owner_username', 'feed_id', 'plugin_id', 'plugin_name',
-                  'plugin_name_exact', 'plugin_version', 'pipeline_inst_id',
-                  'workflow_id']
+                  'plugin_name_exact', 'plugin_version', 'workflow_id']
 
     def filter_by_root_id(self, queryset, name, value):
         """
