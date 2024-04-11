@@ -13,7 +13,7 @@
 # For more information: https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/Storage-Backends
 #
 
-version: '3.9'
+#version: '3.9'
 
 services:
   chrisomatic:

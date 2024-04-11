@@ -382,7 +382,7 @@ class PluginInstanceManager(object):
         output_folders = previous.output_folder.get_descendants()
         fnames = []
         for folder in output_folders:
-            fnames.extend([f.fname.name for f in folder.user_files.all()])
+            fnames.extend([f.fname.name for f in folder.chris_files.all()])
         for i in range(20):  # loop to deal with eventual consistency
             try:
                 l_ls = self.storage_manager.ls(output_path)

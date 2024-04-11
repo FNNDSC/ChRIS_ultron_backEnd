@@ -92,13 +92,8 @@ class ChrisFolder(models.Model):
         Custom method to return all the folders that are a descendant of this
         folder.
         """
-        descendants = []
-        queue = [self]
-        while len(queue) > 0:
-            visited = queue.pop()
-            queue.extend(list(visited.children.all()))
-            descendants.append(visited)
-        return descendants
+        path = self.path.rstrip('/') + '/'
+        return list(ChrisFolder.objects.filter(path__startswith=path))
 
 
 class ChrisFolderFilter(FilterSet):
