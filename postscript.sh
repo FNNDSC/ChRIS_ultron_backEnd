@@ -16,10 +16,10 @@ G_SYNOPSIS="
     postscript.sh
 
   SYNOPSIS
-    postscript.sh [swift|filesystem]
+    postscript.sh [swift|fslink|filesystem]
 
   ARGS
-    [swift|filesystem]
+    [swift|fslink|filesystem]
     Denotes the storage environment.
 
   DESCRIPTION
@@ -33,8 +33,14 @@ fi
 
 STORAGE_ENV=$1
 
+if ! [[ "$STORAGE_ENV" =~ ^(swift|fslink|filesystem)$ ]]; then
+    echo "error: Invalid storage environment"
+    echo "$G_SYNOPSIS"
+    exit 1
+fi
+
 if [[ $STORAGE_ENV == 'swift' ]]; then
     docker compose -f docker-compose_dev.yml run --rm chrisomatic chrisomatic postscript.yml
-elif [[ $STORAGE_ENV == 'filesystem' ]]; then
+elif [[ $STORAGE_ENV =~ ^(fslink|filesystem)$ ]]; then
     docker compose -f docker-compose_noswift.yml run --rm chrisomatic chrisomatic postscript.yml
 fi
