@@ -3,6 +3,22 @@
 [![Build](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/fnndsc/ChRIS_ultron_backEnd.svg)](./LICENSE)
 
+## TL;DR
+
+To quick start _ChRIS Ultron Back End_:
+
+```
+./docker-compose-dev.sh
+```
+
+To shutdown:
+
+```
+./docker-compose-down.sh
+```
+
+## Introduction
+
 _ChRIS_ is an open-source platform for containerized medical compute.
 The _ChRIS_ backend, a.k.a. _ChRIS Ultron Backend_ or _**CUBE**_ for short,
 is a component of the _ChRIS_ system.
@@ -11,7 +27,6 @@ is a component of the _ChRIS_ system.
 ![Architecture Diagram](https://chrisproject.org/img/figures/ChRIS_architecture_dark.svg#gh-dark-mode-only)
 
 The core backend service for the ChRIS distributed software platform, also known by the anacronym _CUBE_. Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
-
 
 ## ChRIS development, testing and deployment
 
@@ -38,8 +53,8 @@ macOS is fully supported as a host platform for _CUBE_. Please note that you **m
 
 In a word, **don't** (ok, that's technically two words). _CUBE_ is ideally meant to be deployed on Linux/*nix systems. **Windows is not officially supported nor recommended as the host environment**. If you insist on trying on Windows you can consult some unmaintained documentation on attempts to deploy _CUBE_ using the Windows Subsystem for Linux (WSL) [here](https://github.com/FNNDSC/CHRIS_docs/blob/master/workflows/ChRIS_on_WSL.asciidoc). This probably will break. Note that currently no one on the core development uses Windows in much of any capacity so interest or knowledge to help questions about Windows support is low. Nonetheless, we would welcome any brave soul though who has the time and inclination to fully investigate _CUBE_ on Windows deployment.
 
- 
-#### Install latest Docker and Docker Compose. 
+
+#### Install latest Docker and Docker Compose.
 
 Currently tested platforms:
 * ``Docker 18.06.0+``
@@ -50,59 +65,6 @@ Currently tested platforms:
 
 Consult this page https://docs.docker.com/engine/install/linux-postinstall/
 
-### TL;DR
-
-#### If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and running with no mess, no fuss:
-
-##### The real TL;DR
-
-The all in one copy/paste line to drop into your terminal (assuming of course you are in the repo directory and have the preconditions met):
-
-```bash
-docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
-./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&        \
-./make.sh -U -I -i
-```
-
-This will start a **bare bones** _CUBE_. This _CUBE_ will **NOT** have any plugins installed. To install a set of plugins, do
-
-```bash
-./postscript.sh
-```
-
-##### Slightly longer but still short TL;DR
-
-Start a local Docker Swarm cluster if not already started:
-
-```bash
-docker swarm init --advertise-addr 127.0.0.1
-```
-
-Get the source code from CUBE repo: 
-
-```bash
-git clone https://github.com/FNNDSC/ChRIS_ultron_backend
-cd ChRIS_ultron_backend
-```
-
-Run full CUBE instantiation with tests:
-```bash
-./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
-```
-
-Or skip unit and integration tests and the intro:
-```bash
-./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -s
-```
-
-Once the system is "up" you can add more compute plugins to the ecosystem:
-
-```bash
-./postscript.sh
-```
-
-The resulting CUBE instance uses the default Django development server and therefore is not suitable for production.
-
 
 ### Production deployments
 
@@ -110,6 +72,23 @@ Please refer to https://github.com/FNNDSC/khris-helm
 
 
 ### Development
+
+#### Quick Start with Docker-compose:
+
+Use `docker-compose-dev.sh` to start:
+
+```
+./docker-compose-dev.sh
+```
+
+To shutdown:
+
+```
+./docker-compose-down.sh
+```
+
+##### _CAVEAT_ for mac or linux/arm64 users:
+  * Some docker images are not available yet. You need to compile the docker images on your own and tag the images as specified in `docker-compose-dev.yml`.
 
 #### Docker Swarm-based development environment:
 
@@ -126,7 +105,7 @@ git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
 cd ChRIS_ultron_backEnd
 ./make.sh
 ```
-All the steps performed by the above script are properly documented in the script itself. 
+All the steps performed by the above script are properly documented in the script itself.
 After running this script all the automated tests should have successfully run and a Django development server should be running in interactive mode in this terminal.
 
 Later you can stop and remove CUBE services and storage space by running the following bash script from the repository source directory:
@@ -143,8 +122,8 @@ docker swarm leave --force
 
 #### Kubernetes-based development environment:
 
-Install single-node Kubernetes cluster. 
-On MAC OS Docker Desktop includes a standalone Kubernetes server and client. 
+Install single-node Kubernetes cluster.
+On MAC OS Docker Desktop includes a standalone Kubernetes server and client.
 Consult this page https://docs.docker.com/desktop/kubernetes/.
 On Linux there is a simple MicroK8s installation. Consult this page https://microk8s.io.
 Then create the required alias:
@@ -201,7 +180,7 @@ docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test --
 To run all the tests:
 
 ```bash
-docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test 
+docker compose -f docker-compose_dev.yml exec chris_dev python manage.py test
 ```
 
 After running the Integration tests the ``./CHRIS_REMOTE_FS`` directory **must** be empty otherwise it means some error has occurred and you should manually empty it.
@@ -215,7 +194,7 @@ docker compose -f docker-compose_dev.yml exec chris_dev coverage run --source=fe
 docker compose -f docker-compose_dev.yml exec chris_dev coverage report
 ```
 
-#### Using [HTTPie](https://httpie.org/) client to play with the REST API 
+#### Using [HTTPie](https://httpie.org/) client to play with the REST API
 A simple GET request to retrieve the user-specific list of feeds:
 ```bash
 http -a cube:cube1234 http://localhost:8000/api/v1/
@@ -233,7 +212,6 @@ http -a cube:cube1234 http://localhost:8000/api/v1/plugins/instances/1/
 ```bash
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
 ```
-
 
 ### Documentation
 
