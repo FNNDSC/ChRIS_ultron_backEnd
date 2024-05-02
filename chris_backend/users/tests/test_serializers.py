@@ -7,13 +7,13 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from userfiles.models import UserFile
-from users.serializers import UserSerializer
+from users.serializers import UserSerializer, GroupSerializer, GroupUserSerializer
 from core.storage.helpers import mock_storage
 
 
-class UserSerializerTests(TestCase):
+class SerializerTests(TestCase):
     """
-    Generic user view tests' setup and tearDown
+    Generic serializers tests' setup and tearDown.
     """
 
     def setUp(self):
@@ -33,6 +33,12 @@ class UserSerializerTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+
+class UserSerializerTests(SerializerTests):
+    """
+    User serializer tests.
+    """
 
     def test_create(self):
         """
@@ -62,9 +68,50 @@ class UserSerializerTests(TestCase):
         the 'chris' special user.
         """
         user_serializer = UserSerializer()
+
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('user/')
+
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('chris')
+
         username = user_serializer.validate_username(self.username)
         self.assertEqual(username, self.username)
+
+
+class GroupSerializerTests(SerializerTests):
+    """
+    Group serializer tests.
+    """
+
+    def test_validate_name(self):
+        """
+        Test whether overriden validate_name method raises a
+        serializers.ValidationError when the group name contains forward slashes.
+        """
+        group_serializer = GroupSerializer()
+
+        with self.assertRaises(serializers.ValidationError):
+            group_serializer.validate_name('user/')
+
+        group_name = group_serializer.validate_name('students')
+        self.assertEqual(group_name, 'students')
+
+
+class GroupUserSerializerTests(SerializerTests):
+    """
+    Group user serializer tests.
+    """
+
+    def test_validate_name(self):
+        """
+        Test whether overriden validate_username method raises a
+        serializers.ValidationError when the passed username doesn't exist in the DB.
+        """
+        group_user_serializer = GroupUserSerializer()
+
+        with self.assertRaises(serializers.ValidationError):
+            group_user_serializer.validate_username('foo')
+
+        user = group_user_serializer.validate_username(self.chris_username)
+        self.assertEqual(user.username, self.chris_username)

@@ -18,3 +18,17 @@ class IsUserOrChrisOrReadOnly(permissions.BasePermission):
         return (obj == request.user) or (request.user.username == 'chris')
 
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow admin users to modify/edit it. Read only is allowed
+    to normal users.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to normal users.
+        if request.method in permissions.SAFE_METHODS:
+            #if obj.user_set.filter(username=request.user.username).exists():
+                return True
+
+        # Raed/Write permissions are allowed to the admin users
+        return request.user.is_staff

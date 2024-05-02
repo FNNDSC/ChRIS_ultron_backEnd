@@ -20,6 +20,7 @@ from django.urls import path, include
 from django.conf import settings
 
 from plugins import admin as plugin_admin_views
+from users import views as group_admin_views
 
 
 urlpatterns = [
@@ -37,6 +38,26 @@ urlpatterns = [
     path('chris-admin/api/v1/computeresources/<int:pk>/',
          plugin_admin_views.ComputeResourceAdminDetail.as_view(),
          name='admin-computeresource-detail'),
+
+    path('chris-admin/api/v1/groups/',
+         group_admin_views.GroupList.as_view(),
+         name='group-list'),
+
+    path('chris-admin/api/v1/groups/search/',
+         group_admin_views.GroupListQuerySearch.as_view(),
+         name='group-list-query-search'),
+
+    path('chris-admin/api/v1/groups/<int:pk>/',
+         group_admin_views.GroupDetail.as_view(),
+         name='group-detail'),
+
+    path('chris-admin/api/v1/groups/<int:pk>/users/',
+         group_admin_views.GroupUserList.as_view(),
+         name='group-user-list'),
+
+    path('chris-admin/api/v1/groups/users/<int:pk>/',
+         group_admin_views.GroupUserDetail.as_view(),
+         name='user_groups-detail'),
 
     path('chris-admin/', admin.site.urls),
 
