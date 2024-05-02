@@ -755,10 +755,13 @@ class PluginAdminList(generics.ListCreateAPIView):
         to the response.
         """
         response = super(PluginAdminList, self).list(request, *args, **kwargs)
+
         # append document-level link relations
         links = {'compute_resources': reverse('admin-computeresource-list',
-                                              request=request)}
+                                              request=request),
+                 'groups': reverse('group-list', request=request)}
         response = services.append_collection_links(response, links)
+
         # append write template
         template_data = {'fname': '', 'compute_names': '', 'plugin_store_url': ''}
         return services.append_collection_template(response, template_data)
