@@ -16,20 +16,34 @@ services:
     networks:
       - local
 
+  cube_local:
+    image: cube:latest-local
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM ghcr.io/fnndsc/cube:latest
+
+        RUN mkdir -p /opt
+        COPY ./requirements /opt/requirements
+        RUN pip install -r /opt/requirements/local.txt
+    command: sh -c 'exit 0'
+
   db_migrate:
-    image: ghcr.io/fnndsc/cube:5.0.0
+    image: cube:latest-local
     command:
       - sh
       - -c
-      - pip install -r /opt/ChRIS_ultron_backEnd/requirements/local.txt && python manage.py migrate --noinput
+      - python manage.py migrate --noinput
     volumes:
       - chris_files:/var/chris:rw
-      - ./chris_backend:/opt/app-root/src
-      - .:/opt/ChRIS_ultron_backEnd
+      - ./chris_backend:/opt/app-root/src:ro
+      - .:/opt/ChRIS_ultron_backEnd:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV=fslink
     depends_on:
+      cube_local:
+        condition: service_completed_successfully
       chris_dev_db:
         condition: service_healthy
     networks:
@@ -37,21 +51,23 @@ services:
 
   chris:
     container_name: chris
-    image: ghcr.io/fnndsc/cube:5.0.0
+    image: cube:latest-local
     command:
       - sh
       - -c
-      - pip install -r /opt/ChRIS_ultron_backEnd/requirements/local.txt && python manage.py runserver 0.0.0.0:8000
+      - python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     volumes:
       - chris_files:/var/chris:rw
-      - ./chris_backend:/opt/app-root/src
-      - .:/opt/ChRIS_ultron_backEnd
+      - ./chris_backend:/opt/app-root/src:ro
+      - .:/opt/ChRIS_ultron_backEnd:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV=fslink
     depends_on:
+      cube_local:
+        condition: service_completed_successfully
       db_migrate:
         condition: service_completed_successfully
       queue:
@@ -61,15 +77,15 @@ services:
     labels:
       org.chrisproject.role: "ChRIS_ultron_backEnd"
   worker:
-    image: ghcr.io/fnndsc/cube:5.0.0
+    image: cube:latest-local
     command:
       - sh
       - -c
-      - pip install -r /opt/ChRIS_ultron_backEnd/requirements/local.txt && celery -A core worker -c 4 -l info -Q main1,main2
+      - celery -A core worker -c 4 -l info -Q main1,main2
     volumes:
       - chris_files:/var/chris:rw
-      - ./chris_backend:/opt/app-root/src
-      - .:/opt/ChRIS_ultron_backEnd
+      - ./chris_backend:/opt/app-root/src:ro
+      - .:/opt/ChRIS_ultron_backEnd:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV=fslink
@@ -84,19 +100,21 @@ services:
     networks:
       - local
   worker_periodic:
-    image: ghcr.io/fnndsc/cube:5.0.0
+    image: cube:latest-local
     command:
       - sh
       - -c
-      - pip install -r /opt/ChRIS_ultron_backEnd/requirements/local.txt && celery -A core worker -c 2 -l info -Q periodic
+      - celery -A core worker -c 2 -l info -Q periodic
     volumes:
       - chris_files:/var/chris:rw
-      - ./chris_backend:/opt/app-root/src
-      - .:/opt/ChRIS_ultron_backEnd
+      - ./chris_backend:/opt/app-root/src:ro
+      - .:/opt/ChRIS_ultron_backEnd:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV=fslink
     depends_on:
+      cube_local:
+        condition: service_completed_successfully
       db_migrate:
         condition: service_completed_successfully
       queue:
@@ -105,19 +123,21 @@ services:
     networks:
       - local
   scheduler:
-    image: ghcr.io/fnndsc/cube:5.0.0
+    image: cube:latest-local
     command:
       - sh
       - -c
-      - pip install -r /opt/ChRIS_ultron_backEnd/requirements/local.txt && celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+      - celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - chris_files:/var/chris:rw
-      - ./chris_backend:/opt/app-root/src
-      - .:/opt/ChRIS_ultron_backEnd
+      - ./chris_backend:/opt/app-root/src:ro
+      - .:/opt/ChRIS_ultron_backEnd:ro
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV=fslink
     depends_on:
+      cube_local:
+        condition: service_completed_successfully
       db_migrate:
         condition: service_completed_successfully
       queue:
