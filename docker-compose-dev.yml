@@ -198,8 +198,8 @@ services:
     image: ghcr.io/fnndsc/chris_ui:latest-staging
     command: sirv --host --single
     environment:
-      REACT_APP_CHRIS_UI_URL: http://localhost:8000/api/v1/
-      REACT_APP_PFDCM_URL: http://localhost:4005/
+      VITE_APP_CHRIS_UI_URL: http://localhost:8000/api/v1/
+      VITE_APP_PFDCM_URL: http://localhost:4005/
     ports:
       - "8020:3000"
 
