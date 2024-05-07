@@ -5,7 +5,7 @@
 
 ## TL;DR
 
-To quick start _ChRIS Ultron Back End_:
+To quick start _ChRIS Ultron Back End_ development:
 
 ```
 ./docker-compose-dev.sh
@@ -27,6 +27,7 @@ is a component of the _ChRIS_ system.
 ![Architecture Diagram](https://chrisproject.org/img/figures/ChRIS_architecture_dark.svg#gh-dark-mode-only)
 
 The core backend service for the ChRIS distributed software platform, also known by the anacronym _CUBE_. Internally the service is implemented as a Django-PostgreSQL project offering a [collection+json](http://amundsen.com/media-types/collection/) REST API. Important ancillary components include the ``pfcon`` and ``pman`` file transfer and remote process management microservices.
+
 
 ## ChRIS development, testing and deployment
 
@@ -64,6 +65,59 @@ Currently tested platforms:
 #### On a Linux machine make sure to add your computer user to the ``docker`` group
 
 Consult this page https://docs.docker.com/engine/install/linux-postinstall/
+
+### TL;DR
+
+#### If you read nothing else on this page, and just want to get an instance of the ChRIS backend services up and running with no mess, no fuss:
+
+##### The real TL;DR
+
+The all in one copy/paste line to drop into your terminal (assuming of course you are in the repo directory and have the preconditions met):
+
+```bash
+docker swarm leave --force && docker swarm init --advertise-addr 127.0.0.1 &&  \
+./unmake.sh && sudo rm -fr CHRIS_REMOTE_FS && rm -fr CHRIS_REMOTE_FS &&        \
+./make.sh -U -I -i
+```
+
+This will start a **bare bones** _CUBE_. This _CUBE_ will **NOT** have any plugins installed. To install a set of plugins, do
+
+```bash
+./postscript.sh
+```
+
+##### Slightly longer but still short TL;DR
+
+Start a local Docker Swarm cluster if not already started:
+
+```bash
+docker swarm init --advertise-addr 127.0.0.1
+```
+
+Get the source code from CUBE repo: 
+
+```bash
+git clone https://github.com/FNNDSC/ChRIS_ultron_backend
+cd ChRIS_ultron_backend
+```
+
+Run full CUBE instantiation with tests:
+```bash
+./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh
+```
+
+Or skip unit and integration tests and the intro:
+```bash
+./unmake.sh ; sudo rm -fr CHRIS_REMOTE_FS; rm -fr CHRIS_REMOTE_FS; ./make.sh -U -I -s
+```
+
+Once the system is "up" you can add more compute plugins to the ecosystem:
+
+```bash
+./postscript.sh
+```
+
+The resulting CUBE instance uses the default Django development server and therefore is not suitable for production.
 
 
 ### Production deployments
@@ -212,6 +266,7 @@ http -a cube:cube1234 http://localhost:8000/api/v1/plugins/instances/1/
 ```bash
 swift -A http://127.0.0.1:8080/auth/v1.0 -U chris:chris1234 -K testing list users
 ```
+
 
 ### Documentation
 
