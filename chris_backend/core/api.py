@@ -61,6 +61,30 @@ urlpatterns = format_suffix_patterns([
     path('v1/note<int:pk>/',
         feed_views.NoteDetail.as_view(), name='note-detail'),
 
+    path('v1/<int:pk>/grouppermissions/',
+         feed_views.FeedGroupPermissionList.as_view(),
+         name='feed-group-permission-list'),
+
+    path('v1/<int:pk>/grouppermissions/search/',
+         feed_views.FeedGroupPermissionListListQuerySearch.as_view(),
+         name='feed-group-permission-list-query-search'),
+
+    path('v1/grouppermissions/<int:pk>/',
+         feed_views.FeedGroupPermissionDetail.as_view(),
+         name='feed-group-permission-detail'),
+
+    path('v1/<int:pk>/userpermissions/',
+         feed_views.FeedUserPermissionList.as_view(),
+         name='feed-user-permission-list'),
+
+    path('v1/<int:pk>/userpermissions/search/',
+         feed_views.FeedUserPermissionListListQuerySearch.as_view(),
+         name='feed-user-permission-list-query-search'),
+
+    path('v1/userpermissions/<int:pk>/',
+         feed_views.FeedUserPermissionDetail.as_view(),
+         name='feed-user-permission-detail'),
+
     path('v1/<int:pk>/comments/',
         feed_views.CommentList.as_view(), name='comment-list'),
 

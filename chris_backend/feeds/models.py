@@ -1,6 +1,8 @@
 
 from django.db import models
 from django.db.models.signals import post_delete
+from django.contrib.auth.models import User, Group
+from django.db.models import Q
 from django.dispatch import receiver
 
 import django_filters
@@ -17,7 +19,11 @@ class Feed(models.Model):
     public = models.BooleanField(blank=True, default=False, db_index=True)
     folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE, null=True,
                                   related_name='feed')
-    owner = models.ManyToManyField('auth.User', related_name='feed')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    shared_groups = models.ManyToManyField(Group, related_name='shared_feeds',
+                                           through='FeedGroupPermission')
+    shared_users = models.ManyToManyField(User, related_name='shared_feeds',
+                                          through='FeedUserPermission')
 
     class Meta:
         ordering = ('-creation_date',)
@@ -41,19 +47,73 @@ class Feed(models.Model):
         note.feed = self
         note.save()
 
-    def get_creator(self):
-        """
-        Custom method to get the user that created the feed.
-        """
-        plg_inst = self.plugin_instances.filter(plugin__meta__type='fs')[0]
-        return plg_inst.owner
-
     def get_plugin_instances_status_count(self, status):
         """
         Custom method to get the number of associated plugin instances with a given
         execution status.
         """
         return self.plugin_instances.filter(status=status).count()
+
+    def has_group_permission(self, group):
+        """
+        Custom method to determine whether a group has been granted permission to access
+        the feed.
+        """
+        return FeedGroupPermission.objects.filter(group=group, feed=self).exists()
+
+    def has_user_permission(self, user):
+        """
+        Custom method to determine whether a user has been granted permission to access
+        the feed.
+        """
+        lookup = Q(user=user) | Q(user__groups__shared_feeds=self)
+        return FeedUserPermission.objects.filter(feed=self).filter(lookup).exists()
+
+    def grant_group_permission(self, group):
+        """
+        Custom method to grant a group write permission to access the feed and all its
+        folder's descendant folders, link files and files.
+        """
+        FeedGroupPermission.objects.create(folder=self, group=group, permission='w')
+
+    def remove_group_permission(self, group):
+        """
+        Custom method to remove a group's permission to access the feed and all its
+        folder's descendant folders, link files and files.
+        """
+        FeedGroupPermission.objects.get(folder=self, group=group, permission='w').delete()
+
+    def grant_user_permission(self, user):
+        """
+        Custom method to grant a user write permission to access the feed and all its
+        folder's descendant folders, link files and files.
+        """
+        FeedUserPermission.objects.create(folder=self, user=user, permission='w')
+
+    def remove_user_permission(self, user):
+        """
+        Custom method to remove a user's permission to access the feed and all its
+        folder's descendant folders, link files and files.
+        """
+        FeedUserPermission.objects.get(folder=self, user=user, permission='w').delete()
+
+    def grant_public_access(self):
+        """
+        Custom method to grant public access to the feed and all its folder's descendant
+        folders, link files and files.
+        """
+        self.public = True
+        self.folder.grant_public_access()
+        self.save()
+
+    def remove_public_access(self):
+        """
+        Custom method to remove public access to the feed and all its folder's descendant
+        folders, link files and files.
+        """
+        self.public = False
+        self.folder.remove_public_access()
+        self.save()
 
 
 @receiver(post_delete, sender=Feed)
@@ -108,6 +168,76 @@ class FeedFilter(FilterSet):
             feed_ids.add(feed_id)
 
         return queryset.filter(pk__in=list(feed_ids))
+
+
+class FeedGroupPermission(models.Model):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('feed', 'group',)
+
+    def __str__(self):
+        return str(self.id)
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to grant the group write permission to all the folders, files and link
+        files within the feed.
+        """
+        super(FeedGroupPermission, self).save(*args, **kwargs)
+        self.feed.folder.grant_group_permission(self.group, 'w')
+
+    def delete(self, *args, **kwargs):
+        """
+        Overriden to remove the group's write permission to all the folders, files and
+        link files within the feed.
+        """
+        super(FeedGroupPermission, self).delete(*args, **kwargs)
+        self.feed.folder.remove_group_permission(self.group, 'w')
+
+
+class FeedGroupPermissionFilter(FilterSet):
+    group_name = django_filters.CharFilter(field_name='group__name', lookup_expr='exact')
+
+    class Meta:
+        model = FeedGroupPermission
+        fields = ['id', 'group_name']
+
+
+class FeedUserPermission(models.Model):
+    feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('feed', 'user',)
+
+    def __str__(self):
+        return str(self.id)
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to grant the user write permission to all the folders, files and link
+        files within the feed.
+        """
+        super(FeedUserPermission, self).save(*args, **kwargs)
+        self.feed.folder.grant_user_permission(self.user, 'w')
+
+    def delete(self, *args, **kwargs):
+        """
+        Overriden to remove the user's write permission to all the folders, files and
+        link files within the feed.
+        """
+        super(FeedUserPermission, self).delete(*args, **kwargs)
+        self.feed.folder.remove_user_permission(self.user, 'w')
+
+
+class FeedUserPermissionFilter(FilterSet):
+    username = django_filters.CharFilter(field_name='user__username', lookup_expr='exact')
+
+    class Meta:
+        model = FeedUserPermission
+        fields = ['id', 'username']
 
 
 class Note(models.Model):

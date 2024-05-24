@@ -1,13 +1,15 @@
 
+from django.db.models import Q
+from django.contrib.auth.models import User
 from rest_framework import permissions
 
 from feeds.models import Feed
 
 
-class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
+class IsOwnerOrChrisOrWriteUserOrReadOnly(permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object or superuser
-    'chris' to modify/edit it. Read only is allowed to other users.
+    Custom permission to only allow owners of an object or superuser 'chris' or users
+    with write permission to modify/edit it. Read-only is allowed to other users.
     """
 
     def has_object_permission(self, request, view, obj):
@@ -16,8 +18,12 @@ class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # Write permissions are only allowed to the owner and superuser 'chris'.
-        return (request.user == obj.owner) or (request.user.username == 'chris')
+        # Write permissions are only allowed to the owner, superuser 'chris' and users
+        # with write permission.
+        user = request.user
+        lookup = Q(shared_folders=obj) | Q(groups__shared_folders=obj)
+        return (user == obj.owner or user.username == 'chris' or
+                User.objects.filter(username=user.username).filter(lookup).count())
 
 
 class IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly(permissions.BasePermission):

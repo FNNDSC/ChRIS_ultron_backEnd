@@ -1,12 +1,16 @@
 
 import os
 
+from django.contrib.auth.models import User, Group
+from django.db.utils import IntegrityError
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
 from core.utils import get_file_resource_link
-from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
+from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
+                         FolderUserPermission, FileGroupPermission, FileUserPermission,
+                         LinkFileGroupPermission, LinkFileUserPermission)
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
@@ -21,7 +25,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ChrisFolder
-        fields = ('url', 'id', 'creation_date', 'path', 'parent', 'children',
+        fields = ('url', 'id', 'creation_date', 'path', 'public', 'parent', 'children',
                   'files', 'link_files', 'owner')
 
     def create(self, validated_data):
@@ -66,7 +70,90 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         return path
 
 
-class FileBrowserChrisFileSerializer(serializers.HyperlinkedModelSerializer):
+class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    grp_name = serializers.CharField(write_only=True)
+    folder_id = serializers.ReadOnlyField(source='folder.id')
+    folder_name = serializers.ReadOnlyField(source='folder.name')
+    group_id = serializers.ReadOnlyField(source='group.id')
+    group_name = serializers.ReadOnlyField(source='group.name')
+
+    class Meta:
+        model = FolderGroupPermission
+        fields = ('url', 'id', 'permission', 'folder_id', 'folder_name', 'group_id',
+                  'group_name', 'folder', 'group', 'grp_name')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a group that
+        already has a permission granted.
+        """
+        folder = validated_data['folder']
+        group = validated_data['group']
+
+        try:
+            perm = super(FileBrowserFolderGroupPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Group '{group.name}' already has a permission to access folder "
+                      f"with id {folder.id}"]})
+        return perm
+
+    def validate_grp_name(self, grp_name):
+        """
+        Custom method to check whether the provided group name exists in the DB.
+        """
+        try:
+            group = Group.objects.get(name=grp_name)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError(
+                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+        return group
+
+class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    folder_id = serializers.ReadOnlyField(source='folder.id')
+    folder_name = serializers.ReadOnlyField(source='folder.name')
+    user_id = serializers.ReadOnlyField(source='user.id')
+    user_username = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = FolderUserPermission
+        fields = ('url', 'id', 'permission', 'folder_id', 'folder_name', 'user_id',
+                  'user_username', 'folder', 'user', 'username')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a user that
+        already has a permission granted.
+        """
+        folder = validated_data['folder']
+        user = validated_data['user']
+
+        try:
+            perm = super(FileBrowserFolderUserPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"User '{user.username}' already has a permission to access "
+                      f"folder with id {folder.id}"]})
+        return perm
+
+    def validate_username(self, username):
+        """
+        Custom method to check whether the provided username exists in the DB.
+        """
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'username': [f"Couldn't find any user with username '{username}'."]})
+        return user
+
+
+class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -87,7 +174,91 @@ class FileBrowserChrisFileSerializer(serializers.HyperlinkedModelSerializer):
         return get_file_resource_link(self, obj)
 
 
-class FileBrowserChrisLinkFileSerializer(serializers.HyperlinkedModelSerializer):
+class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    grp_name = serializers.CharField(write_only=True)
+    file_id = serializers.ReadOnlyField(source='file.id')
+    file_fname = serializers.ReadOnlyField(source='file.fname')
+    group_id = serializers.ReadOnlyField(source='group.id')
+    group_name = serializers.ReadOnlyField(source='group.name')
+
+    class Meta:
+        model = FileGroupPermission
+        fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'group_id',
+                  'group_name', 'file', 'group', 'grp_name')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a group that
+        already has a permission granted.
+        """
+        f = validated_data['file']
+        group = validated_data['group']
+
+        try:
+            perm = super(FileBrowserFileGroupPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Group '{group.name}' already has a permission to access file "
+                      f"with id {f.id}"]})
+        return perm
+
+    def validate_grp_name(self, grp_name):
+        """
+        Custom method to check whether the provided group name exists in the DB.
+        """
+        try:
+            group = Group.objects.get(name=grp_name)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError(
+                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+        return group
+
+
+class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    file_id = serializers.ReadOnlyField(source='file.id')
+    file_fname = serializers.ReadOnlyField(source='file.fname')
+    user_id = serializers.ReadOnlyField(source='user.id')
+    user_username = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = FileUserPermission
+        fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'user_id',
+                  'user_username', 'file', 'user', 'username')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a user that
+        already has a permission granted.
+        """
+        f = validated_data['file']
+        user = validated_data['user']
+
+        try:
+            perm = super(FileBrowserFileUserPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"User '{user.username}' already has a permission to access "
+                      f"file with id {f.id}"]})
+        return perm
+
+    def validate_username(self, username):
+        """
+        Custom method to check whether the provided username exists in the DB.
+        """
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'username': [f"Couldn't find any user with username '{username}'."]})
+        return user
+
+
+class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False, required=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -146,3 +317,87 @@ class FileBrowserChrisLinkFileSerializer(serializers.HyperlinkedModelSerializer)
             request = self.context['request']
             return reverse('chrisfile-detail', request=request,
                            kwargs={'pk': linked_file.pk})
+
+
+class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    grp_name = serializers.CharField(write_only=True)
+    link_file_id = serializers.ReadOnlyField(source='link_file.id')
+    link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
+    group_id = serializers.ReadOnlyField(source='group.id')
+    group_name = serializers.ReadOnlyField(source='group.name')
+
+    class Meta:
+        model = FileGroupPermission
+        fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname',
+                  'group_id', 'group_name', 'link_file', 'group', 'grp_name')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a group that
+        already has a permission granted.
+        """
+        lf = validated_data['link_file']
+        group = validated_data['group']
+
+        try:
+            perm = super(FileBrowserLinkFileGroupPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Group '{group.name}' already has a permission to access link "
+                      f"file with id {lf.id}"]})
+        return perm
+
+    def validate_grp_name(self, grp_name):
+        """
+        Custom method to check whether the provided group name exists in the DB.
+        """
+        try:
+            group = Group.objects.get(name=grp_name)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError(
+                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+        return group
+
+
+class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    link_file_id = serializers.ReadOnlyField(source='link_file.id')
+    link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
+    user_id = serializers.ReadOnlyField(source='user.id')
+    user_username = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = FileUserPermission
+        fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname', 'user_id',
+                  'user_username', 'link_file', 'user', 'username')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to create a permission for a user that
+        already has a permission granted.
+        """
+        lf = validated_data['link_file']
+        user = validated_data['user']
+
+        try:
+            perm = super(FileBrowserLinkFileUserPermissionSerializer,
+                         self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"User '{user.username}' already has a permission to access "
+                      f"file with id {lf.id}"]})
+        return perm
+
+    def validate_username(self, username):
+        """
+        Custom method to check whether the provided username exists in the DB.
+        """
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'username': [f"Couldn't find any user with username '{username}'."]})
+        return user

@@ -1,11 +1,12 @@
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 
 from plugininstances.models import STATUS_CHOICES
-from .models import Note, Feed, Tag, Tagging, Comment
+from .models import (Note, Feed, Tag, Tagging, Comment, FeedGroupPermission,
+                     FeedUserPermission)
 
 
 class NoteSerializer(serializers.HyperlinkedModelSerializer):
@@ -27,7 +28,6 @@ class TagSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class TaggingSerializer(serializers.HyperlinkedModelSerializer):
-    owner_username = serializers.ReadOnlyField(source='tag.owner.username')
     tag_id = serializers.ReadOnlyField(source='tag.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
@@ -35,7 +35,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Tagging
-        fields = ('url', 'id', 'owner_username', 'tag_id', 'feed_id', 'tag', 'feed')
+        fields = ('url', 'id', 'tag_id', 'feed_id', 'tag', 'feed')
 
     def create(self, validated_data):
         """
@@ -53,8 +53,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_tag(self, tag_id):
         """
-        Custom method to check that a tag id is provided, exists in the DB and
-        owned by the user.
+        Custom method to check that a tag id is provided and exists in the DB.
         """
         if not tag_id:
             raise serializers.ValidationError({'tag_id': ["A tag id is required."]})
@@ -64,16 +63,12 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, ObjectDoesNotExist):
             raise serializers.ValidationError(
                 {'tag_id': ["Couldn't find any tag with id %s." % tag_id]})
-        user = self.context['request'].user
-        if tag.owner != user:
-            raise serializers.ValidationError(
-                {'tag_id': ["User is not the owner of tag with tag_id %s." % tag_id]})
         return tag
 
     def validate_feed(self, feed_id):
         """
         Custom method to check that a feed id is provided, exists in the DB and
-        owned by the user.
+        the user has feed permission.
         """
         if not feed_id:
             raise serializers.ValidationError({'feed_id': ["A feed id is required."]})
@@ -83,15 +78,18 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
         except (ValueError, ObjectDoesNotExist):
             raise serializers.ValidationError(
                 {'feed_id': ["Couldn't find any feed with id %s." % feed_id]})
+
         user = self.context['request'].user
-        if user not in feed.owner.all():
+        if not (feed.owner == user or user.username == 'chris' or
+                feed.has_user_permission(user)):
             raise serializers.ValidationError(
-                {'feed_id': ["User is not the owner of feed with feed_id %s." % feed_id]})
+                {'feed_id': ["User does not have permission to tag feed with feed_id "
+                             "%s." % feed_id]})
         return feed
 
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
-    creator_username = serializers.SerializerMethodField()
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     folder_path = serializers.ReadOnlyField(source='folder.path')
     created_jobs = serializers.SerializerMethodField()
     waiting_jobs = serializers.SerializerMethodField()
@@ -109,16 +107,28 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
     plugin_instances = serializers.HyperlinkedIdentityField(
         view_name='feed-plugininstance-list')
-    owner = serializers.HyperlinkedRelatedField(many=True, view_name='user-detail',
-                                                read_only=True)
+    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'public',
-                  'creator_username', 'folder_path', 'created_jobs', 'waiting_jobs',
+                  'owner_username', 'folder_path', 'created_jobs', 'waiting_jobs',
                   'scheduled_jobs', 'started_jobs', 'registering_jobs',
                   'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'folder', 'note',
                   'tags', 'taggings', 'comments', 'plugin_instances', 'owner')
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to grant or remove public access to the feed's folder and all its
+        descendant folders, link files and files depending on the new public status of
+        the feed.
+        """
+        if 'public' in validated_data:
+            if instance.public and not validated_data['public']:
+                instance.folder.remove_public_access()
+            elif not instance.public and validated_data['public']:
+                instance.folder.grant_public_access()
+        return super(FeedSerializer, self).update(instance, validated_data)
 
     def validate_name(self, name):
         """
@@ -128,24 +138,6 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["This field may not contain forward slashes."])
         return name
-
-    def validate_new_owner(self, username):
-        """
-        Custom method to check whether a new feed owner is a system-registered user.
-        """
-        try:
-            # check if user is a system-registered user
-            new_owner = User.objects.get(username=username)
-        except ObjectDoesNotExist:
-            raise serializers.ValidationError(
-                {'owner': ["User %s is not a registered user." % username]})
-        return new_owner
-
-    def get_creator_username(self, obj):
-        """
-        Overriden to get the username of the creator of the feed.
-        """
-        return obj.get_creator().username
 
     def get_created_jobs(self, obj):
         """
@@ -214,6 +206,87 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         if 'cancelled' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'cancelled'.")
         return obj.get_plugin_instances_status_count('cancelled')
+
+
+class FeedGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    grp_name = serializers.CharField(write_only=True)
+    feed_id = serializers.ReadOnlyField(source='feed.id')
+    feed_name = serializers.ReadOnlyField(source='feed.name')
+    group_id = serializers.ReadOnlyField(source='group.id')
+    group_name = serializers.ReadOnlyField(source='group.name')
+
+    class Meta:
+        model = FeedGroupPermission
+        fields = ('url', 'id', 'feed_id', 'feed_name', 'group_id', 'group_name',
+                  'feed', 'group', 'name')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to grant access permission to a group
+        that already has the permission granted.
+        """
+        feed = validated_data['feed']
+        group = validated_data['group']
+
+        try:
+            feed_perm = super(FeedGroupPermissionSerializer, self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Group '{group.name}' already has permission to access feed "
+                      f"with id {feed.id}"]})
+        return feed_perm
+
+    def validate_grp_name(self, grp_name):
+        """
+        Custom method to check whether the provided group name exists in the DB.
+        """
+        try:
+            group = Group.objects.get(name=grp_name)
+        except Group.DoesNotExist:
+            raise serializers.ValidationError(
+                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+        return group
+
+class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    feed_id = serializers.ReadOnlyField(source='feed.id')
+    feed_name = serializers.ReadOnlyField(source='feed.name')
+    user_id = serializers.ReadOnlyField(source='user.id')
+    user_username = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = FeedUserPermission
+        fields = ('url', 'id', 'feed_id', 'feed_name', 'user_id', 'user_username',
+                  'feed', 'user', 'username')
+
+    def create(self, validated_data):
+        """
+        Overriden to handle the error when trying to grant access permission to a user
+        that already has the permission granted.
+        """
+        feed = validated_data['feed']
+        user = validated_data['user']
+
+        try:
+            feed_perm = super(FeedUserPermissionSerializer, self).create(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"User '{user.username}' already has permission to access feed "
+                      f"with id {feed.id}"]})
+        return feed_perm
+
+    def validate_username(self, username):
+        """
+        Custom method to check whether the provided username exists in the DB.
+        """
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                {'username': [f"Couldn't find any user with username '{username}'."]})
+        return user
 
 
 class CommentSerializer(serializers.HyperlinkedModelSerializer):

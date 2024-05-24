@@ -146,7 +146,7 @@ class GroupUserList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate an owner with the tag before first saving to the DB.
+        Overriden to provide a user and group before first saving to the DB.
         """
         user = serializer.validated_data.pop('username')
         group = self.get_object()

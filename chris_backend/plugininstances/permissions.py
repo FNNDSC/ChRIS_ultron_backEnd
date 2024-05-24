@@ -1,23 +1,5 @@
+
 from rest_framework import permissions
-
-
-class IsRelatedFeedOwnerOrPublicReadOnlyOrChris(permissions.BasePermission):
-    """
-    Custom permission to only allow owners of a feed associated to an object or superuser
-    'chris' to modify/edit the object. Read only is allowed to other users if the related
-    feed is public.
-    """
-
-    def has_object_permission(self, request, view, obj):
-        if request.user.username == 'chris':
-            return True
-
-        if hasattr(obj, 'plugin_inst'):
-            feed = obj.plugin_inst.feed
-        else:
-            feed = obj.feed
-        return (request.method in permissions.SAFE_METHODS and feed.public) or (
-                request.user in feed.owner.all())
 
 
 class IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly(permissions.BasePermission):

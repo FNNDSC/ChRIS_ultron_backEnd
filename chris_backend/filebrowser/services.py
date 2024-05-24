@@ -176,7 +176,7 @@ def get_shared_feed_creators_set(user=None):
         feeds_qs = Feed.objects.filter(models.Q(owner=user) | models.Q(public=True))
         username = user.username
     for feed in feeds_qs.all():
-        creator = feed.get_creator()
+        creator = feed.owner
         if creator.username != username:
             creators_set.add(creator.username)
     return creators_set

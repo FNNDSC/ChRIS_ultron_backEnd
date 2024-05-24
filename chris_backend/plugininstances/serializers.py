@@ -83,6 +83,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         # as plugin instances are always created through the API
         plugin = self.context['view'].get_object()
         previous = None
+
         if plugin.meta.type in ('ds', 'ts'):
             if not previous_id:
                 raise serializers.ValidationError(
@@ -94,10 +95,13 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 err_str = "Couldn't find any 'previous' plugin instance with id %s."
                 raise serializers.ValidationError(
                     {'previous_id': [err_str % previous_id]})
+
             # check that the user can run plugins within this feed
             user = self.context['request'].user
-            if user not in previous.feed.owner.all():
-                err_str = "User is not an owner of feed for previous instance with id %s."
+            feed = previous.feed
+
+            if not (user == feed.owner or feed.has_user_permission(user)):
+                err_str = "Not allowed to write to feed for previous instance with id %s."
                 raise serializers.ValidationError(
                     {'previous_id': [err_str % previous_id]})
         return previous
@@ -314,16 +318,20 @@ def validate_paths(user, string):
     """
     storage_manager = connect_storage(settings)
     path_list = [s.strip() for s in string.split(',')]
+
     for path in path_list:
         path_parts = pathlib.Path(path).parts
+
         if len(path_parts) == 0:
             # trying to access the root of the storage
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
+
         if len(path_parts) == 1 and path_parts[0] not in ('SERVICES', 'PIPELINES'):
             # trying to access the home folder or an unknown folder within the root folder
             raise serializers.ValidationError(
                 ["You do not have permission to access this path."])
+
         if path_parts[0] == 'home' and path_parts[1] != user.username:
             if len(path_parts) <= 3:
                 # trying to access another user's root or personal space
@@ -341,7 +349,8 @@ def validate_paths(user, string):
             except (ValueError, Feed.DoesNotExist):
                 raise serializers.ValidationError(
                     ["This field may not be an invalid path."])
-            if user not in feed.owner.all():
+
+            if not (user == feed.owner or feed.has_user_permission(user)):
                 raise serializers.ValidationError(
                     ["You do not have permission to access this path."])
         else:
