@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+from django.contrib.auth.models import Group
 from django.conf import settings
 from rest_framework import serializers
 
@@ -49,13 +50,17 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
         """
         owner = validated_data.pop('owner')
         pacs_name = validated_data.pop('pacs_name')
+        (pacs_grp, _) = Group.objects.get_or_create(name='pacs_users')
 
         try:
             pacs = PACS.objects.get(identifier=pacs_name)
         except PACS.DoesNotExist:
             folder_path = f'SERVICES/PACS/{pacs_name}'
-            (pacs_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                                 owner=owner)
+            (pacs_folder, tf) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                  owner=owner)
+            if tf:
+                pacs_folder.grant_group_permission(pacs_grp, 'r')
+
             pacs = PACS(folder=pacs_folder, identifier=pacs_name)
             pacs.save()  # create a PACS object
 
@@ -84,6 +89,13 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
                 files.append(pacs_file)
 
             PACSFile.objects.bulk_create(files)
+
+            # grant group permission from the highest folder ancestor without it
+            current = series_folder
+            while not current.parent.has_group_permission(pacs_grp):
+                current = current.parent
+            current.grant_group_permission(pacs_grp, 'r')
+
         else:
             error_msg = (f'A DICOM series with SeriesInstanceUID={SeriesInstanceUID} '
                          f'already registered for pacs {pacs_name}')
@@ -167,8 +179,8 @@ class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PACSFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'owner_username',
-                  'file_resource', 'parent_folder', 'owner')
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public',
+                  'owner_username', 'file_resource', 'parent_folder', 'owner')
 
     def get_file_link(self, obj):
         """

@@ -24,7 +24,7 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UserFile
-        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize',
+        fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize', 'public',
                   'owner_username', 'file_resource', 'parent_folder', 'owner')
 
     def create(self, validated_data):

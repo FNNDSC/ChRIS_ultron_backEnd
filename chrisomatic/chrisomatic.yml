@@ -5,7 +5,7 @@ on:
   chris_superuser:
     username: chris
     password: chris1234
-    email: dev@babymri.org
+    email: dev111@babymri.org
 
 cube:
   users:

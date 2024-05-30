@@ -59,43 +59,53 @@ class Feed(models.Model):
         Custom method to determine whether a group has been granted permission to access
         the feed.
         """
-        return FeedGroupPermission.objects.filter(group=group, feed=self).exists()
+        return FeedGroupPermission.objects.filter(feed=self, group=group).exists()
 
     def has_user_permission(self, user):
         """
         Custom method to determine whether a user has been granted permission to access
-        the feed.
+        the feed (perhaps through one of its groups).
         """
-        lookup = Q(user=user) | Q(user__groups__shared_feeds=self)
-        return FeedUserPermission.objects.filter(feed=self).filter(lookup).exists()
+        lookup = models.Q(shared_feeds=self) | models.Q(groups__shared_feeds=self)
+        return User.objects.filter(username=user.username).filter(lookup).exists()
 
     def grant_group_permission(self, group):
         """
-        Custom method to grant a group write permission to access the feed and all its
+        Custom method to grant a group permission to access the feed and all its
         folder's descendant folders, link files and files.
         """
-        FeedGroupPermission.objects.create(folder=self, group=group, permission='w')
+        FeedGroupPermission.objects.get_or_create(feed=self, group=group)
 
     def remove_group_permission(self, group):
         """
         Custom method to remove a group's permission to access the feed and all its
         folder's descendant folders, link files and files.
         """
-        FeedGroupPermission.objects.get(folder=self, group=group, permission='w').delete()
+        try:
+            perm = FeedGroupPermission.objects.get(feed=self, group=group)
+        except FeedGroupPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_user_permission(self, user):
         """
-        Custom method to grant a user write permission to access the feed and all its
+        Custom method to grant a user permission to access the feed and all its
         folder's descendant folders, link files and files.
         """
-        FeedUserPermission.objects.create(folder=self, user=user, permission='w')
+        FeedUserPermission.objects.get_or_create(feed=self, user=user)
 
     def remove_user_permission(self, user):
         """
         Custom method to remove a user's permission to access the feed and all its
         folder's descendant folders, link files and files.
         """
-        FeedUserPermission.objects.get(folder=self, user=user, permission='w').delete()
+        try:
+            perm = FeedUserPermission.objects.get(feed=self, user=user)
+        except FeedUserPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_public_access(self):
         """
@@ -104,6 +114,7 @@ class Feed(models.Model):
         """
         self.public = True
         self.folder.grant_public_access()
+        self.folder.create_public_link()
         self.save()
 
     def remove_public_access(self):
@@ -112,6 +123,7 @@ class Feed(models.Model):
         folders, link files and files.
         """
         self.public = False
+        self.folder.remove_public_link()
         self.folder.remove_public_access()
         self.save()
 

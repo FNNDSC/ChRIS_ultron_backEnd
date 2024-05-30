@@ -125,9 +125,12 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         """
         if 'public' in validated_data:
             if instance.public and not validated_data['public']:
+                instance.folder.remove_public_link()
                 instance.folder.remove_public_access()
+
             elif not instance.public and validated_data['public']:
                 instance.folder.grant_public_access()
+                instance.folder.create_public_link()
         return super(FeedSerializer, self).update(instance, validated_data)
 
     def validate_name(self, name):
@@ -223,7 +226,8 @@ class FeedGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to grant access permission to a group
-        that already has the permission granted.
+        that already has the permission granted. Also a link file in the SHARED folder
+        pointing to the feed's folder is created if it doesn't exist.
         """
         feed = validated_data['feed']
         group = validated_data['group']
@@ -235,6 +239,9 @@ class FeedGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
                 {'non_field_errors':
                      [f"Group '{group.name}' already has permission to access feed "
                       f"with id {feed.id}"]})
+
+        lf = feed.folder.create_shared_link()
+        lf.grant_group_permission(group, 'r')
         return feed_perm
 
     def validate_grp_name(self, grp_name):
@@ -263,7 +270,8 @@ class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to grant access permission to a user
-        that already has the permission granted.
+        that already has the permission granted. Also a link file in the SHARED folder
+        pointing to the feed's folder is created if it doesn't exist.
         """
         feed = validated_data['feed']
         user = validated_data['user']
@@ -275,6 +283,9 @@ class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
                 {'non_field_errors':
                      [f"User '{user.username}' already has permission to access feed "
                       f"with id {feed.id}"]})
+
+        lf = feed.folder.create_shared_link()
+        lf.grant_user_permission(user, 'r')
         return feed_perm
 
     def validate_username(self, username):

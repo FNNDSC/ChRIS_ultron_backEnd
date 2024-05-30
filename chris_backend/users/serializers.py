@@ -7,7 +7,7 @@ from django.conf import settings
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, ChrisLinkFile
 from core.storage import connect_storage
 from userfiles.models import UserFile
 
@@ -34,19 +34,40 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to take care of the password hashing and create a welcome file
         and a feeds folder for the user in its personal storage space.
         """
+        # retrieve predefined groups
+        try:
+            all_grp = Group.objects.get(name='all_users')
+            pacs_grp = Group.objects.get(name='pacs_users')
+        except Group.DoesNotExist:
+            logger.error(f"Error while retrieving groups: ['all_users', 'pacs_users']")
+            raise
+
         username = validated_data.get('username')
         email = validated_data.get('email')
         password = validated_data.get('password')
+
+        # create user taking care of the password hashing and assign the predefined groups
         user = User.objects.create_user(username, email, password)
+        user.groups.set([all_grp, pacs_grp])
 
         home_path = f'home/{username}'
         uploads_path = f'{home_path}/uploads'
         feeds_path = f'{home_path}/feeds'
 
+        # create predefined folders under the home directory
         (uploads_folder, _) = ChrisFolder.objects.get_or_create(path=uploads_path,
                                                                 owner=user)
         (feeds_folder, _) = ChrisFolder.objects.get_or_create(path=feeds_path, owner=user)
 
+        # create predefined link files under the home directory
+        link_file = ChrisLinkFile(path='PUBLIC', owner=user,
+                                  parent_folder=uploads_folder.parent)
+        link_file.save(name='public')
+        link_file = ChrisLinkFile(path='SHARED', owner=user,
+                                  parent_folder=uploads_folder.parent)
+        link_file.save(name='shared')
+
+        # create a welcome.txt file inside the uploads folder
         storage_manager = connect_storage(settings)
         welcome_file_path = f'{uploads_path}/welcome.txt'
         try:
@@ -62,15 +83,11 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_username(self, username):
         """
-        Overriden to check that the username does not contain forward slashes and is
-        not the 'chris' special username.
+        Overriden to check that the username does not contain forward slashes.
         """
         if '/' in username:
             raise serializers.ValidationError(
                 ["This field may not contain forward slashes."])
-        if username == 'chris':
-            raise serializers.ValidationError(
-                ["Username %s is not available." % username])
         return username
 
 

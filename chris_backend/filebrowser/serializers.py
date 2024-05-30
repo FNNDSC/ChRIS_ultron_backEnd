@@ -14,6 +14,7 @@ from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermi
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
+    path = serializers.CharField(max_length=1024, required=False)
     parent = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
     children = serializers.HyperlinkedIdentityField(
@@ -21,18 +22,25 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
     files = serializers.HyperlinkedIdentityField(view_name='chrisfolder-file-list')
     link_files = serializers.HyperlinkedIdentityField(
         view_name='chrisfolder-linkfile-list')
+    group_permissions = serializers.HyperlinkedIdentityField(
+        view_name='foldergrouppermission-list')
+    user_permissions = serializers.HyperlinkedIdentityField(
+        view_name='folderuserpermission-list')
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisFolder
         fields = ('url', 'id', 'creation_date', 'path', 'public', 'parent', 'children',
-                  'files', 'link_files', 'owner')
+                  'files', 'link_files', 'group_permissions', 'user_permissions', 'owner')
 
     def create(self, validated_data):
         """
         Overriden to set the parent folder.
         """
         path = validated_data.get('path')
+        if path is None:
+            raise serializers.ValidationError({'path': ['This field is required.']})
+
         parent_path = os.path.dirname(path)
         owner = validated_data['owner']
 
@@ -40,6 +48,22 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
                                                                owner=owner)
         validated_data['parent'] = parent_folder
         return super(FileBrowserFolderSerializer, self).create(validated_data)
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to grant or remove public access to the folder and all its
+        descendant folders, link files and files depending on the new public status of
+        the folder.
+        """
+        if 'public' in validated_data:
+            if instance.public and not validated_data['public']:
+                instance.remove_public_link()
+                instance.remove_public_access()
+
+            elif not instance.public and validated_data['public']:
+                instance.grant_public_access()
+                instance.create_public_link()
+        return super(FileBrowserFolderSerializer, self).update(instance, validated_data)
 
     def validate_path(self, path):
         """
@@ -85,7 +109,8 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a group that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to the folder is created if it doesn't exist.
         """
         folder = validated_data['folder']
         group = validated_data['group']
@@ -98,6 +123,9 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
                 {'non_field_errors':
                      [f"Group '{group.name}' already has a permission to access folder "
                       f"with id {folder.id}"]})
+
+        lf = folder.create_shared_link()
+        lf.grant_group_permission(group, 'r')
         return perm
 
     def validate_grp_name(self, grp_name):
@@ -126,7 +154,8 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a user that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to the folder is created if it doesn't exist.
         """
         folder = validated_data['folder']
         user = validated_data['user']
@@ -139,6 +168,9 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
                 {'non_field_errors':
                      [f"User '{user.username}' already has a permission to access "
                       f"folder with id {folder.id}"]})
+
+        lf = folder.create_shared_link()
+        lf.grant_user_permission(user, 'r')
         return perm
 
     def validate_username(self, username):
@@ -160,12 +192,17 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
     file_resource = ItemLinkField('get_file_link')
     parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                         read_only=True)
+    group_permissions = serializers.HyperlinkedIdentityField(
+        view_name='filegrouppermission-list')
+    user_permissions = serializers.HyperlinkedIdentityField(
+        view_name='fileuserpermission-list')
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize',
-                  'owner_username', 'file_resource', 'parent_folder', 'owner')
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public',
+                  'owner_username', 'file_resource', 'parent_folder', 'group_permissions',
+                  'user_permissions', 'owner')
 
     def get_file_link(self, obj):
         """
@@ -189,7 +226,8 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a group that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to the file is created if it doesn't exist.
         """
         f = validated_data['file']
         group = validated_data['group']
@@ -202,6 +240,9 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
                 {'non_field_errors':
                      [f"Group '{group.name}' already has a permission to access file "
                       f"with id {f.id}"]})
+
+        lf = f.create_shared_link()
+        lf.grant_group_permission(group, 'r')
         return perm
 
     def validate_grp_name(self, grp_name):
@@ -231,7 +272,8 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a user that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to the file is created if it doesn't exist.
         """
         f = validated_data['file']
         user = validated_data['user']
@@ -244,6 +286,9 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
                 {'non_field_errors':
                      [f"User '{user.username}' already has a permission to access "
                       f"file with id {f.id}"]})
+
+        lf = f.create_shared_link()
+        lf.grant_user_permission(user, 'r')
         return perm
 
     def validate_username(self, username):
@@ -267,13 +312,17 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     linked_file = ItemLinkField('get_linked_file_link')
     parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                         read_only=True)
+    group_permissions = serializers.HyperlinkedIdentityField(
+        view_name='linkfilegrouppermission-list')
+    user_permissions = serializers.HyperlinkedIdentityField(
+        view_name='linkfileuserpermission-list')
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisLinkFile
-        fields = ('url', 'id', 'creation_date', 'path', 'fname', 'fsize',
+        fields = ('url', 'id', 'creation_date', 'path', 'fname', 'fsize', 'public',
                   'owner_username', 'file_resource', 'linked_folder', 'linked_file',
-                  'parent_folder', 'owner')
+                  'parent_folder', 'group_permissions', 'user_permissions', 'owner')
 
     def get_file_link(self, obj):
         """
@@ -334,7 +383,8 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a group that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to this link file is created if it doesn't exist.
         """
         lf = validated_data['link_file']
         group = validated_data['group']
@@ -347,6 +397,9 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
                 {'non_field_errors':
                      [f"Group '{group.name}' already has a permission to access link "
                       f"file with id {lf.id}"]})
+
+        shared_lf = lf.create_shared_link()
+        shared_lf.grant_group_permission(group, 'r')
         return perm
 
     def validate_grp_name(self, grp_name):
@@ -376,7 +429,8 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a user that
-        already has a permission granted.
+        already has a permission granted. Also a link file in the SHARED folder
+        pointing to this link file is created if it doesn't exist.
         """
         lf = validated_data['link_file']
         user = validated_data['user']
@@ -389,6 +443,9 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
                 {'non_field_errors':
                      [f"User '{user.username}' already has a permission to access "
                       f"file with id {lf.id}"]})
+
+        shared_lf = lf.create_shared_link()
+        shared_lf.grant_user_permission(user, 'r')
         return perm
 
     def validate_username(self, username):

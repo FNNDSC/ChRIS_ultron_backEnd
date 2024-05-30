@@ -27,12 +27,16 @@ from .serializers import (FileBrowserFolderSerializer,
                           FileBrowserLinkFileSerializer,
                           FileBrowserLinkFileGroupPermissionSerializer,
                           FileBrowserLinkFileUserPermissionSerializer)
-from .services import (get_authenticated_user_folder_queryset,
-                       get_unauthenticated_user_folder_queryset,
-                       get_authenticated_user_folder_children,
-                       get_unauthenticated_user_folder_children)
-from .permissions import (IsOwnerOrChrisOrWriteUserOrReadOnly,
-                          IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly)
+from .services import (get_folder_queryset,
+                       get_folder_children_queryset,
+                       get_folder_files_queryset,
+                       get_folder_link_files_queryset)
+from .permissions import (IsOwnerOrChrisOrHasWritePermissionOrReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly,
+                          IsFolderOwnerOrChrisOrHasAnyFolderPermissionReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic,
+                          IsFileOwnerOrChrisOrHasAnyFilePermissionReadOnly,
+                          IsLinkFileOwnerOrChrisOrHasAnyLinkFilePermissionReadOnly)
 
 
 logger = logging.getLogger(__name__)
@@ -70,10 +74,20 @@ class FileBrowserFolderList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset that is only comprised by the initial
-        path (empty path).
+        Overriden to return a custom queryset that is only comprised by the root
+        folder (empty path).
         """
-        return ChrisFolder.objects.filter(path='')
+        user = self.request.user
+        pk_dict = {'path': ''}
+
+        if user.is_authenticated:
+            qs = get_folder_queryset(pk_dict, user)
+        else:
+            qs = get_folder_queryset(pk_dict)
+
+        if qs.count() == 0:
+            raise Http404('Not found.')
+        return qs
 
 
 class FileBrowserFolderListQuerySearch(generics.ListAPIView):
@@ -98,8 +112,8 @@ class FileBrowserFolderListQuerySearch(generics.ListAPIView):
             pk_dict = {'path': path}
 
         if user.is_authenticated:
-            return get_authenticated_user_folder_queryset(pk_dict, user)
-        return get_unauthenticated_user_folder_queryset(pk_dict)
+            return get_folder_queryset(pk_dict, user)
+        return get_folder_queryset(pk_dict)
 
 
 class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -110,25 +124,35 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrWriteUserOrReadOnly)
+                          IsOwnerOrChrisOrHasWritePermissionOrReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Overriden to get the collection of file browser paths directly under a path.
+        Overriden to retrieve a file browser folder and append a collection+json template.
         """
         user = request.user
         id = kwargs.get('pk')
         pk_dict = {'id': id}
 
         if user.is_authenticated:
-            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+            qs = get_folder_queryset(pk_dict, user)
         else:
-            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+            qs = get_folder_queryset(pk_dict)
 
         if qs.count() == 0:
             raise Http404('Not found.')
 
-        return super(FileBrowserFolderDetail, self).retrieve(request, *args, **kwargs)
+        response = super(FileBrowserFolderDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"public": ""}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove path if provided by the user before serializer validation.
+        """
+        request.data.pop('path', None)  # change path is not implemented yet
+        return super(FileBrowserFolderDetail, self).update(request, *args, **kwargs)
+
 
 class FileBrowserFolderChildList(generics.ListAPIView):
     """
@@ -147,28 +171,19 @@ class FileBrowserFolderChildList(generics.ListAPIView):
         pk_dict = {'id': id}
 
         if user.is_authenticated:
-            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+            qs = get_folder_queryset(pk_dict, user)
         else:
-            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+            qs = get_folder_queryset(pk_dict)
 
-        if qs.count() == 0:
+        folder = qs.first()
+        if folder is None:
             raise Http404('Not found.')
 
-        queryset = self.get_children_queryset()
-        return services.get_list_response(self, queryset)
-
-    def get_children_queryset(self):
-        """
-        Custom method to get the actual queryset of the children.
-        """
-        user = self.request.user
-        folder = self.get_object()
-
         if user.is_authenticated:
-            children = get_authenticated_user_folder_children(folder, user)
+            children_qs = get_folder_children_queryset(folder, user)
         else:
-            children = get_unauthenticated_user_folder_children(folder)
-        return self.filter_queryset(children)
+            children_qs = get_folder_children_queryset(folder)
+        return services.get_list_response(self, children_qs)
 
 
 class FileBrowserFolderGroupPermissionList(generics.ListCreateAPIView):
@@ -179,7 +194,7 @@ class FileBrowserFolderGroupPermissionList(generics.ListCreateAPIView):
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderGroupPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -198,8 +213,10 @@ class FileBrowserFolderGroupPermissionList(generics.ListCreateAPIView):
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         folder = self.get_object()
-        links = {'folder': reverse('folder-detail', request=request,
+
+        links = {'folder': reverse('chrisfolder-detail', request=request,
                                    kwargs={"pk": folder.id})}
+
         response = services.append_collection_links(response, links)
         template_data = {"grp_name": ""}
         return services.append_collection_template(response, template_data)
@@ -219,8 +236,7 @@ class FileBrowserFolderGroupPermissionListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FileBrowserFolderGroupPermissionSerializer
-    permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = FolderGroupPermissionFilter
 
     def get_queryset(self):
@@ -228,8 +244,14 @@ class FileBrowserFolderGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         group permissions.
         """
-        folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
-        return folder.shared_groups.all()
+        user = self.request.user
+        id = self.kwargs['pk']
+        pk_dict = {'id': id}
+
+        folder = get_folder_queryset(pk_dict, user).first()
+        if folder is None:
+            raise Http404('Not found.')
+        return FolderGroupPermission.objects.filter(folder=folder)
 
 
 class FileBrowserFolderGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -240,7 +262,7 @@ class FileBrowserFolderGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIVi
     serializer_class = FileBrowserFolderGroupPermissionSerializer
     queryset = FolderGroupPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsFolderOwnerOrChrisOrHasAnyFolderPermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -251,6 +273,23 @@ class FileBrowserFolderGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIVi
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the group permission for the link file in the SHARED folder
+        pointing to the folder. The link file itself is removed if all its permissions
+        have been removed.
+        """
+        folder = instance.folder
+        group = instance.group
+
+        lf = folder.get_shared_link()
+        if lf is not None:
+            lf.remove_group_permission(group, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                folder.remove_shared_link()
+        super(FileBrowserFolderGroupPermissionDetail, self).perform_destroy(instance)
+
 
 class FileBrowserFolderUserPermissionList(generics.ListCreateAPIView):
     """
@@ -260,7 +299,7 @@ class FileBrowserFolderUserPermissionList(generics.ListCreateAPIView):
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderUserPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -279,8 +318,10 @@ class FileBrowserFolderUserPermissionList(generics.ListCreateAPIView):
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         folder = self.get_object()
+
         links = {'folder': reverse('chrisfolder-detail', request=request,
                                    kwargs={"pk": folder.id})}
+
         response = services.append_collection_links(response, links)
         template_data = {"username": ""}
         return services.append_collection_template(response, template_data)
@@ -300,8 +341,7 @@ class FileBrowserFolderUserPermissionListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FileBrowserFolderUserPermissionSerializer
-    permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = FolderUserPermissionFilter
 
     def get_queryset(self):
@@ -309,8 +349,14 @@ class FileBrowserFolderUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         user permissions.
         """
-        folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
-        return folder.shared_users.all()
+        user = self.request.user
+        id = self.kwargs['pk']
+        pk_dict = {'id': id}
+
+        folder = get_folder_queryset(pk_dict, user).first()
+        if folder is None:
+            raise Http404('Not found.')
+        return FolderUserPermission.objects.filter(folder=folder)
 
 
 class FileBrowserFolderUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -321,7 +367,7 @@ class FileBrowserFolderUserPermissionDetail(generics.RetrieveUpdateDestroyAPIVie
     serializer_class = FileBrowserFolderUserPermissionSerializer
     queryset = FolderUserPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsFolderOwnerOrChrisOrHasAnyFolderPermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -331,6 +377,23 @@ class FileBrowserFolderUserPermissionDetail(generics.RetrieveUpdateDestroyAPIVie
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the user permission for the link file in the SHARED folder
+        pointing to the folder. The link file itself is removed if all its permissions
+        have been removed.
+        """
+        folder = instance.folder
+        user = instance.user
+
+        lf = folder.get_shared_link()
+        if lf is not None:
+            lf.remove_user_permission(user, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                folder.remove_shared_link()
+        super(FileBrowserFolderUserPermissionDetail, self).perform_destroy(instance)
 
 
 class FileBrowserFolderFileList(generics.ListAPIView):
@@ -350,23 +413,21 @@ class FileBrowserFolderFileList(generics.ListAPIView):
         pk_dict = {'id': id}
 
         if user.is_authenticated:
-            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+            qs = get_folder_queryset(pk_dict, user)
         else:
-            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+            qs = get_folder_queryset(pk_dict)
 
-        if qs.count() == 0:
+        folder = qs.first()
+        if folder is None:
             raise Http404('Not found.')
 
-        queryset = self.get_files_queryset()
-        response = services.get_list_response(self, queryset)
-        return response
+        if user.is_authenticated:
+            files_qs = get_folder_files_queryset(folder, user)
+        else:
+            files_qs = get_folder_files_queryset(folder)
 
-    def get_files_queryset(self):
-        """
-        Custom method to get a queryset with all the files directly under this folder.
-        """
-        folder = self.get_object()
-        return folder.chris_files.all()
+        response = services.get_list_response(self, files_qs)
+        return response
 
 
 class FileBrowserFileDetail(generics.RetrieveAPIView):
@@ -376,7 +437,8 @@ class FileBrowserFileDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = ChrisFile.get_base_queryset()
     serializer_class = FileBrowserFileSerializer
-    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
 
 
 class FileBrowserFileResource(generics.GenericAPIView):
@@ -386,7 +448,8 @@ class FileBrowserFileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = ChrisFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
@@ -406,7 +469,7 @@ class FileBrowserFileGroupPermissionList(generics.ListCreateAPIView):
     queryset = ChrisFile.objects.all()
     serializer_class = FileBrowserFileGroupPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -425,8 +488,10 @@ class FileBrowserFileGroupPermissionList(generics.ListCreateAPIView):
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         f = self.get_object()
+
         links = {'file': reverse('chrisfile-detail', request=request,
                                    kwargs={"pk": f.id})}
+
         response = services.append_collection_links(response, links)
         template_data = {"grp_name": ""}
         return services.append_collection_template(response, template_data)
@@ -447,7 +512,7 @@ class FileBrowserFileGroupPermissionListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = FileBrowserFileGroupPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = FileGroupPermissionFilter
 
     def get_queryset(self):
@@ -456,10 +521,10 @@ class FileBrowserFileGroupPermissionListQuerySearch(generics.ListAPIView):
         group permissions.
         """
         f = get_object_or_404(ChrisFile, pk=self.kwargs['pk'])
-        return f.shared_groups.all()
+        return FileGroupPermission.objects.filter(file=f)
 
 
-class FileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
+class FileBrowserFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A view for a file's group permission.
     """
@@ -467,16 +532,33 @@ class FileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = FileBrowserFileGroupPermissionSerializer
     queryset = FileGroupPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsFileOwnerOrChrisOrHasAnyFilePermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
-        response = super(FileGroupPermissionDetail,
+        response = super(FileBrowserFileGroupPermissionDetail,
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the group permission for the link file in the SHARED folder
+        pointing to the file. The link file itself is removed if all its permissions
+        have been removed.
+        """
+        f = instance.file
+        group = instance.group
+
+        lf = f.get_shared_link()
+        if lf is not None:
+            lf.remove_group_permission(group, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                f.remove_shared_link()
+        super(FileBrowserFileGroupPermissionDetail, self).perform_destroy(instance)
 
 
 class FileBrowserFileUserPermissionList(generics.ListCreateAPIView):
@@ -487,7 +569,7 @@ class FileBrowserFileUserPermissionList(generics.ListCreateAPIView):
     queryset = ChrisFile.objects.all()
     serializer_class = FileBrowserFileUserPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -506,8 +588,10 @@ class FileBrowserFileUserPermissionList(generics.ListCreateAPIView):
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         f = self.get_object()
+
         links = {'file': reverse('chrisfile-detail', request=request,
                                  kwargs={"pk": f.id})}
+
         response = services.append_collection_links(response, links)
         template_data = {"username": ""}
         return services.append_collection_template(response, template_data)
@@ -528,7 +612,7 @@ class FileBrowserFileUserPermissionListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = FileBrowserFileUserPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = FileUserPermissionFilter
 
     def get_queryset(self):
@@ -537,7 +621,7 @@ class FileBrowserFileUserPermissionListQuerySearch(generics.ListAPIView):
         user permissions.
         """
         f = get_object_or_404(ChrisFile, pk=self.kwargs['pk'])
-        return f.shared_users.all()
+        return FileUserPermission.objects.filter(file=f)
 
 
 class FileBrowserFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -548,7 +632,7 @@ class FileBrowserFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView)
     serializer_class = FileBrowserFileUserPermissionSerializer
     queryset = FileUserPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsFileOwnerOrChrisOrHasAnyFilePermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -558,6 +642,23 @@ class FileBrowserFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView)
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the user permission for the link file in the SHARED folder
+        pointing to the file. The link file itself is removed if all its permissions
+        have been removed.
+        """
+        f = instance.file
+        user = instance.user
+
+        lf = f.get_shared_link()
+        if lf is not None:
+            lf.remove_user_permission(user, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                f.remove_shared_link()
+        super(FileBrowserFileUserPermissionDetail, self).perform_destroy(instance)
 
 
 class FileBrowserFolderLinkFileList(generics.ListAPIView):
@@ -577,24 +678,21 @@ class FileBrowserFolderLinkFileList(generics.ListAPIView):
         pk_dict = {'id': id}
 
         if user.is_authenticated:
-            qs = get_authenticated_user_folder_queryset(pk_dict, user)
+            qs = get_folder_queryset(pk_dict, user)
         else:
-            qs = get_unauthenticated_user_folder_queryset(pk_dict)
+            qs = get_folder_queryset(pk_dict)
 
-        if qs.count() == 0:
+        folder = qs.first()
+        if folder is None:
             raise Http404('Not found.')
 
-        queryset = self.get_link_files_queryset()
-        response = services.get_list_response(self, queryset)
-        return response
+        if user.is_authenticated:
+            link_files_qs = get_folder_link_files_queryset(folder, user)
+        else:
+            link_files_qs = get_folder_link_files_queryset(folder)
 
-    def get_link_files_queryset(self):
-        """
-        Custom method to get a queryset with all the link files directly under this
-        folder.
-        """
-        folder = self.get_object()
-        return folder.chris_link_files.all()
+        response = services.get_list_response(self, link_files_qs)
+        return response
 
 
 class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
@@ -604,7 +702,8 @@ class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = ChrisLinkFile.objects.all()
     serializer_class = FileBrowserLinkFileSerializer
-    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
 
 
 class FileBrowserLinkFileResource(generics.GenericAPIView):
@@ -614,7 +713,8 @@ class FileBrowserLinkFileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = ChrisLinkFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (IsOwnerOrChrisOrRelatedFeedOwnerOrPublicReadOnly,)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
@@ -634,7 +734,7 @@ class FileBrowserLinkFileGroupPermissionList(generics.ListCreateAPIView):
     queryset = ChrisLinkFile.objects.all()
     serializer_class = FileBrowserLinkFileGroupPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -653,8 +753,10 @@ class FileBrowserLinkFileGroupPermissionList(generics.ListCreateAPIView):
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         lf = self.get_object()
+
         links = {'link_file': reverse('chrislinkfile-detail', request=request,
                                       kwargs={"pk": lf.id})}
+
         response = services.append_collection_links(response, links)
         template_data = {"grp_name": ""}
         return services.append_collection_template(response, template_data)
@@ -675,7 +777,7 @@ class FileBrowserLinkFileGroupPermissionListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = FileBrowserLinkFileGroupPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = LinkFileGroupPermissionFilter
 
     def get_queryset(self):
@@ -684,10 +786,10 @@ class FileBrowserLinkFileGroupPermissionListQuerySearch(generics.ListAPIView):
         group permissions.
         """
         lf = get_object_or_404(ChrisLinkFile, pk=self.kwargs['pk'])
-        return lf.shared_groups.all()
+        return LinkFileGroupPermission.objects.filter(link_file=lf)
 
 
-class LinkFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
+class FileBrowserLinkFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A view for a link file's group permission.
     """
@@ -695,16 +797,33 @@ class LinkFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = FileBrowserLinkFileGroupPermissionSerializer
     queryset = LinkFileGroupPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsLinkFileOwnerOrChrisOrHasAnyLinkFilePermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to append a collection+json template.
         """
-        response = super(LinkFileGroupPermissionDetail,
+        response = super(FileBrowserLinkFileGroupPermissionDetail,
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the group permission for the link file in the SHARED folder
+        pointing to this link file. The link file itself is removed if all its
+        permissions have been removed.
+        """
+        link_file = instance.link_file
+        group = instance.group
+
+        lf = link_file.get_shared_link()
+        if lf is not None:
+            lf.remove_group_permission(group, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                link_file.remove_shared_link()
+        super(FileBrowserLinkFileGroupPermissionDetail, self).perform_destroy(instance)
 
 
 class FileBrowserLinkFileUserPermissionList(generics.ListCreateAPIView):
@@ -715,7 +834,7 @@ class FileBrowserLinkFileUserPermissionList(generics.ListCreateAPIView):
     queryset = ChrisLinkFile.objects.all()
     serializer_class = FileBrowserLinkFileUserPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -756,7 +875,7 @@ class FileBrowserLinkFileUserPermissionListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = FileBrowserLinkFileUserPermissionSerializer
     permission_classes = (permissions.IsAuthenticated,
-                          IsOwnerOrChrisOrHasPermissionReadOnly)
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = LinkFileUserPermissionFilter
 
     def get_queryset(self):
@@ -765,7 +884,7 @@ class FileBrowserLinkFileUserPermissionListQuerySearch(generics.ListAPIView):
         user permissions.
         """
         lf = get_object_or_404(ChrisLinkFile, pk=self.kwargs['pk'])
-        return lf.shared_users.all()
+        return LinkFileUserPermission.objects.filter(link_file=lf)
 
 
 class FileBrowserLinkFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -776,7 +895,7 @@ class FileBrowserLinkFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIV
     serializer_class = FileBrowserLinkFileUserPermissionSerializer
     queryset = LinkFileUserPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+                          IsLinkFileOwnerOrChrisOrHasAnyLinkFilePermissionReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -786,3 +905,20 @@ class FileBrowserLinkFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIV
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the user permission for the link file in the SHARED folder
+        pointing to this link file. The link file itself is removed if all its
+        permissions have been removed.
+        """
+        link_file = instance.link_file
+        user = instance.user
+
+        lf = link_file.get_shared_link()
+        if lf is not None:
+            lf.remove_user_permission(user, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                link_file.remove_shared_link()
+        super(FileBrowserLinkFileUserPermissionDetail, self).perform_destroy(instance)

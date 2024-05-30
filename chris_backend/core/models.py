@@ -95,6 +95,7 @@ class ChrisFolder(models.Model):
         """
         if self.path:
             parent_path = os.path.dirname(self.path)
+
             try:
                 parent = ChrisFolder.objects.get(path=parent_path)
             except ChrisFolder.DoesNotExist:
@@ -102,7 +103,8 @@ class ChrisFolder(models.Model):
                 parent.save()  # recursive call
             self.parent = parent
 
-        if self.path in ('', 'home') or self.path.startswith(('PIPELINES', 'SERVICES')):
+        if self.path in ('', 'home', 'PUBLIC', 'SHARED') or self.path.startswith(
+                ('PIPELINES', 'SERVICES')):
             self.owner = User.objects.get(username='chris')
         super(ChrisFolder, self).save(*args, **kwargs)
 
@@ -114,23 +116,36 @@ class ChrisFolder(models.Model):
         path = self.path.rstrip('/') + '/'
         return list(ChrisFolder.objects.filter(path__startswith=path))
 
-    def has_group_permission(self, group, permission):
+    def has_group_permission(self, group, permission=''):
         """
         Custom method to determine whether a group has been granted a permission
         to access the folder.
         """
-        p = validate_permission(permission)
-        qs = FolderGroupPermission.objects.filter(group=group, folder=self, permission=p)
+        if not permission:
+            qs = FolderGroupPermission.objects.filter(group=group, folder=self)
+        else:
+            p = validate_permission(permission)
+            qs = FolderGroupPermission.objects.filter(group=group, folder=self,
+                                                      permission=p)
         return qs.exists()
 
-    def has_user_permission(self, user, permission):
+    def has_user_permission(self, user, permission=''):
         """
         Custom method to determine whether a user has been granted a permission
-        to access the folder.
+        to access the folder (perhaps through one of its groups).
         """
-        p = validate_permission(permission)
-        lookup = models.Q(user=user) | models.Q(user__groups__shared_folders=self)
-        qs = FolderUserPermission.objects.filter(folder=self, permission=p).filter(lookup)
+        if not permission:
+            lookup = models.Q(shared_folders=self) | models.Q(groups__shared_folders=self)
+            qs = User.objects.filter(username=user.username).filter(lookup)
+        else:
+            p = validate_permission(permission)
+            if FolderUserPermission.objects.filter(folder=self, user=user,
+                                                   permission=p).exists():
+                return True
+
+            user_grp_ids = [g.id for g in user.groups.all()]
+            qs = FolderGroupPermission.objects.filter(folder=self, permission=p,
+                                                      group__pk__in=user_grp_ids)
         return qs.exists()
 
     def grant_group_permission(self, group, permission):
@@ -148,7 +163,6 @@ class ChrisFolder(models.Model):
         """
         FolderGroupPermission.objects.get(folder=self, group=group,
                                           permission=permission).delete()
-
 
     def grant_user_permission(self, user, permission):
         """
@@ -178,6 +192,81 @@ class ChrisFolder(models.Model):
         folders, link files and files.
         """
         self._update_public_access(False)
+
+    def get_shared_link(self):
+        """
+        Custom method to get the link file in the SHARED folder pointing to
+        this folder if it exists.
+        """
+        path = self.path.rstrip('/')
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            return None
+        return lf
+
+    def create_shared_link(self):
+        """
+        Custom method to create a link file in the SHARED folder pointing to
+        this folder.
+        """
+        path = self.path.rstrip('/')
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            shared_folder = ChrisFolder.objects.get(path='SHARED')
+            lf = ChrisLinkFile(path=path, owner=self.owner, parent_folder=shared_folder)
+            lf.save(name=str_source_trace_dir)
+        return lf
+
+    def remove_shared_link(self):
+        """
+        Custom method to remove a link file in the SHARED folder pointing to
+        this folder if it exists.
+        """
+        fname = 'SHARED/' + self.path.rstrip('/').replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
+
+    def create_public_link(self):
+        """
+        Custom method to create a public link file in the PUBLIC folder pointing to
+        this folder.
+        """
+        path = self.path.rstrip('/')
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'PUBLIC/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            public_folder = ChrisFolder.objects.get(path='PUBLIC')
+            lf = ChrisLinkFile(path=path, owner=self.owner, public=True,
+                               parent_folder=public_folder)
+            lf.save(name=str_source_trace_dir)
+
+    def remove_public_link(self):
+        """
+        Custom method to remove a public link file in the PUBLIC folder pointing to
+        this folder if it exists.
+        """
+        fname = 'PUBLIC/' + self.path.rstrip('/').replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
 
     def _update_public_access(self, public_tf):
         """
@@ -389,51 +478,74 @@ class ChrisFile(models.Model):
     def __str__(self):
         return self.fname.name
 
-    def has_group_permission(self, group, permission):
+    def has_group_permission(self, group, permission=''):
         """
-        Custom method to determine whether a group has been granted permission to access
-        the file.
+        Custom method to determine whether a group has been granted a permission to
+        access the file.
         """
-        p = validate_permission(permission)
-        qs = FileGroupPermission.objects.filter(group=group, file=self, permission=p)
+        if not permission:
+            qs = FileGroupPermission.objects.filter(group=group, file=self)
+        else:
+            p = validate_permission(permission)
+            qs = FileGroupPermission.objects.filter(group=group, file=self, permission=p)
         return qs.exists()
 
-    def has_user_permission(self, user, permission):
+    def has_user_permission(self, user, permission=''):
         """
-        Custom method to determine whether a user has been granted permission to access
-        the file.
+        Custom method to determine whether a user has been granted a permission to
+        access the file (perhaps through one of its groups).
         """
-        p = validate_permission(permission)
-        lookup = models.Q(user=user) | models.Q(user__groups__shared_files=self)
-        qs = FileUserPermission.objects.filter(file=self, permission=p).filter(lookup)
+        if not permission:
+            lookup = models.Q(shared_files=self) | models.Q(groups__shared_files=self)
+            qs = User.objects.filter(username=user.username).filter(lookup)
+        else:
+            p = validate_permission(permission)
+            if FileUserPermission.objects.filter(file=self, user=user,
+                                                 permission=p).exists():
+                return True
+
+            user_grp_ids = [g.id for g in user.groups.all()]
+            qs = FileGroupPermission.objects.filter(file=self, permission=p,
+                                                    group__pk__in=user_grp_ids)
         return qs.exists()
 
     def grant_group_permission(self, group, permission):
         """
         Custom method to grant a group a permission to access the file.
         """
-        FileGroupPermission.objects.create(folder=self, group=group,
-                                           permission=permission)
+        FileGroupPermission.objects.update_or_create(file=self, group=group,
+                                                     defaults={'permission': permission})
 
     def remove_group_permission(self, group, permission):
         """
         Custom method to remove a group's permission to access the file.
         """
-        FileGroupPermission.objects.get(folder=self, group=group,
-                                        permission=permission).delete()
+        try:
+            perm = FileGroupPermission.objects.get(file=self, group=group,
+                                                   permission=permission)
+        except FileGroupPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_user_permission(self, user, permission):
         """
         Custom method to grant a user a permission to access the file.
         """
-        FileUserPermission.objects.create(folder=self, user=user, permission=permission)
+        FileUserPermission.objects.update_or_create(file=self, user=user,
+                                                    defaults={'permission': permission})
 
     def remove_user_permission(self, user, permission):
         """
         Custom method to remove a user's permission to access the file.
         """
-        FileUserPermission.objects.get(folder=self, user=user,
-                                       permission=permission).delete()
+        try:
+            perm = FileUserPermission.objects.get(file=self, user=user,
+                                                  permission=permission)
+        except FileUserPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_public_access(self):
         """
@@ -448,6 +560,81 @@ class ChrisFile(models.Model):
         """
         self.public = False
         self.save()
+
+    def get_shared_link(self):
+        """
+        Custom method to get the link file in the SHARED folder pointing to
+        this file if it exists.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            return None
+        return lf
+
+    def create_shared_link(self):
+        """
+        Custom method to create a link file in the SHARED folder pointing to
+        this file.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            shared_folder = ChrisFolder.objects.get(path='SHARED')
+            lf = ChrisLinkFile(path=path, owner=self.owner, parent_folder=shared_folder)
+            lf.save(name=str_source_trace_dir)
+        return lf
+
+    def remove_shared_link(self):
+        """
+        Custom method to remove a link file in the SHARED folder pointing to
+        this file if it exists.
+        """
+        fname = 'SHARED/' + self.fname.name.replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
+
+    def create_public_link(self):
+        """
+        Custom method to create a public link file in the PUBLIC folder pointing to
+        this file.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'PUBLIC/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            public_folder = ChrisFolder.objects.get(path='PUBLIC')
+            lf = ChrisLinkFile(path=path, owner=self.owner, public=True,
+                               parent_folder=public_folder)
+            lf.save(name=str_source_trace_dir)
+
+    def remove_public_link(self):
+        """
+        Custom method to remove a public link file in the PUBLIC folder pointing to
+        this file if it exists.
+        """
+        fname = 'PUBLIC/' + self.fname.name.replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
 
     @classmethod
     def get_base_queryset(cls):
@@ -545,52 +732,76 @@ class ChrisLinkFile(models.Model):
         self.fname.name = link_file_path
         super(ChrisLinkFile, self).save(*args, **kwargs)
 
-    def has_group_permission(self, group, permission):
+    def has_group_permission(self, group, permission=''):
         """
-        Custom method to determine whether a group has been granted permission to access
-        the link file.
+        Custom method to determine whether a group has been granted a permission to
+        access the link file.
         """
-        p = validate_permission(permission)
-        return LinkFileGroupPermission.objects.filter(group=group, link_file=self,
-                                                      permission=p).exists()
+        if not permission:
+            qs = LinkFileGroupPermission.objects.filter(group=group, link_file=self)
+        else:
+            p = validate_permission(permission)
+            qs = LinkFileGroupPermission.objects.filter(group=group, link_file=self,
+                                                        permission=p)
+        return qs.exists()
 
-    def has_user_permission(self, user, permission):
+    def has_user_permission(self, user, permission=''):
         """
-        Custom method to determine whether a user has been granted permission to access
-        the link file.
+        Custom method to determine whether a user has been granted a permission to
+        access the link file (perhaps through one of its groups).
         """
-        p = validate_permission(permission)
-        lookup = models.Q(user=user) | models.Q(user__groups__shared_link_files=self)
-        return LinkFileUserPermission.objects.filter(link_file=self,
-                                                     permission=p).filter(lookup).exists()
+        if not permission:
+            lookup = models.Q(shared_link_files=self) | models.Q(
+                groups__shared_link_files=self)
+            qs = User.objects.filter(username=user.username).filter(lookup)
+        else:
+            p = validate_permission(permission)
+            if LinkFileUserPermission.objects.filter(link_file=self, user=user,
+                                                     permission=p).exists():
+                return True
+
+            user_grp_ids = [g.id for g in user.groups.all()]
+            qs = LinkFileGroupPermission.objects.filter(link_file=self, permission=p,
+                                                        group__pk__in=user_grp_ids)
+        return qs.exists()
 
     def grant_group_permission(self, group, permission):
         """
         Custom method to grant a group a permission to access the link file.
         """
-        LinkFileGroupPermission.objects.create(folder=self, group=group,
-                                               permission=permission)
+        LinkFileGroupPermission.objects.update_or_create(file=self, group=group,
+                                                         defaults={'permission': permission})
 
     def remove_group_permission(self, group, permission):
         """
         Custom method to remove a group's permission to access the link file.
         """
-        LinkFileGroupPermission.objects.get(folder=self, group=group,
-                                            permission=permission).delete()
+        try:
+            perm = LinkFileGroupPermission.objects.get(file=self, group=group,
+                                                       permission=permission)
+        except LinkFileGroupPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_user_permission(self, user, permission):
         """
         Custom method to grant a user a permission to access the link file.
         """
-        LinkFileUserPermission.objects.create(folder=self, user=user,
-                                              permission=permission)
+        LinkFileUserPermission.objects.update_or_create(file=self, user=user,
+                                                        defaults={'permission': permission})
 
     def remove_user_permission(self, user, permission):
         """
         Custom method to remove a user's permission to access the link file.
         """
-        LinkFileUserPermission.objects.get(folder=self, user=user,
-                                           permission=permission).delete()
+        try:
+            perm = LinkFileUserPermission.objects.get(file=self, user=user,
+                                                      permission=permission)
+        except LinkFileUserPermission.DoesNotExist:
+            pass
+        else:
+            perm.delete()
 
     def grant_public_access(self):
         """
@@ -606,6 +817,80 @@ class ChrisLinkFile(models.Model):
         self.public = False
         self.save()
 
+    def get_shared_link(self):
+        """
+        Custom method to get the link file in the SHARED folder pointing to
+        this file if it exists.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            return None
+        return lf
+
+    def create_shared_link(self):
+        """
+        Custom method to create a link file in the SHARED folder pointing to
+        this file.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            shared_folder = ChrisFolder.objects.get(path='SHARED')
+            lf = ChrisLinkFile(path=path, owner=self.owner, parent_folder=shared_folder)
+            lf.save(name=str_source_trace_dir)
+        return lf
+
+    def remove_shared_link(self):
+        """
+        Custom method to remove a link file in the SHARED folder pointing to
+        this link file if it exists.
+        """
+        fname = 'SHARED/' + self.fname.name.replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
+
+    def create_public_link(self):
+        """
+        Custom method to create a public link file in the PUBLIC folder pointing to
+        this link file.
+        """
+        path = self.fname.name
+        str_source_trace_dir = path.replace('/', '_')
+        fname = 'PUBLIC/' + str_source_trace_dir + '.chrislink'
+
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            public_folder = ChrisFolder.objects.get(path='PUBLIC')
+            lf = ChrisLinkFile(path=path, owner=self.owner, public=True,
+                               parent_folder=public_folder)
+            lf.save(name=str_source_trace_dir)
+
+    def remove_public_link(self):
+        """
+        Custom method to remove a public link file in the PUBLIC folder pointing to
+        this link file if it exists.
+        """
+        fname = 'PUBLIC/' + self.fname.name.replace('/', '_') + '.chrislink'
+        try:
+            lf = ChrisLinkFile.objects.get(fname=fname)
+        except ChrisLinkFile.DoesNotExist:
+            pass
+        else:
+            lf.delete()
 
 @receiver(post_delete, sender=ChrisLinkFile)
 def auto_delete_file_from_storage(sender, instance, **kwargs):

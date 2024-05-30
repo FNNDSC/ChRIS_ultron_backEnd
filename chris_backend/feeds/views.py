@@ -494,6 +494,23 @@ class FeedGroupPermissionDetail(generics.RetrieveDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,
                           IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
 
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the group permission for the link file in the SHARED folder
+        pointing to the feed's folder. The link file itself is removed if all
+        its permissions have been removed.
+        """
+        feed = instance.feed
+        group = instance.group
+
+        lf = feed.folder.get_shared_link()
+        if lf is not None:
+            lf.remove_group_permission(group, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                feed.folder.remove_shared_link()
+        super(FeedGroupPermissionDetail, self).perform_destroy(instance)
+
 
 class FeedUserPermissionList(generics.ListCreateAPIView):
     """
@@ -565,6 +582,23 @@ class FeedUserPermissionDetail(generics.RetrieveDestroyAPIView):
     queryset = FeedUserPermission.objects.all()
     permission_classes = (permissions.IsAuthenticated,
                           IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly)
+
+    def perform_destroy(self, instance):
+        """
+        Overriden to remove the group permission for the link file in the SHARED folder
+        pointing to the feed's folder. The link file itself is removed if all
+        its permissions have been removed.
+        """
+        feed = instance.feed
+        user = instance.user
+
+        lf = feed.folder.get_shared_link()
+        if lf is not None:
+            lf.remove_user_permission(user, 'r')
+
+            if not lf.shared_groups.all().exists() and not lf.shared_users.all().exists():
+                feed.folder.remove_shared_link()
+        super(FeedUserPermissionDetail, self).perform_destroy(instance)
 
 
 class CommentList(generics.ListCreateAPIView):
