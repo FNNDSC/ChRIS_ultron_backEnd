@@ -28,7 +28,7 @@ class PACSSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
-    path = serializers.CharField(write_only=True)
+    path = serializers.CharField(max_length=1024, write_only=True)
     ndicom = serializers.IntegerField(write_only=True)
     pacs_name = serializers.CharField(max_length=20, write_only=True)
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')

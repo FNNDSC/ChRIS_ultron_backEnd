@@ -162,7 +162,8 @@ if AUTH_LDAP:
         'last_name': 'sn',
         'email': 'mail'
     }
+
     AUTHENTICATION_BACKENDS = (
-        'django_auth_ldap.backend.LDAPBackend',
+        'users.models.CustomLDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )

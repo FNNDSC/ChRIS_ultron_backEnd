@@ -3,10 +3,12 @@ import os
 
 from django.contrib.auth.models import User, Group
 from django.db.utils import IntegrityError
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
+from core.storage import connect_storage
 from core.utils import get_file_resource_link
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
@@ -67,31 +69,63 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_path(self, path):
         """
-        Overriden to check whether the provided path is under home/<username>/ but not
-        under home/<username>/feeds/.
+        Overriden to check whether the provided path is under a home/'s subdirectory
+        for which the user has write permission. Also to check whether the folder
+        already exists.
         """
         # remove leading and trailing slashes
         path = path.strip(' ').strip('/')
-        user = self.context['request'].user
-        prefix = f'home/{user.username}/'
 
-        if path.startswith(prefix + 'feeds/'):
-            error_msg = f"Invalid field value. Creating folders with a path under the " \
-                        f"feed's directory '{prefix + 'feeds/'}' is not allowed."
-            raise serializers.ValidationError([error_msg])
-
-        if not path.startswith(prefix):
-            error_msg = f"Invalid field value. Path must start with '{prefix}'."
-            raise serializers.ValidationError([error_msg])
-
+        if not path.startswith('home/'):
+            raise serializers.ValidationError(["Invalid path. Path must start with "
+                                               "'home/'."])
         try:
             ChrisFolder.objects.get(path=path)
         except ChrisFolder.DoesNotExist:
             pass
         else:
-            error_msg = f"Folder with path '{path}' already exists."
-            raise serializers.ValidationError([error_msg])
+            raise serializers.ValidationError([f"Folder with path '{path}' already "
+                                               f"exists."])
+        user = self.context['request'].user
+        parent_folder_path = os.path.dirname(path)
+
+        while True:
+            try:
+                parent_folder = ChrisFolder.objects.get(path=parent_folder_path)
+            except ChrisFolder.DoesNotExist:
+                parent_folder_path = os.path.dirname(parent_folder_path)
+            else:
+                break
+
+        if not (parent_folder.owner == user or parent_folder.public or
+                parent_folder.has_user_permission(user, 'w')):
+            raise serializers.ValidationError([f"Invalid path. User do not have write "
+                                               f"permission under the folder "
+                                               f"'{parent_folder_path}'."])
         return path
+
+    def validate_public(self, public):
+        """
+        Overriden to check that only the owner or superuser chris can change a folder's
+        public status.
+        """
+        if self.instance:  # on update
+            user = self.context['request'].user
+
+            if not (self.instance.owner == user or user.username == 'chris'):
+                raise serializers.ValidationError(
+                    ["Public status of a feed can only be changed by its owner or"
+                     "superuser 'chris'."])
+        return public
+
+    def validate(self, data):
+        """
+        Overriden to validate that the 'public' field is in data when updating a folder.
+        """
+        if self.instance:  # on update
+            if 'public' not in data:
+                raise serializers.ValidationError({'public': ['This field is required.']})
+        return data
 
 
 class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
@@ -186,6 +220,8 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
 
 
 class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
+    new_file_path = serializers.CharField(max_length=1024, write_only=True,
+                                          required=False)
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -201,14 +237,105 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ChrisFile
         fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public',
-                  'owner_username', 'file_resource', 'parent_folder', 'group_permissions',
-                  'user_permissions', 'owner')
+                  'new_file_path', 'owner_username', 'file_resource', 'parent_folder',
+                  'group_permissions', 'user_permissions', 'owner')
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to set the file's saving path and parent folder and delete the old
+        path from storage.
+        """
+        if 'public' in validated_data:
+            instance.public = validated_data['public']
+
+        new_file_path = validated_data.pop('new_file_path', None)
+
+        if new_file_path:
+            # user file will be stored at: SWIFT_CONTAINER_NAME/<new_file_path>
+            # where <new_file_path> must start with home/
+
+            old_storage_path = instance.fname.name
+
+            storage_manager = connect_storage(settings)
+            if storage_manager.obj_exists(new_file_path):
+                storage_manager.delete_obj(new_file_path)
+
+            storage_manager.copy_obj(old_storage_path, new_file_path)
+            storage_manager.delete_obj(old_storage_path)
+
+            folder_path = os.path.dirname(new_file_path)
+            owner = instance.owner
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                   owner=owner)
+            instance.parent_folder = parent_folder
+            instance.fname.name = new_file_path
+
+        instance.save()
+        return instance
 
     def get_file_link(self, obj):
         """
         Custom method to get the hyperlink to the actual file resource.
         """
         return get_file_resource_link(self, obj)
+
+    def validate_new_file_path(self, new_file_path):
+        """
+        Overriden to check whether the provided path is under a home/'s subdirectory
+        for which the user has write permission.
+        """
+        # remove leading and trailing slashes
+        new_file_path = new_file_path.strip(' ').strip('/')
+
+        if new_file_path.endswith('.chrislink'):
+            raise serializers.ValidationError(["Invalid path. This is not a ChRIS link "
+                                               "file."])
+        if not new_file_path.startswith('home/'):
+            raise serializers.ValidationError(["Invalid path. Path must start with "
+                                               "'home/'."])
+        user = self.context['request'].user
+        folder_path = os.path.dirname(new_file_path)
+
+        while True:
+            try:
+                folder = ChrisFolder.objects.get(path=folder_path)
+            except ChrisFolder.DoesNotExist:
+                folder_path = os.path.dirname(folder_path)
+            else:
+                break
+
+        if not (folder.owner == user or folder.public or
+                folder.has_user_permission(user, 'w')):
+            raise serializers.ValidationError([f"Invalid path. User do not have write "
+                                               f"permission under the folder "
+                                               f"'{folder_path}'."])
+        return new_file_path
+
+    def validate_public(self, public):
+        """
+        Overriden to check that only the owner or superuser chris can change a file's
+        public status.
+        """
+        if self.instance:  # on update
+            user = self.context['request'].user
+
+            if not (self.instance.owner == user or user.username == 'chris'):
+                raise serializers.ValidationError(
+                    ["Public status of a feed can only be changed by its owner or"
+                     "superuser 'chris'."])
+        return public
+
+    def validate(self, data):
+        """
+        Overriden to validate that at least one of two fields are in data when
+        updating a file.
+        """
+        if self.instance:  # on update
+            if 'public' not in data and 'new_file_path' not in data:
+                raise serializers.ValidationError(
+                    {'non_field_errors': ["At least one of the fields 'public' "
+                                          "or 'new_file_path' must be provided."]})
+        return data
 
 
 class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
@@ -304,6 +431,8 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
 
 
 class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
+    new_link_file_path = serializers.CharField(max_length=1024, write_only=True,
+                                               required=False)
     fname = serializers.FileField(use_url=False, required=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -321,8 +450,42 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ChrisLinkFile
         fields = ('url', 'id', 'creation_date', 'path', 'fname', 'fsize', 'public',
-                  'owner_username', 'file_resource', 'linked_folder', 'linked_file',
-                  'parent_folder', 'group_permissions', 'user_permissions', 'owner')
+                  'new_link_file_path', 'owner_username', 'file_resource',
+                  'linked_folder', 'linked_file', 'parent_folder', 'group_permissions',
+                  'user_permissions', 'owner')
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to set the link file's saving path and parent folder and delete
+        the old path from storage.
+        """
+        if 'public' in validated_data:
+            instance.public = validated_data['public']
+
+        new_link_file_path = validated_data.pop('new_link_file_path', None)
+
+        if new_link_file_path:
+            # user file will be stored at: SWIFT_CONTAINER_NAME/<new_link_file_path>
+            # where <new_link_file_path> must start with home/
+
+            old_storage_path = instance.fname.name
+
+            storage_manager = connect_storage(settings)
+            if storage_manager.obj_exists(new_link_file_path):
+                storage_manager.delete_obj(new_link_file_path)
+
+            storage_manager.copy_obj(old_storage_path, new_link_file_path)
+            storage_manager.delete_obj(old_storage_path)
+
+            folder_path = os.path.dirname(new_link_file_path)
+            owner = instance.owner
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                   owner=owner)
+            instance.parent_folder = parent_folder
+            instance.fname.name = new_link_file_path
+
+        instance.save()
+        return instance
 
     def get_file_link(self, obj):
         """
@@ -366,6 +529,64 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
             request = self.context['request']
             return reverse('chrisfile-detail', request=request,
                            kwargs={'pk': linked_file.pk})
+
+    def validate_new_link_file_path(self, new_link_file_path):
+        """
+        Overriden to check whether the provided path is under a home/'s subdirectory
+        for which the user has write permission.
+        """
+        # remove leading and trailing slashes
+        new_link_file_path = new_link_file_path.strip(' ').strip('/')
+
+        if new_link_file_path.endswith('.chrislink'):
+            raise serializers.ValidationError(["Invalid path. This is not a ChRIS link "
+                                               "file."])
+        if not new_link_file_path.startswith('home/'):
+            raise serializers.ValidationError(["Invalid path. Path must start with "
+                                               "'home/'."])
+        user = self.context['request'].user
+        folder_path = os.path.dirname(new_link_file_path)
+
+        while True:
+            try:
+                folder = ChrisFolder.objects.get(path=folder_path)
+            except ChrisFolder.DoesNotExist:
+                folder_path = os.path.dirname(folder_path)
+            else:
+                break
+
+        if not (folder.owner == user or folder.public or
+                folder.has_user_permission(user, 'w')):
+            raise serializers.ValidationError([f"Invalid path. User do not have write "
+                                               f"permission under the folder "
+                                               f"'{folder_path}'."])
+        return new_link_file_path
+
+    def validate_public(self, public):
+        """
+        Overriden to check that only the owner or superuser chris can change a link
+        file's public status.
+        """
+        if self.instance:  # on update
+            user = self.context['request'].user
+
+            if not (self.instance.owner == user or user.username == 'chris'):
+                raise serializers.ValidationError(
+                    ["Public status of a feed can only be changed by its owner or"
+                     "superuser 'chris'."])
+        return public
+
+    def validate(self, data):
+        """
+        Overriden to validate that at least one of two fields are in data when
+        updating a file.
+        """
+        if self.instance:  # on update
+            if 'public' not in data and 'new_link_file_path' not in data:
+                raise serializers.ValidationError(
+                    {'non_field_errors': ["At least one of the fields 'public' "
+                                          "or 'new_link_file_path' must be provided."]})
+        return data
 
 
 class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):

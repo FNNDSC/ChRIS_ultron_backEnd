@@ -1,18 +1,9 @@
 
-import logging
-import io
-
 from django.contrib.auth.models import User, Group
-from django.conf import settings
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from core.models import ChrisFolder, ChrisLinkFile
-from core.storage import connect_storage
-from userfiles.models import UserFile
-
-
-logger = logging.getLogger(__name__)
+from .models import UserProxy
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
@@ -31,55 +22,14 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to take care of the password hashing and create a welcome file
-        and a feeds folder for the user in its personal storage space.
+        Overriden to take care of the password hashing.
         """
-        # retrieve predefined groups
-        try:
-            all_grp = Group.objects.get(name='all_users')
-            pacs_grp = Group.objects.get(name='pacs_users')
-        except Group.DoesNotExist:
-            logger.error(f"Error while retrieving groups: ['all_users', 'pacs_users']")
-            raise
-
         username = validated_data.get('username')
         email = validated_data.get('email')
         password = validated_data.get('password')
 
-        # create user taking care of the password hashing and assign the predefined groups
-        user = User.objects.create_user(username, email, password)
-        user.groups.set([all_grp, pacs_grp])
-
-        home_path = f'home/{username}'
-        uploads_path = f'{home_path}/uploads'
-        feeds_path = f'{home_path}/feeds'
-
-        # create predefined folders under the home directory
-        (uploads_folder, _) = ChrisFolder.objects.get_or_create(path=uploads_path,
-                                                                owner=user)
-        (feeds_folder, _) = ChrisFolder.objects.get_or_create(path=feeds_path, owner=user)
-
-        # create predefined link files under the home directory
-        link_file = ChrisLinkFile(path='PUBLIC', owner=user,
-                                  parent_folder=uploads_folder.parent)
-        link_file.save(name='public')
-        link_file = ChrisLinkFile(path='SHARED', owner=user,
-                                  parent_folder=uploads_folder.parent)
-        link_file.save(name='shared')
-
-        # create a welcome.txt file inside the uploads folder
-        storage_manager = connect_storage(settings)
-        welcome_file_path = f'{uploads_path}/welcome.txt'
-        try:
-            with io.StringIO('Welcome to ChRIS!') as f:
-                storage_manager.upload_obj(welcome_file_path, f.read(),
-                                           content_type='text/plain')
-            welcome_file = UserFile(parent_folder=uploads_folder, owner=user)
-            welcome_file.fname.name = welcome_file_path
-            welcome_file.save()
-        except Exception as e:
-            logger.error(f'Could not create welcome file in user space, detail: {str(e)}')
-        return user
+        # create user taking care of the password hashing and setup groups and home folder
+        return UserProxy.objects.create_user(username, email, password)
 
     def validate_username(self, username):
         """

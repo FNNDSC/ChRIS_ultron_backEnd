@@ -150,8 +150,7 @@ class FeedFilter(FilterSet):
     class Meta:
         model = Feed
         fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
-                  'min_creation_date', 'max_creation_date', 'public',
-                  'files_fname_icontains']
+                  'min_creation_date', 'max_creation_date', 'files_fname_icontains']
 
     def filter_by_fname_icontains(self, queryset, name, value):
         """

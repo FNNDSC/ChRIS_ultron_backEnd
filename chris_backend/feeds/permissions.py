@@ -29,7 +29,7 @@ class IsOwnerOrChrisOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        return (obj.owner == request.user) or (request.user.username == 'chris')
+        return obj.owner == request.user or request.user.username == 'chris'
 
 
 class IsOwnerOrChrisOrHasPermissionOrPublicReadOnly(permissions.BasePermission):
@@ -80,17 +80,20 @@ class IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly(permissions.BasePermission):
                 obj.feed.has_user_permission(request.user))
 
 
-class IsOwnerOrChrisOrReadOnlyOrRelatedFeedPublicReadOnly(permissions.BasePermission):
+class IsOwnerOrChrisOrFeedOwnerOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly(
+    permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object or superuser
-    'chris' to modify/edit it. Read only is allowed to other authenticated users.
-    Read only is also allowed to unauthenticated users when the related feed is public.
+    Custom permission to only allow superuser 'chris', the owner of an object and the
+    owner of the object's associated feed to modify/edit the object (eg. a comment).
+    Read-only access is allowed to users that have been granted the associated feed
+    access permission or to any user if the feed is public.
     """
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if user.username == 'chris':
+
+        if obj.owner == user or user.username == 'chris' or obj.feed.owner == user:
             return True
 
-        return obj.owner == user or (request.method in permissions.SAFE_METHODS and (
-                user.is_authenticated or obj.feed.public))
+        return request.method in permissions.SAFE_METHODS and (
+            obj.feed.public or obj.feed.has_user_permission(user))

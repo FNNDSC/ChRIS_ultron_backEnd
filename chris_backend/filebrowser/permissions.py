@@ -2,23 +2,24 @@
 from rest_framework import permissions
 
 
-class IsOwnerOrChrisOrHasWritePermissionOrReadOnly(permissions.BasePermission):
+class IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow owners of an object or superuser 'chris' or users
-    with write permission to modify/edit it. Read-only is allowed to other users.
+    with write permission to modify/edit it. Read-only access is allowed to other users
+    that have been granted read permission or to any user if the object is public.
     """
 
     def has_object_permission(self, request, view, obj):
-        # Read permissions are allowed to any request,
-        # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.SAFE_METHODS:
+        user = request.user
+
+        if obj.owner == user or user.username == 'chris':
             return True
 
-        # Write permissions are only allowed to the owner, superuser 'chris' and users
-        # with write permission.
-        user = request.user
-        return (user == obj.owner or user.username == 'chris' or
-                obj.has_user_permission(user, 'w'))
+        if request.method in permissions.SAFE_METHODS and (obj.public or
+                                                           obj.has_user_permission(user)):
+            return True
+
+        return obj.has_user_permission(user, 'w')
 
 
 class IsOwnerOrChrisOrHasAnyPermissionReadOnly(permissions.BasePermission):
@@ -35,20 +36,6 @@ class IsOwnerOrChrisOrHasAnyPermissionReadOnly(permissions.BasePermission):
             return True
 
         return (request.method in permissions.SAFE_METHODS and
-                obj.has_user_permission(user))
-
-
-class IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic(permissions.BasePermission):
-    """
-    Custom permission to only allow superuser 'chris', the owner of an object or any
-    users that have been granted any permission to access an object. Also access is
-    allowed to all users if the object is public.
-    """
-
-    def has_object_permission(self, request, view, obj):
-        user = request.user
-
-        return (obj.owner == user or user.username == 'chris' or obj.public or
                 obj.has_user_permission(user))
 
 

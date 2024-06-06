@@ -15,7 +15,7 @@ from .models import UserFile
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
-    upload_path = serializers.CharField(write_only=True)
+    upload_path = serializers.CharField(max_length=1024, write_only=True)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     file_resource = ItemLinkField('get_file_link')
     parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
@@ -47,17 +47,18 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        Overriden to set the file's saving path and parent folder and  delete the old
+        Overriden to set the file's saving path and parent folder and delete the old
         path from storage.
         """
         # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
-        # where <upload_path> must start with home/<username>/
+        # where <upload_path> must start with home/
         upload_path = validated_data.pop('upload_path')
         old_storage_path = instance.fname.name
 
         storage_manager = connect_storage(settings)
         if storage_manager.obj_exists(upload_path):
             storage_manager.delete_obj(upload_path)
+
         storage_manager.copy_obj(old_storage_path, upload_path)
         storage_manager.delete_obj(old_storage_path)
 
@@ -78,24 +79,32 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_upload_path(self, upload_path):
         """
-        Overriden to check whether the provided path is under home/<username>/ but not
-        under home/<username>/feeds/.
+        Overriden to check whether the provided path is under a home/'s subdirectory
+        for which the user has write permission.
         """
         # remove leading and trailing slashes
         upload_path = upload_path.strip(' ').strip('/')
-        user = self.context['request'].user
-        prefix = f'home/{user.username}/'
-
-        if upload_path.startswith(prefix + 'feeds/'):
-            error_msg = f"Invalid file path. Uploading files to a path under the " \
-                        f"feed's directory '{prefix + 'feeds/'}' is not allowed."
-            raise serializers.ValidationError([error_msg])
-
-        if not upload_path.startswith(prefix):
-            error_msg = f"Invalid file path. Path must start with '{prefix}'."
-            raise serializers.ValidationError([error_msg])
 
         if upload_path.endswith('.chrislink'):
-            error_msg = 'Invalid file path. Uploading ChRIS link files is not allowed.'
-            raise serializers.ValidationError([error_msg])
+            raise serializers.ValidationError(["Invalid path. Uploading ChRIS link "
+                                               "files is not allowed."])
+        if not upload_path.startswith('home/'):
+            raise serializers.ValidationError(["Invalid path. Path must start with "
+                                               "'home/'."])
+        user = self.context['request'].user
+        folder_path = os.path.dirname(upload_path)
+
+        while True:
+            try:
+                folder = ChrisFolder.objects.get(path=folder_path)
+            except ChrisFolder.DoesNotExist:
+                folder_path = os.path.dirname(folder_path)
+            else:
+                break
+
+        if not (folder.owner == user or folder.public or
+                folder.has_user_permission(user, 'w')):
+            raise serializers.ValidationError([f"Invalid path. User do not have write "
+                                               f"permission under the folder "
+                                               f"'{folder_path}'."])
         return upload_path

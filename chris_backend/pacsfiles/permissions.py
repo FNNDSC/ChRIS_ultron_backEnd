@@ -2,17 +2,17 @@
 from rest_framework import permissions
 
 
-class IsChrisOrReadOnly(permissions.BasePermission):
+class IsChrisOrIsPACSUserReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow superuser 'chris' to create it.
-    Read only is allowed to other users.
+    Read only is allowed to other users in the pacs_users group.
     """
 
     def has_permission(self, request, view):
-        # Read permissions are allowed to any request,
-        # so we'll always allow GET, HEAD or OPTIONS requests.
-        if request.method in permissions.SAFE_METHODS:
+        user = request.user
+
+        if user.username == 'chris':
             return True
 
-        # Write permissions are only allowed to the superuser 'chris'.
-        return request.user.username == 'chris'
+        return (request.method in permissions.SAFE_METHODS and user.groups.filter(
+                name='pacs_users').exists())

@@ -142,6 +142,20 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                 ["This field may not contain forward slashes."])
         return name
 
+    def validate_public(self, public):
+        """
+        Overriden to check that only the owner or superuser chris can change a feed's
+        public status.
+        """
+        if self.instance:  # validation on update
+            user = self.context['request'].user
+
+            if not (self.instance.owner == user or user.username == 'chris'):
+                raise serializers.ValidationError(
+                    ["Public status of a feed can only be changed by its owner or"
+                     "superuser 'chris'."])
+        return public
+
     def get_created_jobs(self, obj):
         """
         Overriden to get the number of plugin instances in 'created' status.

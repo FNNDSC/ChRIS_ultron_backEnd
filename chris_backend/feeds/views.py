@@ -13,12 +13,11 @@ from .models import (Feed, FeedFilter, FeedGroupPermission, FeedGroupPermissionF
 from .serializers import (FeedSerializer, FeedGroupPermissionSerializer,
                           FeedUserPermissionSerializer, NoteSerializer,
                           TagSerializer, TaggingSerializer, CommentSerializer)
-from .permissions import (IsChrisOrFeedOwnerOrHasFeedPermissionOrPublicFeedReadOnly,
-                          IsOwnerOrChrisOrReadOnly,
-                          IsOwnerOrChrisOrHasPermissionOrPublicReadOnly,
-                          IsOwnerOrChrisOrHasPermissionReadOnly,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly,
-                          IsOwnerOrChrisOrReadOnlyOrRelatedFeedPublicReadOnly)
+from .permissions import (
+    IsChrisOrFeedOwnerOrHasFeedPermissionOrPublicFeedReadOnly, IsOwnerOrChrisOrReadOnly,
+    IsOwnerOrChrisOrHasPermissionOrPublicReadOnly, IsOwnerOrChrisOrHasPermissionReadOnly,
+    IsChrisOrFeedOwnerOrHasFeedPermissionReadOnly,
+    IsOwnerOrChrisOrFeedOwnerOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly)
 
 
 class NoteDetail(generics.RetrieveUpdateAPIView):
@@ -132,7 +131,7 @@ class FeedTagList(generics.ListAPIView):
 
 class TagFeedList(generics.ListAPIView):
     """
-    A view for a tag-specific collection of feeds.
+    A view for the tag-specific collection of feeds.
     """
     http_method_names = ['get']
     queryset = Tag.objects.all()
@@ -161,13 +160,13 @@ class TagFeedList(generics.ListAPIView):
 
         group_ids = [g.id for g in user.groups.all()]
         lookup = Q(owner=user) | Q(public=True) | Q(shared_users=user) | Q(
-            shared_groups__in=group_ids)
+            shared_groups__pk__in=group_ids)
         return tag.feeds.filter(lookup)
 
 
 class FeedTaggingList(generics.ListCreateAPIView):
     """
-    A view for the collection of feed-specific taggings.
+    A view for the feed-specific collection of taggings.
     """
     http_method_names = ['get', 'post']
     queryset = Feed.objects.all()
@@ -257,7 +256,7 @@ class TagTaggingList(generics.ListCreateAPIView):
 
         group_ids = [g.id for g in user.groups.all()]
         lookup = Q(feed__owner=user) | (Q(feed__public=True) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__in=group_ids))
+            feed__shared_users=user) | Q(feed__shared_groups__pk__in=group_ids))
         return Tagging.objects.filter(tag=tag).filter(lookup)
 
 
@@ -287,14 +286,14 @@ class FeedList(generics.ListAPIView):
         """
         user = self.request.user
         if not user.is_authenticated:
-            return []
+            return Feed.objects.none()
 
-        # if the user is chris then return all the feeds in the system
+        # if the user is chris then return all the non-public feeds in the system
         if user.username == 'chris':
-            return Feed.objects.all()
+            return Feed.objects.exclude(public=True)
 
         group_ids = [g.id for g in user.groups.all()]
-        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__in=group_ids)
+        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__pk__in=group_ids)
         return Feed.objects.filter(lookup)
 
     def list(self, request, *args, **kwargs):
@@ -330,6 +329,7 @@ class FeedList(generics.ListAPIView):
 
         if user.is_authenticated:
             links['download_tokens'] = reverse('filedownloadtoken-list', request=request)
+            links['groups'] = reverse('group-list', request=request)
             links['user'] = reverse('user-detail', request=request, kwargs={"pk": user.id})
 
             if user.is_staff:
@@ -343,7 +343,6 @@ class FeedListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FeedSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = FeedFilter
 
     def get_queryset(self):
@@ -353,13 +352,15 @@ class FeedListQuerySearch(generics.ListAPIView):
         the user.
         """
         user = self.request.user
+        if not user.is_authenticated:
+            return Feed.objects.none()
 
-        # if the user is chris then return all the feeds in the system
+        # if the user is chris then return all the non-public feeds in the system
         if user.username == 'chris':
-            return Feed.objects.all()
+            return Feed.objects.exclude(public=True)
 
         group_ids = [g.id for g in user.groups.all()]
-        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__in=group_ids)
+        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__pk__in=group_ids)
         return Feed.objects.filter(lookup)
 
 
@@ -481,7 +482,7 @@ class FeedGroupPermissionListQuerySearch(generics.ListAPIView):
         group permissions.
         """
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
-        return feed.shared_groups.all()
+        return FeedGroupPermission.objects.filter(feed=feed)
 
 
 class FeedGroupPermissionDetail(generics.RetrieveDestroyAPIView):
@@ -570,7 +571,7 @@ class FeedUserPermissionListQuerySearch(generics.ListAPIView):
         user permissions.
         """
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
-        return feed.shared_users.all()
+        return FeedUserPermission.objects.filter(feed=feed)
 
 
 class FeedUserPermissionDetail(generics.RetrieveDestroyAPIView):
@@ -654,7 +655,7 @@ class CommentListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = CommentSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsChrisOrFeedOwnerOrHasFeedPermissionOrPublicFeedReadOnly)
+                          IsOwnerOrChrisOrHasPermissionOrPublicReadOnly)
     filterset_class = CommentFilter
 
     def get_queryset(self):
@@ -673,7 +674,9 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
-    permission_classes = (IsOwnerOrChrisOrReadOnlyOrRelatedFeedPublicReadOnly,)
+    permission_classes = (
+        permissions.IsAuthenticatedOrReadOnly,
+        IsOwnerOrChrisOrFeedOwnerOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
         """

@@ -31,6 +31,26 @@ urlpatterns = format_suffix_patterns([
     path('v1/users/<int:pk>/groups/',
          user_views.UserGroupList.as_view(), name='user-group-list'),
 
+    path('v1/groups/',
+         user_views.GroupList.as_view(),
+         name='group-list'),
+
+    path('v1/groups/search/',
+         user_views.GroupListQuerySearch.as_view(),
+         name='group-list-query-search'),
+
+    path('v1/groups/<int:pk>/',
+         user_views.GroupDetail.as_view(),
+         name='group-detail'),
+
+    path('v1/groups/<int:pk>/users/',
+         user_views.GroupUserList.as_view(),
+         name='group-user-list'),
+
+    path('v1/groups/users/<int:pk>/',
+         user_views.GroupUserDetail.as_view(),
+         name='user_groups-detail'),
+
 
     path('v1/downloadtokens/',
          core_views.FileDownloadTokenList.as_view(),

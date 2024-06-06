@@ -96,7 +96,7 @@ class GroupList(generics.ListCreateAPIView):
     http_method_names = ['get', 'post']
     serializer_class = GroupSerializer
     queryset = Group.objects.all()
-    permission_classes = (permissions.IsAdminUser,)
+    permission_classes = (permissions.IsAuthenticated, IsAdminOrReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
@@ -120,7 +120,7 @@ class GroupListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = GroupSerializer
     queryset = Group.objects.all()
-    permission_classes = (permissions.IsAdminUser,)
+    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = GroupFilter
 
 
@@ -142,7 +142,7 @@ class GroupUserList(generics.ListCreateAPIView):
     http_method_names = ['get', 'post']
     queryset = Group.objects.all()
     serializer_class = GroupUserSerializer
-    permission_classes = (permissions.IsAdminUser, )
+    permission_classes = (permissions.IsAuthenticated, IsAdminOrReadOnly)
 
     def perform_create(self, serializer):
         """
@@ -187,4 +187,4 @@ class GroupUserDetail(generics.RetrieveDestroyAPIView):
     http_method_names = ['get', 'delete']
     serializer_class = GroupUserSerializer
     queryset = User.groups.through.objects.all()
-    permission_classes = (permissions.IsAdminUser,)
+    permission_classes = (permissions.IsAuthenticated, IsAdminOrReadOnly)

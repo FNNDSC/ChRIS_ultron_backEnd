@@ -31,10 +31,9 @@ from .services import (get_folder_queryset,
                        get_folder_children_queryset,
                        get_folder_files_queryset,
                        get_folder_link_files_queryset)
-from .permissions import (IsOwnerOrChrisOrHasWritePermissionOrReadOnly,
+from .permissions import (IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly,
                           IsOwnerOrChrisOrHasAnyPermissionReadOnly,
                           IsFolderOwnerOrChrisOrHasAnyFolderPermissionReadOnly,
-                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic,
                           IsFileOwnerOrChrisOrHasAnyFilePermissionReadOnly,
                           IsLinkFileOwnerOrChrisOrHasAnyLinkFilePermissionReadOnly)
 
@@ -85,7 +84,7 @@ class FileBrowserFolderList(generics.ListCreateAPIView):
         else:
             qs = get_folder_queryset(pk_dict)
 
-        if qs.count() == 0:
+        if not qs.exists():
             raise Http404('Not found.')
         return qs
 
@@ -124,24 +123,12 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrHasWritePermissionOrReadOnly)
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
 
     def retrieve(self, request, *args, **kwargs):
         """
         Overriden to retrieve a file browser folder and append a collection+json template.
         """
-        user = request.user
-        id = kwargs.get('pk')
-        pk_dict = {'id': id}
-
-        if user.is_authenticated:
-            qs = get_folder_queryset(pk_dict, user)
-        else:
-            qs = get_folder_queryset(pk_dict)
-
-        if qs.count() == 0:
-            raise Http404('Not found.')
-
         response = super(FileBrowserFolderDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"public": ""}
         return services.append_collection_template(response, template_data)
@@ -161,29 +148,27 @@ class FileBrowserFolderChildList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFolderSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list of the children ChRIS folders.
+        Overriden to return a list of the children folders and append document-level
+        link relations.
         """
         user = request.user
-        id = kwargs.get('pk')
-        pk_dict = {'id': id}
-
-        if user.is_authenticated:
-            qs = get_folder_queryset(pk_dict, user)
-        else:
-            qs = get_folder_queryset(pk_dict)
-
-        folder = qs.first()
-        if folder is None:
-            raise Http404('Not found.')
+        folder = self.get_object()
 
         if user.is_authenticated:
             children_qs = get_folder_children_queryset(folder, user)
         else:
             children_qs = get_folder_children_queryset(folder)
-        return services.get_list_response(self, children_qs)
+
+        response = services.get_list_response(self, children_qs)
+
+        links = {'folder': reverse('chrisfolder-detail', request=request,
+                                   kwargs={"pk": folder.id})}
+        return services.append_collection_links(response, links)
 
 
 class FileBrowserFolderGroupPermissionList(generics.ListCreateAPIView):
@@ -236,7 +221,8 @@ class FileBrowserFolderGroupPermissionListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FileBrowserFolderGroupPermissionSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = FolderGroupPermissionFilter
 
     def get_queryset(self):
@@ -244,13 +230,7 @@ class FileBrowserFolderGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         group permissions.
         """
-        user = self.request.user
-        id = self.kwargs['pk']
-        pk_dict = {'id': id}
-
-        folder = get_folder_queryset(pk_dict, user).first()
-        if folder is None:
-            raise Http404('Not found.')
+        folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
         return FolderGroupPermission.objects.filter(folder=folder)
 
 
@@ -341,7 +321,8 @@ class FileBrowserFolderUserPermissionListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = FileBrowserFolderUserPermissionSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,
+                          IsOwnerOrChrisOrHasAnyPermissionReadOnly)
     filterset_class = FolderUserPermissionFilter
 
     def get_queryset(self):
@@ -349,13 +330,7 @@ class FileBrowserFolderUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         user permissions.
         """
-        user = self.request.user
-        id = self.kwargs['pk']
-        pk_dict = {'id': id}
-
-        folder = get_folder_queryset(pk_dict, user).first()
-        if folder is None:
-            raise Http404('Not found.')
+        folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
         return FolderUserPermission.objects.filter(folder=folder)
 
 
@@ -403,23 +378,16 @@ class FileBrowserFolderFileList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserFileSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list with all the files directly under this folder.
+        Overriden to return a list of the files directly under this folder and
+        append document-level link relations.
         """
         user = request.user
-        id = kwargs.get('pk')
-        pk_dict = {'id': id}
-
-        if user.is_authenticated:
-            qs = get_folder_queryset(pk_dict, user)
-        else:
-            qs = get_folder_queryset(pk_dict)
-
-        folder = qs.first()
-        if folder is None:
-            raise Http404('Not found.')
+        folder = self.get_object()
 
         if user.is_authenticated:
             files_qs = get_folder_files_queryset(folder, user)
@@ -427,18 +395,37 @@ class FileBrowserFolderFileList(generics.ListAPIView):
             files_qs = get_folder_files_queryset(folder)
 
         response = services.get_list_response(self, files_qs)
-        return response
+
+        links = {'folder': reverse('chrisfolder-detail', request=request,
+                                   kwargs={"pk": folder.id})}
+        return services.append_collection_links(response, links)
 
 
-class FileBrowserFileDetail(generics.RetrieveAPIView):
+class FileBrowserFileDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A ChRIS file view.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'put', 'delete']
     queryset = ChrisFile.get_base_queryset()
     serializer_class = FileBrowserFileSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to retrieve a file and append a collection+json template.
+        """
+        response = super(FileBrowserFileDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {"public": "", "new_file_path": ""}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to include the current fname in the request.
+        """
+        chris_file  = self.get_object()
+        request.data['fname'] = chris_file .fname.file  # fname required in the serializer
+        return super(FileBrowserFileDetail, self).update(request, *args, **kwargs)
 
 
 class FileBrowserFileResource(generics.GenericAPIView):
@@ -449,7 +436,7 @@ class FileBrowserFileResource(generics.GenericAPIView):
     queryset = ChrisFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
@@ -668,23 +655,16 @@ class FileBrowserFolderLinkFileList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = ChrisFolder.objects.all()
     serializer_class = FileBrowserLinkFileSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list with all the link files directly under this folder.
+        Overriden to return a list of the files directly under this folder and
+        append document-level link relations.
         """
         user = request.user
-        id = kwargs.get('pk')
-        pk_dict = {'id': id}
-
-        if user.is_authenticated:
-            qs = get_folder_queryset(pk_dict, user)
-        else:
-            qs = get_folder_queryset(pk_dict)
-
-        folder = qs.first()
-        if folder is None:
-            raise Http404('Not found.')
+        folder = self.get_object()
 
         if user.is_authenticated:
             link_files_qs = get_folder_link_files_queryset(folder, user)
@@ -692,18 +672,38 @@ class FileBrowserFolderLinkFileList(generics.ListAPIView):
             link_files_qs = get_folder_link_files_queryset(folder)
 
         response = services.get_list_response(self, link_files_qs)
-        return response
+
+        links = {'folder': reverse('chrisfolder-detail', request=request,
+                                   kwargs={"pk": folder.id})}
+        return services.append_collection_links(response, links)
 
 
-class FileBrowserLinkFileDetail(generics.RetrieveAPIView):
+class FileBrowserLinkFileDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A ChRIS link file view.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'put', 'delete']
     queryset = ChrisLinkFile.objects.all()
     serializer_class = FileBrowserLinkFileSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to retrieve a link file and append a collection+json template.
+        """
+        response = super(FileBrowserLinkFileDetail, self).retrieve(request, *args,
+                                                                  **kwargs)
+        template_data = {"public": "", "new_link_file_path": ""}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to include the current fname in the request.
+        """
+        chris_link_file = self.get_object()
+        request.data['fname'] = chris_link_file.fname.file  # fname required in the serializer
+        return super(FileBrowserLinkFileDetail, self).update(request, *args, **kwargs)
 
 
 class FileBrowserLinkFileResource(generics.GenericAPIView):
@@ -714,7 +714,7 @@ class FileBrowserLinkFileResource(generics.GenericAPIView):
     queryset = ChrisLinkFile.objects.all()
     renderer_classes = (BinaryFileRenderer,)
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
-                          IsOwnerOrChrisOrHasAnyPermissionOrObjIsPublic)
+                          IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
