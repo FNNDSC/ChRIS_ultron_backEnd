@@ -11,6 +11,7 @@ from feeds.models import Note, Feed
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class FeedModelTests(TestCase):
@@ -21,8 +22,7 @@ class FeedModelTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username, password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.feed_name = "Feed1"
         self.plugin_name = "pacspull"

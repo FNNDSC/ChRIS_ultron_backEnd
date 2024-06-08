@@ -13,6 +13,8 @@ from userfiles.models import UserFile
 from core.storage.helpers import mock_storage, connect_storage
 
 
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
+
 
 class ViewTests(TestCase):
     """
@@ -25,9 +27,7 @@ class ViewTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password, is_staff=True)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
         self.username = 'cube'

@@ -39,10 +39,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to set the parent folder.
         """
-        path = validated_data.get('path')
-        if path is None:
-            raise serializers.ValidationError({'path': ['This field is required.']})
-
+        path = validated_data['path']
         parent_path = os.path.dirname(path)
         owner = validated_data['owner']
 
@@ -120,20 +117,27 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         """
-        Overriden to validate that the 'public' field is in data when updating a folder.
+        Overriden to validate that required fields are in data when creating or
+        updating a folder.
         """
         if self.instance:  # on update
             if 'public' not in data:
                 raise serializers.ValidationError({'public': ['This field is required.']})
+        else:
+            if 'path' not in data: # on create
+                raise serializers.ValidationError({'path': ['This field is required.']})
         return data
 
 
 class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    grp_name = serializers.CharField(write_only=True)
+    grp_name = serializers.CharField(write_only=True, required=False)
     folder_id = serializers.ReadOnlyField(source='folder.id')
     folder_name = serializers.ReadOnlyField(source='folder.name')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
+    folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                 read_only=True)
+    group = serializers.HyperlinkedRelatedField(view_name='group-detail', read_only=True)
 
     class Meta:
         model = FolderGroupPermission
@@ -173,12 +177,32 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
                 {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
         return group
 
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'grp_name' not in data: # on create
+                raise serializers.ValidationError({'grp_name':
+                                                       ['This field is required.']})
+        return data
+
+
 class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32,
+                                     required=False)
     folder_id = serializers.ReadOnlyField(source='folder.id')
     folder_name = serializers.ReadOnlyField(source='folder.name')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
+    folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                 read_only=True)
+    user = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = FolderUserPermission
@@ -217,6 +241,21 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
             raise serializers.ValidationError(
                 {'username': [f"Couldn't find any user with username '{username}'."]})
         return user
+
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'username' not in data: # on create
+                raise serializers.ValidationError({'username':
+                                                       ['This field is required.']})
+        return data
 
 
 class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
@@ -339,11 +378,14 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    grp_name = serializers.CharField(write_only=True)
+    grp_name = serializers.CharField(write_only=True, required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
     file_fname = serializers.ReadOnlyField(source='file.fname')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
+    file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
+                                               read_only=True)
+    group = serializers.HyperlinkedRelatedField(view_name='group-detail', read_only=True)
 
     class Meta:
         model = FileGroupPermission
@@ -383,13 +425,32 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
                 {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
         return group
 
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'grp_name' not in data: # on create
+                raise serializers.ValidationError({'grp_name':
+                                                       ['This field is required.']})
+        return data
+
 
 class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32,
+                                     required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
     file_fname = serializers.ReadOnlyField(source='file.fname')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
+    file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
+                                               read_only=True)
+    user = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = FileUserPermission
@@ -428,6 +489,21 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
             raise serializers.ValidationError(
                 {'username': [f"Couldn't find any user with username '{username}'."]})
         return user
+
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'username' not in data: # on create
+                raise serializers.ValidationError({'username':
+                                                       ['This field is required.']})
+        return data
 
 
 class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
@@ -590,11 +666,14 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    grp_name = serializers.CharField(write_only=True)
+    grp_name = serializers.CharField(write_only=True, required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
     link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
+    link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
+                                                    read_only=True)
+    group = serializers.HyperlinkedRelatedField(view_name='group-detail', read_only=True)
 
     class Meta:
         model = FileGroupPermission
@@ -634,13 +713,32 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
                 {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
         return group
 
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'grp_name' not in data: # on create
+                raise serializers.ValidationError({'grp_name':
+                                                       ['This field is required.']})
+        return data
+
 
 class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
-    username = serializers.CharField(write_only=True, min_length=4, max_length=32)
+    username = serializers.CharField(write_only=True, min_length=4, max_length=32,
+                                     required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
     link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
+    link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
+                                                    read_only=True)
+    user = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = FileUserPermission
@@ -679,3 +777,18 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
             raise serializers.ValidationError(
                 {'username': [f"Couldn't find any user with username '{username}'."]})
         return user
+
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating or
+        updating a permission.
+        """
+        if self.instance:  # on update
+            if 'permission' not in data:
+                raise serializers.ValidationError({'permission':
+                                                       ['This field is required.']})
+        else:
+            if 'username' not in data: # on create
+                raise serializers.ValidationError({'username':
+                                                       ['This field is required.']})
+        return data

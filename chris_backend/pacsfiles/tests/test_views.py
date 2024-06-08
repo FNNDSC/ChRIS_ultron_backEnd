@@ -17,6 +17,9 @@ from pacsfiles.models import PACS, PACSSeries, PACSFile
 from pacsfiles import views
 
 
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
+
+
 class PACSViewTests(TestCase):
     """
     Generic pacs series view tests' setup and tearDown.
@@ -28,9 +31,7 @@ class PACSViewTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
         self.username = 'test'

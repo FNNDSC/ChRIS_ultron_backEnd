@@ -5,6 +5,7 @@ from django.db.models.signals import post_migrate
 
 def setup_chris(sender, **kwargs):
     from django.contrib.auth.models import User, Group
+    from django.conf import settings
     from .models import ChrisInstance, ChrisFolder
 
     ChrisInstance.load()  # create the ChRIS instance singleton
@@ -14,7 +15,7 @@ def setup_chris(sender, **kwargs):
         chris_user = User.objects.get(username='chris')
     except User.DoesNotExist:
         chris_user = User.objects.create_superuser('chris', 'dev@babymri.org',
-                                                   'chris1234')
+                                                   settings.CHRIS_SUPERUSER_PASSWORD)
     # create required groups
     (all_grp, _) = Group.objects.get_or_create(name='all_users')
     (pacs_grp, _) = Group.objects.get_or_create(name='pacs_users')

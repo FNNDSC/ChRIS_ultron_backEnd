@@ -408,7 +408,7 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/filebrowser/<int:pk>/grouppermissions/search/',
          filebrowser_views.FileBrowserFolderGroupPermissionListQuerySearch.as_view(),
-         name='chrisfoldergrouppermission-list-query-search'),
+         name='foldergrouppermission-list-query-search'),
 
     path('v1/filebrowser/grouppermissions/<int:pk>/',
          filebrowser_views.FileBrowserFolderGroupPermissionDetail.as_view(),

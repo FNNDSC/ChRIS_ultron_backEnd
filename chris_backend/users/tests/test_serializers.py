@@ -2,13 +2,15 @@
 import logging
 
 from django.test import TestCase
-from django.contrib.auth.models import User
-
+from django.conf import settings
 from rest_framework import serializers
 
 from userfiles.models import UserFile
 from users.serializers import UserSerializer, GroupSerializer, GroupUserSerializer
 from core.storage.helpers import mock_storage
+
+
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class SerializerTests(TestCase):
@@ -22,9 +24,7 @@ class SerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.username = 'cube'
         self.password = 'cubepass'

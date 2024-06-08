@@ -280,12 +280,12 @@ class ChrisFolder(models.Model):
             folder.public = public_tf
         ChrisFolder.objects.bulk_update(folders, ['public'])
 
-        files = list(ChrisFile.objects.filter(path__startswith=path))
+        files = list(ChrisFile.objects.filter(fname__startswith=path))
         for f in files:
             f.public = public_tf
         ChrisFile.objects.bulk_update(files, ['public'])
 
-        link_files = list(ChrisLinkFile.objects.filter(path__startswith=path))
+        link_files = list(ChrisLinkFile.objects.filter(fname__startswith=path))
         for lf in link_files:
             lf.public = public_tf
         ChrisLinkFile.objects.bulk_update(link_files, ['public'])
@@ -410,18 +410,18 @@ class FolderUserPermission(models.Model):
             objs.append(perm)
         FolderUserPermission.objects.bulk_create(objs, update_conflicts=True,
                                                  update_fields=['permission'],
-                                                 unique_fields=['folder_id', 'group_id'])
+                                                 unique_fields=['folder_id', 'user_id'])
 
-        files = ChrisFile.objects.filter(path__startswith=path)
+        files = ChrisFile.objects.filter(fname__startswith=path)
         objs = []
         for f in files:
             perm = FileUserPermission(file=f, user=user, permission=permission)
             objs.append(perm)
         FileUserPermission.objects.bulk_create(objs, update_conflicts=True,
                                                update_fields=['permission'],
-                                               unique_fields=['file_id', 'group_id'])
+                                               unique_fields=['file_id', 'user_id'])
 
-        link_files = ChrisLinkFile.objects.filter(path__startswith=path)
+        link_files = ChrisLinkFile.objects.filter(fname__startswith=path)
         objs = []
         for lf in link_files:
             perm = LinkFileUserPermission(link_file=lf, user=user, permission=permission)
@@ -429,7 +429,7 @@ class FolderUserPermission(models.Model):
         LinkFileUserPermission.objects.bulk_create(objs, update_conflicts=True,
                                                    update_fields=['permission'],
                                                    unique_fields=['link_file_id',
-                                                                  'group_id'])
+                                                                  'user_id'])
 
     def delete(self, *args, **kwargs):
         """
@@ -769,7 +769,7 @@ class ChrisLinkFile(models.Model):
         """
         Custom method to grant a group a permission to access the link file.
         """
-        LinkFileGroupPermission.objects.update_or_create(file=self, group=group,
+        LinkFileGroupPermission.objects.update_or_create(link_file=self, group=group,
                                                          defaults={'permission': permission})
 
     def remove_group_permission(self, group, permission):
@@ -777,7 +777,7 @@ class ChrisLinkFile(models.Model):
         Custom method to remove a group's permission to access the link file.
         """
         try:
-            perm = LinkFileGroupPermission.objects.get(file=self, group=group,
+            perm = LinkFileGroupPermission.objects.get(link_file=self, group=group,
                                                        permission=permission)
         except LinkFileGroupPermission.DoesNotExist:
             pass
@@ -788,7 +788,7 @@ class ChrisLinkFile(models.Model):
         """
         Custom method to grant a user a permission to access the link file.
         """
-        LinkFileUserPermission.objects.update_or_create(file=self, user=user,
+        LinkFileUserPermission.objects.update_or_create(link_file=self, user=user,
                                                         defaults={'permission': permission})
 
     def remove_user_permission(self, user, permission):
@@ -796,7 +796,7 @@ class ChrisLinkFile(models.Model):
         Custom method to remove a user's permission to access the link file.
         """
         try:
-            perm = LinkFileUserPermission.objects.get(file=self, user=user,
+            perm = LinkFileUserPermission.objects.get(link_file=self, user=user,
                                                       permission=permission)
         except LinkFileUserPermission.DoesNotExist:
             pass

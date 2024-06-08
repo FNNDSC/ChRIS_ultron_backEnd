@@ -185,25 +185,29 @@ class FileBrowserFolderGroupPermissionList(generics.ListCreateAPIView):
         """
         Overriden to provide a group and folder before first saving to the DB.
         """
-        group = serializer.validated_data.pop('name')
+        group = serializer.validated_data.pop('grp_name')
         folder = self.get_object()
-        serializer.save(user=group, folder=folder)
+        serializer.save(group=group, folder=folder)
 
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the group permissions for the queried folder.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         folder = self.get_object()
 
+        query_list = [reverse('foldergrouppermission-list-query-search',
+                              request=request, kwargs={"pk": folder.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'folder': reverse('chrisfolder-detail', request=request,
                                    kwargs={"pk": folder.id})}
-
         response = services.append_collection_links(response, links)
-        template_data = {"grp_name": ""}
+
+        template_data = {"grp_name": "", "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_group_permissions_queryset(self):
@@ -253,6 +257,15 @@ class FileBrowserFolderGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIVi
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'grp_name' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('grp_name', None)  # shoud not change on update
+        return super(FileBrowserFolderGroupPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -292,18 +305,22 @@ class FileBrowserFolderUserPermissionList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the user permissions for the queried folder.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         folder = self.get_object()
 
+        query_list = [reverse('folderuserpermission-list-query-search',
+                              request=request, kwargs={"pk": folder.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'folder': reverse('chrisfolder-detail', request=request,
                                    kwargs={"pk": folder.id})}
-
         response = services.append_collection_links(response, links)
-        template_data = {"username": ""}
+
+        template_data = {"username": "", "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_user_permissions_queryset(self):
@@ -352,6 +369,15 @@ class FileBrowserFolderUserPermissionDetail(generics.RetrieveUpdateDestroyAPIVie
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'username' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('username', None)  # shoud not change on update
+        return super(FileBrowserFolderUserPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
 
     def perform_destroy(self, instance):
         """
@@ -462,25 +488,29 @@ class FileBrowserFileGroupPermissionList(generics.ListCreateAPIView):
         """
         Overriden to provide a group and file before first saving to the DB.
         """
-        group = serializer.validated_data.pop('name')
+        group = serializer.validated_data.pop('grp_name')
         f = self.get_object()
-        serializer.save(user=group, file=f)
+        serializer.save(group=group, file=f)
 
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the group permissions for the queried file.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         f = self.get_object()
 
+        query_list = [reverse('filegrouppermission-list-query-search',
+                              request=request, kwargs={"pk": f.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'file': reverse('chrisfile-detail', request=request,
                                    kwargs={"pk": f.id})}
-
         response = services.append_collection_links(response, links)
-        template_data = {"grp_name": ""}
+
+        template_data = {"grp_name": "", "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_group_permissions_queryset(self):
@@ -530,6 +560,15 @@ class FileBrowserFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'grp_name' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('grp_name', None)  # shoud not change on update
+        return super(FileBrowserFileGroupPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -569,18 +608,22 @@ class FileBrowserFileUserPermissionList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the user permissions for the queried file.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         f = self.get_object()
 
+        query_list = [reverse('fileuserpermission-list-query-search',
+                              request=request, kwargs={"pk": f.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'file': reverse('chrisfile-detail', request=request,
                                  kwargs={"pk": f.id})}
-
         response = services.append_collection_links(response, links)
-        template_data = {"username": ""}
+
+        template_data = {"username": "" , "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_user_permissions_queryset(self):
@@ -629,6 +672,15 @@ class FileBrowserFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView)
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'username' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('username', None)  # shoud not change on update
+        return super(FileBrowserFileUserPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
 
     def perform_destroy(self, instance):
         """
@@ -740,25 +792,29 @@ class FileBrowserLinkFileGroupPermissionList(generics.ListCreateAPIView):
         """
         Overriden to provide a group and link file before first saving to the DB.
         """
-        group = serializer.validated_data.pop('name')
+        group = serializer.validated_data.pop('grp_name')
         lf = self.get_object()
-        serializer.save(user=group, link_file=lf)
+        serializer.save(group=group, link_file=lf)
 
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the group permissions for the queried link file.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         lf = self.get_object()
 
+        query_list = [reverse('linkfilegrouppermission-list-query-search',
+                              request=request, kwargs={"pk": lf.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'link_file': reverse('chrislinkfile-detail', request=request,
                                       kwargs={"pk": lf.id})}
-
         response = services.append_collection_links(response, links)
-        template_data = {"grp_name": ""}
+
+        template_data = {"grp_name": "", "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_group_permissions_queryset(self):
@@ -808,6 +864,15 @@ class FileBrowserLinkFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPI
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'grp_name' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('grp_name', None)  # shoud not change on update
+        return super(FileBrowserLinkFileGroupPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -847,16 +912,22 @@ class FileBrowserLinkFileUserPermissionList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the user permissions for the queried link file.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         lf = self.get_object()
+
+        query_list = [reverse('linkfileuserpermission-list-query-search',
+                              request=request, kwargs={"pk": lf.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'link_file': reverse('chrislinkfile-detail', request=request,
                                       kwargs={"pk": lf.id})}
         response = services.append_collection_links(response, links)
-        template_data = {"username": ""}
+
+        template_data = {"username": "", "permission": ""}
         return services.append_collection_template(response, template_data)
 
     def get_user_permissions_queryset(self):
@@ -905,6 +976,15 @@ class FileBrowserLinkFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIV
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove 'username' if provided by the user before serializer
+        validation.
+        """
+        request.data.pop('username', None)  # shoud not change on update
+        return super(FileBrowserLinkFileUserPermissionDetail, self).update(request,
+                                                                          *args, **kwargs)
 
     def perform_destroy(self, instance):
         """

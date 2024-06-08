@@ -4,10 +4,14 @@ from unittest import mock, skip
 
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.conf import settings
 
 from core.models import ChrisFolder
 from userfiles.models import UserFile
 from filebrowser import services
+
+
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class ServiceTests(TestCase):
@@ -21,9 +25,7 @@ class ServiceTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
 
         # create users

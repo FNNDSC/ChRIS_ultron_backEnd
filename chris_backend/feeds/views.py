@@ -445,15 +445,21 @@ class FeedGroupPermissionList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the group permissions for the queried feed.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_group_permissions_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
+
+        query_list = [reverse('feedgrouppermission-list-query-search',
+                              request=request, kwargs={"pk": feed.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
+
         template_data = {"grp_name": ""}
         return services.append_collection_template(response, template_data)
 
@@ -534,15 +540,21 @@ class FeedUserPermissionList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the user permissions for the queried feed.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        A query list, document-level link relations and a collection+json template are
+        also added to the response.
         """
         queryset = self.get_user_permissions_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
+
+        query_list = [reverse('feeduserpermission-list-query-search',
+                              request=request, kwargs={"pk": feed.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
+
         template_data = {"username": ""}
         return services.append_collection_template(response, template_data)
 
@@ -622,20 +634,23 @@ class CommentList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         """
         Overriden to return a list of the comments for the queried feed.
-        A collection+json write template and document-level link relation are also
-        added to the response.
+        A query list, collection+json write template and document-level link relation
+        are also added to the response.
         """
         queryset = self.get_comments_queryset()
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
+
         # append query list
         query_list = [reverse('comment-list-query-search', request=request,
                               kwargs={"pk": feed.id})]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
         links = {'feed': reverse('feed-detail', request=request,
                                    kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
+
         # append write template
         template_data = {"title": "", "content": ""}
         return services.append_collection_template(response, template_data)

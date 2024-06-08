@@ -14,6 +14,9 @@ from userfiles.models import UserFile
 from userfiles.serializers import UserFileSerializer
 
 
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
+
+
 class UserFileSerializerTests(TestCase):
 
     def setUp(self):
@@ -22,9 +25,7 @@ class UserFileSerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.username = 'test'
         self.password = 'testpass'

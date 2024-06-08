@@ -35,6 +35,10 @@ def get_secret(setting, secret_type=env):
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
 
+# SUPERUSER SETTINGS
+CHRIS_SUPERUSER_PASSWORD = get_secret('CHRIS_SUPERUSER_PASSWORD')
+
+
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
