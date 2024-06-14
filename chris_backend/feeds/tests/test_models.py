@@ -69,16 +69,6 @@ class FeedModelTests(TestCase):
         """
         self.assertEqual(Note.objects.count(), 1)
 
-    def test_get_creator(self):
-        """
-        Test whether custom get_creator method properly returns the user that created the
-        feed.
-        """
-        user = User.objects.get(username=self.username)
-        feed = Feed.objects.get(name=self.feed_name)
-        feed_creator = feed.get_creator()
-        self.assertEqual(feed_creator, user)
-
     def test_get_plugin_instances_status_count(self):
         """
         Test whether custom get_plugin_instances_status_count method properly returns

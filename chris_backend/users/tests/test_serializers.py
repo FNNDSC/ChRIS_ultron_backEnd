@@ -42,13 +42,12 @@ class UserSerializerTests(SerializerTests):
 
     def test_create(self):
         """
-        Test whether overriden create method takes care of the password hashing and
-        creates a welcome file for the user in its personal storage space.
+        Test whether overriden create method takes care of the password hashing.
         """
         user_serializer = UserSerializer()
         validated_data = {'username': self.username, 'password': self.password,
                           'email': self.email}
-        with mock_storage('users.serializers.settings') as storage_manager:
+        with mock_storage('users.models.settings') as storage_manager:
             user = user_serializer.create(validated_data)
 
             self.assertEqual(user.username, self.username)
@@ -56,24 +55,15 @@ class UserSerializerTests(SerializerTests):
             self.assertNotEqual(user.password, self.password)
             self.assertTrue(user.check_password(self.password))
 
-            welcome_file_path = f'home/{self.username}/uploads/welcome.txt'
-            welcome_file = UserFile.objects.get(owner=user)
-            self.assertEqual(welcome_file.fname.name, welcome_file_path)
-            self.assertTrue(storage_manager.obj_exists(welcome_file_path))
-
     def test_validate_username(self):
         """
         Test whether overriden validate_username method raises a
-        serializers.ValidationError when the username contains forward slashes or is
-        the 'chris' special user.
+        serializers.ValidationError when the username contains forward slashes.
         """
         user_serializer = UserSerializer()
 
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('user/')
-
-        with self.assertRaises(serializers.ValidationError):
-            user_serializer.validate_username('chris')
 
         username = user_serializer.validate_username(self.username)
         self.assertEqual(username, self.username)

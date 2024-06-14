@@ -32,7 +32,7 @@ class UserGroupList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = User.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = (permissions.IsAuthenticated, )
+    permission_classes = (permissions.IsAuthenticated, IsUserOrChrisOrReadOnly)
 
     def list(self, request, *args, **kwargs):
         """

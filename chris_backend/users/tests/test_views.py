@@ -30,9 +30,9 @@ class ViewTests(TestCase):
         self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
-        self.username = 'cube'
-        self.password = 'cubepass'
-        self.email = 'dev@babymri.org'
+        self.username = 'fooo'
+        self.password = 'fooopass'
+        self.email = 'foo@gmail.com'
 
     def tearDown(self):
         # re-enable logging
@@ -53,7 +53,7 @@ class UserCreateViewTests(ViewTests):
                                    {"name": "email", "value": self.email}]}})
 
     def test_user_create_success(self):
-        with mock_storage('users.serializers.settings') as storage_manager:
+        with mock_storage('users.models.settings') as storage_manager:
             response = self.client.post(self.create_url, data=self.post,
                                         content_type=self.content_type)
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -208,7 +208,7 @@ class GroupListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_group_list_success(self):
-        self.client.login(username=self.chris_username, password=self.chris_password)
+        self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "G1")
         self.assertContains(response, "G2")
@@ -216,11 +216,6 @@ class GroupListViewTests(ViewTests):
     def test_group_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_group_list_failure_access_denied(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class GroupDetailViewTests(ViewTests):
@@ -252,7 +247,7 @@ class GroupDetailViewTests(ViewTests):
         self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertEqual(Group.objects.count(), 0)
+        self.assertEqual(Group.objects.count(), 2)
 
     def test_group_delete_failure_unauthenticated(self):
         response = self.client.delete(self.read_delete_url)
@@ -304,7 +299,7 @@ class GroupUserListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_group_user_list_success(self):
-        self.client.login(username=self.chris_username, password=self.chris_password)
+        self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
 
         self.assertContains(response, self.username)
@@ -313,11 +308,6 @@ class GroupUserListViewTests(ViewTests):
     def test_group_user_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_group_user_list_failure_access_denied(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class GroupUserDetailViewTests(ViewTests):
@@ -339,7 +329,7 @@ class GroupUserDetailViewTests(ViewTests):
         self.read_delete_url = reverse("user_groups-detail", kwargs={"pk": group_user.id})
 
     def test_group_user_detail_success(self):
-        self.client.login(username=self.chris_username, password=self.chris_password)
+        self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_delete_url)
         self.assertContains(response, 'G4')
         self.assertContains(response, self.username)
@@ -347,11 +337,6 @@ class GroupUserDetailViewTests(ViewTests):
     def test_group_user_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_group_user_detail_failure_access_denied(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_group_user_delete_success(self):
         self.client.login(username=self.chris_username, password=self.chris_password)

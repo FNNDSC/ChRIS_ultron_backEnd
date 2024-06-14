@@ -6,7 +6,7 @@ from unittest import mock
 
 from django.test import TestCase, tag
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.urls import reverse
 
 from rest_framework import status
@@ -37,7 +37,9 @@ class PACSViewTests(TestCase):
         self.username = 'test'
         self.password = 'testpass'
 
-        User.objects.create_user(username=self.username, password=self.password)
+        pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
+        user = User.objects.create_user(username=self.username, password=self.password)
+        user.groups.set([pacs_grp])
 
         # create a PACS file in the DB "already registered" to the server)
         self.storage_manager = connect_storage(settings)

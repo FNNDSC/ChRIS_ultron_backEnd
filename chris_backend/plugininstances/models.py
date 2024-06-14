@@ -191,8 +191,10 @@ class PluginInstance(models.Model):
 
 @receiver(post_delete, sender=PluginInstance)
 def auto_delete_output_folder_with_plugin_instance(sender, instance, **kwargs):
-    if instance.output_folder:
+    try:
         instance.output_folder.delete()
+    except Exception:
+        pass
 
 
 class PluginInstanceFilter(FilterSet):

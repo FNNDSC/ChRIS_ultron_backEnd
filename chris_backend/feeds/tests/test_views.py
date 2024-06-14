@@ -205,9 +205,11 @@ class FeedListQuerySearchViewTests(ViewTests):
         response = self.client.get(self.list_url)
         self.assertContains(response, self.feedname)
 
-    def test_feed_list_query_search_failure_unauthenticated(self):
+    def test_feed_list_query_search_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
+
 
     def test_feed_list_query_search_from_other_users_not_listed(self):
         self.client.login(username=self.other_username, password=self.other_password)
@@ -227,7 +229,7 @@ class FeedDetailViewTests(ViewTests):
         self.read_update_delete_url = reverse("feed-detail", kwargs={"pk": feed.id})
         self.put = json.dumps({
             "template": {"data": [{"name": "name", "value": "Updated"},
-                                  {"name": "owner", "value": self.other_username}]}})
+                                  {"name": "public", "value": True}]}})
           
     def test_feed_detail_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -248,9 +250,8 @@ class FeedDetailViewTests(ViewTests):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
         self.assertContains(response, "Updated")
-        new_owner = User.objects.get(username=self.other_username)
         feed = Feed.objects.get(name="Updated")
-        self.assertIn(new_owner, feed.owner.all())
+        self.assertTrue(feed.public)
 
     def test_feed_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
@@ -262,14 +263,6 @@ class FeedDetailViewTests(ViewTests):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_feed_update_failure_new_unregistered_owner(self):
-        put = json.dumps({"template": {"data": [{"name": "owner", "value": "foouser"}]}})
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.put(self.read_update_delete_url, data=put,
-                                   content_type=self.content_type)
-        feed = Feed.objects.get(name=self.feedname)
-        self.assertFalse(len(feed.owner.all()) > 1)
 
     def test_feed_delete_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -365,11 +358,10 @@ class CommentDetailViewTests(ViewTests):
         self.assertContains(response, "Comment1")
         self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
 
-    def test_comment_detail_success_not_related_feed_owner(self):
+    def test_comment_detail_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.read_update_delete_url)
-        self.assertContains(response, "Comment1")
-        self.assertTrue(response.data["feed"].endswith(self.corresponding_feed_url))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_comment_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
@@ -438,20 +430,15 @@ class TagListViewTests(ViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_tag_list_success(self):
-        self.client.login(username=self.username, password=self.password)
+        self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "Tag2")
         self.assertContains(response, "Tag3")
 
-    def test_tag_list_failure_unauthenticated(self):
+    def test_tag_list_success_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        
-    def test_tag_list_for_other_users_not_listed(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.create_read_url)
-        self.assertNotContains(response, "Tag2")
-        self.assertNotContains(response, "Tag3")
+        self.assertContains(response, "Tag2")
+        self.assertContains(response, "Tag3")
 
 
 class TagDetailViewTests(ViewTests):
@@ -472,18 +459,13 @@ class TagDetailViewTests(ViewTests):
                                   {"name": "color", "value": "black"}]}})
 
     def test_tag_detail_success(self):
-        self.client.login(username=self.username, password=self.password)
+        self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, "Tag1")
 
-    def test_tag_detail_failure_unauthenticated(self):
+    def test_tag_detail_success_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_tag_detail_failure_not_owner(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertContains(response, "Tag1")
 
     def test_tag_update_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -564,17 +546,6 @@ class FeedTagListViewTests(ViewTests):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        
-    def test_feed_tag_list_from_other_feed_owners_not_listed(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        feed = Feed.objects.get(name=self.feedname)
-        owner = User.objects.get(username=self.username)
-        new_owner = User.objects.get(username=self.other_username)
-        # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner.set([owner, new_owner])
-        feed.save()
-        response = self.client.get(self.list_url)
-        self.assertNotContains(response, "Tag2") # a feed owner can not see another feed owner's tags
 
 
 class TagFeedListViewTests(ViewTests):
@@ -615,14 +586,16 @@ class TagFeedListViewTests(ViewTests):
         self.assertContains(response, self.feedname)
         self.assertNotContains(response, "new")  # feed list is tag-specific
 
-    def test_tag_feed_list_failure_unauthenticated(self):
+    def test_tag_feed_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
 
     def test_tag_feed_list_failure_not_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
 
 
 class FeedTaggingListViewTests(ViewTests):
@@ -679,18 +652,6 @@ class FeedTaggingListViewTests(ViewTests):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_feed_tagging_list_from_other_feed_owners_not_listed(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        feed = Feed.objects.get(name=self.feedname)
-        owner = User.objects.get(username=self.username)
-        new_owner = User.objects.get(username=self.other_username)
-        # make new_owner an owner of the feed together with the feed's current owner
-        feed.owner.set([owner, new_owner])
-        feed.save()
-        response = self.client.get(self.create_read_url)
-        tag = Tag.objects.get(name="Tag2")
-        self.assertNotContains(response, tag.id) # a feed owner can not see another feed owner's taggings
 
 
 class TagTaggingListViewTests(ViewTests):
@@ -752,14 +713,10 @@ class TagTaggingListViewTests(ViewTests):
         feed = Feed.objects.get(name=self.feedname)
         self.assertNotContains(response, feed.id)
 
-    def test_tag_tagging_list_failure_unauthenticated(self):
+    def test_tag_tagging_list_success_unauthenticated(self):
         response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-    def test_tag_tagging_list_failure_not_owner(self):
-        self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.create_read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
 
 
 class TaggingDetailViewTests(ViewTests):

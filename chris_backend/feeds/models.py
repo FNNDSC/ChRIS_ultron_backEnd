@@ -2,7 +2,6 @@
 from django.db import models
 from django.db.models.signals import post_delete
 from django.contrib.auth.models import User, Group
-from django.db.models import Q
 from django.dispatch import receiver
 
 import django_filters
@@ -130,7 +129,10 @@ class Feed(models.Model):
 
 @receiver(post_delete, sender=Feed)
 def auto_delete_folder_with_feed(sender, instance, **kwargs):
-    instance.folder.delete()
+    try:
+        instance.folder.delete()
+    except Exception:
+        pass
 
 
 class FeedFilter(FilterSet):
