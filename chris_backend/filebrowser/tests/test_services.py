@@ -8,7 +8,6 @@ from django.conf import settings
 
 from core.models import ChrisFolder
 from users.models import UserProxy
-from userfiles.models import UserFile
 from filebrowser import services
 
 

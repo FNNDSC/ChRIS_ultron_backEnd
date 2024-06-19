@@ -4,7 +4,7 @@ from rest_framework import permissions
 
 class IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly(permissions.BasePermission):
     """
-    Custom permission to only allow owners of an object or superuser 'chris' or users
+    Custom permission to only allow owners of an object, superuser 'chris' and users
     with write permission to modify/edit it. Read-only access is allowed to other users
     that have been granted read permission or to any user if the object is public.
     """
@@ -15,11 +15,12 @@ class IsOwnerOrChrisOrCanWriteOrCanReadOnlyOrPublicReadOnly(permissions.BasePerm
         if obj.owner == user or user.username == 'chris':
             return True
 
-        if request.method in permissions.SAFE_METHODS and (obj.public or
-                                                           obj.has_user_permission(user)):
-            return True
+        if request.method in permissions.SAFE_METHODS:
+            if obj.public:
+                return True
+            return user.is_authenticated and obj.has_user_permission(user)
 
-        return obj.has_user_permission(user, 'w')
+        return user.is_authenticated and obj.has_user_permission(user, 'w')
 
 
 class IsOwnerOrChrisOrHasAnyPermissionReadOnly(permissions.BasePermission):

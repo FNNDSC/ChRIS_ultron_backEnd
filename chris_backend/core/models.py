@@ -111,10 +111,12 @@ class ChrisFolder(models.Model):
     def get_descendants(self):
         """
         Custom method to return all the folders that are a descendant of this
-        folder.
+        folder (including itself).
         """
-        path = self.path.rstrip('/') + '/'
-        return list(ChrisFolder.objects.filter(path__startswith=path))
+        path = str(self.path)
+        if path.endswith('/'):
+            return list(ChrisFolder.objects.filter(path__startswith=path))
+        return [self] + list(ChrisFolder.objects.filter(path__startswith=path + '/'))
 
     def has_group_permission(self, group, permission=''):
         """
@@ -273,9 +275,13 @@ class ChrisFolder(models.Model):
         Internal method to update public access to the folder and all its descendant
         folders, link files and files.
         """
-        path = self.path.rstrip('/') + '/'
+        path = str(self.path)
 
-        folders = list(ChrisFolder.objects.filter(path__startswith=path))
+        if path.endswith('/'):
+            folders = list(ChrisFolder.objects.filter(path__startswith=path))
+        else:
+            folders = [self] + list(ChrisFolder.objects.filter(path__startswith=path + '/'))
+
         for folder in folders:
             folder.public = public_tf
         ChrisFolder.objects.bulk_update(folders, ['public'])

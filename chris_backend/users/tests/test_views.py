@@ -76,10 +76,8 @@ class UserCreateViewTests(ViewTests):
         welcome_file = UserFile.objects.get(owner=user)
         self.assertEqual(welcome_file.fname.name, welcome_file_path)
 
-        # delete welcome file
-        storage_manager = connect_storage(settings)
-
-        storage_manager.delete_obj(welcome_file_path)
+        # delete user and it's home tree
+        user.delete()
 
     def test_user_create_failure_already_exists(self):
         User.objects.create_user(username=self.username,

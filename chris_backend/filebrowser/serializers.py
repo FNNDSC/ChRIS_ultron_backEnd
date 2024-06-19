@@ -71,7 +71,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         already exists.
         """
         # remove leading and trailing slashes
-        path = path.strip(' ').strip('/')
+        path = path.strip().strip('/')
 
         if not path.startswith('home/'):
             raise serializers.ValidationError(["Invalid path. Path must start with "

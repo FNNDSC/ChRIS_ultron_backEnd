@@ -143,39 +143,6 @@ class FileBrowserFolderListQuerySearchViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, 'PIPELINES')
 
-    def test_filebrowserfolder_list_query_search_feeds_folder_success_shared_feed(self):
-        other_user = User.objects.get(username=self.other_username)
-        plugin = self.plugin
-
-        # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
-                                                title='test',
-                                                compute_resource=plugin.compute_resources.all()[0])
-        pl_inst.feed.name = 'shared_feed'
-        pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
-
-        self.client.login(username=self.username, password=self.password)
-        read_url = reverse('chrisfolder-list-query-search') + f'?path=home/{self.other_username}/feeds'
-        response = self.client.get(read_url)
-        self.assertContains(response, f'home/{self.other_username}/feeds')
-
-    def test_filebrowserfolder_list_query_search_feeds_folder_failure_shared_feed_unauthenticated(self):
-        other_user = User.objects.get(username=self.other_username)
-        plugin = self.plugin
-
-        # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
-                                                title='test',
-                                                compute_resource=plugin.compute_resources.all()[0])
-        pl_inst.feed.name = 'shared_feed'
-        pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
-
-        read_url = reverse('chrisfolder-list-query-search') + f'?path=home/{self.other_username}/feeds'
-        response = self.client.get(read_url)
-        self.assertFalse(response.data['results'])
-
     def test_filebrowserfolder_list_query_search_feed_folder_success_shared_feed(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
@@ -284,11 +251,11 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, 'home')
 
-    def test_filebrowserfolder_home_folder_success_unauthenticated(self):
+    def test_filebrowserfolder_home_folder_failure_unauthenticated(self):
         folder = ChrisFolder.objects.get(path='home')
         read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertContains(response, 'home')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolder_user_home_folder_success(self):
         folder = ChrisFolder.objects.get(path=f'home/{self.username}')
@@ -297,11 +264,11 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, f'home/{self.username}')
 
-    def test_filebrowserfolder_user_home_folder_failure_not_found_unauthenticated(self):
+    def test_filebrowserfolder_user_home_folder_failure_not_unauthenticated(self):
         folder = ChrisFolder.objects.get(path=f'home/{self.username}')
         read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolder_SERVICES_folder_success(self):
         folder = ChrisFolder.objects.get(path='SERVICES')
@@ -310,11 +277,11 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, 'SERVICES')
 
-    def test_filebrowserfolder_SERVICES_folder_failure_not_found_unauthenticated(self):
+    def test_filebrowserfolder_SERVICES_folder_failure_unauthenticated(self):
         folder = ChrisFolder.objects.get(path='SERVICES')
         read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolder_PIPELINES_folder_success(self):
         folder = ChrisFolder.objects.get(path='PIPELINES')
@@ -328,43 +295,6 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
         self.assertContains(response, 'PIPELINES')
-
-    def test_filebrowserfolder_feeds_folder_success_shared_feed(self):
-        other_user = User.objects.get(username=self.other_username)
-        plugin = self.plugin
-
-        # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
-                                                title='test',
-                                                compute_resource=
-                                                plugin.compute_resources.all()[0])
-        pl_inst.feed.name = 'shared_feed'
-        pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
-
-        self.client.login(username=self.username, password=self.password)
-        folder = ChrisFolder.objects.get(path=f'home/{self.other_username}/feeds')
-        read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
-        response = self.client.get(read_url)
-        self.assertContains(response,f'home/{self.other_username}/feeds')
-
-    def test_filebrowserfolder_feeds_folder_failure_not_found_shared_feed_unauthenticated(self):
-        other_user = User.objects.get(username=self.other_username)
-        plugin = self.plugin
-
-        # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
-                                                title='test',
-                                                compute_resource=
-                                                plugin.compute_resources.all()[0])
-        pl_inst.feed.name = 'shared_feed'
-        pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
-
-        folder = ChrisFolder.objects.get(path=f'home/{self.other_username}/feeds')
-        read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
-        response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_filebrowserfolder_feed_folder_success_shared_feed(self):
         other_user = User.objects.get(username=self.other_username)
@@ -417,8 +347,9 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
                                                 compute_resource=
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'public_feed'
-        pl_inst.feed.public = True
         pl_inst.feed.save()
+
+        pl_inst.feed.grant_public_access()
 
         self.client.login(username=self.username, password=self.password)
         folder = ChrisFolder.objects.get(
@@ -439,8 +370,10 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
                                                 compute_resource=
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'public_feed'
-        pl_inst.feed.public = True
         pl_inst.feed.save()
+
+        # make feed public
+        pl_inst.feed.grant_public_access()
 
         folder = ChrisFolder.objects.get(
             path=f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}')
@@ -490,13 +423,15 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         self.assertContains(response, 'home')
         self.assertContains(response, 'SERVICES')
         self.assertContains(response, 'PIPELINES')
-        self.assertEqual(len(response.data['results']), 3)
+        self.assertContains(response, 'PUBLIC')
+        self.assertContains(response, 'SHARED')
+        self.assertEqual(len(response.data['results']), 5)
 
     def test_filebrowserfolderchild_list_root_folder_success_unauthenticated(self):
         folder = ChrisFolder.objects.get(path='')
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertContains(response, 'home')
+        self.assertContains(response, 'PUBLIC')
         self.assertContains(response, 'PIPELINES')
         self.assertEqual(len(response.data['results']), 2)
 
@@ -521,11 +456,11 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, f'home/{self.username}')
 
-    def test_filebrowserfolderchild_list_user_home_folder_failure_not_found_unauthenticated(self):
+    def test_filebrowserfolderchild_list_user_home_folder_failure_unauthenticated(self):
         folder = ChrisFolder.objects.get(path=f'home/{self.username}')
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolderchild_list_SERVICES_folder_success(self):
         folder = ChrisFolder.objects.get(path='SERVICES')
@@ -534,18 +469,18 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, 'SERVICES/PACS')
 
-    def test_filebrowserfolderchild_list_SERVICES_folder_failure_not_found_unauthenticated(self):
+    def test_filebrowserfolderchild_list_SERVICES_folder_failure_unauthenticated(self):
         folder = ChrisFolder.objects.get(path='SERVICES')
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolderchild_list_PIPELINES_folder_success(self):
         folder = ChrisFolder.objects.get(path='PIPELINES')
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(read_url)
-        self.assertContains(response, f'PIPELINES/{self.username}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_filebrowserfolderchild_list_PIPELINES_folder_succes_unauthenticated(self):
         folder = ChrisFolder.objects.get(path='PIPELINES')
@@ -553,7 +488,7 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_filebrowserfolderchild_list_feeds_folder_success_shared_feed(self):
+    def test_filebrowserfolderchild_list_feeds_folder_failure_shared_feed(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
 
@@ -567,24 +502,6 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         self.client.login(username=self.username, password=self.password)
-        folder = ChrisFolder.objects.get(path=f'home/{self.other_username}/feeds')
-        read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
-        response = self.client.get(read_url)
-        self.assertContains(response, f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}')
-
-    def test_filebrowserfolderchild_list_feeds_folder_failure_shared_feed_unauthenticated_access_denied(self):
-        other_user = User.objects.get(username=self.other_username)
-        plugin = self.plugin
-
-        # create a feed by creating a "fs" plugin instance
-        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=other_user,
-                                                title='test',
-                                                compute_resource=
-                                                plugin.compute_resources.all()[0])
-        pl_inst.feed.name = 'shared_feed'
-        pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
-
         folder = ChrisFolder.objects.get(path=f'home/{self.other_username}/feeds')
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
         response = self.client.get(read_url)
@@ -612,7 +529,7 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         self.assertContains(response,
                             f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}/')
 
-    def test_filebrowserfolderchild_list_feed_folder_failure_shared_feed_unauthenticated_access_denied(self):
+    def test_filebrowserfolderchild_list_feed_folder_failure_shared_feed_unauthenticated(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
 
@@ -630,7 +547,7 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
         read_url = reverse("chrisfolder-child-list", kwargs={"pk": folder.id})
 
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolderchild_list_feed_folder_success_public_feed(self):
         other_user = User.objects.get(username=self.other_username)
@@ -641,8 +558,10 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
                                                 title='test',
                                                 compute_resource=plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'public_feed'
-        pl_inst.feed.public = True
         pl_inst.feed.save()
+
+        # make feed public
+        pl_inst.feed.grant_public_access()
 
         self.client.login(username=self.username, password=self.password)
         folder = ChrisFolder.objects.get(
@@ -663,8 +582,10 @@ class FileBrowserFolderChildListViewTests(FileBrowserViewTests):
                                                 compute_resource=
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'public_feed'
-        pl_inst.feed.public = True
         pl_inst.feed.save()
+
+        # make feed public
+        pl_inst.feed.grant_public_access()
 
         folder = ChrisFolder.objects.get(
             path=f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}')
@@ -744,8 +665,6 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
                                                 title='test',
                                                 compute_resource=
                                                 self.plugin.compute_resources.all()[0])
-        pl_inst.feed.public = True
-        pl_inst.feed.save()
 
         # create file
         self.storage_manager = connect_storage(settings)
@@ -759,6 +678,9 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
         userfile.fname.name = file_path
         userfile.save()
 
+        # make feed public
+        pl_inst.feed.grant_public_access()
+
         read_url = reverse("chrisfolder-file-list",
                            kwargs={"pk": pl_inst.output_folder.id})
 
@@ -770,14 +692,10 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
 
     def test_filebrowserfolderfile_list_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolderfile_list_failure_not_found(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(reverse("chrisfolder-file-list", kwargs={"pk": 111111111}))
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_filebrowserfolderfile_list_failure_not_found_unauthenticated(self):
         response = self.client.get(reverse("chrisfolder-file-list", kwargs={"pk": 111111111}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -788,13 +706,6 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(read_url)
         self.assertContains(response, self.upload_path)
-
-    def test_filebrowserfolderfile_list_file_folder_failure_not_found_unauthenticated(self):
-        folder_path = os.path.dirname(self.upload_path)
-        folder = ChrisFolder.objects.get(path=folder_path)
-        read_url = reverse("chrisfolder-file-list", kwargs={"pk": folder.id})
-        response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_fileBrowserfile_list_success_shared_feed(self):
         other_user = User.objects.get(username=self.other_username)
@@ -807,7 +718,6 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'shared_feed'
         pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         file_path = f'{pl_inst.output_folder.path}/file3.txt'
         with io.StringIO("test file") as file3:
@@ -818,6 +728,9 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
         userfile.fname.name = file_path
         userfile.save()
 
+        # share feed
+        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
+
         read_url = reverse("chrisfolder-file-list",
                            kwargs={"pk": pl_inst.output_folder.id})
         self.client.login(username=self.username, password=self.password)
@@ -826,7 +739,7 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
 
         self.storage_manager.delete_obj(file_path)
 
-    def test_fileBrowserfile_list_failure_not_found_shared_feed_unauthenticated(self):
+    def test_fileBrowserfile_list_failure_shared_feed_unauthenticated(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
 
@@ -837,7 +750,6 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'shared_feed'
         pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         file_path = f'{pl_inst.output_folder.path}/file3.txt'
         with io.StringIO("test file") as file3:
@@ -848,11 +760,14 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
         userfile.fname.name = file_path
         userfile.save()
 
+        # share feed
+        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
+
         read_url = reverse("chrisfolder-file-list",
                            kwargs={"pk": pl_inst.output_folder.id})
 
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         self.storage_manager.delete_obj(file_path)
 
@@ -910,8 +825,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
                                                 title='test',
                                                 compute_resource=
                                                 self.plugin.compute_resources.all()[0])
-        pl_inst.feed.public = True
-        pl_inst.feed.save()
 
         # create link file
         link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
@@ -919,6 +832,9 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
         link_file = ChrisLinkFile(path='SERVICES/PACS', owner=user,
                                   parent_folder=pl_inst.output_folder)
         link_file.save(name='SERVICES_PACS')
+
+        # make feed public
+        pl_inst.feed.grant_public_access()
 
         read_url = reverse("chrisfolder-linkfile-list",
                            kwargs={"pk": pl_inst.output_folder.id})
@@ -930,15 +846,10 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
 
     def test_filebrowserfolderlinkfile_list_failure_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolderlinkfile_list_failure_not_found(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(reverse("chrisfolder-linkfile-list",
-                                           kwargs={"pk": 111111111}))
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_filebrowserfolderlinkfile_list_failure_not_found_unauthenticated(self):
         response = self.client.get(reverse("chrisfolder-linkfile-list",
                                            kwargs={"pk": 111111111}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -951,13 +862,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertContains(response, self.link_path)
 
-    def test_filebrowserfolderlinkfile_list_file_folder_failure_not_found_unauthenticated(self):
-        folder_path = os.path.dirname(self.link_path)
-        folder = ChrisFolder.objects.get(path=folder_path)
-        read_url = reverse("chrisfolder-linkfile-list", kwargs={"pk": folder.id})
-        response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
     def test_fileBrowserlinkfile_list_success_shared_feed(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
@@ -969,7 +873,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'shared_feed'
         pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         # create link file in the output folder
         link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
@@ -978,6 +881,9 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
                                   parent_folder=pl_inst.output_folder)
         link_file.save(name='SERVICES_PACS')
 
+        # share feed
+        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
+
         read_url = reverse("chrisfolder-linkfile-list", kwargs={"pk": pl_inst.output_folder.id})
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(read_url)
@@ -985,7 +891,7 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
 
         self.storage_manager.delete_obj(link_path)
 
-    def test_fileBrowserlinkfile_list_failure_not_found_shared_feed_unauthenticated(self):
+    def test_fileBrowserlinkfile_list_failure_shared_feed_unauthenticated(self):
         other_user = User.objects.get(username=self.other_username)
         plugin = self.plugin
 
@@ -996,7 +902,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'shared_feed'
         pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         # create link file in the output folder
         link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
@@ -1005,9 +910,12 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
                                   parent_folder=pl_inst.output_folder)
         link_file.save(name='SERVICES_PACS')
 
+        # share feed
+        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
+
         read_url = reverse("chrisfolder-linkfile-list", kwargs={"pk": pl_inst.output_folder.id})
         response = self.client.get(read_url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         self.storage_manager.delete_obj(link_path)
 
@@ -1072,8 +980,7 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_fileBrowserlinkfile_detail_success_public_feed_unauthenticated(self):
-        self.pl_inst.feed.public = True
-        self.pl_inst.feed.save()
+        self.pl_inst.feed.grant_public_access()
         response = self.client.get(self.read_url)
         self.assertContains(response, self.link_path)
 
@@ -1088,7 +995,6 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
                                                 plugin.compute_resources.all()[0])
         pl_inst.feed.name = 'shared_feed'
         pl_inst.feed.save()
-        pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         # create link file in the output folder
         link_path = f'{pl_inst.output_folder.path}/SERVICES_PACS.chrislink'
@@ -1096,6 +1002,10 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         link_file = ChrisLinkFile(path='SERVICES/PACS', owner=other_user,
                                   parent_folder=pl_inst.output_folder)
         link_file.save(name='SERVICES_PACS')
+
+        # share feed
+        user = User.objects.get(username=self.username)
+        pl_inst.feed.grant_user_permission(user)
 
         read_url = reverse("chrislinkfile-detail", kwargs={"pk": link_file.id})
         self.client.login(username=self.username, password=self.password)
