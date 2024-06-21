@@ -37,7 +37,7 @@ class ViewTests(TestCase):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        # create superuser chris (owner of root folders)
+        # superuser chris (owner of root and top-level folders)
         self.chris_username = 'chris'
         self.chris_password = CHRIS_SUPERUSER_PASSWORD
 

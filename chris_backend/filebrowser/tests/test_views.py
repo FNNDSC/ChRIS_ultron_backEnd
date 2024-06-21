@@ -2,6 +2,7 @@
 import logging
 import io
 import os
+import json
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -28,30 +29,33 @@ class FileBrowserViewTests(TestCase):
     Generic filebrowser view tests' setup and tearDown.
     """
 
-    def setUp(self):
+    content_type = 'application/vnd.collection+json'
+
+    # superuser chris (owner of root and top-level folders)
+    chris_username = 'chris'
+    chris_password = CHRIS_SUPERUSER_PASSWORD
+
+    # normal users
+    username = 'foo'
+    password = 'foopass'
+    other_username = 'boo'
+    other_password = 'boopass'
+
+    @classmethod
+    def setUpClass(cls):
+
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        self.content_type = 'application/vnd.collection+json'
+        # create users with their home folders setup
+        UserProxy.objects.create_user(username=cls.username, password=cls.password)
+        UserProxy.objects.create_user(username=cls.other_username,
+                                      password=cls.other_password)
 
-        # superuser chris (owner of root folders)
-        self.chris_username = 'chris'
-        self.chris_password = CHRIS_SUPERUSER_PASSWORD
-
-        # normal users
-        self.username = 'foo'
-        self.password = 'foopass'
-        self.other_username = 'boo'
-        self.other_password = 'boopass'
-
-        # create users
-        UserProxy.objects.create_user(username=self.username, password=self.password)
-        UserProxy.objects.create_user(username=self.other_username,
-                                      password=self.other_password)
-
-    def tearDown(self):
-        User.objects.get(username=self.username).delete()
-        User.objects.get(username=self.other_username).delete()
+    @classmethod
+    def tearDownClass(cls):
+        User.objects.get(username=cls.username).delete()
+        User.objects.get(username=cls.other_username).delete()
 
         # re-enable logging
         logging.disable(logging.NOTSET)
@@ -64,17 +68,33 @@ class FileBrowserFolderListViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserFolderListViewTests, self).setUp()
-        self.read_url = reverse('chrisfolder-list')
+        self.create_read_url = reverse('chrisfolder-list')
+        self.post = json.dumps(
+            {"template":
+                 {"data": [{"name": "path",
+                            "value": f"home/{self.username}/uploads/folder1/folder2"}]}})
+
+    def test_filebrowserfolder_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["path"], f"home/{self.username}/uploads/folder1/folder2")
+
+    def test_filebrowserfolder_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolder_list_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.create_read_url)
         self.assertContains(response, 'path')
         #import pdb; pdb.set_trace()
         self.assertEqual(response.data['results'][0]['path'],'')
 
     def test_filebrowserfolder_list_success_unauthenticated(self):
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.create_read_url)
         self.assertContains(response, 'path')
         self.assertEqual(response.data['results'][0]['path'],'')
 
@@ -244,11 +264,68 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
 
         self.plugin = plugin
 
+        self.folder = ChrisFolder.objects.get(path=f'home/{self.username}')
+        self.read_update_delete_url = reverse("chrisfolder-detail",
+                                              kwargs={"pk": self.folder.id})
+
+        self.put = json.dumps({
+            "template": {"data": [{"name": "public", "value": True}]}})
+
+    def test_filebrowserfolder_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_update_delete_url)
+        self.assertContains(response, f'home/{self.username}')
+
+    def test_filebrowserfolder_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_filebrowserfolder_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["public"],True)
+        self.folder.remove_public_access()
+
+    def test_filebrowserfolder_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_filebrowserfolder_update_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_filebrowserfolder_delete_success(self):
+        # create a folder
+        owner = User.objects.get(username=self.username)
+        folder, _ = ChrisFolder.objects.get_or_create(
+            path=f'home/{self.username}/uploads/test', owner=owner)
+
+        read_update_delete_url = reverse("chrisfolder-detail",
+                                         kwargs={"pk": folder.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_filebrowserfolder_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_filebrowserfolder_delete_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_filebrowserfolder_home_folder_success(self):
         folder = ChrisFolder.objects.get(path='home')
-        read_url = reverse("chrisfolder-detail", kwargs={"pk": folder.id})
+        read_update_delete_url = reverse("chrisfolder-detail",
+                                         kwargs={"pk": folder.id})
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(read_url)
+        response = self.client.get(read_update_delete_url)
         self.assertContains(response, 'home')
 
     def test_filebrowserfolder_home_folder_failure_unauthenticated(self):
