@@ -24,10 +24,10 @@ class ServiceTests(TestCase):
     chris_password = CHRIS_SUPERUSER_PASSWORD
 
     # normal users
-    username = 'foo'
-    password = 'foopass'
-    other_username = 'boo'
-    other_password = 'boopass'
+    username = 'fee'
+    password = 'feepass'
+    other_username = 'bee'
+    other_password = 'beepass'
     
     @classmethod
     def setUpClass(cls):

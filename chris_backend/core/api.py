@@ -83,27 +83,27 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/<int:pk>/grouppermissions/',
          feed_views.FeedGroupPermissionList.as_view(),
-         name='feed-group-permission-list'),
+         name='feedgrouppermission-list'),
 
     path('v1/<int:pk>/grouppermissions/search/',
          feed_views.FeedGroupPermissionListQuerySearch.as_view(),
-         name='feed-group-permission-list-query-search'),
+         name='feedgrouppermission-list-query-search'),
 
     path('v1/grouppermissions/<int:pk>/',
          feed_views.FeedGroupPermissionDetail.as_view(),
-         name='feed-group-permission-detail'),
+         name='feedgrouppermission-detail'),
 
     path('v1/<int:pk>/userpermissions/',
          feed_views.FeedUserPermissionList.as_view(),
-         name='feed-user-permission-list'),
+         name='feeduserpermission-list'),
 
     path('v1/<int:pk>/userpermissions/search/',
          feed_views.FeedUserPermissionListQuerySearch.as_view(),
-         name='feed-user-permission-list-query-search'),
+         name='feeduserpermission-list-query-search'),
 
     path('v1/userpermissions/<int:pk>/',
          feed_views.FeedUserPermissionDetail.as_view(),
-         name='feed-user-permission-detail'),
+         name='feeduserpermission-detail'),
 
     path('v1/<int:pk>/comments/',
         feed_views.CommentList.as_view(), name='comment-list'),

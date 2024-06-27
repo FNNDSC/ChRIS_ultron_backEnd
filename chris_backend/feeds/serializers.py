@@ -102,6 +102,10 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
     note = serializers.HyperlinkedRelatedField(view_name='note-detail', read_only=True)
+    group_permissions = serializers.HyperlinkedIdentityField(
+        view_name='feedgrouppermission-list')
+    user_permissions = serializers.HyperlinkedIdentityField(
+        view_name='feeduserpermission-list')
     tags = serializers.HyperlinkedIdentityField(view_name='feed-tag-list')
     taggings = serializers.HyperlinkedIdentityField(view_name='feed-tagging-list')
     comments = serializers.HyperlinkedIdentityField(view_name='comment-list')
@@ -115,7 +119,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                   'owner_username', 'folder_path', 'created_jobs', 'waiting_jobs',
                   'scheduled_jobs', 'started_jobs', 'registering_jobs',
                   'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'folder', 'note',
-                  'tags', 'taggings', 'comments', 'plugin_instances', 'owner')
+                  'group_permissions', 'user_permissions', 'tags', 'taggings',
+                  'comments', 'plugin_instances', 'owner')
 
     def update(self, instance, validated_data):
         """
@@ -231,11 +236,13 @@ class FeedGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     feed_name = serializers.ReadOnlyField(source='feed.name')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    group = serializers.HyperlinkedRelatedField(view_name='group-detail', read_only=True)
 
     class Meta:
         model = FeedGroupPermission
         fields = ('url', 'id', 'feed_id', 'feed_name', 'group_id', 'group_name',
-                  'feed', 'group', 'name')
+                  'feed', 'group', 'grp_name')
 
     def create(self, validated_data):
         """
@@ -260,13 +267,13 @@ class FeedGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_grp_name(self, grp_name):
         """
-        Custom method to check whether the provided group name exists in the DB.
+        Overriden to check whether the provided group name exists in the DB.
         """
         try:
             group = Group.objects.get(name=grp_name)
         except Group.DoesNotExist:
-            raise serializers.ValidationError(
-                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+            raise serializers.ValidationError([f"Couldn't find any group with name "
+                                               f"'{grp_name}'."])
         return group
 
 class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
@@ -275,10 +282,12 @@ class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
     feed_name = serializers.ReadOnlyField(source='feed.name')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
+    feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
+    user = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = FeedUserPermission
-        fields = ('url', 'id', 'feed_id', 'feed_name', 'user_id', 'user_username',
+        fields = ('url', 'id', 'feed_id', 'feed_name', 'user_id','user_username',
                   'feed', 'user', 'username')
 
     def create(self, validated_data):
@@ -304,13 +313,13 @@ class FeedUserPermissionSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_username(self, username):
         """
-        Custom method to check whether the provided username exists in the DB.
+        Overriden to check whether the provided username exists in the DB.
         """
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {'username': [f"Couldn't find any user with username '{username}'."]})
+            raise serializers.ValidationError([f"Couldn't find any user with username "
+                                               f"'{username}'."])
         return user
 
 

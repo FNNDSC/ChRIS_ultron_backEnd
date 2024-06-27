@@ -438,9 +438,9 @@ class FeedGroupPermissionList(generics.ListCreateAPIView):
         """
         Overriden to provide a group and feed before first saving to the DB.
         """
-        group = serializer.validated_data.pop('name')
+        group = serializer.validated_data.pop('grp_name')
         feed = self.get_object()
-        serializer.save(user=group, feed=feed)
+        serializer.save(group=group, feed=feed)
 
     def list(self, request, *args, **kwargs):
         """

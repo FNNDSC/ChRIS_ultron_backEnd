@@ -3,7 +3,7 @@ import logging
 
 from django.http import Http404, FileResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 
@@ -139,6 +139,21 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         request.data.pop('path', None)  # change path is not implemented yet
         return super(FileBrowserFolderDetail, self).update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to verify that the user's home or feeds folder is not being deleted.
+        """
+        username = request.user.username
+        folder = self.get_object()
+
+        if username != 'chris' and folder.path in (
+                f'home/{username}', f'home/{username}/feeds'):
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Deleting folder '{folder.path}' is not allowed."]})
+
+        return super(FileBrowserFolderDetail, self).destroy(request, *args, **kwargs)
 
 
 class FileBrowserFolderChildList(generics.ListAPIView):
@@ -756,6 +771,22 @@ class FileBrowserLinkFileDetail(generics.RetrieveUpdateDestroyAPIView):
         chris_link_file = self.get_object()
         request.data['fname'] = chris_link_file.fname.file  # fname required in the serializer
         return super(FileBrowserLinkFileDetail, self).update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to verify that the user's home's system-predefined link files are not
+        being deleted.
+        """
+        username = request.user.username
+        lf = self.get_object()
+
+        if username != 'chris' and lf.fname.name in (
+                f'home/{username}/public.chrislink', f'home/{username}/shared.chrislink'):
+            raise serializers.ValidationError(
+                {'non_field_errors':
+                     [f"Deleting link file '{lf.fname.name}' is not allowed."]})
+
+        return super(FileBrowserLinkFileDetail, self).destroy(request, *args, **kwargs)
 
 
 class FileBrowserLinkFileResource(generics.GenericAPIView):

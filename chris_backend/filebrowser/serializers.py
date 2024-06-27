@@ -118,11 +118,20 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
     def validate(self, data):
         """
         Overriden to validate that required fields are in data when creating or
-        updating a folder.
+        updating a folder. Also to verify that the user's home or feeds folder is not
+        being moved.
         """
         if self.instance:  # on update
             if 'public' not in data:
                 raise serializers.ValidationError({'public': ['This field is required.']})
+
+            username = self.context['request'].user.username
+
+            if 'path' in data and username != 'chris' and self.instance.path in (
+                    f'home/{username}', f'home/{username}/feeds'):
+                raise serializers.ValidationError(
+                    {'non_field_errors':
+                         [f"Moving folder '{self.instance.path}' is not allowed."]})
         else:
             if 'path' not in data: # on create
                 raise serializers.ValidationError({'path': ['This field is required.']})
@@ -132,7 +141,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     grp_name = serializers.CharField(write_only=True, required=False)
     folder_id = serializers.ReadOnlyField(source='folder.id')
-    folder_name = serializers.ReadOnlyField(source='folder.name')
+    folder_path = serializers.ReadOnlyField(source='folder.path')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
@@ -141,7 +150,7 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
 
     class Meta:
         model = FolderGroupPermission
-        fields = ('url', 'id', 'permission', 'folder_id', 'folder_name', 'group_id',
+        fields = ('url', 'id', 'permission', 'folder_id', 'folder_path', 'group_id',
                   'group_name', 'folder', 'group', 'grp_name')
 
     def create(self, validated_data):
@@ -168,13 +177,13 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
 
     def validate_grp_name(self, grp_name):
         """
-        Custom method to check whether the provided group name exists in the DB.
+        Overriden to check whether the provided group name exists in the DB.
         """
         try:
             group = Group.objects.get(name=grp_name)
         except Group.DoesNotExist:
-            raise serializers.ValidationError(
-                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+            raise serializers.ValidationError([f"Couldn't find any group with name "
+                                               f"'{grp_name}'."])
         return group
 
     def validate(self, data):
@@ -197,7 +206,7 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
     username = serializers.CharField(write_only=True, min_length=4, max_length=32,
                                      required=False)
     folder_id = serializers.ReadOnlyField(source='folder.id')
-    folder_name = serializers.ReadOnlyField(source='folder.name')
+    folder_path = serializers.ReadOnlyField(source='folder.path')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
@@ -206,7 +215,7 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
 
     class Meta:
         model = FolderUserPermission
-        fields = ('url', 'id', 'permission', 'folder_id', 'folder_name', 'user_id',
+        fields = ('url', 'id', 'permission', 'folder_id', 'folder_path', 'user_id',
                   'user_username', 'folder', 'user', 'username')
 
     def create(self, validated_data):
@@ -233,13 +242,13 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
 
     def validate_username(self, username):
         """
-        Custom method to check whether the provided username exists in the DB.
+        Overriden to check whether the provided username exists in the DB.
         """
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {'username': [f"Couldn't find any user with username '{username}'."]})
+            raise serializers.ValidationError([f"Couldn't find any user with username "
+                                               f"'{username}'."])
         return user
 
     def validate(self, data):
@@ -380,7 +389,7 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
 class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     grp_name = serializers.CharField(write_only=True, required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
-    file_fname = serializers.ReadOnlyField(source='file.fname')
+    file_fname = serializers.ReadOnlyField(source='file.fname.name')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
     file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
@@ -416,13 +425,13 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
 
     def validate_grp_name(self, grp_name):
         """
-        Custom method to check whether the provided group name exists in the DB.
+        Overriden to check whether the provided group name exists in the DB.
         """
         try:
             group = Group.objects.get(name=grp_name)
         except Group.DoesNotExist:
-            raise serializers.ValidationError(
-                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+            raise serializers.ValidationError([f"Couldn't find any group with name "
+                                               f"'{grp_name}'."])
         return group
 
     def validate(self, data):
@@ -445,7 +454,7 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
     username = serializers.CharField(write_only=True, min_length=4, max_length=32,
                                      required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
-    file_fname = serializers.ReadOnlyField(source='file.fname')
+    file_fname = serializers.ReadOnlyField(source='file.fname.name')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
     file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
@@ -481,13 +490,13 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
 
     def validate_username(self, username):
         """
-        Custom method to check whether the provided username exists in the DB.
+        Overriden to check whether the provided username exists in the DB.
         """
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {'username': [f"Couldn't find any user with username '{username}'."]})
+            raise serializers.ValidationError([f"Couldn't find any user with username "
+                                               f"'{username}'."])
         return user
 
     def validate(self, data):
@@ -655,20 +664,32 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     def validate(self, data):
         """
         Overriden to validate that at least one of two fields are in data when
-        updating a file.
+        updating a link file. Also to verify that the user's home's system-predefined
+        link files are not being moved.
         """
         if self.instance:  # on update
             if 'public' not in data and 'new_link_file_path' not in data:
                 raise serializers.ValidationError(
                     {'non_field_errors': ["At least one of the fields 'public' "
                                           "or 'new_link_file_path' must be provided."]})
+
+            username = self.context['request'].user.username
+            fname = self.instance.fname.name
+
+            if ('new_link_file_path' in data and username != 'chris' and fname in (
+                    f'home/{username}/public.chrislink',
+                    f'home/{username}/shared.chrislink')):
+                raise serializers.ValidationError(
+                    {'non_field_errors':
+                         [f"Moving link file '{fname}' is not allowed."]})
+
         return data
 
 
 class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     grp_name = serializers.CharField(write_only=True, required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
-    link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
+    link_file_fname = serializers.ReadOnlyField(source='link_file.fname.name')
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
     link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
@@ -704,13 +725,13 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
 
     def validate_grp_name(self, grp_name):
         """
-        Custom method to check whether the provided group name exists in the DB.
+        Overriden to check whether the provided group name exists in the DB.
         """
         try:
             group = Group.objects.get(name=grp_name)
         except Group.DoesNotExist:
-            raise serializers.ValidationError(
-                {'grp_name': [f"Couldn't find any group with name '{grp_name}'."]})
+            raise serializers.ValidationError([f"Couldn't find any group with name "
+                                               f"'{grp_name}'."])
         return group
 
     def validate(self, data):
@@ -733,7 +754,7 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
     username = serializers.CharField(write_only=True, min_length=4, max_length=32,
                                      required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
-    link_file_fname = serializers.ReadOnlyField(source='link_file.fname')
+    link_file_fname = serializers.ReadOnlyField(source='link_file.fname.name')
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
     link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
@@ -769,13 +790,13 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
 
     def validate_username(self, username):
         """
-        Custom method to check whether the provided username exists in the DB.
+        Overriden to check whether the provided username exists in the DB.
         """
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            raise serializers.ValidationError(
-                {'username': [f"Couldn't find any user with username '{username}'."]})
+            raise serializers.ValidationError([f"Couldn't find any user with username "
+                                               f"'{username}'."])
         return user
 
     def validate(self, data):

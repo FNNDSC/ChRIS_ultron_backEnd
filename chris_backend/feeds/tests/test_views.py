@@ -4,13 +4,14 @@ import json
 
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.conf import settings
 from rest_framework import status
 
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance
-from feeds.models import Note, Tag, Tagging, Feed, Comment
+from feeds.models import (Note, Tag, Tagging, Feed, FeedGroupPermission,
+                          FeedUserPermission, Comment)
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -30,9 +31,9 @@ class ViewTests(TestCase):
         self.content_type='application/vnd.collection+json'
 
         self.username = 'foo'
-        self.password = 'bar'
-        self.other_username = 'boo'
-        self.other_password = 'far'
+        self.password = 'foopass'
+        self.other_username = 'booo'
+        self.other_password = 'booopass'
              
         self.plugin_name = "pacspull"
         self.plugin_type = "fs"
@@ -46,10 +47,16 @@ class ViewTests(TestCase):
         # create basic models
         
         # create users
-        User.objects.create_user(username=self.other_username,
-                                 password=self.other_password)
+        other_user = User.objects.create_user(username=self.other_username,
+                                              password=self.other_password)
         user = User.objects.create_user(username=self.username,
                                         password=self.password)
+
+        # assign predefined group
+        all_grp = Group.objects.get(name='all_users')
+
+        other_user.groups.set([all_grp])
+        user.groups.set([all_grp])
         
         # create two plugins of different types
 
@@ -252,6 +259,7 @@ class FeedDetailViewTests(ViewTests):
         self.assertContains(response, "Updated")
         feed = Feed.objects.get(name="Updated")
         self.assertTrue(feed.public)
+        feed.remove_public_access()
 
     def test_feed_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
@@ -277,6 +285,408 @@ class FeedDetailViewTests(ViewTests):
     def test_feed_delete_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class FeedGroupPermissionListViewTests(ViewTests):
+    """
+    Test the 'feedgrouppermission-list' view.
+    """
+
+    def setUp(self):
+        super(FeedGroupPermissionListViewTests, self).setUp()
+
+        self.grp_name = 'all_users'
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.create_read_url = reverse('feedgrouppermission-list',
+                                       kwargs={"pk": feed.id})
+        self.post = json.dumps(
+            {"template":
+                 {"data": [{"name": "grp_name", "value": self.grp_name}]}})
+
+    def test_feed_group_permission_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.assertIn(self.grp_name, [g.name for g in feed.shared_groups.all()])
+        self.assertIn(self.grp_name, [g.name for g in feed.folder.shared_groups.all()])
+
+        grp = Group.objects.get(name=self.grp_name)
+        feed.remove_group_permission(grp)
+        feed.folder.remove_shared_link()
+
+    def ttest_feed_group_permission_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_group_permission_create_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_group_permission_shared_create_failure_access_denied(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        feed.remove_user_permission(other_user)
+
+    def test_feed_group_permission_list_success(self):
+        grp = Group.objects.get(name=self.grp_name)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_group_permission(grp)
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, self.grp_name)
+
+        feed.remove_group_permission(grp)
+
+    def test_feed_group_permission_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_group_permission_list_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_group_permission_shared_user_list_success(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        feed.remove_user_permission(other_user)
+
+
+class FeedGroupPermissionListQuerySearchViewTests(ViewTests):
+    """
+    Test the 'feedgrouppermission-list-query-search' view.
+    """
+
+    def setUp(self):
+        super(FeedGroupPermissionListQuerySearchViewTests, self).setUp()
+
+        self.grp_name = 'all_users'
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.read_url = reverse('feedgrouppermission-list-query-search',
+                                kwargs={"pk": feed.id})
+
+        grp = Group.objects.get(name=self.grp_name)
+        feed.grant_group_permission(grp)
+
+    def tearDown(self):
+        grp = Group.objects.get(name=self.grp_name)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.remove_group_permission(grp)
+
+        super(FeedGroupPermissionListQuerySearchViewTests, self).tearDown()
+
+    def test_feed_group_permission_list_query_search_success(self):
+        read_url = f'{self.read_url}?group_name={self.grp_name}'
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, self.grp_name)
+
+    def test_feed_group_permission_list_query_search_success_shared(self):
+        read_url = f'{self.read_url}?group_name={self.grp_name}'
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(read_url)
+        self.assertContains(response, self.grp_name)
+
+    def test_feed_group_permission_list_query_search_failure_unauthenticated(self):
+        read_url = f'{self.read_url}?group_name={self.grp_name}'
+
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_group_permission_list_query_search_failure_other_user(self):
+        grp = Group.objects.get(name=self.grp_name)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.remove_group_permission(grp)
+
+        read_url = f'{self.read_url}?group_name={self.grp_name}'
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['results'])
+
+
+class FeedGroupPermissionDetailViewTests(ViewTests):
+    """
+    Test the feedgrouppermission-detail view.
+    """
+
+    def setUp(self):
+        super(FeedGroupPermissionDetailViewTests, self).setUp()
+
+        self.grp_name = 'all_users'
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        grp = Group.objects.get(name=self.grp_name)
+        feed.grant_group_permission(grp)
+
+        gp = FeedGroupPermission.objects.get(group=grp, feed=feed)
+
+        self.read_delete_url = reverse("feedgrouppermission-detail",
+                                              kwargs={"pk": gp.id})
+
+    def tearDown(self):
+        grp = Group.objects.get(name=self.grp_name)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.remove_group_permission(grp)
+        #feed.folder.remove_shared_link()
+
+        super(FeedGroupPermissionDetailViewTests, self).tearDown()
+
+    def test_feed_group_permission_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'all_users')
+        self.assertContains(response, self.feedname)
+
+    def test_feed_group_permission_detail_shared_success(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'all_users')
+        self.assertContains(response, self.feedname)
+
+    def test_feed_group_permission_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_group_permission_delete_success(self):
+        feed = Feed.objects.get(name=self.feedname)
+        grp = Group.objects.get(name='pacs_users')
+
+        # create a group permission
+        feed.grant_group_permission(grp)
+        gp = FeedGroupPermission.objects.get(group=grp, feed=feed)
+
+        read_update_delete_url = reverse("feedgrouppermission-detail",
+                                         kwargs={"pk": gp.id})
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_feed_group_permission_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_group_permission_delete_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class FeedUserPermissionListViewTests(ViewTests):
+    """
+    Test the 'feeduserpermission-list' view.
+    """
+
+    def setUp(self):
+        super(FeedUserPermissionListViewTests, self).setUp()
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.create_read_url = reverse('feeduserpermission-list',
+                                       kwargs={"pk": feed.id})
+        self.post = json.dumps(
+            {"template":
+                 {"data": [{"name": "username", "value": self.other_username}]}})
+
+    def test_feed_user_permission_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.assertIn(self.other_username, [u.username for u in feed.shared_users.all()])
+        self.assertIn(self.other_username, [u.username for u in
+                                            feed.folder.shared_users.all()])
+
+        other_user = User.objects.get(username=self.other_username)
+        feed.remove_user_permission(other_user)
+        feed.folder.remove_shared_link()
+
+    def test_feed_user_permission_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_user_permission_create_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_user_permission_shared_create_failure_access_denied(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.post(self.create_read_url, data=self.post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        feed.remove_user_permission(other_user)
+
+    def test_feed_user_permission_list_success(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, self.other_username)
+
+        feed.remove_user_permission(other_user)
+
+    def test_feed_user_permission_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_user_permission_list_failure_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_feed_user_permission_shared_user_list_success(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        feed.remove_user_permission(other_user)
+
+
+class FeedUserPermissionListQuerySearchViewTests(ViewTests):
+    """
+    Test the 'feeduserpermission-list-query-search' view.
+    """
+
+    def setUp(self):
+        super(FeedUserPermissionListQuerySearchViewTests, self).setUp()
+
+        feed = Feed.objects.get(name=self.feedname)
+
+        self.read_url = reverse('feeduserpermission-list-query-search',
+                                kwargs={"pk": feed.id})
+
+        other_user = User.objects.get(username=self.other_username)
+        feed.grant_user_permission(other_user)
+
+    def tearDown(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.remove_user_permission(other_user)
+
+        super(FeedUserPermissionListQuerySearchViewTests, self).tearDown()
+
+    def test_feed_user_permission_list_query_search_success(self):
+        read_url = f'{self.read_url}?username={self.other_username}'
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(read_url)
+        self.assertContains(response, self.other_username)
+
+    def test_feed_user_permission_list_query_search_success_shared(self):
+        read_url = f'{self.read_url}?username={self.other_username}'
+
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(read_url)
+        self.assertContains(response, self.other_username)
+
+    def test_feed_user_permission_list_query_search_failure_unauthenticated(self):
+        read_url = f'{self.read_url}?username={self.other_username}'
+
+        response = self.client.get(read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class FeedUserPermissionDetailViewTests(ViewTests):
+    """
+    Test the feeduserpermission-detail view.
+    """
+
+    def setUp(self):
+        super(FeedUserPermissionDetailViewTests, self).setUp()
+        other_user = User.objects.get(username=self.other_username)
+
+        feed = Feed.objects.get(name=self.feedname)
+        feed.grant_user_permission(other_user)
+
+        up = FeedUserPermission.objects.get(user=other_user, feed=feed)
+
+        self.read_delete_url = reverse("feeduserpermission-detail",
+                                              kwargs={"pk": up.id})
+
+    def tearDown(self):
+        other_user = User.objects.get(username=self.other_username)
+        feed = Feed.objects.get(name=self.feedname)
+        feed.remove_user_permission(other_user)
+
+        super(FeedUserPermissionDetailViewTests, self).tearDown()
+
+    def test_feed_user_permission_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, self.other_username)
+        self.assertContains(response, self.feedname)
+
+    def test_feed_user_permission_detail_shared_success(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, self.other_username)
+        self.assertContains(response, self.feedname)
+
+    def test_feed_user_permission_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_user_permission_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_feed_user_permission_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_feed_user_permission_delete_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
