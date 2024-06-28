@@ -93,7 +93,7 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(UserFileDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"upload_path": ""}
+        template_data = {"upload_path": "", "public": ""}
         return services.append_collection_template(response, template_data)
 
     def update(self, request, *args, **kwargs):

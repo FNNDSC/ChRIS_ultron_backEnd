@@ -146,12 +146,14 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         username = request.user.username
         folder = self.get_object()
+        path_parts = folder.path.split('/')
 
-        if username != 'chris' and folder.path in (
-                f'home/{username}', f'home/{username}/feeds'):
-            raise serializers.ValidationError(
-                {'non_field_errors':
-                     [f"Deleting folder '{folder.path}' is not allowed."]})
+        if username != 'chris' and len(path_parts) > 1 and path_parts[0] == 'home':
+            if len(path_parts) == 2 or (len(path_parts) == 3 and path_parts[2] == 'feeds'):
+
+                raise serializers.ValidationError(
+                    {'non_field_errors':
+                         [f"Deleting folder '{folder.path}' is not allowed."]})
 
         return super(FileBrowserFolderDetail, self).destroy(request, *args, **kwargs)
 
@@ -465,7 +467,7 @@ class FileBrowserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to include the current fname in the request.
         """
         chris_file  = self.get_object()
-        request.data['fname'] = chris_file .fname.file  # fname required in the serializer
+        request.data['fname'] = chris_file.fname.file  # fname required in the serializer
         return super(FileBrowserFileDetail, self).update(request, *args, **kwargs)
 
 
@@ -779,9 +781,11 @@ class FileBrowserLinkFileDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         username = request.user.username
         lf = self.get_object()
+        fname_parts = lf.fname.name.split('/')
 
-        if username != 'chris' and lf.fname.name in (
-                f'home/{username}/public.chrislink', f'home/{username}/shared.chrislink'):
+        if username != 'chris' and len(fname_parts) == 3 and fname_parts[0] == 'home' and (
+                fname_parts[2] in ('public.chrislink', 'shared.chrislink')):
+
             raise serializers.ValidationError(
                 {'non_field_errors':
                      [f"Deleting link file '{lf.fname.name}' is not allowed."]})

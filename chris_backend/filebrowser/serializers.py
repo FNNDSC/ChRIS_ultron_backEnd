@@ -111,7 +111,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
             if not (self.instance.owner == user or user.username == 'chris'):
                 raise serializers.ValidationError(
-                    ["Public status of a feed can only be changed by its owner or"
+                    ["Public status of a folder can only be changed by its owner or"
                      "superuser 'chris'."])
         return public
 
@@ -127,11 +127,15 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
             username = self.context['request'].user.username
 
-            if 'path' in data and username != 'chris' and self.instance.path in (
-                    f'home/{username}', f'home/{username}/feeds'):
-                raise serializers.ValidationError(
-                    {'non_field_errors':
-                         [f"Moving folder '{self.instance.path}' is not allowed."]})
+            if 'path' in data and username != 'chris':
+                inst_path_parts = self.instance.path.split('/')
+
+                if len(inst_path_parts) > 1 and inst_path_parts[0] == 'home' and (
+                        len(inst_path_parts) == 2 or (len(inst_path_parts) == 3 and
+                                                      inst_path_parts[2] == 'feeds')):
+                    raise serializers.ValidationError(
+                        {'non_field_errors':
+                             [f"Moving folder '{self.instance.path}' is not allowed."]})
         else:
             if 'path' not in data: # on create
                 raise serializers.ValidationError({'path': ['This field is required.']})
@@ -369,7 +373,7 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
 
             if not (self.instance.owner == user or user.username == 'chris'):
                 raise serializers.ValidationError(
-                    ["Public status of a feed can only be changed by its owner or"
+                    ["Public status of a file can only be changed by its owner or"
                      "superuser 'chris'."])
         return public
 
@@ -657,7 +661,7 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
 
             if not (self.instance.owner == user or user.username == 'chris'):
                 raise serializers.ValidationError(
-                    ["Public status of a feed can only be changed by its owner or"
+                    ["Public status of a link file can only be changed by its owner or"
                      "superuser 'chris'."])
         return public
 
@@ -674,15 +678,17 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
                                           "or 'new_link_file_path' must be provided."]})
 
             username = self.context['request'].user.username
-            fname = self.instance.fname.name
 
-            if ('new_link_file_path' in data and username != 'chris' and fname in (
-                    f'home/{username}/public.chrislink',
-                    f'home/{username}/shared.chrislink')):
-                raise serializers.ValidationError(
-                    {'non_field_errors':
-                         [f"Moving link file '{fname}' is not allowed."]})
+            if 'new_link_file_path' in data and username != 'chris':
+                fname = self.instance.fname.name
+                fname_parts = fname.split('/')
 
+                if len(fname_parts) == 3 and fname_parts[0] == 'home' and (
+                        fname_parts[2] in ('public.chrislink', 'shared.chrislink')):
+
+                    raise serializers.ValidationError(
+                        {'non_field_errors':
+                             [f"Moving link file '{fname}' is not allowed."]})
         return data
 
 

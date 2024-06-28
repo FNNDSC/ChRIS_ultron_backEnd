@@ -15,17 +15,22 @@ from .models import UserFile
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
     fname = serializers.FileField(use_url=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
-    upload_path = serializers.CharField(max_length=1024, write_only=True)
+    upload_path = serializers.CharField(max_length=1024, write_only=True, required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     file_resource = ItemLinkField('get_file_link')
     parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                         read_only=True)
+    group_permissions = serializers.HyperlinkedIdentityField(
+        view_name='filegrouppermission-list')
+    user_permissions = serializers.HyperlinkedIdentityField(
+        view_name='fileuserpermission-list')
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = UserFile
         fields = ('url', 'id', 'creation_date', 'upload_path', 'fname', 'fsize', 'public',
-                  'owner_username', 'file_resource', 'parent_folder', 'owner')
+                  'owner_username', 'file_resource', 'parent_folder', 'group_permissions',
+                  'user_permissions','owner')
 
     def create(self, validated_data):
         """
@@ -50,24 +55,30 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to set the file's saving path and parent folder and delete the old
         path from storage.
         """
-        # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
-        # where <upload_path> must start with home/
-        upload_path = validated_data.pop('upload_path')
-        old_storage_path = instance.fname.name
+        if 'public' in validated_data:
+            instance.public = validated_data['public']
 
-        storage_manager = connect_storage(settings)
-        if storage_manager.obj_exists(upload_path):
-            storage_manager.delete_obj(upload_path)
+        upload_path = validated_data.pop('upload_path', None)
 
-        storage_manager.copy_obj(old_storage_path, upload_path)
-        storage_manager.delete_obj(old_storage_path)
+        if upload_path:
+            # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
+            # where <upload_path> must start with home/
+            old_storage_path = instance.fname.name
 
-        folder_path = os.path.dirname(upload_path)
-        owner = instance.owner
-        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                               owner=owner)
-        instance.parent_folder = parent_folder
-        instance.fname.name = upload_path
+            storage_manager = connect_storage(settings)
+            if storage_manager.obj_exists(upload_path):
+                storage_manager.delete_obj(upload_path)
+
+            storage_manager.copy_obj(old_storage_path, upload_path)
+            storage_manager.delete_obj(old_storage_path)
+
+            folder_path = os.path.dirname(upload_path)
+            owner = instance.owner
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                   owner=owner)
+            instance.parent_folder = parent_folder
+            instance.fname.name = upload_path
+
         instance.save()
         return instance
 
@@ -82,8 +93,7 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         Overriden to check whether the provided path is under a home/'s subdirectory
         for which the user has write permission.
         """
-        # remove leading and trailing slashes
-        upload_path = upload_path.strip(' ').strip('/')
+        upload_path = upload_path.strip().strip('/')
 
         if upload_path.endswith('.chrislink'):
             raise serializers.ValidationError(["Invalid path. Uploading ChRIS link "
@@ -104,7 +114,23 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
         if not (folder.owner == user or folder.public or
                 folder.has_user_permission(user, 'w')):
-            raise serializers.ValidationError([f"Invalid path. User do not have write "
+            raise serializers.ValidationError([f"Invalid path. User does not have write "
                                                f"permission under the folder "
                                                f"'{folder_path}'."])
         return upload_path
+
+    def validate(self, data):
+        """
+        Overriden to validate that at least one of two fields are in data when
+        updating a file.
+        """
+        if self.instance:  # on update
+            if 'public' not in data and 'upload_path' not in data:
+                raise serializers.ValidationError(
+                    {'non_field_errors': ["At least one of the fields 'public' "
+                                          "or 'upload_path' must be provided."]})
+        else:  # on create
+            if 'upload_path' not in data:
+                raise serializers.ValidationError(
+                    {'upload_path': ["This field is required."]})
+        return data
