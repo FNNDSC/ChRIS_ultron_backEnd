@@ -1,12 +1,13 @@
 
 from django.contrib.auth.models import User, Group
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
 
 from collectionjson import services
 
-from .models import GroupFilter
+from .models import GroupFilter, GroupUserFilter
 from .serializers import UserSerializer, GroupSerializer, GroupUserSerializer
 from .permissions import IsUserOrChrisOrReadOnly, IsAdminOrReadOnly
 
@@ -137,7 +138,7 @@ class GroupDetail(generics.RetrieveDestroyAPIView):
 
 class GroupUserList(generics.ListCreateAPIView):
     """
-    A view for a group-specific collection of users.
+    A view for a group-specific collection of group users.
     """
     http_method_names = ['get', 'post']
     queryset = Group.objects.all()
@@ -158,24 +159,49 @@ class GroupUserList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list of the users for the queried group.
-        Document-level link relations and a collection+json template are also added
-        to the response.
+        Overriden to return a list of the group users for the queried group.
+        A query list, document-level link relations and a collection+json template
+        are also added to the response.
         """
         queryset = self.get_users_queryset()
         response = services.get_list_response(self, queryset)
         group = self.get_object()
+
+        query_list = [reverse('group-user-list-query-search',
+                              request=request, kwargs={"pk": group.id})]
+        response = services.append_collection_querylist(response, query_list)
+
         links = {'group': reverse('group-detail', request=request,
                                    kwargs={"pk": group.id})}
         response = services.append_collection_links(response, links)
+
         template_data = {"username": ""}
         return services.append_collection_template(response, template_data)
 
     def get_users_queryset(self):
         """
-        Custom method to get the actual users queryset for the group.
+        Custom method to get the actual group users queryset for the group.
         """
         group = self.get_object()
+        return User.groups.through.objects.filter(group=group)
+
+
+class GroupUserListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of group users resulting from a query
+    search.
+    """
+    http_method_names = ['get']
+    serializer_class = GroupUserSerializer
+    permission_classes = (permissions.IsAuthenticated, IsAdminOrReadOnly)
+    filterset_class = GroupUserFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is comprised by the group-specific
+        group users.
+        """
+        group = get_object_or_404(Group, pk=self.kwargs['pk'])
         return User.groups.through.objects.filter(group=group)
 
 

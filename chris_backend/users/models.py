@@ -25,6 +25,14 @@ class GroupFilter(FilterSet):
         fields = ['id', 'name', 'name_icontains']
 
 
+class GroupUserFilter(FilterSet):
+    username = django_filters.CharFilter(field_name='user__username', lookup_expr='exact')
+
+    class Meta:
+        model = User.groups.through
+        fields = ['id', 'username']
+
+
 class UserProxy(User):
 
     class Meta:
