@@ -42,8 +42,7 @@ class UserFileList(generics.ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to append document-level link relations, a query list and a
-        collection+json template to the response.
+        Overriden to append a query list and a collection+json template to the response.
         """
         response = super(UserFileList, self).list(request, *args, **kwargs)
 

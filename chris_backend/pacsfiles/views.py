@@ -71,7 +71,7 @@ class PACSFileList(generics.ListAPIView):
     """
     A view for the collection of PACS files.
     """
-    http_method_names = ['get', 'post']
+    http_method_names = ['get']
     queryset = PACSFile.get_base_queryset()
     serializer_class = PACSFileSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
