@@ -24,6 +24,9 @@ from django.core.exceptions import ImproperlyConfigured
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
+# Superuser settings
+CHRIS_SUPERUSER_PASSWORD = 'chris1234'
+
 # Hosts/domain names that are valid for this site
 # See https://docs.djangoproject.com/en/4.2/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
@@ -189,7 +192,8 @@ if AUTH_LDAP:
         'last_name': 'sn',
         'email': 'mail'
     }
+
     AUTHENTICATION_BACKENDS = (
-        'django_auth_ldap.backend.LDAPBackend',
+        'users.models.CustomLDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )

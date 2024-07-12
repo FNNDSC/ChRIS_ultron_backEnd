@@ -62,10 +62,13 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 [f"Couldn't find any 'previous' plugin instance with id "
                  f"{previous_plugin_inst_id}."])
+
         # check that the user can run plugins within this feed
         user = self.context['request'].user
-        if user not in previous_plugin_inst.feed.owner.all():
-            raise serializers.ValidationError([f'User is not an owner of feed for '
+        feed = previous_plugin_inst.feed
+
+        if not (user == feed.owner or feed.has_user_permission(user)):
+            raise serializers.ValidationError([f'Not allowed to write to feed for '
                                                f'previous instance with id {pk}.'])
         return previous_plugin_inst
 

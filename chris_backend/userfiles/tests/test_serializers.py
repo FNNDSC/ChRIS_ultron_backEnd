@@ -14,6 +14,9 @@ from userfiles.models import UserFile
 from userfiles.serializers import UserFileSerializer
 
 
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
+
+
 class UserFileSerializerTests(TestCase):
 
     def setUp(self):
@@ -22,16 +25,15 @@ class UserFileSerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.username = 'test'
         self.password = 'testpass'
 
-        # create user
-        User.objects.create_user(username=self.username,
-                                 password=self.password)
+        # create user and its home folder
+        user = User.objects.create_user(username=self.username,
+                                        password=self.password)
+        ChrisFolder.objects.get_or_create(path=f'home/{self.username}', owner=user)
 
     def tearDown(self):
         # re-enable logging
@@ -82,24 +84,47 @@ class UserFileSerializerTests(TestCase):
             connect_storage_mock.assert_called_with(settings)
             storage_manager_mock.delete_obj.assert_called_with(upload_path)
 
-    def test_validate_upload_path_failure_does_not_start_with_home_username(self):
+    def test_validate_upload_path_failure_uploading_link_file(self):
+        """
+        Test whether overriden validate_upload_path method validates submitted path
+        does not end with the .chrislink string.
+        """
+        userfiles_serializer = UserFileSerializer()
+        request = mock.Mock()
+        request.user = User.objects.get(username=self.username)
+        with mock.patch.dict(userfiles_serializer.context,
+                             {'request': request}, clear=True):
+            with self.assertRaises(serializers.ValidationError):
+                upload_path = f'home/{self.username}/uploads/mylink.chrislink'
+                userfiles_serializer.validate_upload_path(upload_path)
+
+    def test_validate_upload_path_failure_does_not_start_with_home(self):
+        """
+        Test whether overriden validate_upload_path method validates submitted path
+        must start with the 'home/' string.
+        """
+        userfiles_serializer = UserFileSerializer()
+        request = mock.Mock()
+        request.user = User.objects.get(username=self.username)
+        with mock.patch.dict(userfiles_serializer.context,
+                             {'request': request}, clear=True):
+            with self.assertRaises(serializers.ValidationError):
+                userfiles_serializer.validate_upload_path('home')
+            with self.assertRaises(serializers.ValidationError):
+                userfiles_serializer.validate_upload_path('random/file1.txt')
+
+    def test_validate_upload_path_failure_does_not_have_write_permission(self):
         """
         Test whether overriden validate_upload_path method validates submitted path
         must start with the 'home/<username>/' string.
         """
         userfiles_serializer = UserFileSerializer()
-        user = mock.Mock(spec=User)
-        user.username = 'cube'
         request = mock.Mock()
-        request.user = user
+        request.user = User.objects.get(username=self.username)
         with mock.patch.dict(userfiles_serializer.context,
                              {'request': request}, clear=True):
             with self.assertRaises(serializers.ValidationError):
-                userfiles_serializer.validate_upload_path('foo/file1.txt')
-            with self.assertRaises(serializers.ValidationError):
-                userfiles_serializer.validate_upload_path('home/cube_file1.txt')
-            with self.assertRaises(serializers.ValidationError):
-                userfiles_serializer.validate_upload_path('cube/uploads_file1.txt')
+                userfiles_serializer.validate_upload_path('SERVICES/PACS/random/file1.txt')
 
     @tag('integration')
     def test_validate_upload_path_success(self):
@@ -107,12 +132,11 @@ class UserFileSerializerTests(TestCase):
         Test whether overriden validate_upload_path method validates submitted path.
         """
         userfiles_serializer = UserFileSerializer()
-        user = mock.Mock(spec=User)
-        user.username = 'cube'
         request = mock.Mock()
-        request.user = user
+        request.user = User.objects.get(username=self.username)
+
         with mock.patch.dict(userfiles_serializer.context,
                              {'request': request}, clear=True):
-            upload_path = 'home/cube/uploads/file1.txt'
+            upload_path = f'home/{self.username}/uploads/file1.txt'
             self.assertEqual(userfiles_serializer.validate_upload_path(upload_path),
                              upload_path)

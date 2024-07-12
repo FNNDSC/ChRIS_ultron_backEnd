@@ -658,11 +658,24 @@ class PluginInstanceManager(object):
 
     def save_plugin_instance_final_status(self):
         """
-        Save to the DB and log the final status of the plugin instance.
+        Set the plugin instance's output folder permissions recursively and log and
+        save the instance's final status to the DB.
         """
         job_id = self.str_job_id
+        logger.info(f"Setting output folder's permissions for job {job_id} ...")
+
+        for group in self.c_plugin_inst.feed.shared_groups.all():
+            self.c_plugin_inst.output_folder.grant_group_permission(group, 'w')
+
+        for user in self.c_plugin_inst.feed.shared_users.all():
+            self.c_plugin_inst.output_folder.grant_user_permission(user, 'w')
+
+        if self.c_plugin_inst.feed.public:
+            self.c_plugin_inst.output_folder.grant_public_access()
+
         logger.info(f"Saving job {job_id} DB status as '{self.c_plugin_inst.status}'")
         self.c_plugin_inst.end_date = timezone.now()
+
         logger.info(f"Saving job {job_id} DB end_date as '{self.c_plugin_inst.end_date}'")
         self.c_plugin_inst.save()
 

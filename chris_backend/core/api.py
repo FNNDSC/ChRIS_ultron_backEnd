@@ -31,6 +31,30 @@ urlpatterns = format_suffix_patterns([
     path('v1/users/<int:pk>/groups/',
          user_views.UserGroupList.as_view(), name='user-group-list'),
 
+    path('v1/groups/',
+         user_views.GroupList.as_view(),
+         name='group-list'),
+
+    path('v1/groups/search/',
+         user_views.GroupListQuerySearch.as_view(),
+         name='group-list-query-search'),
+
+    path('v1/groups/<int:pk>/',
+         user_views.GroupDetail.as_view(),
+         name='group-detail'),
+
+    path('v1/groups/<int:pk>/users/',
+         user_views.GroupUserList.as_view(),
+         name='group-user-list'),
+
+    path('v1/groups/<int:pk>/users/search/',
+         user_views.GroupUserListQuerySearch.as_view(),
+         name='group-user-list-query-search'),
+
+    path('v1/groups/users/<int:pk>/',
+         user_views.GroupUserDetail.as_view(),
+         name='user_groups-detail'),
+
 
     path('v1/downloadtokens/',
          core_views.FileDownloadTokenList.as_view(),
@@ -60,6 +84,30 @@ urlpatterns = format_suffix_patterns([
 
     path('v1/note<int:pk>/',
         feed_views.NoteDetail.as_view(), name='note-detail'),
+
+    path('v1/<int:pk>/grouppermissions/',
+         feed_views.FeedGroupPermissionList.as_view(),
+         name='feedgrouppermission-list'),
+
+    path('v1/<int:pk>/grouppermissions/search/',
+         feed_views.FeedGroupPermissionListQuerySearch.as_view(),
+         name='feedgrouppermission-list-query-search'),
+
+    path('v1/grouppermissions/<int:pk>/',
+         feed_views.FeedGroupPermissionDetail.as_view(),
+         name='feedgrouppermission-detail'),
+
+    path('v1/<int:pk>/userpermissions/',
+         feed_views.FeedUserPermissionList.as_view(),
+         name='feeduserpermission-list'),
+
+    path('v1/<int:pk>/userpermissions/search/',
+         feed_views.FeedUserPermissionListQuerySearch.as_view(),
+         name='feeduserpermission-list-query-search'),
+
+    path('v1/userpermissions/<int:pk>/',
+         feed_views.FeedUserPermissionDetail.as_view(),
+         name='feeduserpermission-detail'),
 
     path('v1/<int:pk>/comments/',
         feed_views.CommentList.as_view(), name='comment-list'),
@@ -358,25 +406,97 @@ urlpatterns = format_suffix_patterns([
          filebrowser_views.FileBrowserFolderChildList.as_view(),
          name='chrisfolder-child-list'),
 
+    path('v1/filebrowser/<int:pk>/grouppermissions/',
+         filebrowser_views.FileBrowserFolderGroupPermissionList.as_view(),
+         name='foldergrouppermission-list'),
+
+    path('v1/filebrowser/<int:pk>/grouppermissions/search/',
+         filebrowser_views.FileBrowserFolderGroupPermissionListQuerySearch.as_view(),
+         name='foldergrouppermission-list-query-search'),
+
+    path('v1/filebrowser/grouppermissions/<int:pk>/',
+         filebrowser_views.FileBrowserFolderGroupPermissionDetail.as_view(),
+         name='foldergrouppermission-detail'),
+
+    path('v1/filebrowser/<int:pk>/userpermissions/',
+         filebrowser_views.FileBrowserFolderUserPermissionList.as_view(),
+         name='folderuserpermission-list'),
+
+    path('v1/filebrowser/<int:pk>/userpermissions/search/',
+         filebrowser_views.FileBrowserFolderUserPermissionListQuerySearch.as_view(),
+         name='folderuserpermission-list-query-search'),
+
+    path('v1/filebrowser/userpermissions/<int:pk>/',
+         filebrowser_views.FileBrowserFolderUserPermissionDetail.as_view(),
+         name='folderuserpermission-detail'),
+
     path('v1/filebrowser/<int:pk>/files/',
          filebrowser_views.FileBrowserFolderFileList.as_view(),
          name='chrisfolder-file-list'),
-
-    path('v1/filebrowser/<int:pk>/linkfiles/',
-         filebrowser_views.FileBrowserFolderLinkFileList.as_view(),
-         name='chrisfolder-linkfile-list'),
 
     path('v1/filebrowser/files/<int:pk>/',
          filebrowser_views.FileBrowserFileDetail.as_view(),
          name='chrisfile-detail'),
 
+    path('v1/filebrowser/files/<int:pk>/grouppermissions/',
+         filebrowser_views.FileBrowserFileGroupPermissionList.as_view(),
+         name='filegrouppermission-list'),
+
+    path('v1/filebrowser/files/<int:pk>/grouppermissions/search/',
+         filebrowser_views.FileBrowserFileGroupPermissionListQuerySearch.as_view(),
+         name='filegrouppermission-list-query-search'),
+
+    path('v1/filebrowser/files/grouppermissions/<int:pk>/',
+         filebrowser_views.FileBrowserFileGroupPermissionDetail.as_view(),
+         name='filegrouppermission-detail'),
+
+    path('v1/filebrowser/files/<int:pk>/userpermissions/',
+         filebrowser_views.FileBrowserFileUserPermissionList.as_view(),
+         name='fileuserpermission-list'),
+
+    path('v1/filebrowser/files/<int:pk>/userpermissions/search/',
+         filebrowser_views.FileBrowserFileUserPermissionListQuerySearch.as_view(),
+         name='fileuserpermission-list-query-search'),
+
+    path('v1/filebrowser/files/userpermissions/<int:pk>/',
+         filebrowser_views.FileBrowserFileUserPermissionDetail.as_view(),
+         name='fileuserpermission-detail'),
+
     re_path(r'^v1/filebrowser/files/(?P<pk>[0-9]+)/.*$',
             filebrowser_views.FileBrowserFileResource.as_view(),
             name='chrisfile-resource'),
 
+    path('v1/filebrowser/<int:pk>/linkfiles/',
+         filebrowser_views.FileBrowserFolderLinkFileList.as_view(),
+         name='chrisfolder-linkfile-list'),
+
     path('v1/filebrowser/linkfiles/<int:pk>/',
          filebrowser_views.FileBrowserLinkFileDetail.as_view(),
          name='chrislinkfile-detail'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/grouppermissions/',
+         filebrowser_views.FileBrowserLinkFileGroupPermissionList.as_view(),
+         name='linkfilegrouppermission-list'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/grouppermissions/search/',
+         filebrowser_views.FileBrowserLinkFileGroupPermissionListQuerySearch.as_view(),
+         name='linkfilegrouppermission-list-query-search'),
+
+    path('v1/filebrowser/linkfiles/grouppermissions/<int:pk>/',
+         filebrowser_views.FileBrowserLinkFileGroupPermissionDetail.as_view(),
+         name='linkfilegrouppermission-detail'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/userpermissions/',
+         filebrowser_views.FileBrowserLinkFileUserPermissionList.as_view(),
+         name='linkfileuserpermission-list'),
+
+    path('v1/filebrowser/linkfiles/<int:pk>/userpermissions/search/',
+         filebrowser_views.FileBrowserLinkFileUserPermissionListQuerySearch.as_view(),
+         name='linkfileuserpermission-list-query-search'),
+
+    path('v1/filebrowser/linkfiles/userpermissions/<int:pk>/',
+         filebrowser_views.FileBrowserLinkFileUserPermissionDetail.as_view(),
+         name='linkfileuserpermission-detail'),
 
     re_path(r'^v1/filebrowser/linkfiles/(?P<pk>[0-9]+)/.*$',
             filebrowser_views.FileBrowserLinkFileResource.as_view(),

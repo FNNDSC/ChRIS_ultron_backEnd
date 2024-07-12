@@ -6,7 +6,7 @@ from unittest import mock
 
 from django.test import TestCase, tag
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.urls import reverse
 
 from rest_framework import status
@@ -15,6 +15,9 @@ from core.models import ChrisFolder
 from core.storage import connect_storage
 from pacsfiles.models import PACS, PACSSeries, PACSFile
 from pacsfiles import views
+
+
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class PACSViewTests(TestCase):
@@ -28,15 +31,15 @@ class PACSViewTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
         self.username = 'test'
         self.password = 'testpass'
 
-        User.objects.create_user(username=self.username, password=self.password)
+        pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
+        user = User.objects.create_user(username=self.username, password=self.password)
+        user.groups.set([pacs_grp])
 
         # create a PACS file in the DB "already registered" to the server)
         self.storage_manager = connect_storage(settings)

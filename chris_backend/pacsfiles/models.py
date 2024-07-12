@@ -29,7 +29,10 @@ class PACS(models.Model):
 
 @receiver(post_delete, sender=PACS)
 def auto_delete_pacs_folder_with_pacs(sender, instance, **kwargs):
-    instance.folder.delete()
+    try:
+        instance.folder.delete()
+    except Exception:
+        pass
 
 
 class PACSSeries(models.Model):
@@ -62,7 +65,10 @@ class PACSSeries(models.Model):
 
 @receiver(post_delete, sender=PACSSeries)
 def auto_delete_series_folder_with_series(sender, instance, **kwargs):
-    instance.folder.delete()
+    try:
+        instance.folder.delete()
+    except Exception:
+        pass
 
 
 class PACSSeriesFilter(FilterSet):

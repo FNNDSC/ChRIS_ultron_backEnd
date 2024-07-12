@@ -3,10 +3,14 @@ import logging
 
 from django.contrib.auth.models import User
 from django.test import TestCase, tag
+from django.conf import settings
 from unittest import mock
 from rest_framework import serializers
 
 from pacsfiles.serializers import PACSSeriesSerializer
+
+
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class PACSSeriesSerializerTests(TestCase):
@@ -17,9 +21,7 @@ class PACSSeriesSerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
     def tearDown(self):
         # re-enable logging

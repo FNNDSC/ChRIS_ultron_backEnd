@@ -20,6 +20,7 @@ from core.storage import connect_storage
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class ViewTests(TestCase):
@@ -30,9 +31,7 @@ class ViewTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
 

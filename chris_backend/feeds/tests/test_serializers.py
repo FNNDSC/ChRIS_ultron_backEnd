@@ -14,6 +14,7 @@ from feeds.serializers import TaggingSerializer, FeedSerializer
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class SerializerTests(TestCase):
@@ -24,9 +25,7 @@ class SerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.username = 'foo'
         self.password = 'bar'
@@ -106,11 +105,6 @@ class TaggingSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             tagging_serializer.validate_tag(tag.id + 1) # error if tag not found in DB
 
-        with self.assertRaises(serializers.ValidationError):
-            other_user = User.objects.get(username=self.other_username)
-            tagging_serializer.context['request'].user = other_user
-            tagging_serializer.validate_tag(tag.id) # error if users doesn't own tag
-
     def test_validate_feed(self):
         """
         Test whether custom validate_feed method returns a feed instance or
@@ -154,27 +148,6 @@ class FeedSerializerTests(SerializerTests):
             self.feed_serializer.validate_name('myfeed/')
         name = self.feed_serializer.validate_name('myfeed')
         self.assertEqual(name, 'myfeed')
-
-    def test_validate_new_owner(self):
-        """
-        Test whether custom validate_new_owner method returns a user instance
-        or raises a serializers.ValidationError when the proposed new owner is
-        not a system-registered user.
-        """
-        new_owner = User.objects.get(username=self.other_username)
-        user_inst = self.feed_serializer.validate_new_owner(new_owner.username)
-        self.assertEqual(user_inst, new_owner)
-
-        with self.assertRaises(serializers.ValidationError):
-            self.feed_serializer.validate_new_owner('not a registered user')
-
-    def test_get_creator_username(self):
-        """
-        Test whether overriden get_creator_username method returns the username of the
-        user that created the feed.
-        """
-        creator_username = self.feed_serializer.get_creator_username(self.feed_serializer.instance)
-        self.assertEqual(creator_username, self.username)
 
     def test_get_started_jobs(self):
         """

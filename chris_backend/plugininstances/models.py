@@ -94,6 +94,7 @@ class PluginInstance(models.Model):
         """
         feed = Feed()
         feed.name = self.title or self.plugin.meta.name
+        feed.owner = self.owner
         feed.save()
 
         # feed's folder path: SWIFT_CONTAINER_NAME/home/<username>/feeds/feed_<id>
@@ -102,7 +103,6 @@ class PluginInstance(models.Model):
         folder.save()
 
         feed.folder = folder
-        feed.owner.set([self.owner])
         feed.save()
         return feed
 
@@ -124,7 +124,8 @@ class PluginInstance(models.Model):
 
         feed = current.feed
         # username = self.owner.username
-        username = feed.get_creator().username  # use creator of the feed for shared feeds
+        username = feed.owner.username  # use creator of the feed for shared
+        # feeds
         output_path = 'home/{0}/feeds/feed_{1}'.format(username, feed.id) + path
 
         folder = ChrisFolder(path=output_path, owner=self.owner)
@@ -190,8 +191,10 @@ class PluginInstance(models.Model):
 
 @receiver(post_delete, sender=PluginInstance)
 def auto_delete_output_folder_with_plugin_instance(sender, instance, **kwargs):
-    if instance.output_folder:
+    try:
         instance.output_folder.delete()
+    except Exception:
+        pass
 
 
 class PluginInstanceFilter(FilterSet):
