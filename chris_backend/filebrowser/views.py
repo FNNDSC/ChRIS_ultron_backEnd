@@ -464,10 +464,10 @@ class FileBrowserFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include the current fname in the request.
+        Overriden to remove 'fname' if provided by the user before serializer
+        validation.
         """
-        chris_file  = self.get_object()
-        request.data['fname'] = chris_file.fname.file  # fname required in the serializer
+        request.data.pop('fname', None)  # shoud not change on update
         return super(FileBrowserFileDetail, self).update(request, *args, **kwargs)
 
 
@@ -768,10 +768,11 @@ class FileBrowserLinkFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include the current fname in the request.
+        Overriden to remove 'fname' and 'path' if provided by the user before serializer
+        validation.
         """
-        chris_link_file = self.get_object()
-        request.data['fname'] = chris_link_file.fname.file  # fname required in the serializer
+        request.data.pop('fname', None)  # shoud not change on update
+        request.data.pop('path', None)  # shoud not change on update
         return super(FileBrowserLinkFileDetail, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):

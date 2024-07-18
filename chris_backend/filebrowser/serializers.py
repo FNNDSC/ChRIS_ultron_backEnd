@@ -274,7 +274,7 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
 class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
     new_file_path = serializers.CharField(max_length=1024, write_only=True,
                                           required=False)
-    fname = serializers.FileField(use_url=False)
+    fname = serializers.FileField(use_url=False, required=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
     file_resource = ItemLinkField('get_file_link')
@@ -522,6 +522,7 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
 class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     new_link_file_path = serializers.CharField(max_length=1024, write_only=True,
                                                required=False)
+    path = serializers.CharField(max_length=1024, required=False)
     fname = serializers.FileField(use_url=False, required=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -573,7 +574,8 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
             instance.parent_folder = parent_folder
             instance.fname.name = new_link_file_path
 
-        instance.save()
+        link_name = os.path.basename(instance.fname.name).rsplit('.chrislink', 1)[0]
+        instance.save(name=link_name)
         return instance
 
     def get_file_link(self, obj):
@@ -689,6 +691,9 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
                     raise serializers.ValidationError(
                         {'non_field_errors':
                              [f"Moving link file '{fname}' is not allowed."]})
+        else: # on create
+            if 'path' not in data:
+                raise serializers.ValidationError({'path': ['This field is required.']})
         return data
 
 
@@ -703,7 +708,7 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
     group = serializers.HyperlinkedRelatedField(view_name='group-detail', read_only=True)
 
     class Meta:
-        model = FileGroupPermission
+        model = LinkFileGroupPermission
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname',
                   'group_id', 'group_name', 'link_file', 'group', 'grp_name')
 
@@ -768,7 +773,7 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
     user = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
-        model = FileUserPermission
+        model = LinkFileUserPermission
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname', 'user_id',
                   'user_username', 'link_file', 'user', 'username')
 
@@ -788,7 +793,7 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
             raise serializers.ValidationError(
                 {'non_field_errors':
                      [f"User '{user.username}' already has a permission to access "
-                      f"file with id {lf.id}"]})
+                      f"link file with id {lf.id}"]})
 
         shared_lf = lf.create_shared_link()
         shared_lf.grant_user_permission(user, 'r')

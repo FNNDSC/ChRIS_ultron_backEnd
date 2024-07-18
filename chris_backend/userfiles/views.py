@@ -97,10 +97,10 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         """
-        Overriden to include the current fname in the request.
+        Overriden to remove 'fname' if provided by the user before serializer
+        validation.
         """
-        user_file = self.get_object()
-        request.data['fname'] = user_file.fname.file  # fname required in the serializer
+        request.data.pop('fname', None)  # shoud not change on update
         return super(UserFileDetail, self).update(request, *args, **kwargs)
 
 

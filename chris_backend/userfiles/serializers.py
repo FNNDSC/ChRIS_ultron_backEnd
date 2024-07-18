@@ -13,7 +13,7 @@ from .models import UserFile
 
 
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
-    fname = serializers.FileField(use_url=False)
+    fname = serializers.FileField(use_url=False, required=False)
     fsize = serializers.ReadOnlyField(source='fname.size')
     upload_path = serializers.CharField(max_length=1024, write_only=True, required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -133,4 +133,7 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
             if 'upload_path' not in data:
                 raise serializers.ValidationError(
                     {'upload_path': ["This field is required."]})
+            if 'fname' not in data:
+                raise serializers.ValidationError(
+                    {'fname': ["This field is required."]})
         return data
