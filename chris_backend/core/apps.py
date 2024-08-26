@@ -13,6 +13,8 @@ def setup_chris(sender, **kwargs):
     # create superuser chris
     try:
         chris_user = User.objects.get(username='chris')
+        chris_user.set_password(settings.CHRIS_SUPERUSER_PASSWORD)
+        chris_user.save()
     except User.DoesNotExist:
         chris_user = User.objects.create_superuser('chris', 'dev@babymri.org',
                                                    settings.CHRIS_SUPERUSER_PASSWORD)
