@@ -124,31 +124,31 @@ class TokenAuthSupportQueryString(TokenAuthentication):
         # Check if 'download_token' is in the request query params
         if 'download_token' in request.query_params:
             token = request.query_params['download_token']
-            err_msg = f'Invalid file download token: {token}'
-
-            try:
-                info = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            except jwt.ExpiredSignatureError:
-                err_msg = f'Expired file download token: {token}'
-                logger.error(err_msg)
-                raise exceptions.AuthenticationFailed(err_msg)
-            except jwt.InvalidTokenError:
-                logger.error(err_msg)
-                raise exceptions.AuthenticationFailed(err_msg)
-
-            try:
-                user = User.objects.get(username=info['user'])
-            except User.DoesNotExist:
-                logger.error(err_msg)
-                raise exceptions.AuthenticationFailed(err_msg)
-
-            try:
-                token_obj = FileDownloadToken.objects.get(owner=user, token=token)
-            except FileDownloadToken.DoesNotExist:
-                logger.error(err_msg)
-                raise exceptions.AuthenticationFailed(err_msg)
-
-            token_obj.delete()  # one-time-use token, we could instead set revoked=true
-            return user, None
-
+            return authenticate_token(token), None
         return super(TokenAuthSupportQueryString, self).authenticate(request)
+
+
+def authenticate_token(token: str) -> User:
+    err_msg = f'Invalid file download token: {token}'
+    try:
+        info = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        err_msg = f'Expired file download token: {token}'
+        logger.error(err_msg)
+        raise exceptions.AuthenticationFailed(err_msg)
+    except jwt.InvalidTokenError:
+        logger.error(err_msg)
+        raise exceptions.AuthenticationFailed(err_msg)
+
+    try:
+        user = User.objects.get(username=info['user'])
+    except User.DoesNotExist:
+        logger.error(err_msg)
+        raise exceptions.AuthenticationFailed(err_msg)
+
+    token_obj = FileDownloadToken.objects.filter(owner=user, token=token).first()
+    if token_obj is None:
+        raise exceptions.AuthenticationFailed(err_msg)
+
+    token_obj.delete()  # one-time-use token, we could instead set revoked=true
+    return user

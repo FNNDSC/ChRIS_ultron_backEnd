@@ -14,3 +14,4 @@ django-auth-ldap==4.5.0
 PyYAML==6.0.1
 whitenoise[brotli]==6.5.0
 PyJWT===2.8.0
+channels[daphne]==4.1.0
