@@ -11,8 +11,8 @@ def register_pacs_series(
         study_date: str,
         study_instance_uid: str,
         study_description: str,
-        series_description: str,
         series_instance_uid: str,
+        series_description: str,
         pacs_name: str,
         path: str,
         ndicom: int
