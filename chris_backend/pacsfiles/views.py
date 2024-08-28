@@ -16,7 +16,7 @@ class PACSSeriesList(generics.ListCreateAPIView):
     """
     A view for the collection of PACS Series.
     """
-    http_method_names = ['get', 'post']
+    http_method_names = ['get']
     queryset = PACSSeries.objects.all()
     serializer_class = PACSSeriesSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly,)
