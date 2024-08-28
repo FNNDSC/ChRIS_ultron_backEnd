@@ -18,5 +18,4 @@ class ChrisInstanceAdmin(admin.ModelAdmin):
 
 admin.site.site_header = 'ChRIS Administration'
 admin.site.site_title = 'ChRIS Admin'
-admin.site.unregister(Group)
 admin.site.register(ChrisInstance, ChrisInstanceAdmin)

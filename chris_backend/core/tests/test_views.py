@@ -1,20 +1,19 @@
 
 import logging
-import json
 
 from django.test import TestCase, tag
 from django.contrib.auth.models import User
 from django.urls import reverse
-from django.conf import settings
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import status
 
 import jwt
 
-from userfiles.models import UserFile
 from core.models import FileDownloadToken
-from core.storage.helpers import mock_storage, connect_storage
 
+
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class CoreViewTests(TestCase):
@@ -28,9 +27,7 @@ class CoreViewTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.content_type = 'application/vnd.collection+json'
         self.username = 'cube'

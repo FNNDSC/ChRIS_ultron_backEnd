@@ -9,7 +9,7 @@ from core.renderers import BinaryFileRenderer
 from core.views import TokenAuthSupportQueryString
 from .models import PACSSeries, PACSSeriesFilter, PACSFile, PACSFileFilter
 from .serializers import PACSSeriesSerializer, PACSFileSerializer
-from .permissions import IsChrisOrReadOnly
+from .permissions import IsChrisOrIsPACSUserReadOnly
 
 
 class PACSSeriesList(generics.ListCreateAPIView):
@@ -19,7 +19,7 @@ class PACSSeriesList(generics.ListCreateAPIView):
     http_method_names = ['get', 'post']
     queryset = PACSSeries.objects.all()
     serializer_class = PACSSeriesSerializer
-    permission_classes = (permissions.IsAuthenticated, IsChrisOrReadOnly,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -53,7 +53,7 @@ class PACSSeriesListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PACSSeriesSerializer
     queryset = PACSSeries.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
     filterset_class = PACSSeriesFilter
 
 
@@ -64,17 +64,17 @@ class PACSSeriesDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PACSSeries.objects.all()
     serializer_class = PACSSeriesSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
 
 
 class PACSFileList(generics.ListAPIView):
     """
     A view for the collection of PACS files.
     """
-    http_method_names = ['get', 'post']
+    http_method_names = ['get']
     queryset = PACSFile.get_base_queryset()
     serializer_class = PACSFileSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
 
     def list(self, request, *args, **kwargs):
         """
@@ -94,7 +94,7 @@ class PACSFileListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PACSFileSerializer
     queryset = PACSFile.get_base_queryset()
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
     filterset_class = PACSFileFilter
 
 
@@ -105,7 +105,7 @@ class PACSFileDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PACSFile.get_base_queryset()
     serializer_class = PACSFileSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
 
 
 class PACSFileResource(generics.GenericAPIView):
@@ -115,7 +115,7 @@ class PACSFileResource(generics.GenericAPIView):
     http_method_names = ['get']
     queryset = PACSFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 

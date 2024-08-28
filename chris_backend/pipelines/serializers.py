@@ -498,7 +498,7 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PipelineSourceFile
-        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'type',
+        fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public', 'type',
                   'ftype', 'uploader_username', 'owner_username', 'pipeline_id',
                   'pipeline_name', 'file_resource', 'parent_folder', 'owner')
 
@@ -526,12 +526,16 @@ class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
         # file will be stored to Swift at:
         # SWIFT_CONTAINER_NAME/PIPELINES/<uploader_username>/<filename>
         folder_path = f'PIPELINES/{uploader.username}'
-        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                               owner=owner)
+        (parent_folder, tf) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                                owner=owner)
+        if tf:
+            parent_folder.grant_public_access()
+
         fname = validated_data['fname']
         filename = os.path.basename(fname.name)
         validated_data['parent_folder'] = parent_folder
         source_file = PipelineSourceFile(**validated_data)
+        source_file.public = True
         source_file.fname.name = f'{folder_path}/{filename}'
         source_file.save()
 

@@ -1,23 +1,17 @@
 
-import logging
 import pathlib
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.conf import settings
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
-from core.storage import connect_storage
+from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
 from plugins.models import TYPES, Plugin
-from feeds.models import Feed
 
 from .models import PluginInstance, PluginInstanceSplit
 from .models import FloatParameter, IntParameter, BoolParameter
 from .models import PathParameter, UnextpathParameter, StrParameter
-
-
-logger = logging.getLogger(__name__)
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
@@ -83,6 +77,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         # as plugin instances are always created through the API
         plugin = self.context['view'].get_object()
         previous = None
+
         if plugin.meta.type in ('ds', 'ts'):
             if not previous_id:
                 raise serializers.ValidationError(
@@ -94,10 +89,13 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                 err_str = "Couldn't find any 'previous' plugin instance with id %s."
                 raise serializers.ValidationError(
                     {'previous_id': [err_str % previous_id]})
+
             # check that the user can run plugins within this feed
             user = self.context['request'].user
-            if user not in previous.feed.owner.all():
-                err_str = "User is not an owner of feed for previous instance with id %s."
+            feed = previous.feed
+
+            if not (user == feed.owner or feed.has_user_permission(user)):
+                err_str = "Not allowed to write to feed for previous instance with id %s."
                 raise serializers.ValidationError(
                     {'previous_id': [err_str % previous_id]})
         return previous
@@ -309,52 +307,52 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 def validate_paths(user, string):
     """
-    Custom function to check whether a user is allowed to access the provided object
-    storage paths.
+    Custom function to check whether a user is allowed to access the provided paths.
     """
-    storage_manager = connect_storage(settings)
-    path_list = [s.strip() for s in string.split(',')]
+    path_list = [s.strip().strip('/') for s in string.split(',')]
+
     for path in path_list:
         path_parts = pathlib.Path(path).parts
-        if len(path_parts) == 0:
-            # trying to access the root of the storage
+
+        if len(path_parts) < 2:
+            # trying to access a top-level folder or an unknown folder
             raise serializers.ValidationError(
-                ["You do not have permission to access this path."])
-        if len(path_parts) == 1 and path_parts[0] not in ('SERVICES', 'PIPELINES'):
-            # trying to access the home folder or an unknown folder within the root folder
+                [f"This field may not reference a top-level folder path '{path}'."])
+
+        if path_parts[0] not in ('home', 'SERVICES', 'PIPELINES'):
             raise serializers.ValidationError(
-                ["You do not have permission to access this path."])
-        if path_parts[0] == 'home' and path_parts[1] != user.username:
-            if len(path_parts) <= 3:
-                # trying to access another user's root or personal space
-                raise serializers.ValidationError(
-                    ["You do not have permission to access this path."])
+                [f"This field may not reference an invalid path '{path}'."])
+
+        if len(path_parts) == 2 and path_parts[0] == 'home':
+            raise serializers.ValidationError(
+                [f"This field may not reference a home folder path '{path}'."])
+
+        if len(path_parts) == 3 and path_parts[0] == 'home' and path_parts[2] == 'feeds':
+            raise serializers.ValidationError(
+                [f"This field may not reference a home's feeds folder path '{path}'."])
+
+        try:
+            obj = ChrisFolder.objects.get(path=path)
+        except ChrisFolder.DoesNotExist:  # path is not a folder
             try:
-                # file paths should be of the form home/<username>/feeds/feed_<id>/..
-                str_l = path_parts[3].split('_')
-                if len(str_l) != 2:
-                    raise ValueError()
-                if str_l[0] != 'feed':
-                    raise ValueError()
-                feed_id = str_l[-1]
-                feed = Feed.objects.get(pk=feed_id)
-            except (ValueError, Feed.DoesNotExist):
-                raise serializers.ValidationError(
-                    ["This field may not be an invalid path."])
-            if user not in feed.owner.all():
-                raise serializers.ValidationError(
-                    ["You do not have permission to access this path."])
-        else:
-            # check whether path exists in swift
-            try:
-                path_exists = storage_manager.path_exists(path)
-            except Exception as e:
-                logger.error('Swift storage error, detail: %s' % str(e))
-                raise serializers.ValidationError(
-                    ["Could not validate this path."])
-            if not path_exists:
-                raise serializers.ValidationError(
-                    ["This field may not be an invalid path."])
+                obj = ChrisFile.objects.get(fname=path)
+            except ChrisFile.DoesNotExist:  # path is not a file
+                try:
+                    obj = ChrisLinkFile.objects.get(fname=path)
+
+                    if obj.path in ('PUBLIC', 'SHARED'):
+                        raise serializers.ValidationError(
+                            [f"This field may not reference an invalid path '{path}'."])
+
+                except ChrisLinkFile.DoesNotExist:  # path is not a link file
+                    raise serializers.ValidationError(
+                        [f"This field may not reference an invalid path '{path}'."])
+
+        if not (obj.owner == user or user.username == 'chris' or obj.public
+                or obj.has_user_permission(user)):
+            raise serializers.ValidationError(
+                [f"User does not have permission to access path '{path}'."])
+
     return ','.join(path_list)
 
 
@@ -381,8 +379,7 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
     def validate_value(self, value):
         """
         Overriden to check that the user making the request is allowed to access
-        the provided object storage paths (value should be a string of paths separated
-        by commas).
+        the provided paths (value should be a string of paths separated by commas).
         """
         return validate_paths(self.user, value)
 
@@ -410,8 +407,7 @@ class UnextpathParameterSerializer(serializers.HyperlinkedModelSerializer):
     def validate_value(self, value):
         """
         Overriden to check that the user making the request is allowed to access
-        the provided object storage paths (value should be a string of paths separated
-        by commas).
+        the provided paths (value should be a string of paths separated by commas).
         """
         return validate_paths(self.user, value)
 

@@ -11,6 +11,7 @@ from feeds.models import Note, Feed
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class FeedModelTests(TestCase):
@@ -21,8 +22,7 @@ class FeedModelTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username, password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.feed_name = "Feed1"
         self.plugin_name = "pacspull"
@@ -68,16 +68,6 @@ class FeedModelTests(TestCase):
         Test whether overriden save method creates a note just after a feed is created.
         """
         self.assertEqual(Note.objects.count(), 1)
-
-    def test_get_creator(self):
-        """
-        Test whether custom get_creator method properly returns the user that created the
-        feed.
-        """
-        user = User.objects.get(username=self.username)
-        feed = Feed.objects.get(name=self.feed_name)
-        feed_creator = feed.get_creator()
-        self.assertEqual(feed_creator, user)
 
     def test_get_plugin_instances_status_count(self):
         """

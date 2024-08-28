@@ -35,6 +35,10 @@ def get_secret(setting, secret_type=env):
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
 
+# SUPERUSER SETTINGS
+CHRIS_SUPERUSER_PASSWORD = get_secret('CHRIS_SUPERUSER_PASSWORD')
+
+
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
@@ -162,7 +166,8 @@ if AUTH_LDAP:
         'last_name': 'sn',
         'email': 'mail'
     }
+
     AUTHENTICATION_BACKENDS = (
-        'django_auth_ldap.backend.LDAPBackend',
+        'users.models.CustomLDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )

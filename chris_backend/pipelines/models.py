@@ -263,7 +263,10 @@ class PipelineSourceFileMeta(models.Model):
 
 @receiver(post_delete, sender=PipelineSourceFileMeta)
 def auto_delete_source_file_with_meta(sender, instance, **kwargs):
-    instance.source_file.delete()
+    try:
+        instance.source_file.delete()
+    except Exception:
+        pass
 
 
 class PluginPiping(models.Model):

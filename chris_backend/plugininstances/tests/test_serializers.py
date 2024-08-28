@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
+from core.models import ChrisFolder
 from core.storage.helpers import mock_storage
 from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.serializers import (PathParameterSerializer,
@@ -16,6 +17,7 @@ from plugininstances.serializers import (PathParameterSerializer,
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
+CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
 class SerializerTests(TestCase):
@@ -26,9 +28,7 @@ class SerializerTests(TestCase):
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = 'chris1234'
-        User.objects.create_user(username=self.chris_username,
-                                 password=self.chris_password)
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
 
         self.username = 'foo'
         self.password = 'foopassword'
@@ -323,9 +323,8 @@ class PathParameterSerializerTests(SerializerTests):
         """
         user = User.objects.get(username=self.username)
         path_parm_serializer = PathParameterSerializer(user=user)
-        with mock_storage('plugininstances.serializers.settings'):
-            with self.assertRaises(serializers.ValidationError):
-                path_parm_serializer.validate_value(self.username)
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(self.username)
 
     def test_validate_value_success(self):
         """
@@ -338,24 +337,18 @@ class PathParameterSerializerTests(SerializerTests):
         plugin = self.plugin
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
-        pl_inst.feed.owner.set([user1, user])
+        pl_inst.feed.grant_user_permission(user)
+
+        ChrisFolder.objects.get_or_create(path=f'home/{self.username}/uploads',
+                                          owner=user)
+
         path_parm_serializer = PathParameterSerializer(user=user)
-        value = "home/{}, home/{}/feeds/feed_{} ".format(self.username,
+        value = "home/{}/uploads, home/{}/feeds/feed_{} ".format(self.username,
                                                         self.other_username,
                                                          pl_inst.feed.id)
-        with mock_storage('plugininstances.serializers.settings') as storage_manager:
-            storage_manager.upload_obj(
-                f'home/{self.username}/uploads/dummy_data.txt',
-                b'dummy data'
-            )
-            storage_manager.upload_obj(
-                f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}/'
-                f'{pl_inst.plugin.meta.name}_{pl_inst.id}/data/dummy_data.txt',
-                b'dummy data'
-            )
-            returned_value = path_parm_serializer.validate_value(value)
-            self.assertEqual(returned_value, "home/{},home/{}/feeds/feed_{}".format(
-                self.username, self.other_username, pl_inst.feed.id))
+        returned_value = path_parm_serializer.validate_value(value)
+        self.assertEqual(returned_value, "home/{}/uploads,home/{}/feeds/feed_{}".format(
+            self.username, self.other_username, pl_inst.feed.id))
 
 
 class UnextpathParameterSerializerTests(SerializerTests):
@@ -424,9 +417,8 @@ class UnextpathParameterSerializerTests(SerializerTests):
         """
         user = User.objects.get(username=self.username)
         path_parm_serializer = UnextpathParameterSerializer(user=user)
-        with mock_storage('plugininstances.serializers.settings'):
-            with self.assertRaises(serializers.ValidationError):
-                path_parm_serializer.validate_value(self.username)
+        with self.assertRaises(serializers.ValidationError):
+            path_parm_serializer.validate_value(self.username)
 
     def test_validate_value_success(self):
         """
@@ -439,22 +431,15 @@ class UnextpathParameterSerializerTests(SerializerTests):
         plugin = self.plugin
         pl_inst = PluginInstance.objects.create(
             plugin=plugin, owner=user1, compute_resource=plugin.compute_resources.all()[0])
-        pl_inst.feed.owner.set([user1, user])
+        pl_inst.feed.grant_user_permission(user)
+
+        ChrisFolder.objects.get_or_create(path=f'home/{self.username}/uploads', owner=user)
+
         path_parm_serializer = UnextpathParameterSerializer(user=user)
-        value = "home/{}, home/{}/feeds/feed_{} ".format(self.username,
+        value = "home/{}/uploads, home/{}/feeds/feed_{} ".format(self.username,
                                                         self.other_username,
                                                          pl_inst.feed.id)
-        with mock_storage('plugininstances.serializers.settings') as storage_manager:
-            storage_manager.upload_obj(
-                f'home/{self.username}/uploads/dummy_data.txt',
-                b'dummy data'
-            )
-            storage_manager.upload_obj(
-                f'home/{self.other_username}/feeds/feed_{pl_inst.feed.id}/'
-                f'{pl_inst.plugin.meta.name}_{pl_inst.id}/data/dummy_data.txt',
-                b'dummy data'
-            )
 
-            returned_value = path_parm_serializer.validate_value(value)
-            self.assertEqual(returned_value, "home/{},home/{}/feeds/feed_{}".format(
+        returned_value = path_parm_serializer.validate_value(value)
+        self.assertEqual(returned_value, "home/{}/uploads,home/{}/feeds/feed_{}".format(
                 self.username, self.other_username, pl_inst.feed.id))

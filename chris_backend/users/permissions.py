@@ -1,3 +1,4 @@
+
 from rest_framework import permissions
 
 
@@ -18,3 +19,16 @@ class IsUserOrChrisOrReadOnly(permissions.BasePermission):
         return (obj == request.user) or (request.user.username == 'chris')
 
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow admin users to modify/edit. Read only is allowed
+    to normal users.
+    """
+
+    def has_permission(self, request, view):
+        # Read permissions are allowed to normal users.
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Raed/Write permissions are allowed to the admin users
+        return request.user.is_staff
