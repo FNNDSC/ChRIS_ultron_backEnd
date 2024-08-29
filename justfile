@@ -99,7 +99,7 @@ get-socket:
     @if [ "$(just get-engine)" = 'podman' ]; then     \
       just get-podman-socket;                         \
     else                                              \
-      echo '/var/lib/docker.sock';                    \
+      echo '/var/run/docker.sock';                    \
     fi
 
 get-podman-socket: check-podman-socket
