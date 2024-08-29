@@ -19,6 +19,7 @@ jobs:
       - name: Start podman daemon
         if: matrix.engine == 'podman'
         run: systemctl --user start podman.service
+      - uses: taiki-e/install-action@just
       - uses: actions/checkout@v4
       - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
         uses: ./
