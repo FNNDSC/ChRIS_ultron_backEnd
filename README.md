@@ -166,6 +166,41 @@ Old development scripts usage is described in [OLD_DEVELOP.md](./OLD_DEVELOP.md)
 
 See https://chrisproject.org/docs/run/helm
 
+## GitHub Actions
+
+This repository can also be used as a GitHub Actions step for running _CUBE_ integration tests, e.g.
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Build something else
+        uses: docker/build-push-action@v6
+        with:
+          tags: localhost/fnndsc/pman:dev
+          load: true
+      - name: Run ChRIS backend integration tests
+        uses: FNNDSC/ChRIS_ultron_backEnd@master
+        # all inputs are optional
+        with:
+          engine: docker  # or podman
+          command: test-integration  # or test-unit, ...
+        # optionally change image used for pman, pfcon, or cube
+        env:
+          CUBE_IMAGE: localhost/fnndsc/cube:dev
+          PFCON_IMAGE: localhost/fnndsc/pfcon:dev
+          PMAN_IMAGE: localhost/fnndsc/pman:dev
+```
+
 ## Documentation
 
 > [!CAUTION]
