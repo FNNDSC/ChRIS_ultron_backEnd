@@ -72,6 +72,10 @@ build: (docker-compose '--profile=cube build')
 # Pull container images.
 pull: (docker-compose 'pull')
 
+# Get container logs.
+logs *args:
+    @just docker-compose --profile=cube logs {{args}}
+
 # docker-compose ... run helper function.
 run +command:
     @just docker-compose --profile=cube run --rm chris {{command}}

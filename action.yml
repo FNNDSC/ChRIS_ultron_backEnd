@@ -1,0 +1,23 @@
+name: "ChRIS Backend Integration Tests"
+description: "Run ChRIS_ultron_backEnd integration tests"
+author: "FNNDSC"
+
+inputs:
+  engine:
+    description: "Container engine to use (docker or podman)"
+    required: false
+    default: "docker"
+  command:
+    description: "Just command (e.g. test-all, test-integration, test-unit)"
+    required: false
+    default: "test-integration"
+
+runs:
+  using: node20
+  pre: githubActions/pre.js
+  main: githubActions/main.js
+  post: githubActions/cleanup.js
+
+branding:
+  color: "blue"
+  icon: "box"
