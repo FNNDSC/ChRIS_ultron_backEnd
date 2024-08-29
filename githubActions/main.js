@@ -6,7 +6,8 @@ const JUST_COMMAND = process.env.INPUT_COMMAND;
 const script = `
 set -x
 just prefer ${CONTAINER_ENGINE}
-rc=$(just ${JUST_COMMAND})
+just ${JUST_COMMAND}
+rc=$?
 if [ "$rc" != '0' ]; then
   just logs
 fi
