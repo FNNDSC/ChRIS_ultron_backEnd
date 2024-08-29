@@ -1,0 +1,178 @@
+# Docker Compose file for ChRIS backend development.
+# See justfile for usage. *DO NOT* use the `docker compose` command directly.
+
+services:
+  chrisomatic:
+    image: ghcr.io/fnndsc/chrisomatic:1.0.0
+    profiles:
+      - tools
+    volumes:
+      - "./chrisomatic/chrisomatic.yml:/chrisomatic.yml"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    userns_mode: host
+    depends_on:
+      - chris
+    networks:
+      - local
+
+  chris:
+    image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
+    build:
+      context: .
+      args:
+        ENVIRONMENT: local
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    volumes: &CHRIS_VOLUMES
+      - chris_files:/data
+      - ./chris_backend:/opt/app-root/src
+    environment: &CHRIS_ENV
+      DJANGO_SETTINGS_MODULE: "config.settings.local"
+      STORAGE_ENV: "fslink"
+    user: ${UID:?Please run me using just.}:${GID:?Please run me using just.}
+    profiles:
+      - cube
+    depends_on: &CHRIS_DEPENDS
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      cube-nonroot-user-volume-fix:
+        condition: service_completed_successfully
+    networks:
+      - local
+  worker-mains:
+    image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
+    command: celery -A core worker -c 4 -l info -Q main1,main2
+    volumes: *CHRIS_VOLUMES
+    environment: *CHRIS_ENV
+    user: ${UID}:${GID}
+    profiles:
+      - cube
+    depends_on: *CHRIS_DEPENDS
+    networks:
+      - local
+  worker-periodic:
+    image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
+    command: celery -A core worker -c 2 -l info -Q periodic
+    volumes: *CHRIS_VOLUMES
+    environment: *CHRIS_ENV
+    user: ${UID}:${GID}
+    profiles:
+      - cube
+    depends_on: *CHRIS_DEPENDS
+    networks:
+      - local
+  celery-scheduler:
+    image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
+    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes: *CHRIS_VOLUMES
+    environment: *CHRIS_ENV
+    user: ${UID}:${GID}
+    profiles:
+      - cube
+    depends_on: *CHRIS_DEPENDS
+    networks:
+      - local
+  db:
+    image: docker.io/library/postgres:16
+    volumes:
+      - db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=chris_dev
+      - POSTGRES_USER=chris
+      - POSTGRES_PASSWORD=Chris1234
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 2s
+      timeout: 4s
+      retries: 3
+      start_period: 60s
+    networks:
+      local:
+        aliases:
+          - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
+  rabbitmq:
+    image: docker.io/library/rabbitmq:3
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    networks:
+      local:
+        aliases:
+          - queue  # hard-coded in chris_backend/config/settings/local.py
+
+  pfcon:
+    image: ${PFCON_IMAGE:-ghcr.io/fnndsc/pfcon:latest}
+    environment:
+      COMPUTE_SERVICE_URL: http://pman:5010/api/v1/
+      SECRET_KEY: secret
+      PFCON_USER: pfcon
+      PFCON_PASSWORD: pfcon1234
+      PFCON_INNETWORK: "true"
+      STORAGE_ENV: filesystem
+      STOREBASE_MOUNT: /var/local/storeBase
+    # port is hard-coded in chris_backend/config/settings/local.py
+    command: gunicorn -b 0.0.0.0:30005 -w 8 -t 120 pfcon.wsgi:application
+    ports:
+      - "30005:30005"
+    volumes:
+      - chris_files:/var/local/storeBase
+    user: ${UID}:${GID}
+    networks:
+      local:
+        aliases:
+          - pfcon.remote  # hard-coded in chris_backend/config/settings/local.py
+    labels:
+      org.chrisproject.role: "pfcon"
+
+  pman:
+    image: ${PMAN_IMAGE:-ghcr.io/fnndsc/pman:latest}
+    environment:
+      CONTAINER_ENV: docker
+      CONTAINER_USER: "${UID}:${GID}"
+      ENABLE_HOME_WORKAROUND: "yes"
+      JOB_LABELS: "org.chrisproject.miniChRIS=plugininstance"
+      SECRET_KEY: secret
+      REMOVE_JOBS: "yes"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - pfcon
+    ports:
+      - "5010:5010"
+    networks:
+      - local
+    userns_mode: "host"
+
+  lldap:
+    image: docker.io/nitnelave/lldap:stable
+    ports:
+      - "3890:3890"
+      - "17170:17170"
+    volumes:
+      - "lldap:/data"
+    environment:
+      TZ: America/New_York
+      LLDAP_JWT_SECRET: super_secret_random_string
+      LLDAP_LDAP_USER_PASS: chris1234
+      LLDAP_LDAP_BASE_DN: dc=example,dc=org
+    networks:
+      local:
+
+  cube-nonroot-user-volume-fix:
+    image: docker.io/library/alpine:latest
+    volumes:
+      - chris_files:/data
+    user: root
+    command: chmod 777 /data
+    restart: "no"
+
+volumes:
+  chris_files:
+  db:
+  lldap:
+  rabbitmq:
+
+networks:
+  local:
