@@ -7,8 +7,9 @@ services:
     profiles:
       - tools
     volumes:
-      - "./chrisomatic/chrisomatic.yml:/chrisomatic.yml"
+      - "./chrisomatic:/etc/chrisomatic:ro"
       - "/var/run/docker.sock:/var/run/docker.sock"
+    working_dir: /etc/chrisomatic
     userns_mode: host
     depends_on:
       - chris
@@ -41,7 +42,9 @@ services:
       cube-nonroot-user-volume-fix:
         condition: service_completed_successfully
     networks:
-      - local
+      local:
+        aliases:
+          - chrisdev.local  # hard-coded in chrisomatic/*.yml
   worker-mains:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     command: celery -A core worker -c 4 -l info -Q main1,main2

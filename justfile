@@ -1,7 +1,7 @@
 compose_file := 'docker-compose_just.yml'
 
 # Start the ChRIS backend in development mode, and attach to the live-reloading server.
-dev: start attach
+dev: chrisomatic attach
 
 # Start the ChRIS backend in development mode.
 start: start-ancillary migrate up
@@ -19,12 +19,11 @@ shell: (run 'python manage.py shell')
 bash: (run 'bash')
 
 # Run chrisomatic, a tool which adds plugins and users to CUBE.
-chrisomatic: start
-    # TODO
+chrisomatic *args: start
+    @just docker-compose --profile=cube run --rm chrisomatic chrisomatic {{args}}
 
 # Run chrisomatic with the contents of chrisomatic/postscript.yml
-postscript: start
-    # TODO
+postscript: (chrisomatic 'postscript.yml')
 
 # Perform database migrations.
 migrate: (run 'python manage.py migrate --noinput')
