@@ -36,7 +36,7 @@ The HTTP API primarily supports the [collection+json](http://amundsen.com/media-
 
 Development is mainly supported on Linux. MacOS and WSL on Windows also work (because Docker Desktop is a Linux VM). You will need at least 8GM RAM, 20GB disk space, and a good internet connection.
 
-Install Docker (version 27 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
+Install Docker (version 27 or above) or Podman (version 5.2 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
 
 <details>
 <summary>
@@ -51,6 +51,28 @@ Docker Installation Instructions
 
 > [!CAUTION]
 > On **Ubuntu**, make sure you follow the instructions here: https://docs.docker.com/engine/install/ubuntu/. If you do not follow the instructions, Ubuntu will try to install Docker using snap, which will cause many problems.
+
+</details>
+
+<details>
+<summary>
+Podman Setup Instructions
+</summary>
+
+Rootless Podman is supported. You must install and configure Podman to use `docker-compose`, _not_ `podman-compose`. `podman-compose` is missing features, see issues [#575](https://github.com/containers/podman-compose/issues/575) and [#866](https://github.com/containers/podman-compose/issues/866).
+
+A Podman daemon must be running, because _ChRIS_ runs containers of its own. To start the Podman daemon on Linux, run
+
+```shell
+systemctl --user start podman.service
+```
+
+If both Podman and Docker are installed, Podman will be used by default. A preference to use either Podman or Docker can be set by running
+
+```shell
+just prefer podman  # or
+just prefer docker
+```
 
 </details>
 
@@ -143,6 +165,41 @@ Old development scripts usage is described in [OLD_DEVELOP.md](./OLD_DEVELOP.md)
 ## Production Deployment
 
 See https://chrisproject.org/docs/run/helm
+
+## GitHub Actions
+
+This repository can also be used as a GitHub Actions step for running _CUBE_ integration tests, e.g.
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Build something else
+        uses: docker/build-push-action@v6
+        with:
+          tags: localhost/fnndsc/pman:dev
+          load: true
+      - name: Run ChRIS backend integration tests
+        uses: FNNDSC/ChRIS_ultron_backEnd@master
+        # all inputs are optional
+        with:
+          engine: docker  # or podman
+          command: test-integration  # or test-unit, ...
+        # optionally change image used for pman, pfcon, or cube
+        env:
+          CUBE_IMAGE: localhost/fnndsc/cube:dev
+          PFCON_IMAGE: localhost/fnndsc/pfcon:dev
+          PMAN_IMAGE: localhost/fnndsc/pman:dev
+```
 
 ## Documentation
 

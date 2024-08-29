@@ -11,19 +11,22 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ 'docker', 'podman' ]
+        test-kind: [ 'unit', 'integration' ]
     steps:
-      - uses: actions/checkout@v4
+      - name: Start podman daemon
+        if: matrix.engine == 'podman'
+        run: systemctl --user start podman.service
       - uses: taiki-e/install-action@just
-      - name: Build development image
-        run: just build
-      - name: Pull other images
-        run: just pull
-      - name: Start ancillary services
-        run: just start-ancillary
-      - name: Run unit tests
-        run: just test-unit
-      - name: Run integration tests
-        run: just test-integration
+      - uses: actions/checkout@v4
+      - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
+        uses: ./
+        with:
+          engine: ${{ matrix.engine }}
+          command: test-${{ matrix.test-kind }}
 
   build:
     needs: [ test ]

@@ -8,7 +8,7 @@ services:
       - tools
     volumes:
       - "./chrisomatic:/etc/chrisomatic:ro"
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
     working_dir: /etc/chrisomatic
     userns_mode: host
     depends_on:
@@ -139,7 +139,7 @@ services:
       SECRET_KEY: secret
       REMOVE_JOBS: "yes"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
     depends_on:
       - pfcon
     ports:

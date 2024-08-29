@@ -36,7 +36,7 @@ test *args:
 test-all: test-unit test-integration
 
 # Run unit tests.
-test-unit: (run 'python manage.py test --force-color --exclude-tag integration')
+test-unit: start-ancillary (run 'python manage.py test --force-color --exclude-tag integration')
 
 # Run integration tests.
 test-integration: start-ancillary (run 'python manage.py test --force-color --tag integration')
@@ -72,10 +72,55 @@ build: (docker-compose '--profile=cube build')
 # Pull container images.
 pull: (docker-compose 'pull')
 
+# Get container logs.
+logs *args:
+    @just docker-compose --profile=cube logs {{args}}
+
 # docker-compose ... run helper function.
 run +command:
     @just docker-compose --profile=cube run --rm chris {{command}}
 
 # docker-compose ... helper function.
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) docker compose -f '{{ compose_file }}' {{command}}
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK=$(just get-socket) $(just get-engine) compose -f '{{ compose_file }}' {{command}}
+
+# Get the container engine to use (docker or podman)
+get-engine:
+    @if [ -f '.preference' ]; then           \
+      cat .preference && exit 0;             \
+    elif type podman > /dev/null 2>&1; then  \
+      echo podman;                           \
+    else                                     \
+      echo docker;                           \
+    fi                                       \
+
+# Get the docker daemon socket
+get-socket:
+    @if [ "$(just get-engine)" = 'podman' ]; then     \
+      just get-podman-socket;                         \
+    else                                              \
+      echo '/var/run/docker.sock';                    \
+    fi
+
+get-podman-socket: check-podman-socket
+    @podman info --format '{{{{ .Host.RemoteSocket.Path }}'
+
+# Ensure that the podman daemon is running.
+check-podman-socket:
+    @if [ "$(podman info --format '{{{{ .Host.RemoteSocket.Exists }}')" != 'true' ]; then       \
+      echo 'Podman daemon not running. Please run `systemctl --user start podman.service`';      \
+      exit 1;                                                                                    \
+    fi
+
+# Set a preference for using either Docker or Podman.
+prefer docker_or_podman:
+    @[ '{{docker_or_podman}}' = 'docker' ] || [ '{{docker_or_podman}}' = 'podman' ] \
+        || ( \
+            >&2 echo 'argument must be either "docker" or "podman"'; \
+            exit 1 \
+        )
+    echo '{{docker_or_podman}}' > .preference
+
+# Remove your preference for Docker or Podman.
+unset-preference:
+    rm -f .preference
