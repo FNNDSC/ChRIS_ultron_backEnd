@@ -36,7 +36,7 @@ The HTTP API primarily supports the [collection+json](http://amundsen.com/media-
 
 Development is mainly supported on Linux. MacOS and WSL on Windows also work (because Docker Desktop is a Linux VM). You will need at least 8GM RAM, 20GB disk space, and a good internet connection.
 
-Install Docker (version 27 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
+Install Docker (version 27 or above) or Podman (version 5.2 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
 
 <details>
 <summary>
@@ -51,6 +51,28 @@ Docker Installation Instructions
 
 > [!CAUTION]
 > On **Ubuntu**, make sure you follow the instructions here: https://docs.docker.com/engine/install/ubuntu/. If you do not follow the instructions, Ubuntu will try to install Docker using snap, which will cause many problems.
+
+</details>
+
+<details>
+<summary>
+Podman Setup Instructions
+</summary>
+
+Rootless Podman is supported. You must install and configure Podman to use `docker-compose`, _not_ `podman-compose`. `podman-compose` is missing features, see issues [#575](https://github.com/containers/podman-compose/issues/575) and [#866](https://github.com/containers/podman-compose/issues/866).
+
+A Podman daemon must be running, because _ChRIS_ runs containers of its own. To start the Podman daemon on Linux, run
+
+```shell
+systemctl --user start podman.service
+```
+
+If both Podman and Docker are installed, Podman will be used by default. A preference to use either Podman or Docker can be set by running
+
+```shell
+just prefer podman  # or
+just prefer docker
+```
 
 </details>
 
