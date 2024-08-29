@@ -14,27 +14,17 @@ jobs:
     strategy:
       matrix:
         engine: [ 'docker', 'podman' ]
+        test-kind: [ 'unit', 'integration' ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@just
       - name: Start podman daemon
         if: matrix.engine == 'podman'
-        run: |
-          set -ex
-          systemctl --user start podman.service
-          just get-socket
-      - name: Set preference to use ${{ matrix.engine }}
-        run: just prefer ${{ matrix.engine }}
-      - name: Build development image
-        run: just build
-      - name: Pull other images
-        run: just pull
-      - name: Start ancillary services
-        run: just start-ancillary
-      - name: Run unit tests
-        run: just test-unit
-      - name: Run integration tests
-        run: just test-integration
+        run: systemctl --user start podman.service
+      - uses: actions/checkout@v4
+      - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
+        uses: ./
+        with:
+          engine: ${{ matrix.engine }}
+          command: test-${{ matrix.test-kind }}
 
   build:
     needs: [ test ]
