@@ -4,7 +4,7 @@ compose_file := 'docker-compose_just.yml'
 dev: start attach
 
 # Start the ChRIS backend in development mode.
-start: start-dependencies migrate up
+start: start-ancillary migrate up
 
 # Start services (without running database migrations).
 up: (docker-compose '--profile=cube up -d')
@@ -40,10 +40,10 @@ test-all: test-unit test-integration
 test-unit: (run 'python manage.py test --force-color --exclude-tag integration')
 
 # Run integration tests.
-test-integration: (run 'python manage.py test --force-color --tag integration')
+test-integration: start-ancillary (run 'python manage.py test --force-color --tag integration')
 
 # Start dependency services.
-start-dependencies: (docker-compose 'up -d')
+start-ancillary: (docker-compose 'up -d')
 
 # Stop services.
 down: (docker-compose '--profile=cube --profile=tools down')

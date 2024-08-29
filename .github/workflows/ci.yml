@@ -18,6 +18,8 @@ jobs:
         run: just build
       - name: Pull other images
         run: just pull
+      - name: Start ancillary services
+        run: just start-ancillary
       - name: Run unit tests
         run: just test-unit
       - name: Run integration tests
