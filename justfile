@@ -36,7 +36,7 @@ test *args:
 test-all: test-unit test-integration
 
 # Run unit tests.
-test-unit: (run 'python manage.py test --force-color --exclude-tag integration')
+test-unit: start-ancillary (run 'python manage.py test --force-color --exclude-tag integration')
 
 # Run integration tests.
 test-integration: start-ancillary (run 'python manage.py test --force-color --tag integration')
