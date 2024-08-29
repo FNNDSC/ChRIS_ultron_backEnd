@@ -101,7 +101,7 @@ SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
 MEDIA_ROOT = None
 if STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
-    MEDIA_ROOT = '/var/chris'  # local filesystem storage settings
+    MEDIA_ROOT = '/data'  # local filesystem storage settings
 
 try:
     verify_storage_connection(
