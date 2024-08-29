@@ -7,6 +7,16 @@ _ChRIS_ is an open-source platform for containerized medical compute.
 
 https://chrisproject.org/
 
+## TL;DR
+
+With [Docker Compose](https://docs.docker.com/compose/) and [just](https://just.systems/) installed, run
+
+```shell
+git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
+cd ChRIS_ultron_backEnd
+just
+```
+
 ## Introduction
 
 The _ChRIS_ backend, a.k.a. _ChRIS Ultron Backend_ or _**CUBE**_ for short,
