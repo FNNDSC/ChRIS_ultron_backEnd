@@ -13,5 +13,5 @@ fi
 exit $rc
 `;
 
-child_process.execFileSync('bash', [script], { stdio: 'inherit' });
+child_process.execFileSync('bash', ['-c', script], { stdio: 'inherit' });
 
