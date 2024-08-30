@@ -136,4 +136,6 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
             if 'fname' not in data:
                 raise serializers.ValidationError(
                     {'fname': ["This field is required."]})
+
+            data.pop('public', None)  # can only be set to public on update
         return data

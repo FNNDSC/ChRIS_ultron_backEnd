@@ -1,4 +1,6 @@
+
 from pathlib import Path
+import shutil
 from typing import Union, List, AnyStr, Optional
 
 from core.storage.storagemanager import StorageManager
@@ -60,3 +62,47 @@ class FilesystemManager(StorageManager):
 
     def delete_obj(self, file_path: str) -> None:
         (self.__base / file_path).unlink()
+
+    def copy_path(self, src: str, dst: str) -> None:
+        src_path = self.__base / src
+        dst_path = self.__base / dst
+
+        if not src_path.exists():
+            raise FileNotFoundError(
+                f"The source path '{src_path}' does not exist.")
+
+        if src_path.is_dir():
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src_path, dst_path)
+        else:
+            self.copy_obj(src, dst)
+
+    def move_path(self, src: str, dst: str) -> None:
+        src_path = self.__base / src
+        dst_path = self.__base / dst
+
+        if not src_path.exists():
+            raise FileNotFoundError(
+                f"The source path '{src_path}' does not exist.")
+
+        if src_path.is_dir():
+            if src_path.parent == dst_path.parent:  # just a renaming
+                src_path.rename(dst_path)
+            else:
+                dst_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(src_path, dst_path)
+        else:
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            src_path.rename(dst_path)
+
+    def delete_path(self, path: str) -> None:
+        p = self.__base / path
+
+        if not p.exists():
+            raise FileNotFoundError(
+                f"The source path '{p}' does not exist.")
+
+        if p.is_dir():
+            shutil.rmtree(p)
+        else:
+            self.delete_obj(path)

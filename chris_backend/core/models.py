@@ -94,8 +94,10 @@ class ChrisFolder(models.Model):
         to the DB.
         """
         if self.path:
-            parent_path = os.path.dirname(self.path)
+            if self.path.startswith('/') or self.path.endswith('/'):
+                raise ValueError('Paths starting or ending with slashes are not allowed.')
 
+            parent_path = os.path.dirname(self.path)
             try:
                 parent = ChrisFolder.objects.get(path=parent_path)
             except ChrisFolder.DoesNotExist:
@@ -108,14 +110,48 @@ class ChrisFolder(models.Model):
             self.owner = User.objects.get(username='chris')
         super(ChrisFolder, self).save(*args, **kwargs)
 
+    def move(self, new_path):
+        """
+        Custom method to move the folder's tree to a new path.
+        """
+        new_path = new_path.strip('/')
+        path = str(self.path)
+
+        storage_manager = connect_storage(settings)
+        storage_manager.move_path(path, new_path)
+
+        prefix = path + '/' # avoid sibling folders with paths that start with path
+
+        folders = [self] + list(ChrisFolder.objects.filter(path__startswith=prefix))
+        for folder in folders:
+            folder.path = folder.path.replace(path, new_path, 1)
+        ChrisFolder.objects.bulk_update(folders, ['path'])
+
+        files = list(ChrisFile.objects.filter(fname__startswith=prefix))
+        for f in files:
+            f.fname.name = f.fname.name.replace(path, new_path, 1)
+        ChrisFile.objects.bulk_update(files, ['fname'])
+
+        link_files = list(ChrisLinkFile.objects.filter(fname__startswith=prefix))
+        for lf in link_files:
+            lf.fname.name = lf.fname.name.replace(path, new_path, 1)
+        ChrisLinkFile.objects.bulk_update(link_files, ['fname'])
+
+        new_parent_path = os.path.dirname(new_path)
+
+        if new_parent_path != os.path.dirname(path):
+            # parent folder has changed
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_parent_path,
+                                                                   owner=self.owner)
+            self.parent_folder = parent_folder
+            self.save()
+
     def get_descendants(self):
         """
         Custom method to return all the folders that are a descendant of this
         folder (including itself).
         """
         path = str(self.path)
-        if path.endswith('/'):
-            return list(ChrisFolder.objects.filter(path__startswith=path))
         return [self] + list(ChrisFolder.objects.filter(path__startswith=path + '/'))
 
     def has_group_permission(self, group, permission=''):
@@ -200,7 +236,7 @@ class ChrisFolder(models.Model):
         Custom method to get the link file in the SHARED folder pointing to
         this folder if it exists.
         """
-        path = self.path.rstrip('/')
+        path = str(self.path)
         str_source_trace_dir = path.replace('/', '_')
         fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
 
@@ -215,7 +251,7 @@ class ChrisFolder(models.Model):
         Custom method to create a link file in the SHARED folder pointing to
         this folder.
         """
-        path = self.path.rstrip('/')
+        path = str(self.path)
         str_source_trace_dir = path.replace('/', '_')
         fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
 
@@ -232,7 +268,8 @@ class ChrisFolder(models.Model):
         Custom method to remove a link file in the SHARED folder pointing to
         this folder if it exists.
         """
-        fname = 'SHARED/' + self.path.rstrip('/').replace('/', '_') + '.chrislink'
+        path = str(self.path)
+        fname = 'SHARED/' + path.replace('/', '_') + '.chrislink'
         try:
             lf = ChrisLinkFile.objects.get(fname=fname)
         except ChrisLinkFile.DoesNotExist:
@@ -245,7 +282,7 @@ class ChrisFolder(models.Model):
         Custom method to create a public link file in the PUBLIC folder pointing to
         this folder.
         """
-        path = self.path.rstrip('/')
+        path = str(self.path)
         str_source_trace_dir = path.replace('/', '_')
         fname = 'PUBLIC/' + str_source_trace_dir + '.chrislink'
 
@@ -262,7 +299,9 @@ class ChrisFolder(models.Model):
         Custom method to remove a public link file in the PUBLIC folder pointing to
         this folder if it exists.
         """
-        fname = 'PUBLIC/' + self.path.rstrip('/').replace('/', '_') + '.chrislink'
+        path = str(self.path)
+        fname = 'PUBLIC/' + path.replace('/', '_') + '.chrislink'
+
         try:
             lf = ChrisLinkFile.objects.get(fname=fname)
         except ChrisLinkFile.DoesNotExist:
@@ -276,22 +315,19 @@ class ChrisFolder(models.Model):
         folders, link files and files.
         """
         path = str(self.path)
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
-        if path.endswith('/'):
-            folders = list(ChrisFolder.objects.filter(path__startswith=path))
-        else:
-            folders = [self] + list(ChrisFolder.objects.filter(path__startswith=path + '/'))
-
+        folders = [self] + list(ChrisFolder.objects.filter(path__startswith=prefix))
         for folder in folders:
             folder.public = public_tf
         ChrisFolder.objects.bulk_update(folders, ['public'])
 
-        files = list(ChrisFile.objects.filter(fname__startswith=path))
+        files = list(ChrisFile.objects.filter(fname__startswith=prefix))
         for f in files:
             f.public = public_tf
         ChrisFile.objects.bulk_update(files, ['public'])
 
-        link_files = list(ChrisLinkFile.objects.filter(fname__startswith=path))
+        link_files = list(ChrisLinkFile.objects.filter(fname__startswith=prefix))
         for lf in link_files:
             lf.public = public_tf
         ChrisLinkFile.objects.bulk_update(link_files, ['public'])
@@ -325,9 +361,10 @@ class FolderGroupPermission(models.Model):
 
         group = self.group
         permission = self.permission
-        path = self.folder.path.rstrip('/') + '/'
+        path = str(self.folder.path)
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
-        folders = ChrisFolder.objects.filter(path__startswith=path)
+        folders = ChrisFolder.objects.filter(path__startswith=prefix)
         objs = []
         for folder in folders:
             perm = FolderGroupPermission(folder=folder, group=group,
@@ -337,7 +374,7 @@ class FolderGroupPermission(models.Model):
                                                   update_fields=['permission'],
                                                   unique_fields=['folder_id', 'group_id'])
 
-        files = ChrisFile.objects.filter(fname__startswith=path)
+        files = ChrisFile.objects.filter(fname__startswith=prefix)
         objs = []
         for f in files:
             perm = FileGroupPermission(file=f, group=group, permission=permission)
@@ -346,7 +383,7 @@ class FolderGroupPermission(models.Model):
                                                 update_fields=['permission'],
                                                 unique_fields=['file_id', 'group_id'])
 
-        link_files = ChrisLinkFile.objects.filter(fname__startswith=path)
+        link_files = ChrisLinkFile.objects.filter(fname__startswith=prefix)
         objs = []
         for lf in link_files:
             perm = LinkFileGroupPermission(link_file=lf, group=group,
@@ -366,15 +403,16 @@ class FolderGroupPermission(models.Model):
 
         group = self.group
         permission = self.permission
-        path = self.folder.path.rstrip('/') + '/'
+        path = str(self.folder.path)
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
-        FolderGroupPermission.objects.filter(folder__path__startswith=path, group=group,
+        FolderGroupPermission.objects.filter(folder__path__startswith=prefix, group=group,
                                              permission=permission).delete()
 
-        FileGroupPermission.objects.filter(file__fname__startswith=path, group=group,
+        FileGroupPermission.objects.filter(file__fname__startswith=prefix, group=group,
                                            permission=permission).delete()
 
-        LinkFileGroupPermission.objects.filter(link_file__fname__startswith=path,
+        LinkFileGroupPermission.objects.filter(link_file__fname__startswith=prefix,
                                                group=group,
                                                permission=permission).delete()
 
@@ -407,9 +445,10 @@ class FolderUserPermission(models.Model):
 
         user = self.user
         permission = self.permission
-        path = self.folder.path.rstrip('/') + '/'
+        path = str(self.folder.path)
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
-        folders = ChrisFolder.objects.filter(path__startswith=path)
+        folders = ChrisFolder.objects.filter(path__startswith=prefix)
         objs = []
         for folder in folders:
             perm = FolderUserPermission(folder=folder, user=user, permission=permission)
@@ -418,7 +457,7 @@ class FolderUserPermission(models.Model):
                                                  update_fields=['permission'],
                                                  unique_fields=['folder_id', 'user_id'])
 
-        files = ChrisFile.objects.filter(fname__startswith=path)
+        files = ChrisFile.objects.filter(fname__startswith=prefix)
         objs = []
         for f in files:
             perm = FileUserPermission(file=f, user=user, permission=permission)
@@ -427,7 +466,7 @@ class FolderUserPermission(models.Model):
                                                update_fields=['permission'],
                                                unique_fields=['file_id', 'user_id'])
 
-        link_files = ChrisLinkFile.objects.filter(fname__startswith=path)
+        link_files = ChrisLinkFile.objects.filter(fname__startswith=prefix)
         objs = []
         for lf in link_files:
             perm = LinkFileUserPermission(link_file=lf, user=user, permission=permission)
@@ -446,15 +485,16 @@ class FolderUserPermission(models.Model):
 
         user = self.user
         permission = self.permission
-        path = self.folder.path.rstrip('/') + '/'
+        path = str(self.folder.path)
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
-        FolderUserPermission.objects.filter(folder__path__startswith=path, user=user,
+        FolderUserPermission.objects.filter(folder__path__startswith=prefix, user=user,
                                              permission=permission).delete()
 
-        FileUserPermission.objects.filter(file__fname__startswith=path, user=user,
+        FileUserPermission.objects.filter(file__fname__startswith=prefix, user=user,
                                           permission=permission).delete()
 
-        LinkFileUserPermission.objects.filter(link_file__fname__startswith=path,
+        LinkFileUserPermission.objects.filter(link_file__fname__startswith=prefix,
                                               user=user, permission=permission).delete()
 
 
@@ -483,6 +523,40 @@ class ChrisFile(models.Model):
 
     def __str__(self):
         return self.fname.name
+
+    def save(self, *args, **kwargs):
+        """
+        Overriden to ensure file paths never start or end with slashes.
+        """
+        path = self.fname.name
+        if path.startswith('/') or path.endswith('/'):
+            raise ValueError('Paths starting or ending with slashes are not allowed.')
+        super(ChrisFile, self).save(*args, **kwargs)
+
+    def move(self, new_path):
+        """
+        Custom method to move the file to a new path.
+        """
+        new_path = new_path.strip('/')
+
+        storage_manager = connect_storage(settings)
+        if storage_manager.obj_exists(new_path):
+            storage_manager.delete_obj(new_path)
+
+        old_path = self.fname.name
+        storage_manager.copy_obj(old_path, new_path)
+        storage_manager.delete_obj(old_path)
+
+        old_folder_path = os.path.dirname(old_path)
+        new_folder_path = os.path.dirname(new_path)
+
+        if new_folder_path != old_folder_path:  # parent folder has changed
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_folder_path,
+                                                                   owner=self.owner)
+            self.parent_folder = parent_folder
+
+        self.fname.name = new_path
+        self.save()
 
     def has_group_permission(self, group, permission=''):
         """
@@ -572,8 +646,7 @@ class ChrisFile(models.Model):
         Custom method to get the link file in the SHARED folder pointing to
         this file if it exists.
         """
-        path = self.fname.name
-        str_source_trace_dir = path.replace('/', '_')
+        str_source_trace_dir = self.fname.name.replace('/', '_')
         fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
 
         try:
@@ -738,6 +811,35 @@ class ChrisLinkFile(models.Model):
         self.fname.name = link_file_path
         super(ChrisLinkFile, self).save(*args, **kwargs)
 
+    def move(self, new_path):
+        """
+        Custom method to move the link file to a new path.
+        """
+        new_path = new_path.strip('/')
+        if not new_path.endswith('.chrislink'):
+            raise ValueError("The new path must end with '.chrislink' sufix.")
+
+        storage_manager = connect_storage(settings)
+        if storage_manager.obj_exists(new_path):
+            storage_manager.delete_obj(new_path)
+
+        old_path = self.fname.name
+        storage_manager.copy_obj(old_path, new_path)
+        storage_manager.delete_obj(old_path)
+
+        old_folder_path = os.path.dirname(old_path)
+        new_folder_path = os.path.dirname(new_path)
+
+        if new_folder_path != old_folder_path:  # parent folder has changed
+            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_folder_path,
+                                                                   owner=self.owner)
+            self.parent_folder = parent_folder
+
+        self.fname.name = new_path
+
+        link_name = os.path.basename(new_path).rsplit('.chrislink', 1)[0]
+        self.save(name=link_name)
+
     def has_group_permission(self, group, permission=''):
         """
         Custom method to determine whether a group has been granted a permission to
@@ -811,25 +913,28 @@ class ChrisLinkFile(models.Model):
 
     def grant_public_access(self):
         """
-        Custom method to grant public access to the file.
+        Custom method to grant public access to the link file.
         """
         self.public = True
-        self.save()
+        path = self.fname.name
+        link_name = os.path.basename(path).rsplit('.chrislink', 1)[0]
+        self.save(name=link_name)
 
     def remove_public_access(self):
         """
-        Custom method to remove public access to the file.
+        Custom method to remove public access to the link file.
         """
         self.public = False
-        self.save()
+        path = self.fname.name
+        link_name = os.path.basename(path).rsplit('.chrislink', 1)[0]
+        self.save(name=link_name)
 
     def get_shared_link(self):
         """
         Custom method to get the link file in the SHARED folder pointing to
         this file if it exists.
         """
-        path = self.fname.name
-        str_source_trace_dir = path.replace('/', '_')
+        str_source_trace_dir = self.fname.name.replace('/', '_')
         fname = 'SHARED/' + str_source_trace_dir + '.chrislink'
 
         try:

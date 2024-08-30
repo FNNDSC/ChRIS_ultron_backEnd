@@ -175,3 +175,21 @@ class SwiftManager(StorageManager):
                 time.sleep(0.4)
             else:
                 break
+
+    def copy_path(self, src: str, dst: str) -> None:
+        l_ls = self.ls(src)
+        for obj_path in l_ls:
+            new_obj_path = obj_path.replace(src, dst, 1)
+            self.copy_obj(obj_path, new_obj_path)
+
+    def move_path(self, src: str, dst: str) -> None:
+        l_ls = self.ls(src)
+        for obj_path in l_ls:
+            new_obj_path = obj_path.replace(src, dst, 1)
+            self.copy_obj(obj_path, new_obj_path)
+            self.delete_obj(obj_path)
+
+    def delete_path(self, path: str) -> None:
+        l_ls = self.ls(path)
+        for obj_path in l_ls:
+            self.delete_obj(obj_path)
