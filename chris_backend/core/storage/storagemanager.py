@@ -57,7 +57,7 @@ class StorageManager(abc.ABC):
 
     def copy_obj(self, src: str, dst: str) -> None:
         """
-        Copy data to a new path.
+        Copy file data to a new path.
 
         Instead of a copy, implementations may create links or shallow copies for efficiency.
         """
@@ -65,6 +65,24 @@ class StorageManager(abc.ABC):
 
     def delete_obj(self, file_path: str) -> None:
         """
-        Delete data from the given path.
+        Delete file data from the given path.
+        """
+        ...
+
+    def copy_path(self, src: str, dst: str) -> None:
+        """
+        Copy all the data under a src path to a new dst path.
+        """
+        ...
+
+    def move_path(self, src: str, dst: str) -> None:
+        """
+        Move all the data under a src path to a new dst path.
+        """
+        ...
+
+    def delete_path(self, path: str) -> None:
+        """
+        Delete all the data under a path.
         """
         ...
