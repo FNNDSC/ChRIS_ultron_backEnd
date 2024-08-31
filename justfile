@@ -20,7 +20,7 @@ bash: (run 'bash')
 
 # Run chrisomatic, a tool which adds plugins and users to CUBE.
 chrisomatic *args: start
-    @just docker-compose --profile=cube run --rm chrisomatic chrisomatic {{args}}
+    @just docker-compose --profile=cube run --rm chrisomatic chrisomatic {{ args }}
 
 # Run chrisomatic with the contents of chrisomatic/postscript.yml
 postscript: (chrisomatic 'postscript.yml')
@@ -30,7 +30,7 @@ migrate: (run 'python manage.py migrate --noinput')
 
 # Run tests, e.g. `just test pacsfiles`
 test *args:
-    @just run python manage.py test --force-color {{args}}
+    @just run python manage.py test --force-color {{ args }}
 
 # Run all tests.
 test-all: test-unit test-integration
@@ -51,8 +51,7 @@ down: (docker-compose '--profile=cube --profile=tools down')
 nuke: reap-plugin-instances (docker-compose '--profile=cube --profile=tools down -v --remove-orphans')
 
 # Remove all plugin instance containers.
-reap-plugin-instances: (
-    docker-compose 'run --rm pman python -c' '''
+reap-plugin-instances: (docker-compose 'run --rm pman python -c' '''
         '
         import os
         import docker
@@ -63,8 +62,7 @@ reap-plugin-instances: (
             print(f"Removing container: {container.name} ({container.image})", flush=True)
             container.remove(force=True)
         '
-    '''
-)
+    ''')
 
 # (Re-)build the container image.
 build: (docker-compose '--profile=cube build')
@@ -74,15 +72,15 @@ pull: (docker-compose 'pull')
 
 # Get container logs.
 logs *args:
-    @just docker-compose --profile=cube logs {{args}}
+    @just docker-compose --profile=cube logs {{ args }}
 
 # docker-compose ... run helper function.
 run +command:
-    @just docker-compose --profile=cube run --rm chris {{command}}
+    @just docker-compose --profile=cube run --rm chris {{ command }}
 
 # docker-compose ... helper function.
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK=$(just get-socket) $(just get-engine) compose -f '{{ compose_file }}' {{command}}
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose -f '{{ compose_file }}' {{ command }}
 
 # Get the container engine to use (docker or podman)
 get-engine:
@@ -114,12 +112,12 @@ check-podman-socket:
 
 # Set a preference for using either Docker or Podman.
 prefer docker_or_podman:
-    @[ '{{docker_or_podman}}' = 'docker' ] || [ '{{docker_or_podman}}' = 'podman' ] \
+    @[ '{{ docker_or_podman }}' = 'docker' ] || [ '{{ docker_or_podman }}' = 'podman' ] \
         || ( \
             >&2 echo 'argument must be either "docker" or "podman"'; \
             exit 1 \
         )
-    echo '{{docker_or_podman}}' > .preference
+    echo '{{ docker_or_podman }}' > .preference
 
 # Remove your preference for Docker or Podman.
 unset-preference:
