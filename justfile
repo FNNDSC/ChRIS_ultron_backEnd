@@ -105,9 +105,10 @@ get-podman-socket: check-podman-socket
 
 # Ensure that the podman daemon is running.
 check-podman-socket:
-    @if [ "$(podman info --format '{{{{ .Host.RemoteSocket.Exists }}')" != 'true' ]; then       \
-      echo 'Podman daemon not running. Please run `systemctl --user start podman.service`';      \
-      exit 1;                                                                                    \
+    @if [ "$(podman info --format '{{{{ .Host.RemoteSocket.Exists }}')" != 'true' ]; then   \
+      cmd='systemctl --user start podman.service';                                          \
+      >&2 echo "Podman daemon not running. Please run \`$(tput bold)$cmd$(tput sgr0)\`";    \
+      exit 1;                                                                               \
     fi
 
 # Set a preference for using either Docker or Podman.
