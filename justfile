@@ -1,4 +1,13 @@
-compose_file := 'docker-compose_just.yml'
+# This is a `justfile` for the development of ChRIS backend. For the most part,
+# it is a wrapper around the `docker compose` or `podman compose` command.
+# Use the `just` program to execute `justfile` commands. Run
+#
+#     just -l
+#
+# to list commands and their descriptions.
+#
+# The syntax and usage of `justfile` is similar to Makefile of GNU Make.
+# For more information, see https://just.systems/man/en/chapter_1.html
 
 # Start the ChRIS backend in development mode, and attach to the live-reloading server.
 [group('(1) start-up')]
@@ -102,7 +111,7 @@ run +command:
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose -f '{{ compose_file }}' {{ command }}
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ command }}
 
 # Get the container engine to use (docker or podman)
 [group('helper function')]
