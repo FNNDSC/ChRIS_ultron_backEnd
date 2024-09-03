@@ -52,17 +52,32 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to grant or remove public access to the folder and all its
         descendant folders, link files and files depending on the new public status of
-        the folder.
+        the folder. Also move the folder's tree to a new path and recreate the public
+        link to the folder if required.
         """
-        if 'public' in validated_data:
-            if instance.public and not validated_data['public']:
-                instance.remove_public_link()
-                instance.remove_public_access()
+        public = instance.public
 
-            elif not instance.public and validated_data['public']:
-                instance.grant_public_access()
-                instance.create_public_link()
-        return super(FileBrowserFolderSerializer, self).update(instance, validated_data)
+        if public and 'public' in validated_data and not validated_data['public']:
+            instance.remove_public_link()
+            instance.remove_public_access()
+
+        new_path = validated_data.get('path')
+
+        if new_path:
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.remove_public_link()
+
+            # folder will be stored at: SWIFT_CONTAINER_NAME/<new_path>
+            # where <new_path> must start with home/
+            instance.move(new_path)
+
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.create_public_link()  # recreate public link
+
+        if not public and 'public' in validated_data and validated_data['public']:
+            instance.grant_public_access()
+            instance.create_public_link()
+        return instance
 
     def validate_path(self, path):
         """
@@ -122,8 +137,10 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         being moved.
         """
         if self.instance:  # on update
-            if 'public' not in data:
-                raise serializers.ValidationError({'public': ['This field is required.']})
+            if 'public' not in data and 'path' not in data:
+                raise serializers.ValidationError(
+                        {'non_field_errors': ["At least one of the fields 'public' "
+                                              "or 'path' must be provided."]})
 
             username = self.context['request'].user.username
 
@@ -139,6 +156,8 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         else:
             if 'path' not in data: # on create
                 raise serializers.ValidationError({'path': ['This field is required.']})
+
+            data.pop('public', None)  # can only be set to public on update
         return data
 
 
@@ -294,35 +313,31 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        Overriden to set the file's saving path and parent folder and delete the old
-        path from storage.
+        Overriden to grant or remove public access to the file and/or move it to a new
+        path.
         """
-        if 'public' in validated_data:
-            instance.public = validated_data['public']
+        public = instance.public
+
+        if public and 'public' in validated_data and not validated_data['public']:
+            instance.remove_public_link()
+            instance.remove_public_access()
 
         new_file_path = validated_data.pop('new_file_path', None)
 
         if new_file_path:
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.remove_public_link()
+
             # user file will be stored at: SWIFT_CONTAINER_NAME/<new_file_path>
             # where <new_file_path> must start with home/
+            instance.move(new_file_path)
 
-            old_storage_path = instance.fname.name
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.create_public_link()  # recreate public link
 
-            storage_manager = connect_storage(settings)
-            if storage_manager.obj_exists(new_file_path):
-                storage_manager.delete_obj(new_file_path)
-
-            storage_manager.copy_obj(old_storage_path, new_file_path)
-            storage_manager.delete_obj(old_storage_path)
-
-            folder_path = os.path.dirname(new_file_path)
-            owner = instance.owner
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                                   owner=owner)
-            instance.parent_folder = parent_folder
-            instance.fname.name = new_file_path
-
-        instance.save()
+        if not public and 'public' in validated_data and validated_data['public']:
+            instance.grant_public_access()
+            instance.create_public_link()
         return instance
 
     def get_file_link(self, obj):
@@ -337,7 +352,7 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
         for which the user has write permission.
         """
         # remove leading and trailing slashes
-        new_file_path = new_file_path.strip(' ').strip('/')
+        new_file_path = new_file_path.strip().strip('/')
 
         if new_file_path.endswith('.chrislink'):
             raise serializers.ValidationError(["Invalid path. This is not a ChRIS link "
@@ -546,36 +561,31 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
 
     def update(self, instance, validated_data):
         """
-        Overriden to set the link file's saving path and parent folder and delete
-        the old path from storage.
+        Overriden to grant or remove public access to the file and/or move it to a new
+        path.
         """
-        if 'public' in validated_data:
-            instance.public = validated_data['public']
+        public = instance.public
+
+        if public and 'public' in validated_data and not validated_data['public']:
+            instance.remove_public_link()
+            instance.remove_public_access()
 
         new_link_file_path = validated_data.pop('new_link_file_path', None)
 
         if new_link_file_path:
-            # user file will be stored at: SWIFT_CONTAINER_NAME/<new_link_file_path>
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.remove_public_link()
+
+            # link file will be stored at: SWIFT_CONTAINER_NAME/<new_link_file_path>
             # where <new_link_file_path> must start with home/
+            instance.move(new_link_file_path)
 
-            old_storage_path = instance.fname.name
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.create_public_link()  # recreate public link
 
-            storage_manager = connect_storage(settings)
-            if storage_manager.obj_exists(new_link_file_path):
-                storage_manager.delete_obj(new_link_file_path)
-
-            storage_manager.copy_obj(old_storage_path, new_link_file_path)
-            storage_manager.delete_obj(old_storage_path)
-
-            folder_path = os.path.dirname(new_link_file_path)
-            owner = instance.owner
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                                   owner=owner)
-            instance.parent_folder = parent_folder
-            instance.fname.name = new_link_file_path
-
-        link_name = os.path.basename(instance.fname.name).rsplit('.chrislink', 1)[0]
-        instance.save(name=link_name)
+        if not public and 'public' in validated_data and validated_data['public']:
+            instance.grant_public_access()
+            instance.create_public_link()
         return instance
 
     def get_file_link(self, obj):
@@ -627,11 +637,11 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
         for which the user has write permission.
         """
         # remove leading and trailing slashes
-        new_link_file_path = new_link_file_path.strip(' ').strip('/')
+        new_link_file_path = new_link_file_path.strip().strip('/')
 
-        if new_link_file_path.endswith('.chrislink'):
-            raise serializers.ValidationError(["Invalid path. This is not a ChRIS link "
-                                               "file."])
+        if not new_link_file_path.endswith('.chrislink'):
+            raise serializers.ValidationError(["Invalid path. The new path must end with"
+                                               " '.chrislink' sufix."])
         if not new_link_file_path.startswith('home/'):
             raise serializers.ValidationError(["Invalid path. Path must start with "
                                                "'home/'."])

@@ -13,3 +13,6 @@ CHRIS_REMOTE_FS
 swarm/prod/secrets
 kubernetes/prod/base/secrets
 dc.out
+
+# created by `just prefer`
+.preference

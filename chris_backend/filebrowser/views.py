@@ -130,15 +130,8 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to retrieve a file browser folder and append a collection+json template.
         """
         response = super(FileBrowserFolderDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {"public": ""}
+        template_data = {"public": "", "path": ""}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove path if provided by the user before serializer validation.
-        """
-        request.data.pop('path', None)  # change path is not implemented yet
-        return super(FileBrowserFolderDetail, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """

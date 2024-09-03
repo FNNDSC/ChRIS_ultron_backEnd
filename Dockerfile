@@ -41,14 +41,5 @@ RUN if [ "$ENVIRONMENT" = "production" ]; then \
 
 CMD ["daphne", "-p", "8000", "config.asgi:application"]
 
-LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
-    org.opencontainers.image.title="ChRIS Backend" \
-    org.opencontainers.image.description="ChRIS backend django API server" \
-    org.opencontainers.image.url="https://chrisproject.org/" \
-    org.opencontainers.image.source="https://github.com/FNNDSC/ChRIS_ultron_backEnd" \
-    org.opencontainers.image.documentation="https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/" \
-    org.opencontainers.image.version="" \
-    org.opencontainers.image.licenses="MIT"
-
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD curl -f http://localhost:8000/api/v1/users/ || exit 1

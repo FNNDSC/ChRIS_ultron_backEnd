@@ -350,7 +350,7 @@ rm -f dc.out ; title -d 1 "Setting global exports"
 windowBottom
 
 rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"      \
-            "and creating appropriate .env for docker-compose"
+            "and creating appropriate .env for docker compose"
 
     printf "${LightCyan}%13s${Green}%-67s${Yellow}\n"               \
             "$ docker pull" " library/postgres"                     | ./boxes.sh
@@ -366,7 +366,7 @@ rm -f dc.out ; title -d 1 "Pulling non-'local/' core containers where needed"   
 
     if (( ! b_skipIntro )) ; then
         echo "# Variables declared here are available to"               > .env
-        echo "# docker-compose on execution"                            >>.env
+        echo "# docker compose on execution"                            >>.env
         for CORE in ${A_CONTAINER[@]} ; do
             cparse $CORE "REPO" "CONTAINER" "MMN" "ENV"
             echo "${ENV}=${REPO}"                                       >>.env
@@ -643,10 +643,10 @@ fi
 # set compute resource 'host' to operate in-network (workaround until chrisomatic supports it)
 if (( b_pfconInNetwork )) ; then
     if [[ $STORAGE_ENV == 'swift' ]]; then
-        docker-compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
+        docker compose -f docker-compose_dev.yml exec chris_dev /bin/bash -c \
             'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
     elif [[ $STORAGE_ENV =~ ^(fslink|filesystem)$ ]]; then
-        docker-compose -f docker-compose_noswift.yml exec chris_dev /bin/bash -c \
+        docker compose -f docker-compose_noswift.yml exec chris_dev /bin/bash -c \
             'python manage.py shell -c "from plugins.models import ComputeResource; cr = ComputeResource.objects.get(name=\"host\"); cr.compute_innetwork = True; cr.save()"'
 
     fi

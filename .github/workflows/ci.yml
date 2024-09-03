@@ -10,37 +10,43 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ 'docker', 'podman' ]
+        test-kind: [ 'unit', 'integration' ]
     steps:
+      - name: Start podman daemon
+        if: matrix.engine == 'podman'
+        run: systemctl --user start podman.service
+      - uses: taiki-e/install-action@just
       - uses: actions/checkout@v4
-      - uses: FNNDSC/cube-integration-action@master
+      - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
+        uses: ./
         with:
-          repository: ${{ github.workspace }}
-          which: all
-
+          engine: ${{ matrix.engine }}
+          command: test-${{ matrix.test-kind }}
 
   build:
     needs: [ test ]
     if: github.event_name == 'push' || github.event_name == 'release'
-    runs-on: ubuntu-22.04
-    env:
-      repo_name: fnndsc/cube
+    runs-on: ubuntu-24.04
     steps:
-      - name: Determine image tags
-        id: determine
-        run: |
-          repo="${{ env.repo_name }}"
-          tag="${GITHUB_REF_NAME:-latest}"  # if build triggered by tag, use tag name
-
-          # if tag is a version number prefixed by 'v', remove the 'v'
-          if [[ "$tag" =~ ^v[0-9].* ]]; then
-            tag="${tag:1}"
-          fi
-
-          dock_image=$repo:$tag
-          echo $dock_image
-          echo "dock_image=$dock_image" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            docker.io/fnndsc/cube
+            ghcr.io/fnndsc/cube
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
@@ -61,12 +67,11 @@ jobs:
           push: true
           context: .
           file: ./Dockerfile
-          tags: |
-            docker.io/${{ steps.determine.outputs.dock_image }}
-            ghcr.io/${{ steps.determine.outputs.dock_image }}
           platforms: linux/amd64,linux/ppc64le,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
@@ -75,4 +80,4 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
           short-description: ChRIS backend
           readme-filepath: ./README.md
-          repository: ${{ env.repo_name }}
+          repository: fnndsc/cube
