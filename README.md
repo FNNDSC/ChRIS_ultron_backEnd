@@ -162,6 +162,41 @@ storage = connect_storage(settings)
 
 Old development scripts usage is described in [OLD_DEVELOP.md](./OLD_DEVELOP.md).
 
+### IDE Setup
+
+Visual Studio Code and PyCharm both support using Docker containers to run the Python interpreter. Run `just build`, then point your IDE to use the container image `localhost/fnndsc/cube:dev`.
+
+Not all text editors support using Docker, or configuring the LSP might be inconvenient. In these cases, you need to install Python and the dependencies on-the-metal.
+
+#### Installing Python Dependencies On-The-Metal
+
+The traditional but worst approach is to install Python 3.11, then run
+
+```shell
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements/local.txt
+```
+
+Some dependencies (such as `python-ldap`) build C code during installation,
+requiring `clang` to be installed. Alternatively, my recommendation is to use
+`micromamba` to install Python 3.11 and `python-ldap`, then use `pip` to
+install everything else.
+[Install micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html), then run
+
+```shell
+micromamba create -p ./.mambaenv -c conda-forge -y python=3.11 python-ldap=3.4
+micromamba -p ./.mambaenv run pip install -r requirements/local.txt
+```
+
+Now the environment is ready. Activate the environment
+
+```shell
+micromamba activate -p ./.mambaenv
+```
+
+And you are ready to run your LSP + text editor.
+
 ## Production Deployment
 
 See https://chrisproject.org/docs/run/helm

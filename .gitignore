@@ -13,7 +13,10 @@ dc.out
 celerybeat.pid
 swarm/prod/secrets/
 kubernetes/prod/base/secrets/
+
 venv
+.venv
+.mambaenv
 
 # created by dev container bc UBI sets HOME to the project src dir
 chris_backend/.config
