@@ -14,5 +14,9 @@ swarm/prod/secrets
 kubernetes/prod/base/secrets
 dc.out
 
+venv
+.venv
+.mambaenv
+
 # created by `just prefer`
 .preference
