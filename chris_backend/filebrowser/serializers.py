@@ -3,12 +3,10 @@ import os
 
 from django.contrib.auth.models import User, Group
 from django.db.utils import IntegrityError
-from django.conf import settings
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from collectionjson.fields import ItemLinkField
-from core.storage import connect_storage
 from core.utils import get_file_resource_link
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
@@ -17,6 +15,7 @@ from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermi
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
     path = serializers.CharField(max_length=1024, required=False)
+    owner_username = serializers.ReadOnlyField(source='owner.username')
     parent = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
     children = serializers.HyperlinkedIdentityField(
@@ -32,8 +31,9 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = ChrisFolder
-        fields = ('url', 'id', 'creation_date', 'path', 'public', 'parent', 'children',
-                  'files', 'link_files', 'group_permissions', 'user_permissions', 'owner')
+        fields = ('url', 'id', 'creation_date', 'path', 'public', 'owner_username',
+                  'parent', 'children', 'files', 'link_files', 'group_permissions',
+                  'user_permissions', 'owner')
 
     def create(self, validated_data):
         """

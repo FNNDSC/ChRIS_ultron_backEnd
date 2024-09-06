@@ -81,6 +81,19 @@ class FileBrowserFolderListViewTests(FileBrowserViewTests):
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["path"], f"home/{self.username}/uploads/folder1/folder2")
+        self.assertFalse(response.data["public"])
+
+    def test_filebrowserfolder_create_public_status_keeps_unchanged(self):
+        self.client.login(username=self.username, password=self.password)
+        post = json.dumps(
+            {"template":
+                 {"data": [{"name": "public", "value": True}, {"name": "path",
+                            "value": f"home/{self.username}/uploads/folder1/folder3"}]}})
+        response = self.client.post(self.create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["path"], f"home/{self.username}/uploads/folder1/folder3")
+        self.assertFalse(response.data["public"])
 
     def test_filebrowserfolder_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -292,15 +305,65 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_filebrowserfolder_update_success(self):
+        # create a folder
+        owner = User.objects.get(username=self.username)
+        folder, _ = ChrisFolder.objects.get_or_create(
+            path=f'home/{self.username}/uploads/test_update', owner=owner)
+
+        # create another folder within the folder
+        inner_folder_path = f'home/{self.username}/uploads/test_update/inner'
+        inner_folder, _ = ChrisFolder.objects.get_or_create(
+            path=inner_folder_path, owner=owner)
+
+        # create a file within the folder
+        storage_manager = connect_storage(settings)
+        file_path = f'home/{self.username}/uploads/test_update/update_file.txt'
+        with io.StringIO("test file") as update_file:
+            storage_manager.upload_obj(file_path, update_file.read(),
+                                       content_type='text/plain')
+        f = UserFile(owner=owner, parent_folder=folder)
+        f.fname.name = file_path
+        f.save()
+
+        # create a link file within the folder
+        lf_path = f'home/{self.username}/uploads/test_update/SERVICES_PACS.chrislink'
+        lf = ChrisLinkFile(path='SERVICES/PACS', owner=owner, parent_folder=folder)
+        lf.save(name='SERVICES_PACS')
+
+        read_update_delete_url = reverse("chrisfolder-detail",
+                                         kwargs={"pk": folder.id})
+
+        new_path = f'home/{self.username}/uploads/test_update_folder/test'
+        put = json.dumps({
+            "template": {"data": [{"name": "public", "value": True},
+                                  {"name": "path", "value": new_path}]}})
+
         self.client.login(username=self.username, password=self.password)
-        response = self.client.put(self.read_update_delete_url, data=self.put,
+        response = self.client.put(read_update_delete_url, data=put,
                                    content_type=self.content_type)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["public"],True)
+        self.assertEqual(response.data["path"], new_path)
+        folder.refresh_from_db()
 
-        folder = ChrisFolder.objects.get(path=f'home/{self.username}')
+        inner_folder.refresh_from_db()
+        self.assertEqual(inner_folder.path, new_path + '/inner')
+        self.assertEqual(inner_folder.parent, folder)
+
+        self.assertTrue(storage_manager.obj_exists(new_path + '/update_file.txt'))
+        self.assertFalse(storage_manager.obj_exists(file_path))
+        f.refresh_from_db()
+        self.assertEqual(f.parent_folder, folder)
+
+        self.assertTrue(storage_manager.obj_exists(new_path + '/SERVICES_PACS.chrislink'))
+        self.assertFalse(storage_manager.obj_exists(lf_path))
+        lf.refresh_from_db()
+        self.assertEqual(lf.parent_folder, folder)
+
         folder.remove_public_link()
         folder.remove_public_access()
+        folder.delete()
 
     def test_filebrowserfolder_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,
@@ -759,12 +822,12 @@ class FileBrowserFolderGroupPermissionListViewTests(FileBrowserViewTests):
         inner_folder = ChrisFolder.objects.create(path=f'{self.path}/inner', owner=user)
 
         # create a file in the inner folder
-        self.storage_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
 
         upload_path = f'{self.path}/inner/file7.txt'
         with io.StringIO("test file") as file7:
-            self.storage_manager.upload_obj(upload_path, file7.read(),
-                                            content_type='text/plain')
+            storage_manager.upload_obj(upload_path, file7.read(),
+                                       content_type='text/plain')
         f = UserFile(owner=user, parent_folder=inner_folder)
         f.fname.name = upload_path
         f.save()
@@ -956,12 +1019,12 @@ class FileBrowserFolderGroupPermissionDetailViewTests(FileBrowserViewTests):
         inner_folder = ChrisFolder.objects.create(path=f'{self.path}/inner', owner=user)
 
         # create a file in the inner folder
-        self.storage_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
 
         upload_path = f'{self.path}/inner/file8.txt'
         with io.StringIO("test file") as file8:
-            self.storage_manager.upload_obj(upload_path, file8.read(),
-                                            content_type='text/plain')
+            storage_manager.upload_obj(upload_path, file8.read(),
+                                       content_type='text/plain')
         f = UserFile(owner=user, parent_folder=inner_folder)
         f.fname.name = upload_path
         f.save()
@@ -1051,12 +1114,12 @@ class FileBrowserFolderUserPermissionListViewTests(FileBrowserViewTests):
         inner_folder = ChrisFolder.objects.create(path=f'{self.path}/inner', owner=user)
 
         # create a file in the inner folder
-        self.storage_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
 
         upload_path = f'{self.path}/inner/file7.txt'
         with io.StringIO("test file") as file7:
-            self.storage_manager.upload_obj(upload_path, file7.read(),
-                                            content_type='text/plain')
+            storage_manager.upload_obj(upload_path, file7.read(),
+                                       content_type='text/plain')
         f = UserFile(owner=user, parent_folder=inner_folder)
         f.fname.name = upload_path
         f.save()
@@ -1235,12 +1298,12 @@ class FileBrowserFolderUserPermissionDetailViewTests(FileBrowserViewTests):
         inner_folder = ChrisFolder.objects.create(path=f'{self.path}/inner', owner=user)
 
         # create a file in the inner folder
-        self.storage_manager = connect_storage(settings)
+        storage_manager = connect_storage(settings)
 
         upload_path = f'{self.path}/inner/file8.txt'
         with io.StringIO("test file") as file8:
-            self.storage_manager.upload_obj(upload_path, file8.read(),
-                                            content_type='text/plain')
+            storage_manager.upload_obj(upload_path, file8.read(),
+                                       content_type='text/plain')
         f = UserFile(owner=user, parent_folder=inner_folder)
         f.fname.name = upload_path
         f.save()
@@ -1347,8 +1410,6 @@ class FileBrowserFolderFileListViewTests(FileBrowserViewTests):
                                                 self.plugin.compute_resources.all()[0])
 
         # create file
-        self.storage_manager = connect_storage(settings)
-
         file_path = f'{pl_inst.output_folder.path}/file3.txt'
         with io.StringIO("test file") as file3:
             self.storage_manager.upload_obj(file_path, file3.read(),
@@ -1491,7 +1552,6 @@ class FileBrowserFileDetailViewTests(FileBrowserViewTests):
 
         self.read_update_delete_url = reverse("chrisfile-detail",
                                               kwargs={"pk": self.file.id})
-
         self.put = json.dumps({
             "template": {"data": [{"name": "public", "value": True}]}})
 
@@ -1530,8 +1590,6 @@ class FileBrowserFileDetailViewTests(FileBrowserViewTests):
         pl_inst.feed.save()
 
         # create file in the output folder
-        self.storage_manager = connect_storage(settings)
-
         file_path = f'{pl_inst.output_folder.path}/file4.txt'
         with io.StringIO("test file") as file4:
             self.storage_manager.upload_obj(file_path, file4.read(),
@@ -1566,8 +1624,6 @@ class FileBrowserFileDetailViewTests(FileBrowserViewTests):
         pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
         # create file in the output folder
-        self.storage_manager = connect_storage(settings)
-
         file_path = f'{pl_inst.output_folder.path}/file5.txt'
         with io.StringIO("test file") as file5:
             self.storage_manager.upload_obj(file_path, file5.read(),
@@ -1585,10 +1641,18 @@ class FileBrowserFileDetailViewTests(FileBrowserViewTests):
 
     def test_filebrowserfile_update_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.put(self.read_update_delete_url, data=self.put,
+        new_file_path = f'home/{self.username}/uploads/mytestfolder/mytestfile.txt'
+        put = json.dumps({
+            "template": {"data": [{"name": "public", "value": True},
+                                  {"name": "new_file_path", "value": new_file_path}]}})
+        response = self.client.put(self.read_update_delete_url, data=put,
                                    content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["public"],True)
+        self.assertEqual(response.data["fname"], new_file_path)
+        self.assertTrue(self.storage_manager.obj_exists(new_file_path))
+        self.assertFalse(self.storage_manager.obj_exists(self.upload_path))
+        self.file.refresh_from_db()
         self.file.remove_public_link()
         self.file.remove_public_access()
 
@@ -1643,8 +1707,6 @@ class FileBrowserFileResourceViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserFileResourceViewTests, self).setUp()
-
-        self.storage_manager = connect_storage(settings)
 
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
@@ -1718,8 +1780,6 @@ class FileBrowserFileResourceViewTests(FileBrowserViewTests):
         path = f'home/{self.other_username}/uploads'
         uploads_folder = ChrisFolder.objects.get(path=path)
 
-        self.storage_manager = connect_storage(settings)
-
         file_path = f'{path}/file6.txt'
         with io.StringIO("test file") as file6:
             self.storage_manager.upload_obj(file_path, file6.read(),
@@ -1755,8 +1815,6 @@ class FileBrowserFileResourceViewTests(FileBrowserViewTests):
         pl_inst.feed.save()
 
         # create a file in the output folder
-        self.storage_manager = connect_storage(settings)
-
         file_path = f'{pl_inst.output_folder}/file6.txt'
         with io.StringIO("test file") as file6:
             self.storage_manager.upload_obj(file_path, file6.read(),
@@ -2316,8 +2374,6 @@ class FileBrowserFolderLinkFileListViewTests(FileBrowserViewTests):
     def setUp(self):
         super(FileBrowserFolderLinkFileListViewTests, self).setUp()
 
-        self.storage_manager = connect_storage(settings)
-
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL)
@@ -2489,8 +2545,11 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         self.link_file = ChrisLinkFile(path='SERVICES/PACS', owner=user,
                                   parent_folder=self.pl_inst.output_folder)
         self.link_file.save(name='SERVICES_PACS')
-        self.read_url = reverse("chrislinkfile-detail",
-                                kwargs={"pk": self.link_file.id})
+
+        self.read_update_delete_url = reverse("chrislinkfile-detail",
+                                              kwargs={"pk": self.link_file.id})
+        self.put = json.dumps({
+            "template": {"data": [{"name": "public", "value": True}]}})
 
     def tearDown(self):
         self.link_file.delete()
@@ -2498,25 +2557,25 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
 
     def test_fileBrowserlinkfile_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, self.link_path)
 
     def test_fileBrowserlinkfile_detail_success_user_chris(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, self.link_path)
 
     def test_fileBrowserlinkfile_detail_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
     def test_fileBrowserlinkfile_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_fileBrowserlinkfile_detail_success_public_feed_unauthenticated(self):
         self.pl_inst.feed.grant_public_access()
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, self.link_path)
         self.pl_inst.feed.remove_public_access()
 
@@ -2543,9 +2602,10 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         user = User.objects.get(username=self.username)
         pl_inst.feed.grant_user_permission(user)
 
-        read_url = reverse("chrislinkfile-detail", kwargs={"pk": link_file.id})
+        read_update_delete_url = reverse("chrislinkfile-detail",
+                                         kwargs={"pk": link_file.id})
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(read_url)
+        response = self.client.get(read_update_delete_url)
         self.assertContains(response, link_path)
 
         link_file.delete()
@@ -2571,12 +2631,69 @@ class FileBrowserLinkFileDetailViewTests(FileBrowserViewTests):
         # share feed
         pl_inst.feed.grant_user_permission(User.objects.get(username=self.username))
 
-        read_url = reverse("chrislinkfile-detail", kwargs={"pk": link_file.id})
-        response = self.client.get(read_url)
+        read_update_delete_url = reverse("chrislinkfile-detail",
+                                         kwargs={"pk": link_file.id})
+        response = self.client.get(read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         link_file.delete()
 
+    def test_filebrowserlinkfile_update_success(self):
+        self.client.login(username=self.username, password=self.password)
+        new_file_path = f'home/{self.username}/uploads/mytestfolder/SERVICES_PACS.chrislink'
+
+        put = json.dumps({
+            "template": {"data": [{"name": "public", "value": True},
+                                  {"name": "new_link_file_path", "value": new_file_path}]}})
+
+        response = self.client.put(self.read_update_delete_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["public"],True)
+        self.assertEqual(response.data["fname"], new_file_path)
+        self.assertTrue(self.storage_manager.obj_exists(new_file_path))
+        self.assertFalse(self.storage_manager.obj_exists(self.link_path))
+        self.link_file.refresh_from_db()
+        self.link_file.remove_public_link()
+        self.link_file.remove_public_access()
+
+    def test_filebrowserlinkfile_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_filebrowserlinkfile_update_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.put(self.read_update_delete_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_filebrowserlinkfile_delete_success(self):
+        user = User.objects.get(username=self.username)
+
+        # create link file
+        lf_path = f'home/{self.username}/uploads/SERVICES_PACS.chrislink'
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(owner=user,
+                                                               path=f'home/{self.username}/uploads')
+        lf = ChrisLinkFile(path='SERVICES/PACS', owner=user, parent_folder=parent_folder)
+        lf.save(name='SERVICES_PACS')
+
+        read_update_delete_url = reverse("chrislinkfile-detail",
+                                         kwargs={"pk": lf.id})
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(self.storage_manager.obj_exists(lf_path))
+
+    def test_filebrowserlinkfile_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_filebrowserlinkfile_delete_failure_user_access_denied(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
     """
@@ -2585,8 +2702,6 @@ class FileBrowserLinkFileResourceViewTests(FileBrowserViewTests):
 
     def setUp(self):
         super(FileBrowserLinkFileResourceViewTests, self).setUp()
-
-        self.storage_manager = connect_storage(settings)
 
         # create compute resource
         (compute_resource, tf) = ComputeResource.objects.get_or_create(

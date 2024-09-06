@@ -122,7 +122,8 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
     def validate(self, data):
         """
         Overriden to validate that at least one of two fields are in data when
-        updating a file.
+        updating a file. Also to validate that required fields are in data on create
+        and remove the 'public' field if passed.
         """
         if self.instance:  # on update
             if 'public' not in data and 'upload_path' not in data:
