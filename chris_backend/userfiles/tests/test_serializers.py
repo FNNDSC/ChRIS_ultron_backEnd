@@ -140,3 +140,34 @@ class UserFileSerializerTests(TestCase):
             upload_path = f'home/{self.username}/uploads/file1.txt'
             self.assertEqual(userfiles_serializer.validate_upload_path(upload_path),
                              upload_path)
+
+    def test_validate_failure_missing_required_fields_on_create(self):
+        """
+        Test whether overriden validate method validates that required fields are in the
+        passed data on create.
+        """
+        userfiles_serializer = UserFileSerializer()
+
+        data = {'upload_path': f'home/{self.username}/uploads/file1.txt'}
+        with self.assertRaises(serializers.ValidationError):
+            userfiles_serializer.validate(data)
+
+        f = ContentFile('Test file'.encode())
+        f.name = 'file1.txt'
+        data = {'fname': f}
+        with self.assertRaises(serializers.ValidationError):
+            userfiles_serializer.validate(data)
+
+    def test_validate_removes_public_field_on_create(self):
+        """
+        Test whether overriden validate method removes the 'public' field from the
+        passed data on create.
+        """
+        userfiles_serializer = UserFileSerializer()
+
+        f = ContentFile('Test file'.encode())
+        f.name = 'file1.txt'
+        data = {'upload_path': f'home/{self.username}/uploads/file1.txt', 'fname': f,
+                'public': True}
+        validated_data = userfiles_serializer.validate(data)
+        self.assertNotIn('public', validated_data)

@@ -6,7 +6,7 @@
 # 2. Edit chris_backend/config/settings/local.py, include the configs
 #
 #     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-#     MEDIA_ROOT = '/var/chris'
+#     MEDIA_ROOT = '/data'
 #
 # 3. Run ./make.sh -s -i
 #
@@ -38,7 +38,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/opt/app-root/src:z
-      - ${STOREBASE:?}:/var/chris
+      - ${STOREBASE:?}:/data
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
       - STORAGE_ENV
@@ -60,7 +60,7 @@ services:
     tty: true        # docker run -t
     volumes:
       - ./chris_backend:/opt/app-root/src:z
-      - ${STOREBASE:?}:/var/chris
+      - ${STOREBASE:?}:/data
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
@@ -96,7 +96,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/opt/app-root/src:z
-      - ${STOREBASE:?}:/var/chris
+      - ${STOREBASE:?}:/data
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
@@ -138,7 +138,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/opt/app-root/src:z
-      - ${STOREBASE:?}:/var/chris
+      - ${STOREBASE:?}:/data
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
@@ -163,7 +163,7 @@ services:
         ENVIRONMENT: local
     volumes:
       - ./chris_backend:/opt/app-root/src:z
-      - ${STOREBASE:?}:/var/chris
+      - ${STOREBASE:?}:/data
     user: ${UID}:${GID}
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.local
