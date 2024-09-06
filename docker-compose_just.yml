@@ -113,7 +113,7 @@ services:
       PFCON_USER: pfcon
       PFCON_PASSWORD: pfcon1234
       PFCON_INNETWORK: "true"
-      STORAGE_ENV: filesystem
+      STORAGE_ENV: "fslink"
       STOREBASE_MOUNT: /var/local/storeBase
     # port is hard-coded in chris_backend/config/settings/local.py
     command: gunicorn -b 0.0.0.0:30005 -w 8 -t 120 pfcon.wsgi:application
