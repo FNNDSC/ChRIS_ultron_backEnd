@@ -100,6 +100,12 @@ services:
     image: docker.io/library/rabbitmq:3
     volumes:
       - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      start_period: 20s
+      retries: 3
+      timeout: 10s
+      interval: 5s
     networks:
       local:
         aliases:
@@ -148,6 +154,44 @@ services:
       - local
     userns_mode: "host"
 
+  oxidicom:
+    image: ghcr.io/fnndsc/oxidicom:pr-3  # https://github.com/FNNDSC/oxidicom/pull/3
+    ports:
+      - "11111:11111"
+    volumes:
+      - chris_files:/data
+    # https://chrisproject.org/docs/oxidicom#environment-variables
+    environment:
+      OXIDICOM_AMQP_ADDRESS: "amqp://queue:5672"
+      OXIDICOM_QUEUE_NAME: main2
+      OXIDICOM_NATS_ADDRESS: "nats:4222"
+      OXIDICOM_PROGRESS_INTERVAL: "100ms"
+      OXIDICOM_FILES_ROOT: /data
+      OXIDICOM_LISTENER_PORT: 11111
+      OXIDICOM_SCP_AET: CUBEDEVOXIDE
+      OXIDICOM_SCP_PROMISCUOUS: "true"
+      OXIDICOM_VERBOSE: "true"
+    user: ${UID}:${GID}
+    networks:
+      local:
+    depends_on:
+      nats:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+  nats:
+    image: docker.io/library/nats:2.10.20-alpine3.20
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      local:
+    healthcheck:
+      test: wget http://localhost:8222/healthz -q -S -O -
+      start_period: 20s
+      retries: 3
+      timeout: 10s
+      interval: 5s
   lldap:
     image: docker.io/nitnelave/lldap:stable
     ports:
