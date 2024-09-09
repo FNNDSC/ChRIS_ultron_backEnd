@@ -6,6 +6,16 @@ const JUST_COMMAND = process.env.INPUT_COMMAND;
 const script = `
 set -x
 just prefer ${CONTAINER_ENGINE}
+
+for i in {1..5}; do
+  just start-ancillary && start=good && break
+done
+
+if [ "$start" != "good" ]; then
+  echo "::error ::Failed to start ancillary services."
+  exit 1
+fi
+
 just ${JUST_COMMAND}
 rc=$?
 if [ "$rc" != '0' ]; then
