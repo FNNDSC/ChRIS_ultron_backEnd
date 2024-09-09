@@ -74,6 +74,8 @@ just prefer podman  # or
 just prefer docker
 ```
 
+With Podman, RabbitMQ might fail to start. Simply retry the command. See https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/573
+
 </details>
 
 ### Just Commands
