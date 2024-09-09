@@ -39,6 +39,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_started
+      nats:
+        condition: service_started
       cube-nonroot-user-volume-fix:
         condition: service_completed_successfully
     networks:
