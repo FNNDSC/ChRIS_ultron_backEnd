@@ -161,6 +161,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
 
 
+# NATS settings
+NATS_ADDRESS = 'nats://nats:4222'
+
 # Celery settings
 
 #CELERY_BROKER_URL = 'amqp://guest:guest@localhost'

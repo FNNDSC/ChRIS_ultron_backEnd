@@ -39,7 +39,7 @@ COPY chris_backend/ ./
 RUN if [ "$ENVIRONMENT" = "production" ]; then \
     env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; fi
 
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "4", "config.wsgi:application"]
+CMD ["daphne", "-p", "8000", "config.asgi:application"]
 
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD curl -f http://localhost:8000/api/v1/users/ || exit 1

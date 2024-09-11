@@ -39,6 +39,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_started
+      nats:
+        condition: service_started
       cube-nonroot-user-volume-fix:
         condition: service_completed_successfully
     networks:
@@ -148,6 +150,19 @@ services:
       - local
     userns_mode: "host"
 
+  nats:
+    image: docker.io/library/nats:2.10.20-alpine3.20
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      local:
+    healthcheck:
+      test: wget http://localhost:8222/healthz -q -S -O -
+      start_period: 20s
+      retries: 3
+      timeout: 10s
+      interval: 5s
   lldap:
     image: docker.io/nitnelave/lldap:stable
     ports:
