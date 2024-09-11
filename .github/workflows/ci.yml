@@ -67,7 +67,7 @@ jobs:
           push: true
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/ppc64le,linux/arm64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.meta.outputs.tags }}
