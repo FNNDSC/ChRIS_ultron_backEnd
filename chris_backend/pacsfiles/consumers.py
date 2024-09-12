@@ -50,14 +50,14 @@ class PACSFileProgress(AsyncJsonWebsocketConsumer):
             response = Lonk(
                 pacs_name=pacs_name,
                 SeriesInstanceUID=series_instance_uid,
-                message=LonkWsSubscription(subscription='subscribed'),
+                message=LonkWsSubscription(subscribed=True),
             )
             await self.send_json(response)
         except Exception as e:
             response = Lonk(
                 pacs_name=pacs_name,
                 SeriesInstanceUID=series_instance_uid,
-                message=LonkWsSubscription(subscription='error'),
+                message=LonkWsSubscription(subscribed=False),
             )
             await self.send_json(response)
             await self.close(code=500)
