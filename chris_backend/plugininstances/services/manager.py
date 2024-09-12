@@ -58,7 +58,7 @@ from django.db.utils import IntegrityError
 
 from core.storage import connect_storage
 from core.utils import json_zip2str
-from core.models import ChrisInstance, ChrisFolder, ChrisLinkFile
+from core.models import ChrisInstance, ChrisFolder, ChrisFile, ChrisLinkFile
 from plugininstances.models import PluginInstance, PluginInstanceLock
 from userfiles.models import UserFile
 
@@ -377,12 +377,12 @@ class PluginInstanceManager(object):
         the eventual consistency.
         """
         job_id = self.str_job_id
-        previous = self.c_plugin_inst.previous
-        output_path = previous.get_output_path()
-        output_folders = previous.output_folder.get_descendants()
-        fnames = []
-        for folder in output_folders:
-            fnames.extend([f.fname.name for f in folder.chris_files.all()])
+        output_path = self.c_plugin_inst.previous.get_output_path()
+        prefix = output_path + '/'  # avoid sibling folders with paths that start with path
+
+        set_fnames = {f.fname.name for f in ChrisFile.objects.filter(
+            fname__startswith=prefix)}
+
         for i in range(20):  # loop to deal with eventual consistency
             try:
                 l_ls = self.storage_manager.ls(output_path)
@@ -390,11 +390,13 @@ class PluginInstanceManager(object):
                 logger.error(f'[CODE06,{job_id}]: Error while listing storage files '
                              f'in {output_path}, detail: {str(e)}')
             else:
-                if all(obj in l_ls for obj in fnames):
+                if set_fnames.issubset(set(l_ls)):
                     return output_path
             time.sleep(3)
+
         logger.error(f'[CODE11,{job_id}]: Error while listing storage files in '
                      f'{output_path}, detail: Presumable eventual consistency problem')
+
         self.c_plugin_inst.error_code = 'CODE11'
         raise NameError('Presumable eventual consistency problem.')
 
@@ -665,13 +667,13 @@ class PluginInstanceManager(object):
         logger.info(f"Setting output folder's permissions for job {job_id} ...")
 
         for group in self.c_plugin_inst.feed.shared_groups.all():
-            self.c_plugin_inst.output_folder.grant_group_permission(group, 'w')
+            self.c_plugin_inst.output_folder.parent.grant_group_permission(group, 'w')
 
         for user in self.c_plugin_inst.feed.shared_users.all():
-            self.c_plugin_inst.output_folder.grant_user_permission(user, 'w')
+            self.c_plugin_inst.output_folder.parent.grant_user_permission(user, 'w')
 
         if self.c_plugin_inst.feed.public:
-            self.c_plugin_inst.output_folder.grant_public_access()
+            self.c_plugin_inst.output_folder.parent.grant_public_access()
 
         logger.info(f"Saving job {job_id} DB status as '{self.c_plugin_inst.status}'")
         self.c_plugin_inst.end_date = timezone.now()
