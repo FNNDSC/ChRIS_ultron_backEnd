@@ -5,7 +5,7 @@ See https://chrisproject.org/docs/oxidicom/lonk
 """
 import asyncio
 import enum
-from sys import byteorder
+import logging
 from typing import (
     Self,
     Callable,
@@ -20,6 +20,8 @@ import nats
 from nats import NATS
 from nats.aio.subscription import Subscription
 from nats.aio.msg import Msg
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionRequest(TypedDict):
@@ -79,7 +81,7 @@ class LonkWsSubscription(TypedDict):
     https://chrisproject.org/docs/oxidicom/lonk-ws#lonk-ws-subscription
     """
 
-    subscription: Literal['subscribed', 'error']
+    subscribed: bool
 
 
 LonkMessageData = LonkProgress | LonkError | LonkDone | LonkWsSubscription
@@ -202,7 +204,9 @@ def _serialize_to_lonkws(payload: bytes) -> LonkMessageData:
             ndicom = int.from_bytes(data, 'little', signed=False)
             return LonkProgress(ndicom=ndicom)
         case LonkMagicByte.ERROR.value:
-            error = data.decode(encoding='utf-8')
+            msg = data.decode(encoding='utf-8')
+            logger.error(f'Error from oxidicom: {msg}')
+            error = 'oxidicom reported an error, check logs for details.'
             return LonkError(error=error)
         case _:
             hexstr = ' '.join(hex(b) for b in payload)

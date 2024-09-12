@@ -57,7 +57,7 @@ class PACSFileProgressTests(TransactionTestCase):
         self.assertEqual(
             await communicator.receive_json_from(),
             Lonk(
-                message=LonkWsSubscription(subscription='subscribed'),
+                message=LonkWsSubscription(subscribed=True),
                 **series1,
             ),
         )
@@ -69,7 +69,7 @@ class PACSFileProgressTests(TransactionTestCase):
         self.assertEqual(
             await communicator.receive_json_from(),
             Lonk(
-                message=LonkWsSubscription(subscription='subscribed'),
+                message=LonkWsSubscription(subscribed=True),
                 **series2,
             ),
         )
@@ -86,9 +86,10 @@ class PACSFileProgressTests(TransactionTestCase):
         )
 
         await oxidicom.send_error(error='stuck in chimney', **series2)
+        expected = 'oxidicom reported an error, check logs for details.'
         self.assertEqual(
             await communicator.receive_json_from(),
-            Lonk(message=LonkError(error='stuck in chimney'), **series2),
+            Lonk(message=LonkError(error=expected), **series2),
         )
 
         await oxidicom.send_progress(ndicom=192, **series1)
