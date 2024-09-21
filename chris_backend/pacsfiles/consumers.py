@@ -9,6 +9,7 @@ from pacsfiles.lonk import (
     validate_subscription,
     LonkWsSubscription,
     Lonk,
+    validate_unsubscription,
 )
 from pacsfiles.permissions import IsChrisOrIsPACSUserReadOnly
 
@@ -37,6 +38,9 @@ class PACSFileProgress(AsyncJsonWebsocketConsumer):
                 content['pacs_name'], content['SeriesInstanceUID']
             )
             return
+        if validate_unsubscription(content):
+            await self._unsubscribe_all()
+            return
         await self.close(code=400, reason='Invalid subscription')
 
     async def _subscribe(self, pacs_name: str, series_instance_uid: str):
@@ -60,6 +64,17 @@ class PACSFileProgress(AsyncJsonWebsocketConsumer):
                 message=LonkWsSubscription(subscribed=False),
             )
             await self.send_json(response)
+            await self.close(code=500)
+            raise e
+
+    async def _unsubscribe_all(self):
+        """
+        Unsubscribe from *all* series notifications.
+        """
+        try:
+            await self.client.unsubscribe_all()
+            await self.send_json({'message': {'subscribed': False}})
+        except Exception as e:
             await self.close(code=500)
             raise e
 
