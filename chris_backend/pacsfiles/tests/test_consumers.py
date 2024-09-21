@@ -20,6 +20,7 @@ from pacsfiles.lonk import (
     LonkProgress,
     LonkDone,
     LonkError,
+    UnsubscriptionRequest,
 )
 from pacsfiles.consumers import PACSFileProgress
 from pacsfiles.tests.mocks import Mockidicom
@@ -39,15 +40,7 @@ class PACSFileProgressTests(TransactionTestCase):
 
     @tag('integration')
     async def test_lonk_ws(self):
-        token = await self._get_download_token()
-        app = TokenQsAuthMiddleware(PACSFileProgress.as_asgi())
-        communicator = WebsocketCommunicator(
-            app, f'v1/pacs/ws/?token={token.token}'
-        )
-        connected, subprotocol = await communicator.connect()
-        assert connected
-
-        oxidicom: Mockidicom = await Mockidicom.connect(settings.NATS_ADDRESS)
+        communicator, oxidicom = await self.connect()
 
         series1 = {'pacs_name': 'MyPACS', 'SeriesInstanceUID': '1.234.567890'}
         subscription_request = SubscriptionRequest(
@@ -102,6 +95,74 @@ class PACSFileProgressTests(TransactionTestCase):
             await communicator.receive_json_from(),
             Lonk(message=LonkDone(done=True), **series1),
         )
+
+    @tag('integration')
+    async def test_unsubscribe(self):
+        """
+        https://chrisproject.org/docs/oxidicom/lonk-ws#unsubscribe
+        """
+        communicator, oxidicom = await self.connect()
+
+        series1 = {
+            'pacs_name': 'MyPACSUnsub',
+            'SeriesInstanceUID': '1.234.567890',
+        }
+        subscription_request = SubscriptionRequest(
+            action='subscribe', **series1
+        )
+        await communicator.send_json_to(subscription_request)
+        self.assertEqual(
+            await communicator.receive_json_from(),
+            Lonk(
+                message=LonkWsSubscription(subscribed=True),
+                **series1,
+            ),
+        )
+
+        unsubscription_request = UnsubscriptionRequest(action='unsubscribe')
+        await communicator.send_json_to(unsubscription_request)
+        self.assertEqual(
+            await communicator.receive_json_from(),
+            {'message': {'subscribed': False}},
+        )
+
+        series2 = {
+            'pacs_name': 'MyPACSUnsub',
+            'SeriesInstanceUID': '5.678.90123',
+        }
+        subscription_request = SubscriptionRequest(
+            action='subscribe', **series2
+        )
+        await communicator.send_json_to(subscription_request)
+        self.assertEqual(
+            await communicator.receive_json_from(),
+            Lonk(
+                message=LonkWsSubscription(subscribed=True),
+                **series2,
+            ),
+        )
+
+        await oxidicom.send_progress(ndicom=1, **series1)
+        await oxidicom.send_progress(ndicom=2, **series2)
+        self.assertEqual(
+            await communicator.receive_json_from(),
+            Lonk(
+                message=LonkProgress(ndicom=2),
+                **series2,  # unsubscribed from series1, should not be a message for it
+            ),
+        )
+
+    async def connect(self) -> tuple[WebsocketCommunicator, Mockidicom]:
+        token = await self._get_download_token()
+        app = TokenQsAuthMiddleware(PACSFileProgress.as_asgi())
+        communicator = WebsocketCommunicator(
+            app, f'v1/pacs/ws/?token={token.token}'
+        )
+        connected, subprotocol = await communicator.connect()
+        assert connected
+
+        oxidicom: Mockidicom = await Mockidicom.connect(settings.NATS_ADDRESS)
+        return communicator, oxidicom
 
     async def test_unauthenticated_not_connected(self):
         app = TokenQsAuthMiddleware(PACSFileProgress.as_asgi())

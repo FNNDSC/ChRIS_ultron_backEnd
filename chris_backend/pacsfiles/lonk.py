@@ -34,6 +34,14 @@ class SubscriptionRequest(TypedDict):
     action: Literal['subscribe']
 
 
+class UnsubscriptionRequest(TypedDict):
+    """
+    A request to unsubscribe from *all* series notifications.
+    """
+
+    action: Literal['unsubscribe']
+
+
 def validate_subscription(data: Any) -> TypeGuard[SubscriptionRequest]:
     if not isinstance(data, dict):
         return False
@@ -42,6 +50,12 @@ def validate_subscription(data: Any) -> TypeGuard[SubscriptionRequest]:
         and isinstance(data.get('SeriesInstanceUID', None), str)
         and isinstance(data.get('pacs_name', None), str)
     )
+
+
+def validate_unsubscription(data: Any) -> TypeGuard[UnsubscriptionRequest]:
+    if not isinstance(data, dict):
+        return False
+    return data.get('action', None) == 'unsubscribe'
 
 
 class LonkProgress(TypedDict):
@@ -114,7 +128,7 @@ class LonkClient:
 
     def __init__(self, nc: NATS):
         self._nc = nc
-        self._subscriptions: list[Subscription] = []
+        self._subscriptions: dict[str, Subscription] = {}
 
     @classmethod
     async def connect(cls, servers: str | list[str]) -> Self:
@@ -127,13 +141,23 @@ class LonkClient:
         cb: Callable[[Lonk], Awaitable[None]],
     ):
         subject = subject_of(pacs_name, series_instance_uid)
+        if (
+            subscription := self._subscriptions.get(subject, None)
+        ) is not None:
+            return subscription  # already subscribed
         cb = _curry_message2json(pacs_name, series_instance_uid, cb)
         subscription = await self._nc.subscribe(subject, cb=cb)
-        self._subscriptions.append(subscription)
+        self._subscriptions[subscription.subject] = subscription
         return subscription
 
+    async def unsubscribe_all(self):
+        await asyncio.gather(
+            *(s.unsubscribe() for s in self._subscriptions.values())
+        )
+        self._subscriptions = {}
+
     async def close(self):
-        await asyncio.gather(*(s.unsubscribe() for s in self._subscriptions))
+        await self.unsubscribe_all()
         await self._nc.close()
 
 
