@@ -42,8 +42,11 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
         folder_path = os.path.dirname(upload_path)
         owner = validated_data['owner']
 
-        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                               owner=owner)
+        try:
+            parent_folder = ChrisFolder.objects.get(path=folder_path)
+        except ChrisFolder.DoesNotExist:
+            parent_folder = ChrisFolder.objects.create(path=folder_path, owner=owner)
+
         validated_data['parent_folder'] = parent_folder
         user_file = UserFile(**validated_data)
         user_file.fname.name = upload_path
@@ -74,8 +77,12 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
             folder_path = os.path.dirname(upload_path)
             owner = instance.owner
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                                   owner=owner)
+
+            try:
+                parent_folder = ChrisFolder.objects.get(path=folder_path)
+            except ChrisFolder.DoesNotExist:
+                parent_folder = ChrisFolder.objects.create(path=folder_path, owner=owner)
+
             instance.parent_folder = parent_folder
             instance.fname.name = upload_path
 

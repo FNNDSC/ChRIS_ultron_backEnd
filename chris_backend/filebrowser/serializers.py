@@ -43,8 +43,11 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         parent_path = os.path.dirname(path)
         owner = validated_data['owner']
 
-        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=parent_path,
-                                                               owner=owner)
+        try:
+            parent_folder = ChrisFolder.objects.get(path=parent_path)
+        except ChrisFolder.DoesNotExist:
+            parent_folder = ChrisFolder.objects.create(path=parent_path, owner=owner)
+
         validated_data['parent'] = parent_folder
         return super(FileBrowserFolderSerializer, self).create(validated_data)
 
