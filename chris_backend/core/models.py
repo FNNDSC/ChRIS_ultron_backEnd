@@ -141,8 +141,11 @@ class ChrisFolder(models.Model):
 
         if new_parent_path != os.path.dirname(path):
             # parent folder has changed
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_parent_path,
-                                                                   owner=self.owner)
+            try:
+                parent_folder = ChrisFolder.objects.get(path=new_parent_path)
+            except ChrisFolder.DoesNotExist:
+                parent_folder = ChrisFolder.objects.create(path=new_parent_path,
+                                                           owner=self.owner)
             self.parent_folder = parent_folder
             self.save()
 
@@ -551,8 +554,11 @@ class ChrisFile(models.Model):
         new_folder_path = os.path.dirname(new_path)
 
         if new_folder_path != old_folder_path:  # parent folder has changed
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_folder_path,
-                                                                   owner=self.owner)
+            try:
+                parent_folder = ChrisFolder.objects.get(path=new_folder_path)
+            except ChrisFolder.DoesNotExist:
+                parent_folder = ChrisFolder.objects.create(path=new_folder_path,
+                                                           owner=self.owner)
             self.parent_folder = parent_folder
 
         self.fname.name = new_path
@@ -831,8 +837,11 @@ class ChrisLinkFile(models.Model):
         new_folder_path = os.path.dirname(new_path)
 
         if new_folder_path != old_folder_path:  # parent folder has changed
-            (parent_folder, _) = ChrisFolder.objects.get_or_create(path=new_folder_path,
-                                                                   owner=self.owner)
+            try:
+                parent_folder = ChrisFolder.objects.get(path=new_folder_path)
+            except ChrisFolder.DoesNotExist:
+                parent_folder = ChrisFolder.objects.create(path=new_folder_path,
+                                                           owner=self.owner)
             self.parent_folder = parent_folder
 
         self.fname.name = new_path
