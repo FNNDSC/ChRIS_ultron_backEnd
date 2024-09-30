@@ -31,6 +31,7 @@ services:
     environment: &CHRIS_ENV
       DJANGO_SETTINGS_MODULE: "config.settings.local"
       STORAGE_ENV: "fslink"
+      SPECTACULAR_SPLIT_REQUEST: "true"
     user: ${UID:?Please run me using just.}:${GID:?Please run me using just.}
     profiles:
       - cube
@@ -191,6 +192,20 @@ services:
     user: root
     command: chmod 777 /data
     restart: "no"
+
+  openapi-generator:
+    image: docker.io/openapitools/openapi-generator-cli:v7.8.0
+    volumes:
+      - ${OPENAPI_GENERATOR_OUTPUT:-./clients}:/out:rw
+    user: ${UID:?Please run me using just.}:${GID:?Please run me using just.}
+    profiles:
+      - cube
+      - tools
+    networks:
+      - local
+    depends_on:
+      chris:
+        condition: service_healthy
 
 volumes:
   chris_files:

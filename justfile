@@ -152,3 +152,9 @@ prefer docker_or_podman:
 [group('(5) docker/podman preference')]
 unset-preference:
     rm -f .preference
+
+[group('(6) OpenAPI generator')]
+openapi-generate output +options:
+    mkdir -vp {{output}}
+    @env OPENAPI_GENERATOR_OUTPUT="$(realpath {{output}})" just docker-compose run --rm openapi-generator \
+        generate {{ options }} -i http://chris:8000/schema/ -o /out
