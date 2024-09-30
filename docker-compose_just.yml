@@ -22,7 +22,7 @@ services:
       context: .
       args:
         ENVIRONMENT: local
-    command: python manage.py runserver 0.0.0.0:8000
+    command: bash -c 'python manage.py runserver 0.0.0.0:8000 2> >(grep -vF "HTTP GET /api/v1/users/ 200" 1>&2)'
     ports:
       - "8000:8000"
     volumes: &CHRIS_VOLUMES
@@ -47,6 +47,12 @@ services:
       local:
         aliases:
           - chrisdev.local  # hard-coded in chrisomatic/*.yml
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "curl -f http://localhost:8000/api/v1/users/ || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
   worker-mains:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     command: celery -A core worker -c 4 -l info -Q main1,main2
