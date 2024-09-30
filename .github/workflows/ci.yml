@@ -30,10 +30,13 @@ jobs:
 
   build:
     needs: [ test ]
-    if: github.event_name == 'push' || github.event_name == 'release'
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Update __version__.py
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo '__version__ = "${{ github.ref_name }}"' > chris_backend/__version__.py
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
