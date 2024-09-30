@@ -13,6 +13,14 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 
+from environs import Env
+
+from __version__ import __version__
+
+# Environment variables-based secrets
+env = Env()
+env.read_env()  # also read .env file, if it exists
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -32,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'collectionjson',
+    'drf_spectacular',
     'core',
     'feeds',
     'plugins',
@@ -66,7 +75,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'
 }
 
 MIDDLEWARE = [
@@ -163,3 +173,32 @@ STATIC_ROOT = '/opt/app-root/var/staticfiles'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# drf-spectacular OPENAPI SCHEMA SETTINGS
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ChRIS Research Integration System: Ultron BackEnd (CUBE) API',
+    'DESCRIPTION': (
+        'The ChRIS Ultron BackEnd (CUBE) is the core backend API of ChRIS. '
+        'It manages ChRIS users, plugins, pipelines, and the provenance of '
+        'data analyses as ChRIS feeds.'
+    ),
+    'VERSION': __version__,
+    'LICENSE': {
+        'name': 'MIT',
+        'url': 'https://github.com/FNNDSC/ChRIS_ultron_backEnd/blob/master/LICENSE'
+    },
+    'EXTERNAL_DOCS': {
+        'url': 'https://chrisproject.org/docs'
+    },
+    'CONTACT': {
+        'name': 'Fetal-Neonatal Neuroimaging Developmental Science Center',
+        'url': 'https://chrisproject.org',
+        'email': 'dev@babymri.org'
+    },
+    'SERVE_INCLUDE_SCHEMA': True,
+    'COMPONENT_SPLIT_REQUEST': env.bool("SPECTACULAR_SPLIT_REQUEST", False),
+
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+    # more settings found at:
+    # https://drf-spectacular.readthedocs.io/en/latest/settings.html
+}
