@@ -1,7 +1,7 @@
-
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.renderers import JSONRenderer
+from django.conf import settings
 
 from collectionjson.renderers import CollectionJsonRenderer
 
@@ -40,7 +40,9 @@ class ResponseMiddleware(object):
     def __call__(self, request):
         return self.get_response(request)
 
-    def process_exception(self, request, exception):
+    def process_exception(self, request, exception: Exception):
+        if settings.DEBUG:
+            raise exception
         print(exception, flush=True)
         mime = request.META.get('HTTP_ACCEPT')
         if mime != 'text/html':
