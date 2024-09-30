@@ -197,6 +197,9 @@ SPECTACULAR_SETTINGS = {
     },
     'SERVE_INCLUDE_SCHEMA': True,
     'COMPONENT_SPLIT_REQUEST': env.bool("SPECTACULAR_SPLIT_REQUEST", False),
+    'PREPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.preprocess_exclude_path_format'
+    ],
 
     'SCHEMA_PATH_PREFIX': '/api/v1/',
     # more settings found at:
