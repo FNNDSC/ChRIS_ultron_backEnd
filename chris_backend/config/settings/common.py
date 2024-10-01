@@ -198,7 +198,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': True,
     'COMPONENT_SPLIT_REQUEST': env.bool("SPECTACULAR_SPLIT_REQUEST", False),
     'PREPROCESSING_HOOKS': [
-        'drf_spectacular.hooks.preprocess_exclude_path_format'
+        'drf_spectacular.hooks.preprocess_exclude_path_format',
+    ],
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'collectionjson.spectacular_hooks.postprocess_remove_collectionjson'
     ],
 
     'SCHEMA_PATH_PREFIX': '/api/v1/',
