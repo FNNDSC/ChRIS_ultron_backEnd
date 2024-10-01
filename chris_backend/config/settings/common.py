@@ -202,7 +202,8 @@ SPECTACULAR_SETTINGS = {
     ],
     'POSTPROCESSING_HOOKS': [
         'drf_spectacular.hooks.postprocess_schema_enums',
-        'collectionjson.spectacular_hooks.postprocess_remove_collectionjson'
+        'collectionjson.spectacular_hooks.postprocess_remove_collectionjson',
+        'plugininstances.spectacular_hooks.additionalproperties_for_plugins_instances_create'
     ],
 
     'SCHEMA_PATH_PREFIX': '/api/v1/',
