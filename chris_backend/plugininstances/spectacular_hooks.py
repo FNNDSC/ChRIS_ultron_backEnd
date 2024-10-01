@@ -7,6 +7,14 @@ def additionalproperties_for_plugins_instances_create(result, **_kwargs):
 
     :param result: an OpenAPI specification
     """
-    result['components']['schemas']['PluginInstanceRequest']['additionalProperties'] = {}
+    plugin_instance_request = result['components']['schemas']['PluginInstanceRequest']
+    assert plugin_instance_request['type'] == 'object'
+    plugin_instance_request['additionalProperties'] = {}
+    plugin_instance_request['properties']['previous_id'] = {
+        'type': 'integer',
+        'minimum': 1,
+        'maximum': 2147483647,
+        'nullable': True
+    }
     return result
 
