@@ -7,10 +7,9 @@ from django.contrib.auth.models import Group
 from django.conf import settings
 from rest_framework import serializers
 
-from collectionjson.fields import ItemLinkField
 from core.models import ChrisFolder
-from core.utils import get_file_resource_link
 from core.storage import connect_storage
+from core.serializers import file_serializer
 
 from .models import PACS, PACSSeries, PACSFile
 
@@ -168,22 +167,10 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
         return data
 
 
+@file_serializer(required=True)
 class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
-    fname = serializers.FileField(use_url=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
-    owner_username = serializers.ReadOnlyField(source='owner.username')
-    file_resource = ItemLinkField('get_file_link')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
-                                                        read_only=True)
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = PACSFile
         fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public',
                   'owner_username', 'file_resource', 'parent_folder', 'owner')
-
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)

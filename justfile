@@ -153,8 +153,14 @@ prefer docker_or_podman:
 unset-preference:
     rm -f .preference
 
-[group('(6) OpenAPI generator')]
-openapi-generate output +options:
-    mkdir -vp {{output}}
-    @env OPENAPI_GENERATOR_OUTPUT="$(realpath {{output}})" just docker-compose run --rm openapi-generator \
-        generate {{ options }} -i http://chris:8000/schema/ -o /out
+# Print the OpenAPI schema via drf-spectacular.
+[group('(3) development')]
+openapi:
+    @just run python manage.py spectacular --color
+
+# Print the OpenAPI schema using drf-spectacular, using workarounds for more
+# reliable client generation.
+[group('(3) development')]
+openapi-split:
+    env SPECTACULAR_SPLIT_REQUEST=true just openapi
+

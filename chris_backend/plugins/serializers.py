@@ -221,7 +221,7 @@ class PluginParameterSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError({'non_field_errors': [error_msg]})
         return data
 
-    def get_default(self, obj):
+    def get_default(self, obj) -> str | int | float | bool | None:
         """
         Overriden to get the default parameter value regardless of type.
         """

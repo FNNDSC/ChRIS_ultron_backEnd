@@ -4,10 +4,12 @@ import pathlib
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from collectionjson.fields import ItemLinkField
 from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
-from plugins.models import TYPES, Plugin
+from plugins.enums import TYPES
+from plugins.models import Plugin
 
 from .models import PluginInstance, PluginInstanceSplit
 from .models import FloatParameter, IntParameter, BoolParameter
@@ -373,7 +375,8 @@ class PathParameterSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the request user as a keyword argument at object creation.
         """
-        self.user = kwargs.pop('user')
+        if 'user' in kwargs:
+            self.user = kwargs.pop('user')
         super(PathParameterSerializer, self).__init__(*args, **kwargs)
 
     def validate_value(self, value):
@@ -401,7 +404,8 @@ class UnextpathParameterSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to get the request user as a keyword argument at object creation.
         """
-        self.user = kwargs.pop('user')
+        if 'user' in kwargs:
+            self.user = kwargs.pop('user')
         super(UnextpathParameterSerializer, self).__init__(*args, **kwargs)
 
     def validate_value(self, value):
@@ -427,6 +431,7 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'param_name', 'value', 'type', 'plugin_inst',
                   'plugin_param')
 
+    @extend_schema_field(OpenApiTypes.URI)
     def _get_url(self, obj):
         """
         Custom method to get the correct url for the serialized object regardless of
@@ -437,7 +442,7 @@ class GenericParameterSerializer(serializers.HyperlinkedModelSerializer):
         view_name = TYPES[obj.plugin_param.type] + 'parameter-detail'
         return reverse(view_name, request=request, kwargs={"pk": obj.id})
 
-    def get_value(self, obj):
+    def get_value(self, obj) -> str | int | float | bool:
         """
         Overriden to get the default parameter value regardless of its type.
         """

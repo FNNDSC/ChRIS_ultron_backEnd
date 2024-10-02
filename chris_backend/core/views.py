@@ -76,6 +76,8 @@ class FileDownloadTokenList(generics.ListCreateAPIView):
         Overriden to return a custom queryset that is only comprised by the file download
         tokens owned by the currently authenticated user.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FileDownloadToken.objects.none()
         user = self.request.user
         # if the user is chris then return all the file download tokens in the system
         if user.username == 'chris':
@@ -98,6 +100,8 @@ class FileDownloadTokenListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the file download
         tokens owned by the currently authenticated user.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FileDownloadToken.objects.none()
         user = self.request.user
         # if the user is chris then return all the file download tokens in the system
         if user.username == 'chris':

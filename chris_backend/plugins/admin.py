@@ -15,7 +15,8 @@ from rest_framework.reverse import reverse
 
 from collectionjson import services
 
-from .models import PluginMeta, Plugin, ComputeResource, TYPES
+from .enums import TYPES
+from .models import PluginMeta, Plugin, ComputeResource
 from .fields import CPUInt, MemoryInt
 from .serializers import (ComputeResourceSerializer, PluginMetaSerializer,
                           PluginSerializer, PluginParameterSerializer,

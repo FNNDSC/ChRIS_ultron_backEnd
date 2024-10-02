@@ -16,6 +16,7 @@ from pathlib import Path
 from environs import Env
 
 from __version__ import __version__
+from plugins.enums import PLUGIN_TYPE_CHOICES, TYPE_CHOICES
 
 # Environment variables-based secrets
 env = Env()
@@ -196,6 +197,10 @@ SPECTACULAR_SETTINGS = {
         'email': 'dev@babymri.org'
     },
     'SERVE_INCLUDE_SCHEMA': True,
+    'ENUM_NAME_OVERRIDES': {
+        'PluginType': PLUGIN_TYPE_CHOICES,
+        'PluginParameterType': TYPE_CHOICES,
+    },
     'COMPONENT_SPLIT_REQUEST': env.bool("SPECTACULAR_SPLIT_REQUEST", False),
     'PREPROCESSING_HOOKS': [
         'drf_spectacular.hooks.preprocess_exclude_path_format',
@@ -203,7 +208,7 @@ SPECTACULAR_SETTINGS = {
     'POSTPROCESSING_HOOKS': [
         'drf_spectacular.hooks.postprocess_schema_enums',
         'collectionjson.spectacular_hooks.postprocess_remove_collectionjson',
-        'plugininstances.spectacular_hooks.additionalproperties_for_plugins_instances_create'
+        'plugininstances.spectacular_hooks.additionalproperties_for_plugins_instances_create',
     ],
 
     'SCHEMA_PATH_PREFIX': '/api/v1/',

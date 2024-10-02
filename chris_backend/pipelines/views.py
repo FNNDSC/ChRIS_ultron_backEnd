@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
 
 from core.renderers import BinaryFileRenderer
 from collectionjson import services
@@ -195,6 +196,7 @@ class PipelineSourceFileResource(generics.GenericAPIView):
     queryset = PipelineSourceFile.get_base_queryset()
     renderer_classes = (BinaryFileRenderer,)
 
+    @extend_schema(responses=OpenApiResponse(OpenApiTypes.BINARY))
     def get(self, request, *args, **kwargs):
         """
         Overriden to be able to make a GET request to an actual file resource.

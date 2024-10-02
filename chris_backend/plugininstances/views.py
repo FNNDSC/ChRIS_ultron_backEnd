@@ -3,6 +3,7 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError
+from drf_spectacular.utils import extend_schema_view, extend_schema
 
 from collectionjson import services
 from plugins.models import Plugin
@@ -20,6 +21,9 @@ from .tasks import run_plugin_instance, cancel_plugin_instance
 from .utils import run_if_ready
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id='plugins_instances_list')
+)
 class PluginInstanceList(generics.ListCreateAPIView):
     """
     A view for the collection of plugin instances.
@@ -118,6 +122,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
         return self.filter_queryset(plugin.instances.all())
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id='all_plugins_instances_list')
+)
 class AllPluginInstanceList(generics.ListAPIView):
     """
     A view for the collection of all plugin instances.

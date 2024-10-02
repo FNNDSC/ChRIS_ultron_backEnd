@@ -4,6 +4,7 @@ from collections import deque
 
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from collectionjson import services
 from pipelines.models import Pipeline
@@ -17,7 +18,9 @@ from .models import Workflow, WorkflowFilter
 from .permissions import IsOwnerOrChrisOrReadOnly
 from .serializers import WorkflowSerializer
 
-
+@extend_schema_view(
+    get=extend_schema(operation_id="workflows_list")
+)
 class WorkflowList(generics.ListCreateAPIView):
     """
     A view for the collection of pipeline-specific workflows.
@@ -134,6 +137,9 @@ class WorkflowList(generics.ListCreateAPIView):
         return plg_inst
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="all_workflows_list")
+)
 class AllWorkflowList(generics.ListAPIView):
     """
     A view for the collection of all workflows.

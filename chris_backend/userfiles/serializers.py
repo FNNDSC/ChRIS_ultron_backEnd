@@ -4,27 +4,20 @@ import os
 from django.conf import settings
 from rest_framework import serializers
 
-from collectionjson.fields import ItemLinkField
-from core.utils import get_file_resource_link
 from core.models import ChrisFolder
 from core.storage import connect_storage
+from core.serializers import file_serializer
 
 from .models import UserFile
 
 
+@file_serializer(required=False)
 class UserFileSerializer(serializers.HyperlinkedModelSerializer):
-    fname = serializers.FileField(use_url=False, required=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
     upload_path = serializers.CharField(max_length=1024, write_only=True, required=False)
-    owner_username = serializers.ReadOnlyField(source='owner.username')
-    file_resource = ItemLinkField('get_file_link')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
-                                                        read_only=True)
     group_permissions = serializers.HyperlinkedIdentityField(
         view_name='filegrouppermission-list')
     user_permissions = serializers.HyperlinkedIdentityField(
         view_name='fileuserpermission-list')
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = UserFile
@@ -88,12 +81,6 @@ class UserFileSerializer(serializers.HyperlinkedModelSerializer):
 
         instance.save()
         return instance
-
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)
 
     def validate_upload_path(self, upload_path):
         """
