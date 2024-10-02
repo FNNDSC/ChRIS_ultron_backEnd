@@ -92,6 +92,7 @@ jobs:
     steps:
       - uses: taiki-e/install-action@just
       - uses: actions/checkout@v4
+      - run: just prefer docker
       - name: Generate OpenAPI schema (correct)
         run: just openapi 2> spectacular.log > schema.yaml || (cat spectacular.log; exit 1)
       - name: Generate OpenAPI schema (split)
