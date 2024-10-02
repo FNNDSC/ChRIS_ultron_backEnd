@@ -112,8 +112,8 @@ jobs:
               exit 1
             fi
           done
-      - name: Clean up
-        run: just nuke
+      - name: Stop services
+        run: just down
 
   draft-release:
     name: Draft GitHub Release
