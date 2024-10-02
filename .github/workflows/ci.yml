@@ -93,9 +93,9 @@ jobs:
       - uses: taiki-e/install-action@just
       - uses: actions/checkout@v4
       - name: Generate OpenAPI schema (correct)
-        run: just openapi 2> spectacular.log > schema.yaml
+        run: just openapi 2> spectacular.log > schema.yaml || (cat spectacular.log; exit 1)
       - name: Generate OpenAPI schema (split)
-        run: just openapi-split 2> spectacular_split.log > schema_split.yaml
+        run: just openapi-split 2> spectacular_split.log > schema_split.yaml || (cat spectacular_split.log; exit 1)
       - name: Upload schema YAML files
         uses: actions/upload-artifact@v4
         with:
@@ -110,6 +110,8 @@ jobs:
               exit 1
             fi
           done
+      - name: Clean up
+        run: just nuke
 
   draft-release:
     name: Draft GitHub Release
