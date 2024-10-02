@@ -132,7 +132,7 @@ jobs:
         with:
           draft: true
           prerelease: ${{ contains( github.ref_name, '-' ) }}
-          files: openapi_schema/*.yaml
+          files: '*.yaml'
           fail_on_unmatched_files: true
           name: CUBE - version ${{ steps.version.outputs.version }}
           generate_release_notes: true
