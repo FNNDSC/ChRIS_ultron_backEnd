@@ -106,7 +106,7 @@ jobs:
       - name: Assert no drf-spectacular errors nor warnings
         run: |
           for f in spectacular*.log; do
-            if grep -qi '(warning|error)' $f;
+            if grep -qi '(warning|error)' $f; then
               cat $f
               exit 1
             fi
