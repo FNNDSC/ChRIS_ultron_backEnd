@@ -7,6 +7,8 @@ def additionalproperties_for_plugins_instances_create(result, **_kwargs):
 
     :param result: an OpenAPI specification
     """
+    if 'PluginInstanceRequest' not in result['components']['schemas']:
+        return result
     plugin_instance_request = result['components']['schemas']['PluginInstanceRequest']
     assert plugin_instance_request['type'] == 'object'
     plugin_instance_request['additionalProperties'] = {}
@@ -17,4 +19,3 @@ def additionalproperties_for_plugins_instances_create(result, **_kwargs):
         'nullable': True
     }
     return result
-

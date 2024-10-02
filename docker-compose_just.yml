@@ -31,7 +31,7 @@ services:
     environment: &CHRIS_ENV
       DJANGO_SETTINGS_MODULE: "config.settings.local"
       STORAGE_ENV: "fslink"
-      SPECTACULAR_SPLIT_REQUEST: "true"
+      SPECTACULAR_SPLIT_REQUEST: "${SPECTACULAR_SPLIT_REQUEST-false}"
     user: ${UID:?Please run me using just.}:${GID:?Please run me using just.}
     profiles:
       - cube

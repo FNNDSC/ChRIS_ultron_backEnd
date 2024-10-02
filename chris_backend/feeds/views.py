@@ -3,6 +3,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from collectionjson import services
 from plugininstances.serializers import PluginInstanceSerializer
@@ -39,6 +40,9 @@ class NoteDetail(generics.RetrieveUpdateAPIView):
         return services.append_collection_template(response, template_data)
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="tags_list")
+)
 class TagList(generics.ListCreateAPIView):
     """
     A view for the collection of tags.
@@ -98,6 +102,9 @@ class TagDetail(generics.RetrieveUpdateDestroyAPIView):
         return services.append_collection_template(response, template_data)
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="feed_tags_list")
+)
 class FeedTagList(generics.ListAPIView):
     """
     A view for a feed-specific collection of user-specific tags.
@@ -487,6 +494,8 @@ class FeedGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the feed-specific
         group permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FeedGroupPermission.objects.none()
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
         return FeedGroupPermission.objects.filter(feed=feed)
 
@@ -582,6 +591,8 @@ class FeedUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the feed-specific
         user permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FeedUserPermission.objects.none()
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
         return FeedUserPermission.objects.filter(feed=feed)
 
@@ -678,6 +689,8 @@ class CommentListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the feed-specific
         comments.
         """
+        if getattr(self, 'swagger_fake_view', False):
+            return Feed.comments.field.model.objects.none()
         feed = get_object_or_404(Feed, pk=self.kwargs['pk'])
         return feed.comments.all()
 
@@ -702,6 +715,9 @@ class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
         return services.append_collection_template(response, template_data)
 
 
+# @extend_schema_view(
+#     get=extend_schema(operation_id='feed_plugins_instances_list')
+# )
 class FeedPluginInstanceList(generics.ListAPIView):
     """
     A view for the collection of feed-specific plugin instances.

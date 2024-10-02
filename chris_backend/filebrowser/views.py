@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
 
 from core.models import (ChrisFolder, FolderGroupPermission,
                          FolderGroupPermissionFilter, FolderUserPermission,
@@ -76,6 +77,8 @@ class FileBrowserFolderList(generics.ListCreateAPIView):
         Overriden to return a custom queryset that is only comprised by the root
         folder (empty path).
         """
+        if getattr(self, "swagger_fake_view", False):
+            return ChrisFolder.objects.none()
         user = self.request.user
         pk_dict = {'path': ''}
 
@@ -101,6 +104,9 @@ class FileBrowserFolderListQuerySearch(generics.ListAPIView):
         """
         Overriden to return a custom queryset of at most one element.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return ChrisFolder.objects.none()
+
         user = self.request.user
         id = self.request.GET.get('id')
         pk_dict = {'id': id}
@@ -244,6 +250,8 @@ class FileBrowserFolderGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         group permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FolderGroupPermission.objects.none()
         folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
         return FolderGroupPermission.objects.filter(folder=folder)
 
@@ -357,6 +365,8 @@ class FileBrowserFolderUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the folder-specific
         user permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FolderUserPermission.objects.none()
         folder = get_object_or_404(ChrisFolder, pk=self.kwargs['pk'])
         return FolderUserPermission.objects.filter(folder=folder)
 
@@ -476,6 +486,7 @@ class FileBrowserFileResource(generics.GenericAPIView):
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
+    @extend_schema(responses=OpenApiResponse(OpenApiTypes.BINARY))
     def get(self, request, *args, **kwargs):
         """
         Overriden to be able to make a GET request to an actual file resource.
@@ -547,6 +558,8 @@ class FileBrowserFileGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the file-specific
         group permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FileGroupPermission.objects.none()
         f = get_object_or_404(ChrisFile, pk=self.kwargs['pk'])
         return FileGroupPermission.objects.filter(file=f)
 
@@ -660,6 +673,8 @@ class FileBrowserFileUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the file-specific
         user permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return FileUserPermission.objects.none()
         f = get_object_or_404(ChrisFile, pk=self.kwargs['pk'])
         return FileUserPermission.objects.filter(file=f)
 
@@ -799,6 +814,7 @@ class FileBrowserLinkFileResource(generics.GenericAPIView):
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
+    @extend_schema(responses=OpenApiResponse(OpenApiTypes.BINARY))
     def get(self, request, *args, **kwargs):
         """
         Overriden to be able to make a GET request to an actual file resource.
@@ -870,6 +886,8 @@ class FileBrowserLinkFileGroupPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the link file-specific
         group permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return LinkFileGroupPermission.objects.none()
         lf = get_object_or_404(ChrisLinkFile, pk=self.kwargs['pk'])
         return LinkFileGroupPermission.objects.filter(link_file=lf)
 
@@ -983,6 +1001,8 @@ class FileBrowserLinkFileUserPermissionListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the link file-specific
         user permissions.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return LinkFileUserPermission.objects.none()
         lf = get_object_or_404(ChrisLinkFile, pk=self.kwargs['pk'])
         return LinkFileUserPermission.objects.filter(link_file=lf)
 

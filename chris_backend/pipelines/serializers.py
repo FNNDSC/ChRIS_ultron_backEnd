@@ -9,12 +9,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from core.graph import Graph
-from core.utils import get_file_resource_link
 from core.models import ChrisFolder
+from core.serializers import file_serializer
 from collectionjson.fields import ItemLinkField
-from plugins.models import Plugin, TYPES
+from plugins.enums import TYPES
+from plugins.models import Plugin
 from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 
@@ -475,38 +477,26 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'name', 'locked', 'authors', 'category', 'description',
                   'plugin_tree')
 
-    def get_plugin_tree(self, obj):
+    def get_plugin_tree(self, obj) -> str:
         """
         Overriden to get the plugin_tree JSON string.
         """
         return json.dumps(obj.get_plugin_tree())
 
 
+@file_serializer(required=True)
 class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
-    fname = serializers.FileField(use_url=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
     ftype = serializers.ReadOnlyField(source='meta.type')
     type = serializers.CharField(write_only=True, required=False)
     uploader_username = serializers.ReadOnlyField(source='meta.uploader.username')
-    owner_username = serializers.ReadOnlyField(source='owner.username')
     pipeline_id = serializers.ReadOnlyField(source='meta.pipeline.id')
     pipeline_name = serializers.ReadOnlyField(source='meta.pipeline.name')
-    file_resource = ItemLinkField('get_file_link')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
-                                                        read_only=True)
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = PipelineSourceFile
         fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public', 'type',
                   'ftype', 'uploader_username', 'owner_username', 'pipeline_id',
                   'pipeline_name', 'file_resource', 'parent_folder', 'owner')
-
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)
 
     def create(self, validated_data):
         """
@@ -755,6 +745,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
+    @extend_schema_field(OpenApiTypes.URI)
     def _get_url(self, obj):
         """
         Custom method to get the correct url for the serialized object regardless of
@@ -766,7 +757,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
         view_name = 'defaultpiping' + TYPES[obj.plugin_param.type] + 'parameter-detail'
         return reverse(view_name, request=request, kwargs={"pk": obj.id})
 
-    def get_value(self, obj):
+    def get_value(self, obj) -> str | int | float | bool:
         """
         Overriden to get the default parameter value regardless of its type.
         """

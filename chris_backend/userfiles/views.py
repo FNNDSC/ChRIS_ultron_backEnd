@@ -4,6 +4,7 @@ from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -26,6 +27,9 @@ class UserFileList(generics.ListCreateAPIView):
         Overriden to return a custom queryset that is only comprised by the files
         owned by the currently authenticated user.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return UserFile.objects.none()
+
         user = self.request.user
 
         # if the user is chris then return all the files in the user space
@@ -69,6 +73,8 @@ class UserFileListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the files
         owned by the currently authenticated user.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return UserFile.objects.none()
         user = self.request.user
 
         # if the user is chris then return all the files in the user space
@@ -115,6 +121,7 @@ class UserFileResource(generics.GenericAPIView):
     authentication_classes = (TokenAuthSupportQueryString, BasicAuthentication,
                               SessionAuthentication)
 
+    @extend_schema(responses=OpenApiResponse(OpenApiTypes.BINARY))
     def get(self, request, *args, **kwargs):
         """
         Overriden to be able to make a GET request to an actual file resource.

@@ -201,6 +201,8 @@ class GroupUserListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is comprised by the group-specific
         group users.
         """
+        if getattr(self, "swagger_fake_view", False):
+            return User.groups.through.objects.none()
         group = get_object_or_404(Group, pk=self.kwargs['pk'])
         return User.groups.through.objects.filter(group=group)
 

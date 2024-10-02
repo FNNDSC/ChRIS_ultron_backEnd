@@ -205,7 +205,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                     {'previous_plugin_inst_id': ["This field is required."]})
         return data
 
-    def get_created_jobs(self, obj):
+    def get_created_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'created' status.
         """
@@ -213,7 +213,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError("Undefined plugin instance execution status: 'created'.")
         return obj.get_plugin_instances_status_count('created')
 
-    def get_waiting_jobs(self, obj):
+    def get_waiting_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'waiting' status.
         """
@@ -222,7 +222,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError(msg)
         return obj.get_plugin_instances_status_count('waiting')
 
-    def get_scheduled_jobs(self, obj):
+    def get_scheduled_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'scheduled' status.
         """
@@ -230,7 +230,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError("Undefined plugin instance execution status: 'scheduled'.")
         return obj.get_plugin_instances_status_count('scheduled')
 
-    def get_started_jobs(self, obj):
+    def get_started_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'started' status.
         """
@@ -238,7 +238,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError("Undefined plugin instance execution status: 'started'.")
         return obj.get_plugin_instances_status_count('started')
 
-    def get_registering_jobs(self, obj):
+    def get_registering_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'registeringFiles' status.
         """
@@ -247,7 +247,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError(msg)
         return obj.get_plugin_instances_status_count('registeringFiles')
 
-    def get_finished_jobs(self, obj):
+    def get_finished_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'finishedSuccessfully' status.
         """
@@ -256,7 +256,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                            "'finishedSuccessfully'.")
         return obj.get_plugin_instances_status_count('finishedSuccessfully')
 
-    def get_errored_jobs(self, obj):
+    def get_errored_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'finishedWithError' status.
         """
@@ -265,7 +265,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                            "'finishedWithError'.")
         return obj.get_plugin_instances_status_count('finishedWithError')
 
-    def get_cancelled_jobs(self, obj):
+    def get_cancelled_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'cancelled' status.
         """

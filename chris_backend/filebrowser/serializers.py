@@ -5,12 +5,13 @@ from django.contrib.auth.models import User, Group
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from collectionjson.fields import ItemLinkField
-from core.utils import get_file_resource_link
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
                          LinkFileGroupPermission, LinkFileUserPermission)
+from core.serializers import file_serializer
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
@@ -293,20 +294,14 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
         return data
 
 
+@file_serializer(required=False)
 class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
     new_file_path = serializers.CharField(max_length=1024, write_only=True,
                                           required=False)
-    fname = serializers.FileField(use_url=False, required=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
-    owner_username = serializers.ReadOnlyField(source='owner.username')
-    file_resource = ItemLinkField('get_file_link')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
-                                                        read_only=True)
     group_permissions = serializers.HyperlinkedIdentityField(
         view_name='filegrouppermission-list')
     user_permissions = serializers.HyperlinkedIdentityField(
         view_name='fileuserpermission-list')
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisFile
@@ -342,12 +337,6 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
             instance.grant_public_access()
             instance.create_public_link()
         return instance
-
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)
 
     def validate_new_file_path(self, new_file_path):
         """
@@ -411,7 +400,7 @@ class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
 class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     grp_name = serializers.CharField(write_only=True, required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
-    file_fname = serializers.ReadOnlyField(source='file.fname.name')
+    file_fname = serializers.SerializerMethodField()
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
     file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
@@ -422,6 +411,9 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
         model = FileGroupPermission
         fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'group_id',
                   'group_name', 'file', 'group', 'grp_name')
+
+    def get_file_fname(self, obj) -> str:
+        return obj.file.fname.name
 
     def create(self, validated_data):
         """
@@ -476,7 +468,7 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
     username = serializers.CharField(write_only=True, min_length=4, max_length=32,
                                      required=False)
     file_id = serializers.ReadOnlyField(source='file.id')
-    file_fname = serializers.ReadOnlyField(source='file.fname.name')
+    file_fname = serializers.SerializerMethodField()
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
     file = serializers.HyperlinkedRelatedField(view_name='chrisfile-detail',
@@ -487,6 +479,9 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
         model = FileUserPermission
         fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'user_id',
                   'user_username', 'file', 'user', 'username')
+
+    def get_file_fname(self, obj) -> str:
+        return obj.file.fname.name
 
     def create(self, validated_data):
         """
@@ -537,23 +532,17 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
         return data
 
 
+@file_serializer(required=False)
 class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
     new_link_file_path = serializers.CharField(max_length=1024, write_only=True,
                                                required=False)
     path = serializers.CharField(max_length=1024, required=False)
-    fname = serializers.FileField(use_url=False, required=False)
-    fsize = serializers.ReadOnlyField(source='fname.size')
-    owner_username = serializers.ReadOnlyField(source='owner.username')
-    file_resource = ItemLinkField('get_file_link')
     linked_folder = ItemLinkField('get_linked_folder_link')
     linked_file = ItemLinkField('get_linked_file_link')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
-                                                        read_only=True)
     group_permissions = serializers.HyperlinkedIdentityField(
         view_name='linkfilegrouppermission-list')
     user_permissions = serializers.HyperlinkedIdentityField(
         view_name='linkfileuserpermission-list')
-    owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     class Meta:
         model = ChrisLinkFile
@@ -591,12 +580,7 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
             instance.create_public_link()
         return instance
 
-    def get_file_link(self, obj):
-        """
-        Custom method to get the hyperlink to the actual file resource.
-        """
-        return get_file_resource_link(self, obj)
-
+    @extend_schema_field(OpenApiTypes.URI)
     def get_linked_folder_link(self, obj):
         """
         Custom method to get the hyperlink to the linked folder if the ChRIS link
@@ -610,6 +594,7 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
         return reverse('chrisfolder-detail', request=request,
                        kwargs={'pk': linked_folder.pk})
 
+    @extend_schema_field(OpenApiTypes.URI)
     def get_linked_file_link(self, obj):
         """
         Custom method to get the hyperlink to the linked file if the ChRIS link
@@ -713,7 +698,7 @@ class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
 class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelSerializer):
     grp_name = serializers.CharField(write_only=True, required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
-    link_file_fname = serializers.ReadOnlyField(source='link_file.fname.name')
+    link_file_fname = serializers.SerializerMethodField()
     group_id = serializers.ReadOnlyField(source='group.id')
     group_name = serializers.ReadOnlyField(source='group.name')
     link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
@@ -724,6 +709,9 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
         model = LinkFileGroupPermission
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname',
                   'group_id', 'group_name', 'link_file', 'group', 'grp_name')
+
+    def get_link_file_fname(self, obj) -> str:
+        return obj.link_file.fname.name
 
     def create(self, validated_data):
         """
@@ -778,7 +766,7 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
     username = serializers.CharField(write_only=True, min_length=4, max_length=32,
                                      required=False)
     link_file_id = serializers.ReadOnlyField(source='link_file.id')
-    link_file_fname = serializers.ReadOnlyField(source='link_file.fname.name')
+    link_file_fname = serializers.SerializerMethodField()
     user_id = serializers.ReadOnlyField(source='user.id')
     user_username = serializers.ReadOnlyField(source='user.username')
     link_file = serializers.HyperlinkedRelatedField(view_name='chrislinkfile-detail',
@@ -789,6 +777,9 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
         model = LinkFileUserPermission
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname', 'user_id',
                   'user_username', 'link_file', 'user', 'username')
+
+    def get_link_file_fname(self, obj) -> str:
+        return obj.link_file.fname.name
 
     def create(self, validated_data):
         """
