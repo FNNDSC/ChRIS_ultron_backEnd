@@ -29,6 +29,7 @@ jobs:
           command: test-${{ matrix.test-kind }}
 
   build:
+    name: Build
     needs: [ test ]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -63,7 +64,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -84,3 +85,63 @@ jobs:
           short-description: ChRIS backend
           readme-filepath: ./README.md
           repository: fnndsc/cube
+
+  openapi:
+    name: Generate OpenAPI Schema
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: taiki-e/install-action@just
+      - uses: actions/checkout@v4
+      - name: Generate OpenAPI schema (correct)
+        run: just openapi 2> spectacular.log > schema.yaml
+      - name: Generate OpenAPI schema (split)
+        run: just openapi-split 2> spectacular_split.log > schema_split.yaml
+      - name: Upload schema YAML files
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi_schema
+          path: schema*.yaml
+          if-no-files-found: error
+      - name: Assert no drf-spectacular errors nor warnings
+        run: |
+          for f in spectacular*.log; do
+            if grep -qi '(warning|error)' $f;
+              cat $f
+              exit 1
+            fi
+          done
+
+  draft-release:
+    name: Draft GitHub Release
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build
+      - openapi
+    steps:
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME:1}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: openapi_schema
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: ${{ contains( github.ref_name, '-' ) }}
+          files: openapi_schema/*.yaml
+          fail_on_unmatched_files: true
+          name: CUBE - version ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## Getting the Image
+            
+            Using [Podman](https://podman.io):
+            
+            ```shell
+            podman pull ghcr.io/fnndsc/cube:${{ steps.version.outputs.version }}
+            ```
+            Using [Docker](https://docker.com):
+            
+            ```shell
+            docker pull ghcr.io/fnndsc/cube:${{ steps.version.outputs.version }}
+            ```
