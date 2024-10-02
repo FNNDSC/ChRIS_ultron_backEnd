@@ -55,8 +55,13 @@ class FileBrowserViewTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        User.objects.get(username=cls.username).delete()
-        User.objects.get(username=cls.other_username).delete()
+        storage_manager = connect_storage(settings)
+
+        for username in [cls.username, cls.other_username]:
+            User.objects.get(username=username).delete()
+            home = f'home/{username}'
+            if storage_manager.path_exists(home):
+                storage_manager.delete_path(home)
 
         # re-enable logging
         logging.disable(logging.NOTSET)
