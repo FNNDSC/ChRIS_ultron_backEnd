@@ -127,7 +127,7 @@ just up
 If you modify `Dockerfile` or `requirements/*.txt`, you need to rebuild the image and recreate your containers.
 
 ```shell
-just rebuild && just up
+just build && just up
 ```
 
 #### Trying HTTP requests from the CLI
@@ -198,6 +198,23 @@ micromamba activate -p ./.mambaenv
 ```
 
 And you are ready to run your LSP + text editor.
+
+### OpenAPI Compatibility
+
+[drf-spectacular](https://drf-spectacular.readthedocs.io/) is used to generate an OpenAPI schema.
+Generally, its introspection is capable and accurate, but some special care is necessary to make
+everything work. See:
+
+- https://github.com/FNNDSC/ChRIS_ultron_backEnd/pull/584
+- https://github.com/tfranzel/drf-spectacular/issues/1303#issuecomment-2387220962
+- https://drf-spectacular.readthedocs.io/en/latest/faq.html#my-get-queryset-depends-on-some-attributes-not-available-at-schema-generation-time
+
+Be sure to lint your OpenAPI annotations for errors and warnings by running:
+
+```shell
+just openapi > /dev/null
+just openapi-split > /dev/null
+```
 
 ## Production Deployment
 
