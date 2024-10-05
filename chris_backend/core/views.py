@@ -9,6 +9,7 @@ from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 
 from collectionjson import services
 from .models import ChrisInstance, FileDownloadToken, FileDownloadTokenFilter
@@ -156,3 +157,15 @@ def authenticate_token(token: str) -> User:
 
     token_obj.delete()  # one-time-use token, we could instead set revoked=true
     return user
+
+
+class TokenAuthSupportQueryStringScheme(OpenApiAuthenticationExtension):
+    target_class = TokenAuthSupportQueryString
+    name = 'DownloadTokenInQueryString'
+
+    def get_security_definition(self, auto_schema):
+        return {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'download_token'
+        }
