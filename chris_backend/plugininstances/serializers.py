@@ -35,7 +35,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     size = serializers.ReadOnlyField()
     error_code = serializers.ReadOnlyField()
     previous = serializers.HyperlinkedRelatedField(
-        view_name='plugininstance-detail', read_only=True
+        view_name='plugininstance-detail', read_only=True, allow_null=True
     )
     output_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                         read_only=True)
@@ -49,7 +49,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         view_name='plugin-detail', read_only=True
     )
     workflow = serializers.HyperlinkedRelatedField(
-        view_name='workflow-detail', read_only=True
+        view_name='workflow-detail', read_only=True, allow_null=True
     )
     feed = serializers.HyperlinkedRelatedField(view_name='feed-detail', read_only=True)
     compute_resource = serializers.HyperlinkedRelatedField(
