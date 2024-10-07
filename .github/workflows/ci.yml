@@ -115,6 +115,48 @@ jobs:
       - name: Stop services
         run: just down
 
+  build-docs:
+    name: Generate OpenAPI Documentation
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: openapi
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: openapi_schema
+      - name: Install the OpenAPI Generator
+        run: npm install @openapitools/openapi-generator-cli -g
+      - name: Generate html2
+        run: |
+          openapi-generator-cli generate -i schema_split.yaml -g html2 -o dist \
+            -p infoEmail=dev@babymri.org,infoUrl=https://chrisproject.org \
+            -p licenseInfo=MIT \
+            -p licenseUrl=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/LICENSE \
+            -p pythonPackageName=chris_oag
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy-docs:
+    name: Update GitHub Pages
+    needs: build-docs
+    runs-on: ubuntu-24.04
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   draft-release:
     name: Draft GitHub Release
     runs-on: ubuntu-24.04
