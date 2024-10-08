@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Update __version__.py
         if: startsWith(github.ref, 'refs/tags/v')
-        run: echo '__version__ = "${{ github.ref_name }}"' > chris_backend/__version__.py
+        run: echo '__version__ = "${GITHUB_REF_NAME:1}"' > chris_backend/__version__.py
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Update __version__.py
         if: startsWith(github.ref, 'refs/tags/v')
-        run: echo '__version__ = "${{ github.ref_name }}"' > chris_backend/__version__.py
+        run: echo '__version__ = "${GITHUB_REF_NAME:1}"' > chris_backend/__version__.py
       - run: just prefer docker
       - run: just build
       - name: Generate OpenAPI schema (correct)
