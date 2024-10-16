@@ -6,13 +6,11 @@ from rest_framework import serializers
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
-from core.serializers import file_serializer
-
+from core.file_serializer import ChrisFileSerializer
 from .models import UserFile
 
 
-@file_serializer(required=False)
-class UserFileSerializer(serializers.HyperlinkedModelSerializer):
+class UserFileSerializer(ChrisFileSerializer):
     upload_path = serializers.CharField(max_length=1024, write_only=True, required=False)
     group_permissions = serializers.HyperlinkedIdentityField(
         view_name='filegrouppermission-list')

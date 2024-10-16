@@ -11,7 +11,7 @@ from collectionjson.fields import ItemLinkField
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
                          LinkFileGroupPermission, LinkFileUserPermission)
-from core.serializers import file_serializer
+from core.file_serializer import ChrisFileSerializer
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
@@ -294,8 +294,7 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
         return data
 
 
-@file_serializer(required=False)
-class FileBrowserFileSerializer(serializers.HyperlinkedModelSerializer):
+class FileBrowserFileSerializer(ChrisFileSerializer):
     new_file_path = serializers.CharField(max_length=1024, write_only=True,
                                           required=False)
     group_permissions = serializers.HyperlinkedIdentityField(
@@ -532,8 +531,7 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
         return data
 
 
-@file_serializer(required=False)
-class FileBrowserLinkFileSerializer(serializers.HyperlinkedModelSerializer):
+class FileBrowserLinkFileSerializer(ChrisFileSerializer):
     new_link_file_path = serializers.CharField(max_length=1024, write_only=True,
                                                required=False)
     path = serializers.CharField(max_length=1024, required=False)

@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
-from core.serializers import file_serializer
+from core.file_serializer import ChrisFileSerializer
 
 from .models import PACS, PACSSeries, PACSFile
 
@@ -167,8 +167,8 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
         return data
 
 
-@file_serializer(required=True)
-class PACSFileSerializer(serializers.HyperlinkedModelSerializer):
+class PACSFileSerializer(ChrisFileSerializer):
+    fname = serializers.FileField(use_url=False, required=True)
 
     class Meta:
         model = PACSFile

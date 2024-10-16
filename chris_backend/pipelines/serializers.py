@@ -13,7 +13,7 @@ from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from core.graph import Graph
 from core.models import ChrisFolder
-from core.serializers import file_serializer
+from core.file_serializer import ChrisFileSerializer
 from collectionjson.fields import ItemLinkField
 from plugins.enums import TYPES
 from plugins.models import Plugin
@@ -484,8 +484,8 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
         return json.dumps(obj.get_plugin_tree())
 
 
-@file_serializer(required=True)
-class PipelineSourceFileSerializer(serializers.HyperlinkedModelSerializer):
+class PipelineSourceFileSerializer(ChrisFileSerializer):
+    fname = serializers.FileField(use_url=False, required=True)
     ftype = serializers.ReadOnlyField(source='meta.type')
     type = serializers.CharField(write_only=True, required=False)
     uploader_username = serializers.ReadOnlyField(source='meta.uploader.username')
