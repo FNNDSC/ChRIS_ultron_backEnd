@@ -39,4 +39,4 @@ COPY chris_backend/ ./
 RUN if [ "$ENVIRONMENT" = "production" ]; then \
     env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; fi
 
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
+CMD ["granian", "--host", "0.0.0.0", "--interface", "asginl", "config.asgi:application"]

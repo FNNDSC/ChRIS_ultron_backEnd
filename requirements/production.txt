@@ -1,3 +1,2 @@
 -r base.txt # includes the base.txt requirements
 
-gunicorn==21.2.0
