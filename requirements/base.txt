@@ -14,6 +14,7 @@ django-auth-ldap==4.5.0
 PyYAML==6.0.1
 whitenoise[brotli]==6.5.0
 PyJWT===2.8.0
-channels[daphne]==4.1.0
+channels==4.1.0
 nats-py==2.9.0
+granian==1.6.1
 git+https://github.com/tfranzel/drf-spectacular.git@refs/pull/1307/head
