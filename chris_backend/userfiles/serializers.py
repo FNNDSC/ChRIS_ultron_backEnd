@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
-from core.file_serializer import ChrisFileSerializer
+from core.serializers import ChrisFileSerializer
 from .models import UserFile
 
 

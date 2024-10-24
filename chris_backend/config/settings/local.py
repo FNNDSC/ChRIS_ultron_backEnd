@@ -164,6 +164,10 @@ CORS_EXPOSE_HEADERS = ['Allow', 'Content-Type', 'Content-Length']
 # NATS settings
 NATS_ADDRESS = 'nats://nats:4222'
 
+# PFDCM settings
+PFDCM_ADDRESS = 'http://pfdcm:4005'
+
+
 # Celery settings
 
 #CELERY_BROKER_URL = 'amqp://guest:guest@localhost'

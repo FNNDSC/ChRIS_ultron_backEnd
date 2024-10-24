@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class PACS(models.Model):
     identifier = models.CharField(max_length=20, unique=True)
+    active = models.BooleanField(blank=True, default=True)
     # pacs top folder
     folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
                                   related_name='pacs')
@@ -33,6 +34,13 @@ def auto_delete_pacs_folder_with_pacs(sender, instance, **kwargs):
         instance.folder.delete()
     except Exception:
         pass
+
+
+class PACSFilter(FilterSet):
+
+    class Meta:
+        model = PACS
+        fields = ['id', 'identifier', 'active']
 
 
 class PACSSeries(models.Model):

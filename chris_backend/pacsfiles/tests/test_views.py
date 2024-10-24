@@ -82,6 +82,68 @@ class PACSViewTests(TestCase):
         logging.disable(logging.NOTSET)
 
 
+class PACSListViewTests(PACSViewTests):
+    """
+    Test the pacs-list view.
+    """
+
+    def setUp(self):
+        super(PACSListViewTests, self).setUp()
+        self.read_url = reverse("pacs-list")
+
+    @tag('integration')
+    def test_integration_pacs_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, self.pacs_name)
+        self.assertContains(response, 'MINICHRISORTHANC')
+
+    def test_pacs_list_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PACSDetailViewTests(PACSViewTests):
+    """
+    Test the pacs-detail view.
+    """
+
+    def setUp(self):
+        super(PACSDetailViewTests, self).setUp()
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        self.read_url = reverse("pacs-detail", kwargs={"pk": pacs.id})
+
+    def test_pacs_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, self.pacs_name)
+        self.assertEqual(response.data["active"], True)
+
+    def test_pacs_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PACSSpecificSeriesListViewTests(PACSViewTests):
+    """
+    Test the pacs-specific-series-list view.
+    """
+
+    def setUp(self):
+        super(PACSSpecificSeriesListViewTests, self).setUp()
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        self.read_url = reverse("pacs-specific-series-list", kwargs={"pk": pacs.id})
+
+    def test_pacs_specific_series_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, 'brain_crazy_study')
+
+    def test_pacs_list_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class PACSSeriesListViewTests(PACSViewTests):
     """
     Test the pacsseries-list view.
@@ -108,14 +170,14 @@ class PACSSeriesDetailViewTests(PACSViewTests):
 
     def setUp(self):
         super(PACSSeriesDetailViewTests, self).setUp()
-        pacs_file = PACSFile.objects.get(fname=self.path + '/file1.dcm')
-        self.read_url = reverse("pacsfile-detail",
-                                kwargs={"pk": pacs_file.id})
+        pacs_series = PACSSeries.objects.get(PatientID='123456')
+        self.read_url = reverse("pacsseries-detail",
+                                kwargs={"pk": pacs_series.id})
 
     def test_pacs_series_detail_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_url)
-        self.assertContains(response, self.path)
+        self.assertContains(response, 'brain_crazy_study')
 
     def test_pacs_series_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_url)

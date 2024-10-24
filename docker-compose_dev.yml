@@ -293,6 +293,32 @@ services:
     networks:
       local:
 
+  orthanc:
+    image: docker.io/jodogne/orthanc-plugins:1.12.3
+    volumes:
+      - ./orthanc.json:/etc/orthanc/orthanc.json:ro
+      - orthanc:/var/lib/orthanc/db
+    ports:
+      - "4242:4242"
+      - "8042:8042"
+    networks:
+      local:
+
+  pfdcm:
+    image: ghcr.io/fnndsc/pfdcm:3.1.2
+    container_name: pfdcm
+    environment:
+      MAX_WORKERS: 1
+    volumes:
+      - ./dicom:/home/dicom:rw
+      - ./pfdcm-services:/home/dicom/services:ro
+      - ${STOREBASE:?}:/chris_files:rw
+    ports:
+      - "4005:4005"
+    networks:
+      local:
+
+
 networks:
   local:
   remote:
@@ -306,3 +332,4 @@ volumes:
   queue_data:
   swift_storage_dev:
   lldap_data:
+  orthanc:

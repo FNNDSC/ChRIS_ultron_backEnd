@@ -37,6 +37,10 @@ postscript: (chrisomatic 'postscript.yml')
 [group('(1) start-up')]
 migrate: (run 'python manage.py migrate --noinput')
 
+# Create database migrations.
+[group('(3) development')]
+makemigrations: (run 'python manage.py makemigrations')
+
 # Run tests, e.g. `just test pacsfiles`
 [group('(3) development')]
 test *args:

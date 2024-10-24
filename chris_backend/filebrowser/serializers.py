@@ -11,7 +11,7 @@ from collectionjson.fields import ItemLinkField
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
                          LinkFileGroupPermission, LinkFileUserPermission)
-from core.file_serializer import ChrisFileSerializer
+from core.serializers import ChrisFileSerializer
 
 
 class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):

@@ -1,6 +1,7 @@
+
 from django.test import TestCase
 
-from core.file_serializer import ChrisFileSerializer
+from core.serializers import ChrisFileSerializer
 
 
 class ChrisFileSerializerTests(TestCase):
