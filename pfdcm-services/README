@@ -1,0 +1,6 @@
+PFDCM configuration files.
+
+../docker-compose_just.yml specifies this directory to be mounted into
+the pfdcm container at /home/dicom/services as a read-only volume.
+Consequentially, configuring SWIFT and CUBE resources for pfdcm
+using HTTP requests will not work.

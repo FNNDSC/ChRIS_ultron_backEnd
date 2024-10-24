@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
-from core.file_serializer import ChrisFileSerializer
+from core.serializers import ChrisFileSerializer
 
 from .models import PACS, PACSSeries, PACSFile
 
@@ -18,16 +18,21 @@ logger = logging.getLogger(__name__)
 
 
 class PACSSerializer(serializers.HyperlinkedModelSerializer):
+    folder_path = serializers.ReadOnlyField(source='folder.path')
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
+    pacs_series_list = serializers.HyperlinkedIdentityField(
+        view_name='pacs-specific-series-list')
 
     class Meta:
         model = PACS
-        fields = ('url', 'id', 'identifier', 'folder')
+        fields = ('url', 'id', 'identifier', 'active', 'folder_path', 'folder',
+                  'pacs_series_list')
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
     path = serializers.CharField(max_length=1024, write_only=True)
+    folder_path = serializers.ReadOnlyField(source='folder.path')
     ndicom = serializers.IntegerField(write_only=True)
     pacs_name = serializers.CharField(max_length=20, write_only=True)
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
@@ -36,11 +41,12 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = PACSSeries
-        fields = ('url', 'id', 'creation_date', 'path', 'ndicom', 'PatientID',
-                  'PatientName', 'PatientBirthDate', 'PatientAge', 'PatientSex',
-                  'StudyDate', 'AccessionNumber', 'Modality', 'ProtocolName',
-                  'StudyInstanceUID', 'StudyDescription', 'SeriesInstanceUID',
-                  'SeriesDescription', 'pacs_name', 'pacs_identifier', 'folder')
+        fields = ('url', 'id', 'creation_date', 'path', 'folder_path', 'ndicom',
+                  'PatientID', 'PatientName', 'PatientBirthDate', 'PatientAge',
+                  'PatientSex', 'StudyDate', 'AccessionNumber', 'Modality',
+                  'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
+                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_name',
+                  'pacs_identifier', 'folder')
 
     def create(self, validated_data):
         """

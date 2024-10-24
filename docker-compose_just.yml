@@ -31,7 +31,9 @@ services:
       DJANGO_SETTINGS_MODULE: "config.settings.local"
       STORAGE_ENV: "fslink"
       SPECTACULAR_SPLIT_REQUEST: "${SPECTACULAR_SPLIT_REQUEST-false}"
-      GRANIAN_RELOAD: "true"
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    command: python manage.py runserver 0.0.0.0:8000
     user: ${UID:?Please run me using just.}:${GID:?Please run me using just.}
     profiles:
       - cube
@@ -50,10 +52,11 @@ services:
           - chrisdev.local  # hard-coded in chrisomatic/*.yml
     healthcheck:
       test: [ "CMD", "sh", "-c", "curl -f http://localhost:8000/api/v1/users/ || exit 1" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 60s
+
   worker-mains:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     command: celery -A core worker -c 4 -l info -Q main1,main2
@@ -65,6 +68,7 @@ services:
     depends_on: *CHRIS_DEPENDS
     networks:
       - local
+
   worker-periodic:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     command: celery -A core worker -c 2 -l info -Q periodic
@@ -76,6 +80,7 @@ services:
     depends_on: *CHRIS_DEPENDS
     networks:
       - local
+
   celery-scheduler:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
@@ -87,6 +92,7 @@ services:
     depends_on: *CHRIS_DEPENDS
     networks:
       - local
+
   db:
     image: docker.io/library/postgres:16
     volumes:
@@ -105,6 +111,7 @@ services:
       local:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
+
   rabbitmq:
     image: docker.io/library/rabbitmq:3
     volumes:
@@ -170,6 +177,7 @@ services:
       retries: 3
       timeout: 10s
       interval: 5s
+
   lldap:
     image: docker.io/nitnelave/lldap:stable
     ports:
@@ -207,11 +215,50 @@ services:
       chris:
         condition: service_healthy
 
+  orthanc:
+    image: docker.io/jodogne/orthanc-plugins:1.12.3
+    volumes:
+      - ./orthanc.json:/etc/orthanc/orthanc.json:ro
+      - orthanc:/var/lib/orthanc/db
+    ports:
+      - "4242:4242"
+      - "8042:8042"
+    networks:
+      - local
+
+  pfdcm:
+    image: ghcr.io/fnndsc/pfdcm:3.1.2
+    container_name: pfdcm
+    environment:
+      MAX_WORKERS: 1
+    volumes:
+      - pfdcm:/home/dicom:rw
+      - ./pfdcm-services:/home/dicom/services:ro
+      - chris_files:/chris_files:rw
+    ports:
+      - "4005:4005"
+    networks:
+      - local
+    user: "1001"
+    depends_on:
+      pfdcm-nonroot-user-volume-fix:
+        condition: service_completed_successfully
+
+  pfdcm-nonroot-user-volume-fix:
+    image: docker.io/library/alpine:latest
+    volumes:
+      - pfdcm:/home/dicom:rw
+    user: root
+    command: chown 1001 /home/dicom
+    restart: "no"
+
 volumes:
   chris_files:
   db:
   lldap:
   rabbitmq:
+  orthanc:
+  pfdcm:
 
 networks:
   local:

@@ -133,6 +133,11 @@ CORS_ALLOWED_ORIGINS = get_secret('DJANGO_CORS_ALLOWED_ORIGINS', env.list)
 NATS_ADDRESS = get_secret('NATS_ADDRESS')
 
 
+# PFDCM SETTINGS
+# ------------------------------------------------------------------------------
+PFDCM_ADDRESS = get_secret('PFDCM_ADDRESS')
+
+
 # CELERY SETTINGS
 # ------------------------------------------------------------------------------
 CELERY_BROKER_URL = get_secret('CELERY_BROKER_URL')

@@ -13,7 +13,7 @@ from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from core.graph import Graph
 from core.models import ChrisFolder
-from core.file_serializer import ChrisFileSerializer
+from core.serializers import ChrisFileSerializer
 from collectionjson.fields import ItemLinkField
 from plugins.enums import TYPES
 from plugins.models import Plugin

@@ -328,6 +328,7 @@ class FeedList(generics.ListAPIView):
                  'pipelinesourcefiles': reverse('pipelinesourcefile-list',
                                                 request=request),
                  'userfiles': reverse('userfile-list', request=request),
+                 'pacs': reverse('pacs-list', request=request),
                  'pacsfiles': reverse('pacsfile-list', request=request),
                  'pacsseries': reverse('pacsseries-list', request=request),
                  'filebrowser': reverse('chrisfolder-list', request=request)}

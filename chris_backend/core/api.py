@@ -361,6 +361,22 @@ urlpatterns = format_suffix_patterns([
         name='userfile-resource'),
 
 
+    path('v1/pacs/',
+         pacsfile_views.PACSList.as_view(),
+         name='pacs-list'),
+
+    path('v1/pacs/search/',
+         pacsfile_views.PACSListQuerySearch.as_view(),
+         name='pacs-list-query-search'),
+
+    path('v1/pacs/<int:pk>/',
+         pacsfile_views.PACSDetail.as_view(),
+         name='pacs-detail'),
+
+    path('v1/pacs/<int:pk>/series/',
+         pacsfile_views.PACSSpecificSeriesList.as_view(),
+         name='pacs-specific-series-list'),
+
     path('v1/pacs/series/',
          pacsfile_views.PACSSeriesList.as_view(),
          name='pacsseries-list'),
