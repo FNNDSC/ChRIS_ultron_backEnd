@@ -235,13 +235,17 @@ class PipelineSourceFileFilter(FilterSet):
     fname_exact = django_filters.CharFilter(field_name='fname', lookup_expr='exact')
     fname_icontains = django_filters.CharFilter(field_name='fname',
                                                 lookup_expr='icontains')
+    pipeline_id = django_filters.CharFilter(field_name='meta__pipeline_id',
+                                            lookup_expr='exact')
+    pipeline_name = django_filters.CharFilter(field_name='meta__pipeline__name',
+                                              lookup_expr='exact')
     uploader_username = django_filters.CharFilter(field_name='meta__uploader__username',
                                                   lookup_expr='exact')
 
     class Meta:
         model = PipelineSourceFile
         fields = ['id', 'min_creation_date', 'max_creation_date', 'fname', 'fname_exact',
-                  'fname_icontains', 'uploader_username']
+                  'fname_icontains', 'pipeline_id', 'pipeline_name', 'uploader_username']
 
 
 class PipelineSourceFileMeta(models.Model):
