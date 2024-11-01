@@ -138,15 +138,6 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
                 instance.folder.create_public_link()
         return super(FeedSerializer, self).update(instance, validated_data)
 
-    def validate_name(self, name):
-        """
-        Overriden to check that the feed's name does not contain forward slashes.
-        """
-        if '/' in name:
-            raise serializers.ValidationError(
-                ["This field may not contain forward slashes."])
-        return name
-
     def validate_public(self, public):
         """
         Overriden to check that only the owner or superuser chris can change a feed's
