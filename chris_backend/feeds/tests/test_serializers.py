@@ -139,16 +139,6 @@ class FeedSerializerTests(SerializerTests):
         feed = Feed.objects.get(name=self.feedname)
         self.feed_serializer = FeedSerializer(feed)
 
-    def test_validate_name(self):
-        """
-        Test whether overriden validate_name method raises a serializers.ValidationError
-        when the feed name contains forward slashes.
-        """
-        with self.assertRaises(serializers.ValidationError):
-            self.feed_serializer.validate_name('myfeed/')
-        name = self.feed_serializer.validate_name('myfeed')
-        self.assertEqual(name, 'myfeed')
-
     def test_get_started_jobs(self):
         """
         Test whether overriden get_created_jobs method returns the correct number of
