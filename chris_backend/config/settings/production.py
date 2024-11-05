@@ -181,3 +181,7 @@ if AUTH_LDAP:
         'users.models.CustomLDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )
+
+
+# ENABLE/DISABLE USER CREATION THROUGH AN API ENDPOINT
+DISABLE_USER_ACCOUNT_CREATION = get_secret('DISABLE_USER_ACCOUNT_CREATION', env.bool)
