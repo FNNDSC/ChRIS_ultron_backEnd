@@ -1,6 +1,7 @@
 
 from django.contrib.auth.models import User, Group
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
 from rest_framework.response import Response
@@ -13,7 +14,8 @@ from .permissions import IsUserOrChrisOrReadOnly, IsAdminOrReadOnly
 
 
 class UserCreate(generics.ListCreateAPIView):
-    http_method_names = ['get', 'post']
+    http_method_names = ['get'] if settings.DISABLE_USER_ACCOUNT_CREATION else ['get',
+                                                                                'post']
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -22,6 +24,10 @@ class UserCreate(generics.ListCreateAPIView):
         Overriden to append a collection+json write template.
         """
         response = services.get_list_response(self, [])
+
+        if settings.DISABLE_USER_ACCOUNT_CREATION:
+            return response
+
         template_data = {"username": "", "password": "", "email": ""}
         return services.append_collection_template(response, template_data)
 

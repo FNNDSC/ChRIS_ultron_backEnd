@@ -155,6 +155,7 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 COMPUTE_RESOURCE_URL = 'http://pfcon.remote:30005/api/v1/'
 
+
 # corsheaders
 # ------------------------------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = True
@@ -204,3 +205,7 @@ if AUTH_LDAP:
         'users.models.CustomLDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
     )
+
+
+# Setting to enable/disable user creation through an API endpoint
+DISABLE_USER_ACCOUNT_CREATION = False
