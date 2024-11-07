@@ -5,7 +5,7 @@ Production Configurations
 """
 
 import ldap
-from django_auth_ldap.config import LDAPSearch
+from django_auth_ldap.config import LDAPSearch, GroupOfNamesType
 from .common import *  # noqa
 from environs import Env, EnvValidationError
 from core.storage import verify_storage_connection
@@ -168,6 +168,8 @@ if AUTH_LDAP:
     AUTH_LDAP_BIND_DN = get_secret('AUTH_LDAP_BIND_DN')
     AUTH_LDAP_BIND_PASSWORD = get_secret('AUTH_LDAP_BIND_PASSWORD')
     AUTH_LDAP_USER_SEARCH_ROOT = get_secret('AUTH_LDAP_USER_SEARCH_ROOT')
+    AUTH_LDAP_GROUP_SEARCH_ROOT = get_secret('AUTH_LDAP_GROUP_SEARCH_ROOT')
+    AUTH_LDAP_CHRIS_ADMIN_GROUP = get_secret('AUTH_LDAP_CHRIS_ADMIN_GROUP')
 
     AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
                                        '(uid=%(user)s)')
@@ -176,6 +178,13 @@ if AUTH_LDAP:
         'last_name': 'sn',
         'email': 'mail'
     }
+    AUTH_LDAP_GROUP_SEARCH = LDAPSearch(AUTH_LDAP_GROUP_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
+                                        '(objectClass=groupOfNames)')
+    AUTH_LDAP_GROUP_TYPE = GroupOfNamesType()
+    AUTH_LDAP_USER_FLAGS_BY_GROUP = {
+        'is_staff': f'cn={AUTH_LDAP_CHRIS_ADMIN_GROUP},{AUTH_LDAP_GROUP_SEARCH_ROOT}'
+    }
+    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = ['all_users', 'pacs_users']
 
     AUTHENTICATION_BACKENDS = (
         'users.models.CustomLDAPBackend',
