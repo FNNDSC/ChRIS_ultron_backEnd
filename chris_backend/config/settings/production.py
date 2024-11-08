@@ -184,7 +184,7 @@ if AUTH_LDAP:
     AUTH_LDAP_USER_FLAGS_BY_GROUP = {
         'is_staff': f'cn={AUTH_LDAP_CHRIS_ADMIN_GROUP},{AUTH_LDAP_GROUP_SEARCH_ROOT}'
     }
-    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = ['all_users', 'pacs_users']
+    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = ['all_users']
 
     AUTHENTICATION_BACKENDS = (
         'users.models.CustomLDAPBackend',
