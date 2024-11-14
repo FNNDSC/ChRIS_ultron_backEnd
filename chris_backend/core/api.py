@@ -31,6 +31,7 @@ urlpatterns = format_suffix_patterns([
     path('v1/users/<int:pk>/groups/',
          user_views.UserGroupList.as_view(), name='user-group-list'),
 
+
     path('v1/groups/',
          user_views.GroupList.as_view(),
          name='group-list'),
@@ -372,6 +373,22 @@ urlpatterns = format_suffix_patterns([
     path('v1/pacs/<int:pk>/',
          pacsfile_views.PACSDetail.as_view(),
          name='pacs-detail'),
+
+    path('v1/pacs/<int:pk>/queries/',
+         pacsfile_views.PACSQueryList.as_view(),
+         name='pacsquery-list'),
+
+    path('v1/pacs/queries/',
+         pacsfile_views.AllPACSQueryList.as_view(),
+         name='allpacsquery-list'),
+
+    path('v1/pacs/queries/search/',
+         pacsfile_views.AllPACSQueryListQuerySearch.as_view(),
+         name='allpacsquery-list-query-search'),
+
+    path('v1/pacs/queries/<int:pk>/',
+         pacsfile_views.PACSQueryDetail.as_view(),
+         name='pacsquery-detail'),
 
     path('v1/pacs/<int:pk>/series/',
          pacsfile_views.PACSSpecificSeriesList.as_view(),

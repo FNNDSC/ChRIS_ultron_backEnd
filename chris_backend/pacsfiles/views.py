@@ -10,11 +10,13 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from core.models import ChrisFolder
 from core.views import TokenAuthSupportQueryString
-from .models import (PACS, PACSFilter, PACSSeries, PACSSeriesFilter, PACSFile,
-                     PACSFileFilter)
-from .serializers import PACSSerializer, PACSSeriesSerializer, PACSFileSerializer
+from .models import (PACS, PACSFilter, PACSQuery, PACSQueryFilter, PACSSeries,
+                     PACSSeriesFilter, PACSFile, PACSFileFilter)
+from .serializers import (PACSSerializer,  PACSQuerySerializer, PACSSeriesSerializer,
+                          PACSFileSerializer)
 from .services import PfdcmClient
-from .permissions import IsChrisOrIsPACSUserReadOnly
+from .permissions import (IsChrisOrIsPACSUserReadOnly, IsChrisOrIsPACSUserOrReadOnly,
+                          IsChrisOrOwnerOrIsPACSUserReadOnly)
 
 
 class PACSList(generics.ListCreateAPIView):
@@ -123,6 +125,135 @@ class PACSSpecificSeriesList(generics.ListAPIView):
         """
         pacs = self.get_object()
         return self.filter_queryset(pacs.series_list.all())
+
+
+class PACSQueryList(generics.ListCreateAPIView):
+    """
+    A view for the collection of PACS-specific queries.
+    """
+    http_method_names = ['get', 'post']
+    queryset = PACS.objects.all()
+    serializer_class = PACSQuerySerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserOrReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return the list of queries for the queried pacs. A document-level
+        link relation and a collection+json template are also added to the response.
+        """
+        queryset = self.get_pacs_queries_queryset()
+        response = services.get_list_response(self, queryset)
+        pacs = self.get_object()
+
+        # append document-level link relations
+        links = {'pacs': reverse('pacs-detail', request=request,
+                                 kwargs={"pk": pacs.id})}
+        response = services.append_collection_links(response, links)
+
+        # append write template
+        template_data = {'title': '', 'query': '', 'description': ''}
+        return services.append_collection_template(response, template_data)
+
+    def get_pacs_queries_queryset(self):
+        """
+        Custom method to get the actual PACS queries' queryset. The returned queryset
+        is limited to only the queries owned by the user when the user is no longer in
+        the pacs_users group.
+        """
+        user = self.request.user
+        pacs = self.get_object()
+
+        if  user.username == 'chris' or user.groups.filter(name='pacs_users').exists():
+            return pacs.query_list.all()
+        return pacs.query_list.filter(owner=self.request.user)
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate the owner and the pacs with the PACS query before first
+        saving to the DB.
+        """
+        pacs = self.get_object()
+        serializer.save(owner=self.request.user, pacs=pacs)
+
+
+class AllPACSQueryList(generics.ListAPIView):
+    """
+    A view for the collection of all pacs queries.
+    """
+    http_method_names = ['get']
+    serializer_class = PACSQuerySerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to add a query list and document-level link relation to the response.
+        """
+        response = super(AllPACSQueryList, self).list(request, *args, **kwargs)
+        # append query list
+        query_list = [reverse('allpacsquery-list-query-search', request=request)]
+        response = services.append_collection_querylist(response, query_list)
+        # append document-level link relations
+        links = {'pacs': reverse('pacs-list', request=request)}
+        return services.append_collection_links(response, links)
+
+    def get_queryset(self):
+        """
+        Overriden to limit the returned queryset to only the queries owned by the user
+        when the user is no longer in the pacs_users group.
+        """
+        user = self.request.user
+
+        if  user.username == 'chris' or user.groups.filter(name='pacs_users').exists():
+            return PACSQuery.objects.all()
+        return PACSQuery.objects.filter(owner=user)
+
+
+class AllPACSQueryListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of workflows resulting from a query search.
+    """
+    http_method_names = ['get']
+    serializer_class = PACSQuerySerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filterset_class = PACSQueryFilter
+
+    def get_queryset(self):
+        """
+        Overriden to limit the returned queryset to only the queries owned by the user
+        when the user is no longer in the pacs_users group.
+        """
+        user = self.request.user
+
+        if user.username == 'chris' or user.groups.filter(name='pacs_users').exists():
+            return PACSQuery.objects.all()
+        return PACSQuery.objects.filter(owner=user)
+
+
+class PACSQueryDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    A PACS query view.
+    """
+    http_method_names = ['get', 'put', 'delete']
+    queryset = PACSQuery.objects.all()
+    serializer_class = PACSQuerySerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrIsPACSUserReadOnly)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template to the response.
+        """
+        response = super(PACSQueryDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {'title': '', 'description': ''}
+        return services.append_collection_template(response, template_data)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Overriden to remove descriptors that are not allowed to be updated before
+        serializer validation.
+        """
+        data = self.request.data
+        data.pop('query', None)
+        return super(PACSQueryDetail, self).update(request, *args, **kwargs)
 
 
 class PACSSeriesList(generics.ListCreateAPIView):

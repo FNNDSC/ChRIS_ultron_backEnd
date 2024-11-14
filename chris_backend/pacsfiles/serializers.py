@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+from django.db.utils import IntegrityError
 from django.contrib.auth.models import Group
 from django.conf import settings
 from rest_framework import serializers
@@ -10,8 +11,10 @@ from rest_framework import serializers
 from core.models import ChrisFolder
 from core.storage import connect_storage
 from core.serializers import ChrisFileSerializer
+from core.utils import json_zip2str
 
-from .models import PACS, PACSSeries, PACSFile
+from .models import PACS, PACSQuery, PACSSeries, PACSFile
+from .services import PfdcmClient
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +31,59 @@ class PACSSerializer(serializers.HyperlinkedModelSerializer):
         model = PACS
         fields = ('url', 'id', 'identifier', 'active', 'folder_path', 'folder',
                   'pacs_series_list')
+
+
+class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
+    query = serializers.JSONField(binary=True)
+    result = serializers.ReadOnlyField()
+    pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
+    owner_username = serializers.ReadOnlyField(source='owner.username')
+
+    class Meta:
+        model = PACSQuery
+        fields = ('url', 'id', 'creation_date', 'title', 'query', 'description',
+                  'result', 'pacs_identifier', 'owner_username')
+
+    def create(self, validated_data):
+        """
+        Overriden to rise a serializer error when attempting to create a PACSQuery
+        object that results in a DB conflict. Then a query is made to the PFDCM service.
+        """
+        title = validated_data['title']
+        query = validated_data['query']
+        pacs_name = validated_data['pacs'].identifier
+
+        try:
+            pacs_query  = super(PACSQuerySerializer, self).create(validated_data)
+        except IntegrityError:
+            error_msg = (f'You have already registered a PACS query with title={title} '
+                         f'for pacs {pacs_name}')
+            raise serializers.ValidationError([error_msg])
+
+        pfdcm_cl = PfdcmClient()
+        result = pfdcm_cl.query(pacs_name, query)
+
+        if result:
+            pacs_query.result = json_zip2str(result)
+            pacs_query.save()
+        return pacs_query
+
+    def update(self, instance, validated_data):
+        """
+        Overriden to rise a serializer error when attempting to update a PACSQuery
+        object that results in a DB conflict.
+        """
+        pacs = instance.pacs
+        title = validated_data.get('title')
+
+        if title is None:
+            title = instance.title
+        try:
+            return super(PACSQuerySerializer, self).update(instance, validated_data)
+        except IntegrityError:
+            error_msg = (f'You have already registered a PACS query with title={title} '
+                         f'for pacs {pacs.identifier}')
+            raise serializers.ValidationError([error_msg])
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
