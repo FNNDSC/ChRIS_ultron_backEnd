@@ -7,26 +7,113 @@ from django.conf import settings
 from unittest import mock
 from rest_framework import serializers
 
-from pacsfiles.serializers import PACSSeriesSerializer
+from core.models import ChrisFolder
+from core.utils import json_zip2str
+from pacsfiles.models import PACS, PACSQuery
+from pacsfiles.serializers import PACSQuerySerializer, PACSSeriesSerializer
 
 
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
-class PACSSeriesSerializerTests(TestCase):
-
+class SerializerTests(TestCase):
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
 
-        # create superuser chris (owner of root folders)
+        # superuser chris (owner of root folders)
         self.chris_username = 'chris'
-        self.chris_password = CHRIS_SUPERUSER_PASSWORD
+        chris_user = User.objects.get(username=self.chris_username)
+
+        # create normal user
+        self.username = 'foo'
+        self.password = 'bar'
+        User.objects.create_user(username=self.username, password=self.password)
+
+        # create a PACS
+        self.pacs_name = 'myPACS'
+        folder_path = f'SERVICES/PACS/{self.pacs_name}'
+        (pacs_folder, tf) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                              owner=chris_user)
+        PACS.objects.get_or_create(folder=pacs_folder, identifier=self.pacs_name)
 
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
 
+
+class PACSQuerySerializerTests(SerializerTests):
+
+    def test_create_success(self):
+        """
+        Test whether overriden 'create' method successfully creates a new PACS query.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        data = {'title': 'query1', 'query': query, 'owner': user, 'pacs': pacs}
+
+        with mock.patch('pacsfiles.serializers.PfdcmClient.query') as pfdcm_query_mock:
+            result = {'mock': 'mock'}
+            pfdcm_query_mock.return_value = result
+            pacs_query_serializer = PACSQuerySerializer(data=data)
+            pacs_query = pacs_query_serializer.create(data)
+            pfdcm_query_mock.assert_called_with(self.pacs_name, query)
+            self.assertEqual(pacs_query.result, json_zip2str(result))
+
+
+    def test_create_failure_pacs_user_title_combination_already_exists(self):
+        """
+        Test whether overriden 'create' method raises a ValidationError when a user has
+        already registered a PACS query with the same title and pacs.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '1.3.12.2.1107'}
+
+        PACSQuery.objects.get_or_create(title='query2', query=query, owner=user, pacs=pacs)
+
+        data = {'title': 'query2', 'query': query, 'owner': user, 'pacs': pacs}
+        pacs_query_serializer = PACSQuerySerializer(data=data)
+        with self.assertRaises(serializers.ValidationError):
+            pacs_query_serializer.create(data)
+
+    def test_update_success(self):
+        """
+        Test whether overriden 'update' method successfully updates an existing PACS query.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query2', query=query,
+                                                        owner=user, pacs=pacs)
+
+        data = {'title': 'query4'}
+        pacs_query_serializer = PACSQuerySerializer(pacs_query, data)
+        pacs_query = pacs_query_serializer.update(pacs_query, data)
+        self.assertEqual(pacs_query.title, 'query4')
+
+    def test_update_failure_pacs_user_title_combination_already_exists(self):
+        """
+        Test whether overriden 'update' method raises a ValidationError when a user has
+        already registered a PACS query with the same title and pacs.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '1.3.12.2.1107'}
+
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query2', query=query,
+                                                        owner=user, pacs=pacs)
+        PACSQuery.objects.get_or_create(title='query3', query=query, owner=user, pacs=pacs)
+
+        data = {'title': 'query3'}
+        pacs_query_serializer = PACSQuerySerializer(pacs_query, data)
+        with self.assertRaises(serializers.ValidationError):
+            pacs_query_serializer.update(pacs_query, data)
+
+
+class PACSSeriesSerializerTests(SerializerTests):
 
     def test_validate_ndicom_failure_not_positive(self):
         """

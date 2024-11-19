@@ -19,7 +19,7 @@ from .permissions import (IsChrisOrIsPACSUserReadOnly, IsChrisOrIsPACSUserOrRead
                           IsChrisOrOwnerOrIsPACSUserReadOnly)
 
 
-class PACSList(generics.ListCreateAPIView):
+class PACSList(generics.ListAPIView):
     """
     A view for the collection of registered PACS.
     """

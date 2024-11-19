@@ -24,17 +24,17 @@ class PACSSerializer(serializers.HyperlinkedModelSerializer):
     folder_path = serializers.ReadOnlyField(source='folder.path')
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
-    pacs_series_list = serializers.HyperlinkedIdentityField(
-        view_name='pacs-specific-series-list')
+    query_list = serializers.HyperlinkedIdentityField(view_name='pacsquery-list')
+    series_list = serializers.HyperlinkedIdentityField(view_name='pacs-specific-series-list')
 
     class Meta:
         model = PACS
         fields = ('url', 'id', 'identifier', 'active', 'folder_path', 'folder',
-                  'pacs_series_list')
+                  'query_list', 'series_list')
 
 
 class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
-    query = serializers.JSONField(binary=True)
+    query = serializers.JSONField(binary=True, required=False)
     result = serializers.ReadOnlyField()
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
     owner_username = serializers.ReadOnlyField(source='owner.username')
@@ -84,6 +84,16 @@ class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
             error_msg = (f'You have already registered a PACS query with title={title} '
                          f'for pacs {pacs.identifier}')
             raise serializers.ValidationError([error_msg])
+
+    def validate(self, data):
+        """
+        Overriden to validate that the query field is in data when creating a new query.
+        """
+        if not self.instance:  # on create
+            if 'query' not in data:
+                raise serializers.ValidationError(
+                    {'query': ["This field is required."]})
+        return data
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
