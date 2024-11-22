@@ -63,7 +63,12 @@ class PfdcmClient(object):
                     raise
                 time.sleep(0.4)
             else:
-                return resp.json()
+                result = resp.json()
+                if result.get('status'):
+                    pypx = result.get('pypx')
+                    if pypx and 'data' in pypx:
+                        return pypx['data']
+                return []
 
     def retrieve(self, pacs_name, query, timeout=30):
         """

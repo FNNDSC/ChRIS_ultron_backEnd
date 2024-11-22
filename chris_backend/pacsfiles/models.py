@@ -43,6 +43,43 @@ class PACSFilter(FilterSet):
         fields = ['id', 'identifier', 'active']
 
 
+class PACSQuery(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    title = models.CharField(max_length=300, db_index=True)
+    query = models.JSONField()
+    description = models.CharField(max_length=700, blank=True)
+    result = models.TextField(blank=True)
+    pacs = models.ForeignKey(PACS, on_delete=models.CASCADE, related_name='query_list')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('pacs', 'owner', '-creation_date',)
+        unique_together = ('pacs', 'owner', 'title',)
+
+    def __str__(self):
+        return self.query
+
+
+class PACSQueryFilter(FilterSet):
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
+    title_exact = django_filters.CharFilter(field_name='title', lookup_expr='exact')
+    title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    description = django_filters.CharFilter(field_name='description',
+                                            lookup_expr='icontains')
+    pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
+                                                lookup_expr='exact')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                                lookup_expr='exact')
+
+    class Meta:
+        model = PACSQuery
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'title_exact',
+                  'title', 'description', 'pacs_identifier', 'owner_username']
+
+
 class PACSSeries(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     PatientID = models.CharField(max_length=100, db_index=True)
