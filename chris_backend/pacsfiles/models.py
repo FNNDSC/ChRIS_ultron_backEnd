@@ -69,6 +69,7 @@ class PACSQueryFilter(FilterSet):
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
+    pacs_id = django_filters.CharFilter(field_name='pacs_id', lookup_expr='exact')
     pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
                                                 lookup_expr='exact')
     owner_username = django_filters.CharFilter(field_name='owner__username',
@@ -77,7 +78,34 @@ class PACSQueryFilter(FilterSet):
     class Meta:
         model = PACSQuery
         fields = ['id', 'min_creation_date', 'max_creation_date', 'title_exact',
-                  'title', 'description', 'pacs_identifier', 'owner_username']
+                  'title', 'description', 'pacs_id', 'pacs_identifier', 'owner_username']
+
+
+class PACSRetrieve(models.Model):
+    creation_date = models.DateTimeField(auto_now_add=True)
+    result = models.TextField(blank=True)
+    pacs_query = models.ForeignKey(PACSQuery, on_delete=models.CASCADE,
+                                   related_name='retrieve_list')
+    owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('pacs_query', '-creation_date',)
+
+    def __str__(self):
+        return self.pacs_query.query
+
+
+class PACSRetrieveFilter(FilterSet):
+    min_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='gte')
+    max_creation_date = django_filters.IsoDateTimeFilter(field_name='creation_date',
+                                                         lookup_expr='lte')
+    owner_username = django_filters.CharFilter(field_name='owner__username',
+                                                lookup_expr='exact')
+
+    class Meta:
+        model = PACSRetrieve
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'owner_username']
 
 
 class PACSSeries(models.Model):
@@ -133,6 +161,7 @@ class PACSSeriesFilter(FilterSet):
                                                  lookup_expr='gte')
     max_PatientAge = django_filters.NumberFilter(field_name='PatientAge',
                                                  lookup_expr='lte')
+    pacs_id = django_filters.CharFilter(field_name='pacs_id', lookup_expr='exact')
     pacs_identifier = django_filters.CharFilter(field_name='pacs__identifier',
                                                 lookup_expr='exact')
 
@@ -142,7 +171,7 @@ class PACSSeriesFilter(FilterSet):
                   'PatientName', 'PatientSex', 'PatientAge', 'min_PatientAge',
                   'max_PatientAge', 'PatientBirthDate', 'StudyDate', 'AccessionNumber',
                   'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
-                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_identifier']
+                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_id', 'pacs_identifier']
 
 
 class PACSFile(ChrisFile):

@@ -10,7 +10,8 @@ from rest_framework import serializers
 from core.models import ChrisFolder
 from core.utils import json_zip2str
 from pacsfiles.models import PACS, PACSQuery
-from pacsfiles.serializers import PACSQuerySerializer, PACSSeriesSerializer
+from pacsfiles.serializers import (PACSQuerySerializer, PACSRetrieveSerializer,
+                                   PACSSeriesSerializer)
 
 
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
@@ -111,6 +112,29 @@ class PACSQuerySerializerTests(SerializerTests):
         pacs_query_serializer = PACSQuerySerializer(pacs_query, data)
         with self.assertRaises(serializers.ValidationError):
             pacs_query_serializer.update(pacs_query, data)
+
+
+class PACSRetrieveSerializerTests(SerializerTests):
+
+    def test_create_success(self):
+        """
+        Test whether overriden 'create' method successfully creates a new PACS retrieve.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query2', query=query,
+                                                        owner=user, pacs=pacs)
+        data = {'pacs_query': pacs_query, 'owner': user}
+
+        with mock.patch('pacsfiles.serializers.PfdcmClient.retrieve') as pfdcm_retrieve_mock:
+            result = {'mock': 'mock'}
+            pfdcm_retrieve_mock.return_value = result
+            pacs_retrieve_serializer = PACSRetrieveSerializer(data=data)
+            pacs_retrieve = pacs_retrieve_serializer.create(data)
+            pfdcm_retrieve_mock.assert_called_with(self.pacs_name, query)
+            self.assertEqual(pacs_retrieve.result, json_zip2str(result))
 
 
 class PACSSeriesSerializerTests(SerializerTests):

@@ -1,6 +1,7 @@
 
 from django.http import FileResponse
 from django.contrib.auth.models import User, Group
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
@@ -10,10 +11,11 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from core.models import ChrisFolder
 from core.views import TokenAuthSupportQueryString
-from .models import (PACS, PACSFilter, PACSQuery, PACSQueryFilter, PACSSeries,
-                     PACSSeriesFilter, PACSFile, PACSFileFilter)
-from .serializers import (PACSSerializer,  PACSQuerySerializer, PACSSeriesSerializer,
-                          PACSFileSerializer)
+from .models import (PACS, PACSFilter, PACSQuery, PACSQueryFilter, PACSRetrieve,
+                     PACSRetrieveFilter, PACSSeries, PACSSeriesFilter, PACSFile,
+                     PACSFileFilter)
+from .serializers import (PACSSerializer,  PACSQuerySerializer, PACSRetrieveSerializer,
+                          PACSSeriesSerializer, PACSFileSerializer)
 from .services import PfdcmClient
 from .permissions import (IsChrisOrIsPACSUserReadOnly, IsChrisOrIsPACSUserOrReadOnly,
                           IsChrisOrOwnerOrIsPACSUserReadOnly)
@@ -254,6 +256,91 @@ class PACSQueryDetail(generics.RetrieveUpdateDestroyAPIView):
         data = self.request.data
         data.pop('query', None)
         return super(PACSQueryDetail, self).update(request, *args, **kwargs)
+
+
+class PACSRetrieveList(generics.ListCreateAPIView):
+    """
+    A view for the collection of PACS query-specific retrieves.
+    """
+    http_method_names = ['get', 'post']
+    queryset = PACSQuery.objects.all()
+    serializer_class = PACSRetrieveSerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrIsPACSUserReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overriden to return the list of retrieves for the PACS query. A query list and a
+        document-level link relation are also added to the response.
+        """
+        queryset = self.get_pacs_retrieves_queryset()
+        response = services.get_list_response(self, queryset)
+        pacs_query = self.get_object()
+
+        # append query list
+        query_list = [reverse('pacsretrieve-list-query-search',
+                              request=request, kwargs={"pk": pacs_query.id})]
+        response = services.append_collection_querylist(response, query_list)
+
+        # append document-level link relations
+        links = {'pacs_query': reverse('pacsquery-detail', request=request,
+                                 kwargs={"pk": pacs_query.id})}
+
+        return services.append_collection_links(response, links)
+
+    def get_pacs_retrieves_queryset(self):
+        """
+        Custom method to get the actual PACS retrieves' queryset.
+        """
+        pacs_query = self.get_object()
+        return pacs_query.retrieve_list.all()
+
+    def perform_create(self, serializer):
+        """
+        Overriden to associate the owner and the pacs query with the retrieve
+        before first saving to the DB.
+        """
+        pacs_query = self.get_object()
+        serializer.save(owner=self.request.user, pacs_query=pacs_query)
+
+
+class PACSRetrieveListQuerySearch(generics.ListAPIView):
+    """
+    A view for the collection of PACS query-specific retrieves resulting from a query
+    search.
+    """
+    http_method_names = ['get']
+    serializer_class = PACSRetrieveSerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrIsPACSUserReadOnly,)
+    filterset_class = PACSRetrieveFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is comprised by the PACS
+        query-specific retrieves.
+        """
+        if getattr(self, 'swagger_fake_view', False):
+            return PACSQuery.retrieve_list.field.model.objects.none()
+
+        pacs_query = self.get_object()
+        return pacs_query.retrieve_list.all()
+
+    def get_object(self):
+        """
+        Overriden to get the PACS query object and check its permissions.
+        """
+        pacs_query = get_object_or_404(PACSQuery, pk=self.kwargs['pk'])
+        self.check_object_permissions(self.request, pacs_query)
+        return pacs_query
+
+
+class PACSRetrieveDetail(generics.RetrieveDestroyAPIView):
+    """
+    A PACS retrieve view.
+    """
+    http_method_names = ['get', 'delete']
+    queryset = PACSRetrieve.objects.all()
+    serializer_class = PACSRetrieveSerializer
+    permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrIsPACSUserReadOnly)
 
 
 class PACSSeriesList(generics.ListCreateAPIView):
