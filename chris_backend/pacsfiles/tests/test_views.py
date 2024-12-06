@@ -13,7 +13,7 @@ from rest_framework import status
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
-from pacsfiles.models import PACS, PACSQuery, PACSSeries, PACSFile
+from pacsfiles.models import PACS, PACSQuery, PACSRetrieve, PACSSeries, PACSFile
 from pacsfiles import views
 
 
@@ -38,12 +38,20 @@ class PACSViewTests(TestCase):
         self.password = 'testpass'
         self.other_username = 'boo'
         self.other_password = 'far'
+        self.another_username = 'loo'
+        self.another_password = 'tar'
 
         pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
+
+        user = User.objects.create_user(username=self.another_username,
+                                        password=self.another_password)
+        user.groups.set([pacs_grp])
+
         user = User.objects.create_user(username=self.username, password=self.password)
         user.groups.set([pacs_grp])
 
         User.objects.create_user(username=self.other_username, password=self.other_password)
+
 
         # create a PACS file in the DB "already registered" to the server)
         self.storage_manager = connect_storage(settings)
@@ -294,14 +302,6 @@ class PACSQueryDetailViewTests(PACSViewTests):
     def setUp(self):
         super(PACSQueryDetailViewTests, self).setUp()
 
-        self.other_pacs_user_username = 'loo'
-        self.other_pacs_user_password = 'lar'
-
-        pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
-        pacs_user = User.objects.create_user(username=self.other_pacs_user_username,
-                                        password=self.other_pacs_user_password)
-        pacs_user.groups.set([pacs_grp])
-
         pacs = PACS.objects.get(identifier=self.pacs_name)
         user = User.objects.get(username=self.username)
         query = {'SeriesInstanceUID': '2.3.15.2.1057'}
@@ -320,8 +320,8 @@ class PACSQueryDetailViewTests(PACSViewTests):
         self.assertContains(response, 'query1')
 
     def test_pacs_query_detail_success_other_pacs_user(self):
-        self.client.login(username=self.other_pacs_user_username,
-                          password=self.other_pacs_user_password)
+        self.client.login(username=self.another_username,
+                          password=self.another_password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, 'query1')
 
@@ -352,8 +352,8 @@ class PACSQueryDetailViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_pacs_query_update_failure_access_denied_other_pacs_user(self):
-        self.client.login(username=self.other_pacs_user_username,
-                          password=self.other_pacs_user_password)
+        self.client.login(username=self.another_username,
+                          password=self.another_password)
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -373,9 +373,165 @@ class PACSQueryDetailViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_pacs_query_delete_failure_access_denied_other_pacs_user(self):
-        self.client.login(username=self.other_pacs_user_username,
-                          password=self.other_pacs_user_password)
+        self.client.login(username=self.another_username,
+                          password=self.another_password)
         response = self.client.delete(self.read_update_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PACSRetrieveListViewTests(PACSViewTests):
+    """
+    Test the pacsretrieve-list view.
+    """
+
+    def setUp(self):
+        super(PACSRetrieveListViewTests, self).setUp()
+
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+                                                        owner=user, pacs=pacs)
+
+        PACSRetrieve.objects.get_or_create(pacs_query=pacs_query, owner=user)
+
+        self.create_read_url = reverse("pacsretrieve-list", kwargs={"pk": pacs_query.id})
+
+    def test_pacs_retrieve_list_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_list_success_readonly(self):
+        self.client.login(username=self.another_username, password=self.another_password) # a member of pacs_users
+        response = self.client.get(self.create_read_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_list_failure_unauthenticated(self):
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_retrieve_list_failure_forbiden(self):
+        self.client.login(username=self.other_username, password=self.other_password) # not a member of pacs_users
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pacs_retrieve_create_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url)  # empty data POST do not use content_type
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_pacs_retrieve_create_failure_unauthenticated(self):
+        response = self.client.post(self.create_read_url)  # empty data POST do not use content_type
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_retrieve_create_failure_forbidden(self):
+        self.client.login(username=self.another_username, password=self.another_password)
+        response = self.client.post(self.create_read_url)  # empty data POST do not use content_type
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PACSRetrieveListQuerySearchViewTests(PACSQueryListViewTests):
+    """
+    Test the pacsretrieve-list-query-search view.
+    """
+
+    def setUp(self):
+        super(PACSRetrieveListQuerySearchViewTests, self).setUp()
+
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+                                                        owner=user, pacs=pacs)
+
+        pacs_retrieve, _ = PACSRetrieve.objects.get_or_create(pacs_query=pacs_query,
+                                                              owner=user)
+
+        self.read_url = reverse("pacsretrieve-list-query-search",
+                                kwargs={"pk": pacs_query.id}) + f'?id={pacs_retrieve.id}'
+
+    def test_pacs_retrieve_list_query_search_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_list_query_search_success_readonly(self):
+        self.client.login(username=self.another_username, password=self.another_password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_list_query_search_failure_unauthenticated(self):
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_retrieve_list_query_search_failure_forbidden(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PACSRetrieveDetailViewTests(PACSViewTests):
+    """
+    Test the pacsretrieve-detail view.
+    """
+
+    def setUp(self):
+        super(PACSRetrieveDetailViewTests, self).setUp()
+
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+                                                        owner=user, pacs=pacs)
+
+        pacs_retrieve, _ = PACSRetrieve.objects.get_or_create(pacs_query=pacs_query,
+                                                              owner=user)
+
+        self.read_delete_url = reverse("pacsretrieve-detail", kwargs={"pk":pacs_retrieve.id})
+
+
+    def test_pacs_retrieve_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_detail_success_other_pacs_user(self):
+        self.client.login(username=self.another_username,
+                          password=self.another_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertContains(response, 'query1')
+
+    def test_pacs_retrieve_detail_failure_unauthenticated(self):
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_retrieve_detail_failure_forbidden(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pacs_retrieve_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_pacs_retrieve_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_retrieve_delete_failure_access_denied_non_pacs_user(self):
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pacs_retrieve_delete_failure_access_denied_other_pacs_user(self):
+        self.client.login(username=self.another_username,
+                          password=self.another_password)
+        response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 

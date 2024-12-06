@@ -390,6 +390,16 @@ urlpatterns = format_suffix_patterns([
          pacsfile_views.PACSQueryDetail.as_view(),
          name='pacsquery-detail'),
 
+    path('v1/pacs/queries/<int:pk>/retrieves/',
+         pacsfile_views.PACSRetrieveList.as_view(), name='pacsretrieve-list'),
+
+    path('v1/pacs/queries/<int:pk>/retrieves/search/',
+         pacsfile_views.PACSRetrieveListQuerySearch.as_view(),
+         name='pacsretrieve-list-query-search'),
+
+    path('v1/pacs/queries/retrieves/<int:pk>/',
+         pacsfile_views.PACSRetrieveDetail.as_view(), name='pacsretrieve-detail'),
+
     path('v1/pacs/<int:pk>/series/',
          pacsfile_views.PACSSpecificSeriesList.as_view(),
          name='pacs-specific-series-list'),
