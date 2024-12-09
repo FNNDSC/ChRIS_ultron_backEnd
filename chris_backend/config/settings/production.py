@@ -171,20 +171,28 @@ if AUTH_LDAP:
     AUTH_LDAP_GROUP_SEARCH_ROOT = get_secret('AUTH_LDAP_GROUP_SEARCH_ROOT')
     AUTH_LDAP_CHRIS_ADMIN_GROUP = get_secret('AUTH_LDAP_CHRIS_ADMIN_GROUP')
 
+    _user_search = env.str('AUTH_LDAP_USER_SEARCH_FILTER', default='(uid=%(user)s)')
     AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
-                                       '(uid=%(user)s)')
-    AUTH_LDAP_USER_ATTR_MAP = {
-        'first_name': 'givenName',
-        'last_name': 'sn',
-        'email': 'mail'
-    }
+                                       _user_search)
+    AUTH_LDAP_USER_ATTR_MAP = env.dict(
+        'AUTH_LDAP_USER_ATTR_MAP',
+        default={
+            'first_name': 'givenName',
+            'last_name': 'sn',
+            'email': 'mail'
+        }
+    )
+    _group_search = env.str('AUTH_LDAP_GROUP_SEARCH_FILTER', default='(objectClass=groupOfNames)')
     AUTH_LDAP_GROUP_SEARCH = LDAPSearch(AUTH_LDAP_GROUP_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
-                                        '(objectClass=groupOfNames)')
+                                        _group_search)
     AUTH_LDAP_GROUP_TYPE = GroupOfNamesType()
-    AUTH_LDAP_USER_FLAGS_BY_GROUP = {
-        'is_staff': f'cn={AUTH_LDAP_CHRIS_ADMIN_GROUP},{AUTH_LDAP_GROUP_SEARCH_ROOT}'
-    }
-    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = ['all_users']
+    AUTH_LDAP_USER_FLAGS_BY_GROUP = env.dict(
+        'AUTH_LDAP_USER_FLAGS_BY_GROUP',
+        default={
+            'is_staff': f'cn={AUTH_LDAP_CHRIS_ADMIN_GROUP},{AUTH_LDAP_GROUP_SEARCH_ROOT}'
+        }
+    )
+    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = env.list('AUTH_LDAP_MIRROR_GROUPS_EXCEPT', default=['all_users'])
 
     AUTHENTICATION_BACKENDS = (
         'users.models.CustomLDAPBackend',
