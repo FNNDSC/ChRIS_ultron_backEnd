@@ -11,10 +11,7 @@ from rest_framework import serializers
 from core.models import ChrisFolder
 from core.storage import connect_storage
 from core.serializers import ChrisFileSerializer
-from core.utils import json_zip2str
-
 from .models import PACS, PACSQuery, PACSRetrieve, PACSSeries, PACSFile
-from .services import PfdcmClient
 
 
 logger = logging.getLogger(__name__)
@@ -39,37 +36,29 @@ class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
     owner_username = serializers.ReadOnlyField(source='owner.username')
     result = serializers.ReadOnlyField()
+    status = serializers.ReadOnlyField()
     retrieve_list = serializers.HyperlinkedIdentityField(view_name='pacsretrieve-list')
 
     class Meta:
         model = PACSQuery
         fields = ('url', 'id', 'creation_date', 'title', 'query', 'description',
-                  'pacs_identifier', 'owner_username', 'result', 'retrieve_list')
+                  'status', 'pacs_identifier', 'owner_username', 'result',
+                  'retrieve_list')
 
     def create(self, validated_data):
         """
         Overriden to rise a serializer error when attempting to create a PACSQuery
-        object that results in a DB conflict. Then a PACS query operation is requested
-        to the PFDCM service.
+        object that results in a DB conflict.
         """
         title = validated_data['title']
-        query = validated_data['query']
         pacs_name = validated_data['pacs'].identifier
 
         try:
-            pacs_query  = super(PACSQuerySerializer, self).create(validated_data)
+            return super(PACSQuerySerializer, self).create(validated_data)
         except IntegrityError:
             error_msg = (f'You have already registered a PACS query with title={title} '
                          f'for pacs {pacs_name}')
             raise serializers.ValidationError([error_msg])
-
-        pfdcm_cl = PfdcmClient()
-        result = pfdcm_cl.query(pacs_name, query)
-
-        if result:
-            pacs_query.result = json_zip2str(result)
-            pacs_query.save()
-        return pacs_query
 
     def update(self, instance, validated_data):
         """
@@ -113,24 +102,6 @@ class PACSRetrieveSerializer(serializers.HyperlinkedModelSerializer):
         model = PACSRetrieve
         fields = ('url', 'id', 'creation_date', 'pacs_query_id', 'pacs_query_title',
                   'query', 'pacs_identifier', 'owner_username',  'result', 'pacs_query')
-
-    def create(self, validated_data):
-        """
-        Overriden to request a PACS retrieve operation to the PFDCM service.
-        """
-        pacs_query = validated_data['pacs_query']
-        query = pacs_query.query
-        pacs_name = pacs_query.pacs.identifier
-
-        pacs_retrieve = super(PACSRetrieveSerializer, self).create(validated_data)
-
-        pfdcm_cl = PfdcmClient()
-        result = pfdcm_cl.retrieve(pacs_name, query)
-
-        if result:
-            pacs_retrieve.result = json_zip2str(result)
-            pacs_retrieve.save()
-        return pacs_retrieve
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):

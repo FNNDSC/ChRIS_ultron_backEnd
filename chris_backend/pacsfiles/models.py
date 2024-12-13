@@ -10,8 +10,9 @@ import django_filters
 from django_filters.rest_framework import FilterSet
 
 from core.models import ChrisFolder, ChrisFile
-from core.utils import filter_files_by_n_slashes
+from core.utils import filter_files_by_n_slashes, json_zip2str
 from core.storage import connect_storage
+from .services import PfdcmClient
 
 
 logger = logging.getLogger(__name__)
@@ -43,12 +44,20 @@ class PACSFilter(FilterSet):
         fields = ['id', 'identifier', 'active']
 
 
+PACS_QUERY_STATUS_CHOICES = [("created",   "Default initial"),
+                             ("sent",      "Sent to PACS"),
+                             ("succeeded", "Finished successfully"),
+                             ("errored",   "Finished with error")]
+
+
 class PACSQuery(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     title = models.CharField(max_length=300, db_index=True)
     query = models.JSONField()
     description = models.CharField(max_length=700, blank=True)
     result = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=PACS_QUERY_STATUS_CHOICES,
+                              default='created')
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE, related_name='query_list')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
 
@@ -57,7 +66,28 @@ class PACSQuery(models.Model):
         unique_together = ('pacs', 'owner', 'title',)
 
     def __str__(self):
-        return self.query
+        return self.title
+
+    def send(self):
+        """
+        Custom method to send the query request to pfdcm service.
+        """
+        pacs_name = str(self.pacs.identifier)
+        query = self.query
+        pfdcm_cl = PfdcmClient()
+
+        self.status = 'sent'
+        self.save()
+        try:
+            result = pfdcm_cl.query(pacs_name, query)
+        except Exception:
+            self.status = 'errored'
+            self.save()
+        else:
+            if result:
+                self.result = json_zip2str(result)
+            self.status = 'succeeded'
+            self.save()
 
 
 class PACSQueryFilter(FilterSet):
@@ -81,9 +111,14 @@ class PACSQueryFilter(FilterSet):
                   'title', 'description', 'pacs_id', 'pacs_identifier', 'owner_username']
 
 
+PACS_RETRIEVE_STATUS_CHOICES = PACS_QUERY_STATUS_CHOICES
+
+
 class PACSRetrieve(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     result = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=PACS_RETRIEVE_STATUS_CHOICES,
+                              default='created')
     pacs_query = models.ForeignKey(PACSQuery, on_delete=models.CASCADE,
                                    related_name='retrieve_list')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)
@@ -92,7 +127,28 @@ class PACSRetrieve(models.Model):
         ordering = ('pacs_query', '-creation_date',)
 
     def __str__(self):
-        return self.pacs_query.query
+        return self.pacs_query.title
+
+    def send(self):
+        """
+        Custom method to send the retrieve request to pfdcm service.
+        """
+        pacs_query = self.pacs_query
+        pacs_name = str(pacs_query.pacs.identifier)
+        query = pacs_query.query
+        pfdcm_cl = PfdcmClient()
+
+        self.status = 'sent'
+        self.save()
+        try:
+            result = pfdcm_cl.retrieve(pacs_name, query)
+        except Exception:
+            self.status = 'errored'
+            self.save()
+        else:
+            if result:
+                self.result = json_zip2str(result)
+            self.save()
 
 
 class PACSRetrieveFilter(FilterSet):

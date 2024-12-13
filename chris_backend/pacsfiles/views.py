@@ -14,6 +14,7 @@ from core.views import TokenAuthSupportQueryString
 from .models import (PACS, PACSFilter, PACSQuery, PACSQueryFilter, PACSRetrieve,
                      PACSRetrieveFilter, PACSSeries, PACSSeriesFilter, PACSFile,
                      PACSFileFilter)
+from .tasks import send_pacs_query
 from .serializers import (PACSSerializer,  PACSQuerySerializer, PACSRetrieveSerializer,
                           PACSSeriesSerializer, PACSFileSerializer)
 from .services import PfdcmClient
@@ -41,9 +42,9 @@ class PACSList(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Overriden to contact pfdcm for new PACS available. New PACS might be created
-        with a POST request in the future but this is an initial implementation so no
-        changes are required to other backend services (oxidicom for instance).
+        Overriden to contact pfdcm service for new PACS available. New PACS might be
+        created with a POST request in the future but this is an initial implementation
+        so no changes are required to other backend services (oxidicom for instance).
         """
         queryset = PACS.objects.all()
         existing_pacs_names_set = {pacs.identifier for pacs in queryset}
@@ -172,10 +173,11 @@ class PACSQueryList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         """
         Overriden to associate the owner and the pacs with the PACS query before first
-        saving to the DB.
+        saving to the DB. Then the PACS query operation is sent to the remote PACS.
         """
         pacs = self.get_object()
-        serializer.save(owner=self.request.user, pacs=pacs)
+        pacs_query = serializer.save(owner=self.request.user, pacs=pacs)
+        send_pacs_query.delay(pacs_query.id)  # call async task
 
 
 class AllPACSQueryList(generics.ListAPIView):
@@ -297,10 +299,12 @@ class PACSRetrieveList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         """
         Overriden to associate the owner and the pacs query with the retrieve
-        before first saving to the DB.
+        before first saving to the DB. Then the PACS retrieve operation is sent to
+        the remote PACS.
         """
         pacs_query = self.get_object()
-        serializer.save(owner=self.request.user, pacs_query=pacs_query)
+        pacs_retrieve = serializer.save(owner=self.request.user, pacs_query=pacs_query)
+        pacs_retrieve.send()
 
 
 class PACSRetrieveListQuerySearch(generics.ListAPIView):

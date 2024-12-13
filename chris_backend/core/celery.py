@@ -33,6 +33,7 @@ task_routes = {
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_waiting_plugin_instances':
         {'queue': 'periodic'},
+    'pacsfiles.tasks.send_pacs_query': {'queue': 'main2'},
     'pacsfiles.tasks.register_pacs_series': {'queue': 'main2'}
 }
 app.conf.update(task_routes=task_routes)
