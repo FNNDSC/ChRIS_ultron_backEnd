@@ -4,11 +4,10 @@ import json
 import io
 from unittest import mock
 
-from django.test import TestCase, tag
+from django.test import TestCase, TransactionTestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.urls import reverse
-
 from rest_framework import status
 
 from core.models import ChrisFolder
@@ -190,7 +189,7 @@ class PACSQueryListViewTests(PACSViewTests):
         self.create_read_url = reverse("pacsquery-list", kwargs={"pk": pacs.id})
 
         query = {'SeriesInstanceUID': '2.3.15.2.1057'}
-        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query10', query=query,
                                                         owner=user, pacs=pacs)
 
         self.post = json.dumps(
@@ -200,7 +199,7 @@ class PACSQueryListViewTests(PACSViewTests):
     def test_pacs_query_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.create_read_url)
-        self.assertContains(response, 'query1')
+        self.assertContains(response, 'query10')
 
     def test_pacs_query_list_success_readonly(self):
         pacs = PACS.objects.get(identifier=self.pacs_name)
@@ -212,17 +211,24 @@ class PACSQueryListViewTests(PACSViewTests):
         self.client.login(username=self.other_username, password=self.other_password) # not a member of pacs_users
         response = self.client.get(self.create_read_url)
         self.assertContains(response, 'query2')  # can see its own queries
-        self.assertNotContains(response, 'query1')  # cannot see other users' queries
+        self.assertNotContains(response, 'query10')  # cannot see other users' queries
 
     def test_pacs_query_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_pacs_query_create_success(self):
-        self.client.login(username=self.username, password=self.password)
-        response = self.client.post(self.create_read_url, data=self.post,
-                                    content_type=self.content_type)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        with mock.patch.object(views.send_pacs_query, 'delay',
+                               return_value=None) as delay_mock:
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(self.create_read_url, data=self.post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the send_pacs_query task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+            self.assertEqual(response.data['status'], 'created')
 
     def test_pacs_query_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data=self.post,
@@ -236,13 +242,19 @@ class PACSQueryListViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class AllPACSQueryListViewTests(PACSQueryListViewTests):
+class AllPACSQueryListViewTests(PACSViewTests):
     """
     Test the allpacsquery-list view.
     """
 
     def setUp(self):
         super(AllPACSQueryListViewTests, self).setUp()
+
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+                                                        owner=user, pacs=pacs)
 
         self.read_url = reverse("allpacsquery-list")
 
@@ -268,13 +280,19 @@ class AllPACSQueryListViewTests(PACSQueryListViewTests):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class AllPACSQueryListQuerySearchViewTests(PACSQueryListViewTests):
+class AllPACSQueryListQuerySearchViewTests(PACSViewTests):
     """
     Test the allpacsquery-list-query-search view.
     """
 
     def setUp(self):
         super(AllPACSQueryListQuerySearchViewTests, self).setUp()
+
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query1', query=query,
+                                                        owner=user, pacs=pacs)
 
         self.read_url = reverse("allpacsquery-list-query-search") + '?name=query1'
 
@@ -432,7 +450,7 @@ class PACSRetrieveListViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class PACSRetrieveListQuerySearchViewTests(PACSQueryListViewTests):
+class PACSRetrieveListQuerySearchViewTests(PACSViewTests):
     """
     Test the pacsretrieve-list-query-search view.
     """
@@ -605,7 +623,7 @@ class PACSSeriesListViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class PACSSeriesListQuerySearchViewTests(PACSQueryListViewTests):
+class PACSSeriesListQuerySearchViewTests(PACSViewTests):
     """
     Test the pacsseries-list-query-search view.
     """

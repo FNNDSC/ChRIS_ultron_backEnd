@@ -8,7 +8,6 @@ from unittest import mock
 from rest_framework import serializers
 
 from core.models import ChrisFolder
-from core.utils import json_zip2str
 from pacsfiles.models import PACS, PACSQuery
 from pacsfiles.serializers import (PACSQuerySerializer, PACSRetrieveSerializer,
                                    PACSSeriesSerializer)
@@ -54,13 +53,9 @@ class PACSQuerySerializerTests(SerializerTests):
         query = {'SeriesInstanceUID': '2.3.15.2.1057'}
         data = {'title': 'query1', 'query': query, 'owner': user, 'pacs': pacs}
 
-        with mock.patch('pacsfiles.serializers.PfdcmClient.query') as pfdcm_query_mock:
-            result = {'mock': 'mock'}
-            pfdcm_query_mock.return_value = result
-            pacs_query_serializer = PACSQuerySerializer(data=data)
-            pacs_query = pacs_query_serializer.create(data)
-            pfdcm_query_mock.assert_called_with(self.pacs_name, query)
-            self.assertEqual(pacs_query.result, json_zip2str(result))
+        pacs_query_serializer = PACSQuerySerializer(data=data)
+        pacs_query = pacs_query_serializer.create(data)
+        self.assertEqual(pacs_query.status, 'created')
 
 
     def test_create_failure_pacs_user_title_combination_already_exists(self):
@@ -71,10 +66,10 @@ class PACSQuerySerializerTests(SerializerTests):
         user = User.objects.get(username=self.username)
         pacs = PACS.objects.get(identifier=self.pacs_name)
         query = {'SeriesInstanceUID': '1.3.12.2.1107'}
+        data = {'title': 'query2', 'query': query, 'owner': user, 'pacs': pacs}
 
         PACSQuery.objects.get_or_create(title='query2', query=query, owner=user, pacs=pacs)
 
-        data = {'title': 'query2', 'query': query, 'owner': user, 'pacs': pacs}
         pacs_query_serializer = PACSQuerySerializer(data=data)
         with self.assertRaises(serializers.ValidationError):
             pacs_query_serializer.create(data)
@@ -112,29 +107,6 @@ class PACSQuerySerializerTests(SerializerTests):
         pacs_query_serializer = PACSQuerySerializer(pacs_query, data)
         with self.assertRaises(serializers.ValidationError):
             pacs_query_serializer.update(pacs_query, data)
-
-
-class PACSRetrieveSerializerTests(SerializerTests):
-
-    def test_create_success(self):
-        """
-        Test whether overriden 'create' method successfully creates a new PACS retrieve.
-        """
-        user = User.objects.get(username=self.username)
-        pacs = PACS.objects.get(identifier=self.pacs_name)
-        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
-
-        pacs_query, _ = PACSQuery.objects.get_or_create(title='query2', query=query,
-                                                        owner=user, pacs=pacs)
-        data = {'pacs_query': pacs_query, 'owner': user}
-
-        with mock.patch('pacsfiles.serializers.PfdcmClient.retrieve') as pfdcm_retrieve_mock:
-            result = {'mock': 'mock'}
-            pfdcm_retrieve_mock.return_value = result
-            pacs_retrieve_serializer = PACSRetrieveSerializer(data=data)
-            pacs_retrieve = pacs_retrieve_serializer.create(data)
-            pfdcm_retrieve_mock.assert_called_with(self.pacs_name, query)
-            self.assertEqual(pacs_retrieve.result, json_zip2str(result))
 
 
 class PACSSeriesSerializerTests(SerializerTests):

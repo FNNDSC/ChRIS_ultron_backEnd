@@ -1,8 +1,21 @@
+
 from typing import Optional
-from celery import shared_task
+
 from django.contrib.auth.models import User
 
+from celery import shared_task
+from .models import PACSQuery
 from .serializers import PACSSeriesSerializer
+
+
+@shared_task
+def send_pacs_query(pacs_query_id):
+    """
+    Send PACS query.
+    """
+    #from celery.contrib import rdb;rdb.set_trace()
+    pacs_query = PACSQuery.objects.get(pk=pacs_query_id)
+    pacs_query.send()
 
 
 @shared_task
