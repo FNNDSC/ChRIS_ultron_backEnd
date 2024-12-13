@@ -108,7 +108,8 @@ class PACSQueryFilter(FilterSet):
     class Meta:
         model = PACSQuery
         fields = ['id', 'min_creation_date', 'max_creation_date', 'title_exact',
-                  'title', 'description', 'pacs_id', 'pacs_identifier', 'owner_username']
+                  'title', 'status', 'description', 'pacs_id', 'pacs_identifier',
+                  'owner_username']
 
 
 PACS_RETRIEVE_STATUS_CHOICES = PACS_QUERY_STATUS_CHOICES
@@ -161,7 +162,8 @@ class PACSRetrieveFilter(FilterSet):
 
     class Meta:
         model = PACSRetrieve
-        fields = ['id', 'min_creation_date', 'max_creation_date', 'owner_username']
+        fields = ['id', 'min_creation_date', 'max_creation_date', 'status',
+                  'owner_username']
 
 
 class PACSSeries(models.Model):

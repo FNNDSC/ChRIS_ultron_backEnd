@@ -95,13 +95,15 @@ class PACSRetrieveSerializer(serializers.HyperlinkedModelSerializer):
     pacs_identifier = serializers.ReadOnlyField(source='pacs_query.pacs.identifier')
     owner_username = serializers.ReadOnlyField(source='owner.username')
     result = serializers.ReadOnlyField()
+    status = serializers.ReadOnlyField()
     pacs_query = serializers.HyperlinkedRelatedField(view_name='pacsquery-detail',
                                                      read_only=True)
 
     class Meta:
         model = PACSRetrieve
         fields = ('url', 'id', 'creation_date', 'pacs_query_id', 'pacs_query_title',
-                  'query', 'pacs_identifier', 'owner_username',  'result', 'pacs_query')
+                  'query', 'pacs_identifier', 'status', 'owner_username', 'result',
+                  'pacs_query')
 
 
 class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
