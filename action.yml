@@ -14,7 +14,7 @@ inputs:
 
 runs:
   using: node20
-  pre: githubActions/pre.js
+  pre: githubActions/setup.js
   main: githubActions/main.js
   post: githubActions/cleanup.js
 
