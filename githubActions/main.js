@@ -1,11 +1,11 @@
 const child_process = require('child_process');
+const path = require('path');
 
 const CONTAINER_ENGINE = process.env.INPUT_ENGINE;
 const JUST_COMMAND = process.env.INPUT_COMMAND;
 
 const script = `
 set -x
-cd ${__dirname}/..
 just prefer ${CONTAINER_ENGINE}
 
 # start-up is being retried as a workaround for
@@ -28,5 +28,10 @@ fi
 exit $rc
 `;
 
-child_process.execFileSync('bash', ['-c', script], { stdio: 'inherit' });
+child_process.execFileSync('bash', ['-c', script],
+  {
+    stdio: 'inherit',
+    cwd: path.resolve(__dirname, '..')
+  }
+);
 
