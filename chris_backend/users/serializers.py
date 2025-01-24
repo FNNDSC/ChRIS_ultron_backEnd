@@ -24,12 +24,8 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
         """
         Overriden to take care of the password hashing.
         """
-        username = validated_data.get('username')
-        email = validated_data.get('email')
-        password = validated_data.get('password')
-
         # create user taking care of the password hashing and setup groups and home folder
-        return UserProxy.objects.create_user(username, email, password)
+        return UserProxy.objects.create_user(**validated_data)
 
     def validate_username(self, username):
         """
