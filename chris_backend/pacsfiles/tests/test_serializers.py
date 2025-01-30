@@ -1,5 +1,7 @@
 
 import logging
+import io
+import os
 
 from django.contrib.auth.models import User
 from django.test import TestCase, tag
@@ -8,6 +10,7 @@ from unittest import mock
 from rest_framework import serializers
 
 from core.models import ChrisFolder
+from core.storage import connect_storage
 from pacsfiles.models import PACS, PACSQuery
 from pacsfiles.serializers import (PACSQuerySerializer, PACSRetrieveSerializer,
                                    PACSSeriesSerializer)
@@ -111,6 +114,65 @@ class PACSQuerySerializerTests(SerializerTests):
 
 class PACSSeriesSerializerTests(SerializerTests):
 
+    @tag('integration')
+    def test_create_success(self):
+        """
+        Test whether overriden 'create' method successfully creates a new PACS series.
+        """
+        chris_user = User.objects.get(username=self.chris_username)
+        path = f'SERVICES/PACS/{self.pacs_name}/123456-crazy/brain_crazy_study'
+        data = {'PatientID': '123456', 'PatientName': 'crazy',
+                'StudyDate': '2020-07-15',
+                'StudyInstanceUID': '1.1.3432.54.6545674765.765434',
+                'StudyDescription': 'brain_crazy_study',
+                'SeriesDescription': 'SAG T1 MPRAGE',
+                'SeriesInstanceUID': '2.4.3432.54.845674765.763345',
+                'owner': chris_user,
+                'pacs_name': f'{self.pacs_name}', 'path': path}
+
+        storage_manager = connect_storage(settings)
+
+        # upload two files to the storage PACS's space
+        with io.StringIO('Test file') as f:
+            storage_manager.upload_obj(path + '/, ,/SAG,T1,MPRAGE/tes,t1.dcm', f.read(),
+                                       content_type='text/plain')
+            f.seek(0)
+            storage_manager.upload_obj(path + '/, ,/SAG,T1,MPRAGE/test2.dcm', f.read(),
+                                       content_type='text/plain')
+
+        data['files_in_storage'] = [path + '/, ,/SAG,T1,MPRAGE/tes,t1.dcm',
+                                    path + '/, ,/SAG,T1,MPRAGE/test2.dcm']
+        pacs_series_serializer = PACSSeriesSerializer(data=data)
+        pacs_series = pacs_series_serializer.create(data)
+
+        self.assertEqual(str(pacs_series.folder.path), path)
+
+        folders = pacs_series.folder.children.all()
+        self.assertEqual(len(folders), 1)
+
+        folder = folders.first()
+        fnames = [f.fname.name for f in folder.chris_files.all()]
+
+        self.assertEqual(len(fnames), 2)
+        self.assertIn(path + '/SAGT1MPRAGE/test1.dcm', fnames)
+        self.assertIn(path + '/SAGT1MPRAGE/test2.dcm', fnames)
+
+        # delete files from storage
+        storage_manager.delete_path(path)
+
+
+    def test_validate_pacs_name_failure_contains_commas_or_slashes(self):
+        """
+        Test whether overriden validate_pacs_name method validates that the provided
+        PACS name does not contain commas or forward slashes.
+        """
+        pacs_series_serializer = PACSSeriesSerializer()
+
+        with self.assertRaises(serializers.ValidationError):
+            pacs_series_serializer.validate_pacs_name('My/pacs')
+        with self.assertRaises(serializers.ValidationError):
+            pacs_series_serializer.validate_pacs_name('My,pacs')
+
     def test_validate_ndicom_failure_not_positive(self):
         """
         Test whether overriden validate_ndicom method validates submitted ndicom must
@@ -126,6 +188,17 @@ class PACSSeriesSerializerTests(SerializerTests):
         """
         pacs_series_serializer = PACSSeriesSerializer()
         self.assertEqual(pacs_series_serializer.validate_ndicom(1), 1)
+
+    def test_validate_path_failure_contains_commas(self):
+        """
+        Test whether overriden validate_path method validates that the provided
+        path does not contain commas or forward slashes.
+        """
+        pacs_series_serializer = PACSSeriesSerializer()
+
+        with self.assertRaises(serializers.ValidationError):
+            path = 'SERVICES/PACS/MyPACS/123456-crazy/brain,crazy,study/SAG_T1_MPRAGE'
+            pacs_series_serializer.validate_path(path)
 
     def test_validate_path_failure_does_not_start_with_SERVICES_PACS(self):
         """

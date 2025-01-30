@@ -603,6 +603,18 @@ class PipelineSourceFileSerializerTests(SerializerTests):
                                  '{"name": "plugininstances",' \
                                  '"default": "simpledsapp1,simpledsapp2"}]}]}'
 
+    def test_validate_fname(self):
+        """
+        Test whether overriden validate_fname method validates that a file
+        name does not only contain commas and white spaces.
+        """
+        pipeline_file_serializer = PipelineSourceFileSerializer()
+        fname = mock.Mock()
+        fname.name = 'User/path/, ,'
+
+        with self.assertRaises(serializers.ValidationError):
+            pipeline_file_serializer.validate_fname(fname)
+
     def test_read_yaml_pipeline_representation(self):
         """
         Test whether custom read_yaml_pipeline_representation method returns an appropriate

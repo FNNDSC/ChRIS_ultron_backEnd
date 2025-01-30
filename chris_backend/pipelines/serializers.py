@@ -522,7 +522,7 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
             parent_folder.grant_public_access()
 
         fname = validated_data['fname']
-        filename = os.path.basename(fname.name)
+        filename = os.path.basename(fname.name).replace(',', '')
         validated_data['parent_folder'] = parent_folder
         source_file = PipelineSourceFile(**validated_data)
         source_file.public = True
@@ -534,6 +534,16 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
                                                      source_file=source_file,
                                                      uploader=uploader)
         return source_file
+
+    def validate_fname(self, fname):
+        """
+        Overriden to handle a file name that only contain commas and white spaces.
+        """
+        name = os.path.basename(fname.name)
+
+        if name.replace(',', '').strip() == '':
+            raise serializers.ValidationError([f"Invalid object name '{name}'."])
+        return fname
 
     def validate(self, data):
         """

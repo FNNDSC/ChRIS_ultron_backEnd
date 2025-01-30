@@ -29,11 +29,12 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_username(self, username):
         """
-        Overriden to check that the username does not contain forward slashes.
+        Overriden to check that the username does not contain commas
+        or forward slashes.
         """
-        if '/' in username:
+        if '/' in username or ',' in username:
             raise serializers.ValidationError(
-                ["This field may not contain forward slashes."])
+                ["This field may not contain commas or forward slashes."])
         return username
 
 
