@@ -221,7 +221,61 @@ class PluginInstanceManagerTests(TestCase):
         self.assertTrue(self.storage_manager.obj_exists(str_fileCreatedByPlugin))
 
         # delete files from storage
-        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
-        for obj in files_in_storage:
-            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_path(pl_inst.output_folder.path)
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
+
+    @tag('integration')
+    def test_integration_mananger_can_register_output_files(self):
+        """
+        Test whether the manager can register output files.
+        """
+        # create a plugin's instance
+        user_space_path = 'home/%s/uploads/' % self.username
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, status='finishedSuccessfully',
+            compute_resource=plugin.compute_resources.all()[0])
+
+        pl_param = plugin.parameters.all()[0]
+        PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
+                                            value=user_space_path)
+
+        outputdir = pl_inst.get_output_path()
+
+        # upload two files to the plugin instance's output path
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(outputdir + '/, ,/SAG,T1,MPRAGE/tes,t1.txt',
+                                            f.read(), content_type='text/plain')
+            f.seek(0)
+            self.storage_manager.upload_obj(outputdir + '/, ,/SAG,T1,MPRAGE/test2.txt',
+                                            f.read(), content_type='text/plain')
+
+        plg_inst_manager = manager.PluginInstanceManager(pl_inst)
+        plg_inst_manager.plugin_inst_output_files = {
+            outputdir + '/, ,/SAG,T1,MPRAGE/tes,t1.txt',
+            outputdir + '/, ,/SAG,T1,MPRAGE/test2.txt'}
+
+        plg_inst_manager._register_output_files()
+
+        self.assertEqual(pl_inst.get_output_path(), outputdir)
+
+        folders = pl_inst.output_folder.children.all()
+        self.assertEqual(len(folders), 1)
+
+        folder = folders.first()
+        fnames = [f.fname.name for f in folder.chris_files.all()]
+
+        self.assertEqual(len(fnames), 2)
+        self.assertIn(outputdir + '/SAGT1MPRAGE/test1.txt', fnames)
+        self.assertIn(outputdir + '/SAGT1MPRAGE/test2.txt', fnames)
+
+        self.assertEqual(len(plg_inst_manager.plugin_inst_output_files), 2)
+        self.assertIn(outputdir + '/SAGT1MPRAGE/test1.txt',
+                      plg_inst_manager.plugin_inst_output_files)
+        self.assertIn(outputdir + '/SAGT1MPRAGE/test2.txt',
+                      plg_inst_manager.plugin_inst_output_files)
+
+        # delete files from storage
+        self.storage_manager.delete_path(outputdir)

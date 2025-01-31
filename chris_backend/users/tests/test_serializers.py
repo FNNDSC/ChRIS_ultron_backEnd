@@ -58,12 +58,15 @@ class UserSerializerTests(SerializerTests):
     def test_validate_username(self):
         """
         Test whether overriden validate_username method raises a
-        serializers.ValidationError when the username contains forward slashes.
+        serializers.ValidationError when the username contains commas or
+        forward slashes.
         """
         user_serializer = UserSerializer()
 
         with self.assertRaises(serializers.ValidationError):
             user_serializer.validate_username('user/')
+        with self.assertRaises(serializers.ValidationError):
+            user_serializer.validate_username('user,')
 
         username = user_serializer.validate_username(self.username)
         self.assertEqual(username, self.username)

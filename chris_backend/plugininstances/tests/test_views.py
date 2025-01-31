@@ -396,9 +396,7 @@ class PluginInstanceListViewTests(TasksViewTests):
                                                         '/test.txt'))
 
         # delete files from storage
-        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
-        for obj in files_in_storage:
-            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_path(pl_inst.output_folder.path)
         self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
     @tag('integration')
@@ -489,9 +487,7 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.assertTrue(self.storage_manager.obj_exists(link_file.fname.name))
 
         # delete files from storage
-        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
-        for obj in files_in_storage:
-            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_path(pl_inst.output_folder.path)
         self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
     @tag('integration')
@@ -622,9 +618,7 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.assertTrue(self.storage_manager.obj_exists(link_file.fname.name))
 
         # delete files from storage
-        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
-        for obj in files_in_storage:
-            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_path(pl_inst.output_folder.path)
         self.storage_manager.delete_obj(path)
         self.storage_manager.delete_obj(self.user_space_path + 'test.txt')
 
@@ -763,9 +757,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         self.assertContains(response, "simplefsapp")
 
         # delete files from storage
-        files_in_storage = self.storage_manager.ls(pl_inst.output_folder.path)
-        for obj in files_in_storage:
-            self.storage_manager.delete_obj(obj)
+        self.storage_manager.delete_path(pl_inst.output_folder.path)
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
 
     def test_plugin_instance_detail_failure_unauthenticated(self):

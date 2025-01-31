@@ -82,9 +82,12 @@ class UserFileSerializer(ChrisFileSerializer):
 
     def validate_upload_path(self, upload_path):
         """
-        Overriden to check whether the provided path is under a home/'s subdirectory
-        for which the user has write permission.
+        Overriden to check whether the provided path does not contain commas and is
+        under a home/'s subdirectory for which the user has write permission.
         """
+        if ',' in upload_path:
+            raise serializers.ValidationError([f"Invalid path. Cannot contain commas."])
+
         upload_path = upload_path.strip().strip('/')
 
         if upload_path.endswith('.chrislink'):

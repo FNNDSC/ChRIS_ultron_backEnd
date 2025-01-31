@@ -5,6 +5,8 @@ Swift storage manager module.
 import logging
 import os
 import time
+from pathlib import Path
+from typing import Dict
 
 from swiftclient import Connection
 from swiftclient.exceptions import ClientException
@@ -193,3 +195,44 @@ class SwiftManager(StorageManager):
         l_ls = self.ls(path)
         for obj_path in l_ls:
             self.delete_obj(obj_path)
+
+    def sanitize_obj_names(self, path: str) -> Dict[str, str]:
+        """
+        Removes commas from the paths of all objects that start with the specified
+        input path/prefix.
+        Handles special cases:
+            - Objects with names that only contain commas and white spaces are deleted.
+            - "Folders" with names that only contain commas and white spaces are removed
+            after moving their contents to the parent folder.
+
+        Returns a dictionary that only contains modified object paths. Keys are the
+        original object paths and values are the new object paths. Deleted objects have
+        the empty string as the value.
+        """
+        new_obj_paths = {}
+        l_ls = self.ls(path)
+
+        if len(l_ls) != 1 or l_ls[0] != path:  # Path is a prefix
+            p = Path(path)
+
+            for obj_path in l_ls:
+                p_obj = Path(obj_path)
+
+                if p_obj.name.replace(',', '').strip() == '':
+                    self.delete_obj(obj_path)
+                    new_obj_paths[obj_path] = ''
+                else:
+                    new_parts = []
+                    for part in p_obj.relative_to(p).parts:
+                        new_part = part.replace(',', '')
+                        if new_part.strip() != '':
+                            new_parts.append(new_part)
+
+                    new_p_obj = p / Path(*new_parts)
+
+                    if new_p_obj != p_obj:  # Final file path is different
+                        new_obj_path = str(new_p_obj)
+                        self.copy_obj(obj_path, new_obj_path)
+                        self.delete_obj(obj_path)
+                        new_obj_paths[obj_path] = new_obj_path
+        return new_obj_paths

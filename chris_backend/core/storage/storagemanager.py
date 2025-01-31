@@ -1,5 +1,6 @@
+
 import abc
-from typing import List, AnyStr, Optional
+from typing import List, Dict, AnyStr, Optional
 
 
 class StorageManager(abc.ABC):
@@ -84,5 +85,19 @@ class StorageManager(abc.ABC):
     def delete_path(self, path: str) -> None:
         """
         Delete all the data under a path.
+        """
+        ...
+
+    def sanitize_obj_names(self, path: str) -> Dict[str, str]:
+        """
+        Removes commas from the names of all files and folders under the input path.
+        Handles special cases:
+            - Files with names that only contain commas and white spaces are deleted.
+            - Folders with names that only contain commas and white spaces are removed
+            after moving their contents to the parent folder.
+
+        Returns a dictionary that only contains the modified file paths. Keys are the
+        original file paths and values are the new file paths. Deleted files have
+        the empty string as their value.
         """
         ...

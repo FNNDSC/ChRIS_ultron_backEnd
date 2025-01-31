@@ -85,10 +85,13 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate_path(self, path):
         """
-        Overriden to check whether the provided path is under a home/'s subdirectory
-        for which the user has write permission. Also to check whether the folder
-        already exists.
+        Overriden to check whether the provided path does not contain commas and
+        is under a home/'s subdirectory for which the user has write permission.
+        Also to check whether the folder already exists.
         """
+        if ',' in path:
+            raise serializers.ValidationError([f"Invalid path. Cannot contain commas."])
+
         # remove leading and trailing slashes
         path = path.strip().strip('/')
 

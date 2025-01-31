@@ -1030,29 +1030,42 @@ class PluginInstanceManager(object):
     def _register_output_files(self):
         """
         Internal method to register output files generated for the plugin instance with
-        the DB.
+        the DB. Handles special cases:
+            - Files with names that only contain commas and white spaces are deleted.
+            - Folders with names that only contain commas and white spaces are removed
+            after moving their contents to the parent folder.
         """
         job_id = self.str_job_id
         logger.info('Registering output files with job %s', job_id)
 
         owner = self.c_plugin_inst.owner
+        outputdir = self.c_plugin_inst.get_output_path()
         files = []
         folders = {}
 
-        for obj_name in self.plugin_inst_output_files:
-            logger.info(f'Registering file -->{obj_name}<-- for job {job_id}')
+        # remove commas from the existing files/folders names and handle the special cases
+        changed_file_paths = self.storage_manager.sanitize_obj_names(outputdir)
 
-            folder_path = os.path.dirname(obj_name)
-            parent_folder = folders.get(folder_path)
-            if parent_folder is None:
-                (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
-                                                                       owner=owner)
-                folders[folder_path] = parent_folder
+        for obj_path in self.plugin_inst_output_files:
+            if obj_path in changed_file_paths:
+                obj_path = changed_file_paths[obj_path]
 
-            plg_inst_file = UserFile(owner=owner, parent_folder=parent_folder)
-            plg_inst_file.fname.name = obj_name
-            files.append(plg_inst_file)
+            if obj_path:
+                logger.info(f'Registering file -->{obj_path}<-- for job {job_id}')
 
+                folder_path = os.path.dirname(obj_path)
+                parent_folder = folders.get(folder_path)
+
+                if parent_folder is None:
+                    (parent_folder, _) = ChrisFolder.objects.get_or_create(
+                        path=folder_path, owner=owner)
+                    folders[folder_path] = parent_folder
+
+                plg_inst_file = UserFile(owner=owner, parent_folder=parent_folder)
+                plg_inst_file.fname.name = obj_path
+                files.append(plg_inst_file)
+
+        self.plugin_inst_output_files = {f.fname.name for f in files}
         db_files = UserFile.objects.bulk_create(files)
 
         total_size = 0

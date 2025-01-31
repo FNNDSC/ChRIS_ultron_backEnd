@@ -1,7 +1,7 @@
 
 from pathlib import Path
 import shutil
-from typing import Union, List, AnyStr, Optional
+from typing import Union, List, Dict, AnyStr, Optional
 
 from core.storage.storagemanager import StorageManager
 
@@ -106,3 +106,61 @@ class FilesystemManager(StorageManager):
             shutil.rmtree(p)
         else:
             self.delete_obj(path)
+
+
+    def sanitize_obj_names(self, path: str) -> Dict[str, str]:
+        """
+        Removes commas from the names of all files and folders under the specified
+        input folder path.
+        Handles special cases:
+            - Files with names that only contain commas and white spaces are deleted.
+            - Folders with names that only contain commas and white spaces are removed
+            after moving their contents to the parent folder.
+
+        Returns a dictionary that only contains modified file paths. Keys are the
+        original file paths and values are the new file paths. Deleted files have
+        the empty string as the value.
+        """
+        new_file_paths = {}
+        p = self.__base / path
+        p_rel = Path(path)
+
+        if p.is_dir():
+            for item in sorted(p.rglob('*'), key=lambda i: len(i.parts), reverse=True):
+                # Sorted by depth (deepest paths first) to handle files and subfolders
+                # before their parent folders
+                new_name = item.name.replace(',', '')
+
+                if item.is_file():
+                    item_rel_path = item.relative_to(self.__base)
+
+                    if new_name.strip() == '':
+                        item.unlink()  # Delete the file
+                        new_file_paths[str(item_rel_path)] = ''
+                    else:
+                        if item.name != new_name:
+                            new_path = item.with_name(new_name)
+                            item.rename(new_path)  # Filesystem op
+
+                        new_parts = []
+                        for part in item.relative_to(p).parts:
+                            new_part = part.replace(',', '')
+                            if new_part.strip() != '':
+                                new_parts.append(new_part)
+
+                        new_item_rel_path = p_rel / Path(*new_parts)
+                        if new_item_rel_path != item_rel_path:  # Final file path changes
+                            new_file_paths[str(item_rel_path)] = str(new_item_rel_path)
+
+                elif item.is_dir():
+                    if new_name.strip() == '':
+                        # Move contents to the parent folder
+                        parent = item.parent
+                        for subitem in item.iterdir():
+                            shutil.move(str(subitem), str(parent))
+                        item.rmdir()  # Remove the now-empty folder
+                    else:
+                        if item.name != new_name:
+                            new_path = item.with_name(new_name)
+                            item.rename(new_path)  # Filesystem op
+        return new_file_paths
