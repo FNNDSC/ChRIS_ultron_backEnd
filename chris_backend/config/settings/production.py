@@ -127,6 +127,10 @@ LOGGING = {
 CORS_ALLOW_ALL_ORIGINS = get_secret('DJANGO_CORS_ALLOW_ALL_ORIGINS', env.bool)
 CORS_ALLOWED_ORIGINS = get_secret('DJANGO_CORS_ALLOWED_ORIGINS', env.list)
 
+# client checks Allow header to know if sign-ups are allowed by getting api/v1/users/
+# https://github.com/FNNDSC/ChRIS_ui/commit/dd045b3e678bd5338567aeea4eaa4551a27bb63f
+CORS_EXPOSE_HEADERS = ('Allow',) 
+
 
 # NATS SETTINGS
 # ------------------------------------------------------------------------------
