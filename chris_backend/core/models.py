@@ -194,8 +194,8 @@ class ChrisFolder(models.Model):
         Custom method to grant a group a permission to access the folder and all its
         descendant folders, link files and files.
         """
-        FolderGroupPermission.objects.create(folder=self, group=group,
-                                             permission=permission)
+        FolderGroupPermission.objects.update_or_create(folder=self, group=group,
+                                                       defaults={'permission': permission})
 
     def remove_group_permission(self, group, permission):
         """
@@ -210,7 +210,8 @@ class ChrisFolder(models.Model):
         Custom method to grant a user a permission to access the folder and all its
         descendant folders, link files and files.
         """
-        FolderUserPermission.objects.create(folder=self, user=user, permission=permission)
+        FolderUserPermission.objects.update_or_create(folder=self, user=user,
+                                                      defaults={'permission': permission})
 
     def remove_user_permission(self, user, permission):
         """

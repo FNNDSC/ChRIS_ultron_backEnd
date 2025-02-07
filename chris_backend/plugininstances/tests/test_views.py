@@ -363,8 +363,14 @@ class PluginInstanceListViewTests(TasksViewTests):
                                     content_type=self.content_type)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # instance must be 'started' before checking its status
         pl_inst = PluginInstance.objects.get(pk=response.data['id'])
+
+        # share the instance's feed with another user
+        user = User.objects.get(username=self.other_username)
+        pl_inst.feed.grant_user_permission(user)
+        self.assertTrue(pl_inst.output_folder.has_user_permission(user, 'w'))
+
+        # instance must be 'started' before checking its status
         for _ in range(10):
             time.sleep(3)
             pl_inst.refresh_from_db()
