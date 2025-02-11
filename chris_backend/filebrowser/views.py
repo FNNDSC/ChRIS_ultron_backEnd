@@ -1,5 +1,6 @@
 
 import logging
+from pathlib import Path
 
 from django.http import Http404, FileResponse
 from django.shortcuts import get_object_or_404
@@ -492,7 +493,10 @@ class FileBrowserFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         chris_file = self.get_object()
-        return FileResponse(chris_file.fname)
+        f = chris_file.fname
+        resp = FileResponse(f)
+        resp['Content-Disposition'] = f'attachment; filename="{Path(f.name).name}"'
+        return resp
 
 
 class FileBrowserFileGroupPermissionList(generics.ListCreateAPIView):
@@ -820,7 +824,10 @@ class FileBrowserLinkFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         chris_link_file = self.get_object()
-        return FileResponse(chris_link_file.fname)
+        f = chris_link_file.fname
+        resp = FileResponse(f)
+        resp['Content-Disposition'] = f'attachment; filename="{Path(f.name).name}"'
+        return resp
 
 
 class FileBrowserLinkFileGroupPermissionList(generics.ListCreateAPIView):
