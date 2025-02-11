@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 from django.http import FileResponse
 from django.contrib.auth.models import User, Group
 from django.shortcuts import get_object_or_404
@@ -463,4 +465,7 @@ class PACSFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         pacs_file = self.get_object()
-        return FileResponse(pacs_file.fname)
+        f = pacs_file.fname
+        resp = FileResponse(f)
+        resp['Content-Disposition'] = f'attachment; filename="{Path(f.name).name}"'
+        return resp

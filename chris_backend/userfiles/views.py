@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 from django.http import FileResponse
 
 from rest_framework import generics, permissions
@@ -127,4 +129,7 @@ class UserFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         user_file = self.get_object()
-        return FileResponse(user_file.fname)
+        f = user_file.fname
+        resp = FileResponse(f)
+        resp['Content-Disposition'] = f'attachment; filename="{Path(f.name).name}"'
+        return resp

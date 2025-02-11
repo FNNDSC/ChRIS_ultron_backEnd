@@ -1,5 +1,6 @@
 
 import logging
+import uuid
 import jwt
 
 from django.contrib.auth.models import User
@@ -51,8 +52,8 @@ class FileDownloadTokenList(generics.ListCreateAPIView):
         """
         user = self.request.user
         dt = timezone.now() + timezone.timedelta(minutes=10)
-        token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
-                           algorithm='HS256')
+        token = jwt.encode({'user': user.username, 'nonce': str(uuid.uuid4()), 'exp': dt},
+                           settings.SECRET_KEY, algorithm='HS256')
         serializer.save(token=token, owner=user)
 
     def list(self, request, *args, **kwargs):

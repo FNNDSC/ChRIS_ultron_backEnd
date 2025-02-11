@@ -1,5 +1,6 @@
 
 import logging
+from pathlib import Path
 
 from django.http import FileResponse
 from django.contrib.auth.models import User
@@ -202,7 +203,10 @@ class PipelineSourceFileResource(generics.GenericAPIView):
         Overriden to be able to make a GET request to an actual file resource.
         """
         source_file = self.get_object()
-        return FileResponse(source_file.fname)
+        f = source_file.fname
+        resp = FileResponse(f)
+        resp['Content-Disposition'] = f'attachment; filename="{Path(f.name).name}"'
+        return resp
 
 
 class PipelinePluginList(generics.ListAPIView):
