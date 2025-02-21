@@ -337,6 +337,17 @@ class ChrisFolder(models.Model):
         ChrisLinkFile.objects.bulk_update(link_files, ['public'])
 
 
+@receiver(post_delete, sender=ChrisFolder)
+def auto_delete_folder_from_storage(sender, instance, **kwargs):
+    storage_path = instance.path
+    storage_manager = connect_storage(settings)
+    try:
+        if storage_manager.path_exists(storage_path):
+            storage_manager.delete_path(storage_path)
+    except Exception as e:
+        logger.error('Storage error, detail: %s' % str(e))
+
+
 class ChrisFolderFilter(FilterSet):
     path = django_filters.CharFilter(field_name='path')
 

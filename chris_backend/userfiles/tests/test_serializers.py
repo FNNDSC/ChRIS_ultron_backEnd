@@ -53,11 +53,12 @@ class UserFileSerializerTests(TestCase):
         user_file = userfiles_serializer.create(validated_data)
         self.assertEqual(user_file.fname.name, f'home/{self.username}/uploads/file1.txt')
         self.assertEqual(user_file.parent_folder.path, f'home/{self.username}/uploads')
+        user_file.delete()
 
     def test_update(self):
         """
-        Test whether overriden 'update' method successfully updates a UserFile with
-        the correct path and parent folder
+        Test whether overriden 'update' method successfully moves a UserFile to the
+        correct path.
         """
         owner = User.objects.get(username=self.username)
         upload_path = f'home/{self.username}/uploads/file1.txt'
@@ -71,18 +72,9 @@ class UserFileSerializerTests(TestCase):
         userfiles_serializer = UserFileSerializer()
         validated_data = {'upload_path': f'home/{self.username}/tests/file1.txt'}
 
-        storage_manager_mock = mock.Mock()
-        storage_manager_mock.copy_obj = mock.Mock()
-        storage_manager_mock.delete_obj = mock.Mock()
-
-        with mock.patch('userfiles.serializers.connect_storage') as connect_storage_mock:
-            connect_storage_mock.return_value=storage_manager_mock
-            user_file = userfiles_serializer.update(user_file, validated_data)
-            storage_manager_mock.copy_obj.assert_called_with(upload_path, f'home/{self.username}/tests/file1.txt')
-            self.assertEqual(user_file.fname.name,f'home/{self.username}/tests/file1.txt')
-            self.assertEqual(user_file.parent_folder.path, f'home/{self.username}/tests')
-            connect_storage_mock.assert_called_with(settings)
-            storage_manager_mock.delete_obj.assert_called_with(upload_path)
+        user_file.move = mock.Mock()
+        user_file = userfiles_serializer.update(user_file, validated_data)
+        user_file.move.assert_called_with(f'home/{self.username}/tests/file1.txt')
 
     def test_validate_upload_path_failure_contains_commas(self):
         """
