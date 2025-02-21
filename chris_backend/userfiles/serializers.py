@@ -1,11 +1,9 @@
 
 import os
 
-from django.conf import settings
 from rest_framework import serializers
 
 from core.models import ChrisFolder
-from core.storage import connect_storage
 from core.serializers import ChrisFileSerializer
 from .models import UserFile
 
@@ -46,38 +44,31 @@ class UserFileSerializer(ChrisFileSerializer):
 
     def update(self, instance, validated_data):
         """
-        Overriden to set the file's saving path and parent folder and delete the old
-        path from storage.
+        Overriden to grant or remove public access to the file and/or move it to a new
+        path.
         """
-        if 'public' in validated_data:
-            instance.public = validated_data['public']
+        public = instance.public
+
+        if public and 'public' in validated_data and not validated_data['public']:
+            instance.remove_public_link()
+            instance.remove_public_access()
 
         upload_path = validated_data.pop('upload_path', None)
 
         if upload_path:
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.remove_public_link()
+
             # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
             # where <upload_path> must start with home/
-            old_storage_path = instance.fname.name
+            instance.move(upload_path)
 
-            storage_manager = connect_storage(settings)
-            if storage_manager.obj_exists(upload_path):
-                storage_manager.delete_obj(upload_path)
+            if public and ('public' not in validated_data or validated_data['public']):
+                instance.create_public_link()  # recreate public link
 
-            storage_manager.copy_obj(old_storage_path, upload_path)
-            storage_manager.delete_obj(old_storage_path)
-
-            folder_path = os.path.dirname(upload_path)
-            owner = instance.owner
-
-            try:
-                parent_folder = ChrisFolder.objects.get(path=folder_path)
-            except ChrisFolder.DoesNotExist:
-                parent_folder = ChrisFolder.objects.create(path=folder_path, owner=owner)
-
-            instance.parent_folder = parent_folder
-            instance.fname.name = upload_path
-
-        instance.save()
+        if not public and 'public' in validated_data and validated_data['public']:
+            instance.grant_public_access()
+            instance.create_public_link()
         return instance
 
     def validate_upload_path(self, upload_path):
