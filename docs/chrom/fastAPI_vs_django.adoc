@@ -1,0 +1,158 @@
+= FastAPI and Django Concept Mapping
+
+== 1. Overview
+This document provides a conceptual mapping between *FastAPI* and *Django*, focusing on their equivalent components, how they handle API requests, and how concepts translate between the two frameworks.
+
+== 2. Core Differences
+FastAPI is an *asynchronous* framework optimized for high performance, while Django (with Django REST Framework - DRF) follows a more *synchronous* approach with a focus on rapid development and ORM-based data handling.
+
+== 3. Component Mapping
+[cols="3,3,5"]
+|===
+| FastAPI | Django (CUBE) | Description
+
+| `@app.get("/route/")` | `APIView`, `ListAPIView`, `RetrieveAPIView` | Defines an API endpoint (Django calls these *views*).
+| `pydantic.BaseModel` | `serializers.Serializer` | Defines API request/response schema.
+| SQLAlchemy ORM Models | Django ORM `models.Model` | Defines database schema and interactions.
+| `Depends()` (Dependency Injection) | Middleware, `get_queryset()`, `permissions` | Manages authentication, validation, and business logic.
+| Service Layer (e.g., `controller.py`) | `services.py` | Encapsulates business logic (optional in Django).
+| `JSONResponse` | `Response` from Django REST Framework | Returns API responses in JSON format.
+| `async def` | `def` (unless using Django async views) | FastAPI is asynchronous by default; Django uses sync views by default.
+|===
+
+== 4. Request Processing Flow
+=== FastAPI Flow
+[source,text]
+----
+[Client] → [Route] → [Controller/Service] → [Database] → [Service] → [Response]
+----
+- Routes (views) handle requests.
+- Controllers contain business logic.
+- Pydantic models validate the API request/response.
+
+=== Django (CUBE) Flow
+[source,text]
+----
+[Client] → [View] → [Queryset] → [Serializer] → [Response]
+----
+- Views handle both request processing and query logic.
+- Query logic is built into views via `get_queryset()`.
+- Serializers validate and format API data.
+
+== 5. Model-View-Controller (MVC) Mental Map
+
+Django's MVC architecture differs slightly from FastAPI’s approach in how it structures models. In Django, models are bifurcated into two components: `models.py` (which interacts with the database) and `serializers.py` (which defines API request/response schema). This means that Django models handle persistence while serializers handle validation and transformation of data for APIs. In contrast, FastAPI combines these responsibilities by using *SQLAlchemy models* for database interactions and *Pydantic models* for request validation and response formatting. This separation in Django allows for more fine-grained control over data transformations, while FastAPI’s approach simplifies handling by using Pydantic for both input validation and output serialization.
+
+=== FastAPI MVC Mapping
+[cols="3,3,5"]
+|===
+| Component | FastAPI | Description
+
+| **Model** | SQLAlchemy ORM, Pydantic Models | Defines database schema (SQLAlchemy) and API schema (Pydantic).
+| **View** | Route Handlers (`@app.get()`, `@app.post()`) | Exposes API endpoints and processes requests.
+| **Controller** | Service Layer (`services.py`) | Implements business logic and interacts with the database.
+|===
+
+=== Django MVC Mapping
+[cols="3,3,5"]
+|===
+| Component | Django (CUBE) | Description
+
+| **Model** | Django ORM (`models.py`) | Defines database schema.
+| **Serializer** | Django Serializers (`serializers.py`) | Defines API request/response schema.
+| **View** | Django Views (`APIView`, `ListAPIView`) | Handles request processing and response generation.
+| **Controller** | Service Layer (`services.py`, sometimes logic is in views) | Implements business logic and handles complex operations.
+|===
+
+== 6. FastAPI Models vs Django Models
+=== FastAPI Models
+- FastAPI uses *Pydantic models* to validate and serialize API request/response data.
+- Uses *SQLAlchemy models* to define and interact with the database.
+
+**Example:**
+[source,python]
+----
+from pydantic import BaseModel
+from typing import Optional
+
+class StudySchema(BaseModel):
+    study_instance_uid: str
+    patient_id: str
+    study_date: Optional[str]
+
+from sqlalchemy import Column, String
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Study(Base):
+    __tablename__: str = "studies"
+    study_instance_uid: Column = Column(String, primary_key=True, index=True)
+    patient_id: Column = Column(String, index=True)
+    study_date: Column = Column(String)
+----
+
+=== Django Models
+- Django uses *Django ORM models* for database interactions.
+- Uses *Django serializers* to validate and serialize API request/response data.
+
+**Example:**
+[source,python]
+----
+from django.db import models
+from rest_framework import serializers
+
+class DICOMStudy(models.Model):
+    study_instance_uid: str = models.CharField(max_length=64, unique=True)
+    patient_id: str = models.CharField(max_length=64)
+    study_date: str = models.DateField()
+
+class DICOMStudySerializer(serializers.ModelSerializer):
+    class Meta:
+        model: type = DICOMStudy
+        fields: str = '__all__'
+----
+
+== 7. API Route Definition in Django
+Unlike FastAPI, where route handlers (`@app.get()`, `@app.post()`) directly map to Python functions, Django uses **URL routing and class-based views**.
+
+**FastAPI Route Example:**
+[source,python]
+----
+@app.get("/studies/{study_id}", response_model=StudySchema)
+def get_study_route(study_id: str, db: Session = Depends(get_db)) -> StudySchema:
+    return get_study(db, study_id)
+----
+
+**Django URL Routing and View Mapping:**
+[source,python]
+----
+from django.urls import path
+from .views import DICOMStudyView
+
+urlpatterns = [
+    path("studies/<str:study_instance_uid>/", DICOMStudyView.as_view(), name="study-detail"),
+]
+----
+
+**Django Class-Based View Handling the Request:**
+[source,python]
+----
+from rest_framework.generics import RetrieveAPIView
+from .models import DICOMStudy
+from .serializers import DICOMStudySerializer
+
+class DICOMStudyView(RetrieveAPIView):
+    """Handles retrieval of a DICOM study by its StudyInstanceUID."""
+    queryset = DICOMStudy.objects.all()
+    serializer_class = DICOMStudySerializer
+----
+
+== 8. Key Takeaways
+- **FastAPI** defines routes directly in code, while **Django maps URL patterns to views**.
+- **FastAPI Pydantic models** = **Django serializers**, as both validate and format API data.
+- **Django ORM** is more integrated into views, while FastAPI commonly separates it into service layers.
+- **FastAPI is fully async**, whereas **Django requires explicit async setup** for async support.
+
+
+

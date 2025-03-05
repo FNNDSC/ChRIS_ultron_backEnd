@@ -1,0 +1,120 @@
+= Design Document: DICOMweb Integration into CUBE
+
+== 1. Overview
+The goal of this project is to integrate *DICOMweb* support into *CUBE*, allowing native interaction with *OHIF Viewer* and other DICOMweb-compliant clients. This will enable *STOW-RS (store), QIDO-RS (query), and WADO-RS (retrieve)* functionality within CUBE’s existing ecosystem.
+
+== 2. Justification
+CUBE currently exposes a *collection+json API* and relies on *pfdcm* for PACS interaction. However, many clients (e.g., OHIF Viewer) expect *DICOMweb*, not collection+json. Instead of relying solely on pfdcm, this integration will allow CUBE to:
+- *Directly serve DICOMweb requests* for in-house DICOM storage.
+- *Maintain compatibility* with existing PACS functionality via pfdcm.
+- *Support native DICOM visualization* through OHIF without additional middleware.
+
+== 3. Integration Strategy
+We will introduce a new *`dicomweb` app inside CUBE* to:
+1. *Encapsulate DICOMweb-specific logic* separately from PACS-related features.
+2. *Reuse existing CUBE models (PACSFile, PACSQuery, PACSRetrieve)* where applicable.
+3. *Expose a new `api/dicom/` namespace* to handle STOW-RS, QIDO-RS, and WADO-RS requests.
+
+== 4. High-Level Architecture
+=== 4.1. API Endpoints
+[cols="3,5,5"]
+|===
+| API | Endpoint | Purpose
+
+| *STOW-RS* | `POST /api/dicom/stow/` | Store DICOM instances
+| *QIDO-RS (Studies)* | `GET /api/dicom/qido/studies/` | Query study metadata
+| *QIDO-RS (Series)* | `GET /api/dicom/qido/series/` | Query series metadata
+| *WADO-RS (DICOM Retrieval)* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}` | Retrieve DICOM instance
+| *(Optional) WADO-RS Rendered Image* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}?contentType=image/jpeg` | Retrieve images as JPEG
+| *(Optional) Metadata Retrieval* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}/metadata` | Retrieve DICOM metadata
+|===
+
+=== 4.2. Components
+- *`dicomweb/models.py`* → Defines DICOM Study, Series, and Instance models.
+- *`dicomweb/serializers.py`* → Handles data serialization (like FastAPI’s Pydantic models).
+- *`dicomweb/views.py`* → Implements API views using Django REST Framework (DRF).
+- *`dicomweb/storage.py`* → Manages DICOM file storage.
+- *`dicomweb/services.py`* → Encapsulates DICOM business logic (e.g., metadata extraction).
+
+== 5. File System Structure
+[source,bash]
+----
+chris_backend/
+├── dicomweb/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── serializers.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── services.py
+│   ├── storage.py
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_stow.py
+│   │   ├── test_qido.py
+│   │   ├── test_wado.py
+----
+
+== 6. Sample Code Implementations
+
+=== `models.py`
+[source,python]
+----
+from django.db import models
+
+class DICOMStudy(models.Model):
+    study_instance_uid: str = models.CharField(max_length=64, unique=True)
+    patient_id: str = models.CharField(max_length=64)
+    study_date: str = models.DateField()
+
+class DICOMSeries(models.Model):
+    study: DICOMStudy = models.ForeignKey(DICOMStudy, on_delete=models.CASCADE)
+    series_instance_uid: str = models.CharField(max_length=64, unique=True)
+    modality: str = models.CharField(max_length=16)
+
+class DICOMInstance(models.Model):
+    series: DICOMSeries = models.ForeignKey(DICOMSeries, on_delete=models.CASCADE)
+    sop_instance_uid: str = models.CharField(max_length=64, unique=True)
+    file_path: str = models.CharField(max_length=512)
+    transfer_syntax: str = models.CharField(max_length=64)
+----
+
+=== `serializers.py`
+[source,python]
+----
+from rest_framework import serializers
+from .models import DICOMStudy, DICOMSeries, DICOMInstance
+
+class DICOMStudySerializer(serializers.ModelSerializer):
+    class Meta:
+        model: type = DICOMStudy
+        fields: str = '__all__'
+
+class DICOMSeriesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model: type = DICOMSeries
+        fields: str = '__all__'
+
+class DICOMInstanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model: type = DICOMInstance
+        fields: str = '__all__'
+----
+
+=== `views.py`
+[source,python]
+----
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.http import HttpRequest
+from .models import DICOMStudy
+from .serializers import DICOMStudySerializer
+
+class DICOMStudyView(APIView):
+    def get(self, request: HttpRequest, study_uid: str) -> Response:
+        study: DICOMStudy = DICOMStudy.objects.get(study_instance_uid=study_uid)
+        serializer: DICOMStudySerializer = DICOMStudySerializer(study)
+        return Response(serializer.data)
+----
+
+

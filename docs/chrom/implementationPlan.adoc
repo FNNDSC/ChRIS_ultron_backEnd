@@ -1,0 +1,115 @@
+= Design Document: DICOMweb Integration into CUBE
+
+== 1. Overview
+The goal of this project is to integrate *DICOMweb* support into *CUBE*, allowing native interaction with *OHIF Viewer* and other DICOMweb-compliant clients. This will enable *STOW-RS (store), QIDO-RS (query), and WADO-RS (retrieve)* functionality within CUBE’s existing ecosystem.
+
+== 2. Justification
+CUBE currently exposes a *collection+json API* and relies on *pfdcm* for PACS interaction. However, many clients (e.g., OHIF Viewer) expect *DICOMweb*, not collection+json. Instead of relying solely on pfdcm, this integration will allow CUBE to:
+- *Directly serve DICOMweb requests* for in-house DICOM storage.
+- *Maintain compatibility* with existing PACS functionality via pfdcm.
+- *Support native DICOM visualization* through OHIF without additional middleware.
+
+== 3. Integration Strategy
+We will introduce a new *`dicomweb` app inside CUBE* to:
+1. *Encapsulate DICOMweb-specific logic* separately from PACS-related features.
+2. *Reuse existing CUBE models (PACSFile, PACSQuery, PACSRetrieve)* where applicable.
+3. *Expose a new `api/dicom/` namespace* to handle STOW-RS, QIDO-RS, and WADO-RS requests.
+
+== 4. High-Level Architecture
+=== 4.1. API Endpoints
+[cols="3,5,5"]
+|===
+| API | Endpoint | Purpose
+
+| *STOW-RS* | `POST /api/dicom/stow/` | Store DICOM instances
+| *QIDO-RS (Studies)* | `GET /api/dicom/qido/studies/` | Query study metadata
+| *QIDO-RS (Series)* | `GET /api/dicom/qido/series/` | Query series metadata
+| *WADO-RS (DICOM Retrieval)* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}` | Retrieve DICOM instance
+| *(Optional) WADO-RS Rendered Image* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}?contentType=image/jpeg` | Retrieve images as JPEG
+| *(Optional) Metadata Retrieval* | `GET /api/dicom/wado/{StudyUID}/{SeriesUID}/{InstanceUID}/metadata` | Retrieve DICOM metadata
+|===
+
+=== 4.2. Components
+- *`dicomweb/models.py`* → Defines DICOM Study, Series, and Instance models.
+- *`dicomweb/serializers.py`* → Handles data serialization (like FastAPI’s Pydantic models).
+- *`dicomweb/views.py`* → Implements API views using Django REST Framework (DRF).
+- *`dicomweb/storage.py`* → Manages DICOM file storage.
+- *`dicomweb/services.py`* → Encapsulates DICOM business logic (e.g., metadata extraction).
+
+== 5. Data Model
+=== DICOM Models (Database Tables)
+[source,python]
+----
+class DICOMStudy(models.Model):
+    study_instance_uid = models.CharField(max_length=64, unique=True)
+    patient_id = models.CharField(max_length=64)
+    study_date = models.DateField()
+
+class DICOMSeries(models.Model):
+    study = models.ForeignKey(DICOMStudy, on_delete=models.CASCADE)
+    series_instance_uid = models.CharField(max_length=64, unique=True)
+    modality = models.CharField(max_length=16)
+
+class DICOMInstance(models.Model):
+    series = models.ForeignKey(DICOMSeries, on_delete=models.CASCADE)
+    sop_instance_uid = models.CharField(max_length=64, unique=True)
+    file_path = models.CharField(max_length=512)
+    transfer_syntax = models.CharField(max_length=64)
+----
+
+== 6. Implementation Plan
+=== Phase 1: Core API Development (Week 1-2)
+- [ ] Set up `dicomweb` app inside `chris_backend/`.
+- [ ] Implement models for **DICOMStudy, DICOMSeries, DICOMInstance**.
+- [ ] Implement `STOW-RS` API:
+  - [ ] Accept **multipart DICOM file uploads**.
+  - [ ] Parse metadata from DICOM files.
+  - [ ] Store DICOM files in CUBE’s file storage.
+  - [ ] Create associated **database entries**.
+  - [ ] Implement error handling for malformed DICOM files.
+  - [ ] Add validation checks for duplicate studies.
+
+=== Phase 2: Query & Retrieval (Week 2-3)
+- [ ] Implement `QIDO-RS`:
+  - [ ] Allow clients to **query studies and series**.
+  - [ ] Apply **filters (PatientID, StudyDate, Modality, etc.)**.
+  - [ ] Optimize database indexing for **fast lookup**.
+  - [ ] Implement pagination for large datasets.
+  - [ ] Handle edge cases like missing metadata.
+- [ ] Implement `WADO-RS`:
+  - [ ] Allow clients to **retrieve stored DICOM instances**.
+  - [ ] Ensure compatibility with **OHIF Viewer**.
+  - [ ] Implement **file streaming** for large datasets.
+  - [ ] Handle content negotiation for DICOM file types.
+  - [ ] Add proper authentication/authorization checks.
+
+=== Phase 3: Enhancements & Testing (Week 3-4)
+- [ ] Implement optional **image rendering (JPEG/PNG support)**:
+  - [ ] Convert DICOM images to **viewable formats**.
+  - [ ] Implement optional `?contentType=image/jpeg` in WADO-RS.
+  - [ ] Ensure high-quality image conversion using `pydicom` and `Pillow`.
+  - [ ] Optimize rendering speed for large images.
+- [ ] Implement optional **metadata retrieval**.
+  - [ ] Expose detailed metadata via `/metadata` endpoint.
+  - [ ] Allow retrieval of JSON-formatted DICOM tags.
+  - [ ] Ensure compliance with OHIF metadata expectations.
+- [ ] Write **unit tests using `dicomweb-client`**:
+  - [ ] Validate **API compliance**.
+  - [ ] Ensure **data integrity**.
+  - [ ] Simulate **real-world DICOM uploads and retrievals**.
+  - [ ] Test edge cases like **corrupted DICOM files**.
+- [ ] Optimize **storage & indexing** for performance.
+  - [ ] Implement caching for frequently accessed datasets.
+  - [ ] Optimize query performance with database indexes.
+- [ ] Perform **integration tests with OHIF Viewer**.
+  - [ ] Verify study listing and retrieval.
+  - [ ] Test viewing experience for different DICOM modalities.
+  - [ ] Ensure smooth interaction with existing CUBE features.
+
+== 7. Expected Outcomes
+- CUBE will *natively support DICOMweb*, allowing *OHIF Viewer* to connect directly.
+- Users can *store, query, and retrieve DICOM files* without relying on external PACS.
+- The system will remain *scalable & extendable*, supporting additional DICOMweb features if needed.
+
+
+
