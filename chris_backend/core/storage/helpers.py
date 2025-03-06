@@ -46,7 +46,9 @@ def mock_storage(target_settings) -> ContextManager[FilesystemManager]:
     """
     with TemporaryDirectory() as tmp_dir:
         settings = {
-            'DEFAULT_FILE_STORAGE': 'fake.FileSystemStorage',
+            'STORAGES': {
+                'default': {'BACKEND': 'fake.FileSystemStorage'}
+            },
             'MEDIA_ROOT': tmp_dir
         }
         with unittest.mock.patch.multiple(target_settings, **settings):
@@ -61,4 +63,4 @@ class _DummySettings:
 
 
 def __get_storage_name(settings: Any) -> str:
-    return settings.DEFAULT_FILE_STORAGE.rsplit('.', maxsplit=1)[-1]
+    return settings.STORAGES['default']['BACKEND'].rsplit('.', maxsplit=1)[-1]

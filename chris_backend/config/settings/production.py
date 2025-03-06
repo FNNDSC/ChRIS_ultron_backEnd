@@ -30,7 +30,7 @@ def get_secret(setting, secret_type=env):
 
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/4.2/ref/settings/#secret-key
+# See: https://docs.djangoproject.com/en/5.1/ref/settings/#secret-key
 # Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not in os.environ
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
@@ -42,7 +42,7 @@ CHRIS_SUPERUSER_PASSWORD = get_secret('CHRIS_SUPERUSER_PASSWORD')
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/4.2/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/5.1/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
@@ -72,14 +72,14 @@ if STORAGE_ENV == 'swift':
                                'key': SWIFT_KEY,
                                'authurl': SWIFT_AUTH_URL}
     verify_storage = lambda: verify_storage_connection(
-        DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
+        STORAGES=STORAGES,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
 elif STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = get_secret('MEDIA_ROOT')
-    verify_storage = lambda: verify_storage_connection(DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
+    verify_storage = lambda: verify_storage_connection(STORAGES=STORAGES,
                                                        MEDIA_ROOT=MEDIA_ROOT)
 else:
     verify_storage = lambda: verify_storage_connection()
@@ -95,7 +95,7 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/4.2/topics/logging/ for
+# See https://docs.djangoproject.com/en/5.1/topics/logging/ for
 # more details on how to customize your logging configuration.
 ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
 LOGGING = {

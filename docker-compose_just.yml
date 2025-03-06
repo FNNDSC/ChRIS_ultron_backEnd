@@ -94,7 +94,7 @@ services:
       - local
 
   db:
-    image: docker.io/library/postgres:16
+    image: docker.io/library/postgres:17
     volumes:
       - db:/var/lib/postgresql/data
     environment:
@@ -113,7 +113,7 @@ services:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
   rabbitmq:
-    image: docker.io/library/rabbitmq:3
+    image: docker.io/library/rabbitmq:4
     volumes:
       - rabbitmq:/var/lib/rabbitmq
     networks:
