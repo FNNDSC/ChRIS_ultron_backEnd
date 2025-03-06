@@ -5,7 +5,6 @@
 # 1. Run rm docker-compose_dev.yml && ln -sv docker-compose_noswift.yml docker-compose_dev.yml
 # 2. Edit chris_backend/config/settings/local.py, include the configs
 #
-#     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 #     MEDIA_ROOT = '/data'
 #
 # 3. Run ./make.sh -s -i
@@ -185,7 +184,7 @@ services:
       role: "Backend development periodic tasks scheduler"
 
   chris_dev_db:
-    image: postgres:16
+    image: postgres:17
     volumes:
       - chris_dev_db_data:/var/lib/postgresql/data
     environment:
@@ -205,7 +204,7 @@ services:
       start_period: 60s
 
   queue:
-    image: rabbitmq:3
+    image: rabbitmq:4
     hostname: 'queue'
     volumes:
       - queue_data:/var/lib/rabbitmq
@@ -244,7 +243,7 @@ services:
       role: "Chris store service"
 
   chris_store_db:
-    image: postgres:16
+    image: postgres:17
     volumes:
       - chris_store_db_data:/var/lib/postgresql/data
     environment:

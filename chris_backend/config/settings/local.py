@@ -19,7 +19,7 @@ from core.storage import verify_storage_connection
 from django.core.exceptions import ImproperlyConfigured
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
@@ -28,14 +28,14 @@ SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 CHRIS_SUPERUSER_PASSWORD = 'chris1234'
 
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/4.2/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/5.1/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/4.2/topics/logging/ for
+# See https://docs.djangoproject.com/en/5.1/topics/logging/ for
 # more details on how to customize your logging configuration.
 LOGGING = {
     'version': 1,
@@ -105,7 +105,7 @@ if STORAGE_ENV in ('fslink', 'filesystem'):
 
 try:
     verify_storage_connection(
-        DEFAULT_FILE_STORAGE=STORAGES['default']['BACKEND'],
+        STORAGES=STORAGES,
         MEDIA_ROOT=MEDIA_ROOT,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
@@ -117,7 +117,7 @@ except Exception as e:
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
 # Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'
