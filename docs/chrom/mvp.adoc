@@ -1,0 +1,170 @@
+= Technical Requirements Document: DICOMweb MVP for CUBE
+
+== 1. Overview
+This document outlines the technical requirements for the *Minimum Viable Product (MVP)* implementation of *DICOMweb Query Support* in CUBE. The fundamental goal of this MVP is to allow an external DICOMweb client, such as the *OHIF viewer*, to query CUBE *natively* using the DICOMweb standard.
+
+== 2. Scope
+
+- **Supports DICOMweb Query (`QIDO-RS`) only**
+- **Does not include** DICOMweb Store (`STOW-RS`) or Retrieve (`WADO-RS`)
+- **Maintains backward compatibility** with existing CUBE APIs and internal models
+- **Uses existing PACS models** as much as possible, returning empty values for unsupported DICOM tags
+- **Duplicate tables are acceptable** if required to meet constraints
+
+== 3. API Specification
+
+=== 3.1. Endpoints
+The MVP will introduce the following *DICOMweb-compliant query endpoints* under `/api/dicom/`:
+
+[options="header"]
+|===
+| Endpoint | Method | Description
+| `/api/dicom/studies` | `GET` | Returns a list of available DICOM studies
+| `/api/dicom/studies/{StudyInstanceUID}/series` | `GET` | Returns series for a given study
+| `/api/dicom/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}` | `GET` | Returns details for a given series
+|===
+
+Queries for studies based on `PatientID`, `AccessionNumber`, or `StudyDate` must be performed using query parameters. Explicit API endpoints for these attributes are not defined in the DICOMweb standard. Instead, queries should use the `/studies` endpoint with query parameters. For example:
+
+```
+GET /api/dicom/studies?PatientID=12345
+```
+
+
+For more details, refer to the DICOMweb Query (QIDO-RS) specification: [DICOM QIDO-RS](https://www.dicomstandard.org/using/dicomweb/query-qido-rs)
+
+=== 3.2. Query Parameters
+The API supports a subset of DICOM query parameters, specifically those already mapped in CUBE’s existing PACS models. If a requested DICOM tag is not present, the response will return an empty field rather than failing.
+
+Supported query parameters:
+
+- **StudyInstanceUID** (`0020000D`)
+- **SeriesInstanceUID** (`0020000E`)
+- **PatientID** (`00100020`) – Unique identifier for a patient
+- **AccessionNumber** (`00080050`) – Identifier for a study request
+- **StudyDate** (`00080020`) – Date when the study was performed
+- **Modality** (`00080060`) – Imaging modality type (e.g., CT, MR, US)
+- **StudyDescription** (`00081030`) – Description of the study
+- **SeriesDescription** (`0008103E`) – Description of the series
+
+=== 3.3. Query Parameters Usage
+
+[options="header"]
+|===
+| Key | Value | Description
+| `{attributeID}` | `{value}` | Query matching on supplied value
+| `includefield` | `{attribute} \| all` | Include supplied tags in result
+| `fuzzymatching` | `true \| false` | Whether query should use fuzzy matching
+| `limit` | `{n}` | Return only `{n}` results
+| `offset` | `{n}` | Skip `{n}` results
+|===
+
+=== 3.4. Expected API Responses
+Each API endpoint will return **DICOMweb-compliant JSON responses** formatted according to `QIDO-RS` conventions. Below are example response structures with sample data (note these might not be complete and are presented simply as reference):
+
+==== Query studies by PatientID
+
+**Request:**
+[source,http]
+----
+GET /api/dicom/studies?PatientID=123456 HTTP/1.1
+----
+
+**Response:**
+[source,json]
+----
+[
+  {
+    "0020000D": { "Value": ["1.2.840.113619.2.55.3.283116435.2023.11.01.12.30.30"], "vr": "UI" },
+    "00100010": { "Value": ["John Doe"], "vr": "PN" },
+    "00080020": { "Value": ["20231101"], "vr": "DA" },
+    "00081030": { "Value": ["Brain MRI Study"], "vr": "LO" }
+  }
+]
+----
+
+==== Query series by AccessionNumber
+
+**Request:**
+[source,http]
+----
+GET /api/dicom/studies?AccessionNumber=ABC123456 HTTP/1.1
+----
+
+**Response:**
+[source,json]
+----
+[
+  {
+    "0020000E": { "Value": ["1.2.840.113619.2.55.3.283116435.2023.11.01.12.45.50"], "vr": "UI" },
+    "00080060": { "Value": ["MR"], "vr": "CS" },
+    "00200011": { "Value": ["1"], "vr": "IS" },
+    "0008103E": { "Value": ["T1_MPRAGE"], "vr": "LO" }
+  }
+]
+----
+
+==== Query studies by StudyDate
+
+**Request:**
+[source,http]
+----
+GET /api/dicom/studies?StudyDate=20240101 HTTP/1.1
+----
+
+**Response:**
+[source,json]
+----
+[
+  {
+    "0020000D": { "Value": ["1.2.840.113619.2.55.3.283116435.2023.11.01.12.30.30"], "vr": "UI" },
+    "00100010": { "Value": ["John Doe"], "vr": "PN" },
+    "00080020": { "Value": ["20240101"], "vr": "DA" }
+  }
+]
+----
+
+==== Query series by StudyInstanceUID
+
+**Request:**
+[source,http]
+----
+GET /api/dicom/studies/1.2.840.113619.2.55.3.283116435.2023.11.01.12.30.30/series HTTP/1.1
+----
+
+**Response:**
+[source,json]
+----
+[
+  {
+    "0020000E": { "Value": ["1.2.840.113619.2.55.3.283116435.2023.11.01.12.45.50"], "vr": "UI" },
+    "00080060": { "Value": ["MR"], "vr": "CS" },
+    "00200011": { "Value": ["1"], "vr": "IS" }
+  }
+]
+----
+
+==== Query series details by SeriesInstanceUID
+
+**Request:**
+[source,http]
+----
+GET /api/dicom/studies/1.2.840.113619.2.55.3.283116435.2023.11.01.12.30.30/series/1.2.840.113619.2.55.3.283116435.2023.11.01.12.45.50 HTTP/1.1
+----
+
+**Response:**
+[source,json]
+----
+{
+  "0020000E": { "Value": ["1.2.840.113619.2.55.3.283116435.2023.11.01.12.45.50"], "vr": "UI" },
+  "00080060": { "Value": ["MR"], "vr": "CS" },
+  "00200011": { "Value": ["1"], "vr": "IS" },
+  "00080021": { "Value": ["20231101"], "vr": "DA" }
+}
+----
+
+== 10. Bibliography
+- [1] DICOMweb QIDO-RS Specification: https://www.dicomstandard.org/using/dicomweb/query-qido-rs
+- [2] DICOM Tag Dictionary: https://www.dicomlibrary.com/dicom/dicom-tags/  
+- [3] OHIF Viewer DICOMweb API Usage: https://docs.ohif.org/configuration/datasources/dicom-web/  
+

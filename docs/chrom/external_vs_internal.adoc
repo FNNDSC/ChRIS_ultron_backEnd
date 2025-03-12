@@ -1,0 +1,51 @@
+= Microservice vs. Internal Django App for DICOMweb Integration
+
+[options="header"]
+|===
+| Approach | Microservice (Separate Service) | Internal Django App (Inside CUBE)
+
+| **Architecture**
+| A standalone FastAPI/Django microservice that exposes DICOMweb API, communicating with CUBE via its Collection+JSON API or directly via the database.
+| A new Django app (`dicomweb`) inside CUBE that extends the existing API to support DICOMweb at `/api/dicom/`.
+
+| **Performance**
+| Potentially better *scalability* (independent scaling from CUBE).
+| Lower *latency* since it avoids inter-service API calls.
+
+| **Deployment Complexity**
+| Requires *separate deployment, orchestration* (Docker/Kubernetes).
+| *Simpler deployment*, integrated into the existing CUBE infrastructure.
+
+| **Codebase Complexity**
+| Keeps CUBE *unmodified*, avoids introducing DICOM-specific logic into it.
+| Increases *CUBE’s complexity*, requiring integration with its existing authentication and database layers.
+
+| **Data Access**
+| Can either: 1) *Call CUBE API* (adds overhead) or 2) *Directly query CUBE’s DB* (breaks encapsulation).
+| Direct access to *CUBE’s ORM and authentication system* ensures tighter integration.
+
+| **Interoperability**
+| More *modular*: Easier to replace/upgrade without affecting CUBE.
+| More *monolithic*: Changes in DICOMweb affect the whole CUBE system.
+
+| **API Standardization**
+| Can fully *adhere to DICOMweb*, independent of CUBE’s Collection+JSON API.
+| Must ensure *DICOMweb compliance* while coexisting with CUBE’s API structure.
+
+| **Security**
+| Separate authentication/authorization needed. Needs *secure API calls* between services.
+| Reuses *CUBE’s authentication* (e.g., Django’s user management, tokens).
+
+| **Development Effort**
+| Requires *separate repo, CI/CD pipeline*, and potential duplication of logic.
+| Faster to develop since it *leverages CUBE’s existing Django setup*.
+
+| **Fault Isolation**
+| DICOMweb failures *don’t impact CUBE*.
+| A failure in the DICOMweb app *could affect the entire CUBE instance*.
+
+| **Estimated Development Time**
+| *6-8 months* (incl. API integration, DB layer, deployment, testing)
+| *3-4 months* (leveraging CUBE’s existing infrastructure, fewer integration issues)
+|===
+
