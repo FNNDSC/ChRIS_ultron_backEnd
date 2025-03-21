@@ -190,6 +190,7 @@ class PipelineFilter(FilterSet):
     owner_username = django_filters.CharFilter(field_name='owner__username',
                                                lookup_expr='exact')
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
     category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
     description = django_filters.CharFilter(field_name='description',
                                             lookup_expr='icontains')
@@ -197,7 +198,7 @@ class PipelineFilter(FilterSet):
 
     class Meta:
         model = Pipeline
-        fields = ['id', 'owner_username', 'name', 'category', 'description',
+        fields = ['id', 'owner_username', 'name', 'name_exact', 'category', 'description',
                   'authors', 'min_creation_date', 'max_creation_date']
 
 
