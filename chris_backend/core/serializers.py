@@ -41,16 +41,17 @@ class _ChrisFileSerializerMetaclass(serializers.SerializerMetaclass):
         return super().__new__(cls, name, bases, dct)
 
 
-class ChrisFileSerializer(serializers.HyperlinkedModelSerializer, metaclass=_ChrisFileSerializerMetaclass):
+class ChrisFileSerializer(serializers.HyperlinkedModelSerializer,
+                          metaclass=_ChrisFileSerializerMetaclass):
     """
     A superclass for serializers of ``ChrisFile`` or similar.
     """
-
-    fname = serializers.FileField(use_url=False, required=False)
+    fname = serializers.FileField(use_url=False, allow_empty_file=True, required=False)
     fsize = serializers.SerializerMethodField()
     file_resource = ItemLinkField('get_file_link')
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail', read_only=True)
+    parent_folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
+                                                        read_only=True)
     owner = serializers.HyperlinkedRelatedField(view_name='user-detail', read_only=True)
 
     def get_fsize(self, obj) -> int:

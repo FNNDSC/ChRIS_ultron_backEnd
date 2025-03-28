@@ -110,6 +110,7 @@ class PluginMetaFilter(FilterSet):
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='name', lookup_expr='exact')
     title = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
+    public_repo = django_filters.CharFilter(field_name='public_repo', lookup_expr='exact')
     category = django_filters.CharFilter(field_name='category', lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='type', lookup_expr='exact')
     authors = django_filters.CharFilter(field_name='authors', lookup_expr='icontains')
@@ -141,9 +142,9 @@ class PluginMetaFilter(FilterSet):
 
     class Meta:
         model = PluginMeta
-        fields = ['id', 'name', 'name_exact', 'title', 'category', 'type', 'authors',
-                  'min_creation_date', 'max_creation_date', 'name_title_category',
-                  'name_authors_category']
+        fields = ['id', 'name', 'name_exact', 'title',  'public_repo', 'category', 'type',
+                  'authors', 'min_creation_date', 'max_creation_date',
+                  'name_title_category', 'name_authors_category']
 
 
 class Plugin(models.Model):
@@ -209,6 +210,8 @@ class PluginFilter(FilterSet):
     name = django_filters.CharFilter(field_name='meta__name', lookup_expr='icontains')
     name_exact = django_filters.CharFilter(field_name='meta__name', lookup_expr='exact')
     title = django_filters.CharFilter(field_name='meta__title', lookup_expr='icontains')
+    public_repo = django_filters.CharFilter(field_name='meta__public_repo',
+                                            lookup_expr='exact')
     category = django_filters.CharFilter(field_name='meta__category',
                                          lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='meta__type', lookup_expr='exact')
@@ -232,8 +235,8 @@ class PluginFilter(FilterSet):
     class Meta:
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
-                  'min_creation_date', 'max_creation_date', 'title',  'description',
-                  'name_title_category', 'compute_resource_id']
+                  'min_creation_date', 'max_creation_date', 'title',  'public_repo',
+                  'description', 'name_title_category', 'compute_resource_id']
 
 
 class PluginParameter(models.Model):
