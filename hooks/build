@@ -1,8 +1,0 @@
-#!/bin/bash
-
-if [ $DOCKER_TAG == "dev" ]
-then
-  docker build --build-arg ENVIRONMENT=local -f $DOCKERFILE_PATH -t $IMAGE_NAME .
-else
-  docker build -f $DOCKERFILE_PATH -t $IMAGE_NAME .
-fi

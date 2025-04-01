@@ -19,13 +19,13 @@ cube:
       username: pfcon
       password: pfcon1234
       description: host Description
-      innetwork: false
+      innetwork: true
     - name: moc
       url: "http://pfcon.remote:30005/api/v1/"
       username: pfcon
       password: pfcon1234
       description: moc Description
-      innetwork: false
+      innetwork: true
 
   plugins:
     - name: pl-simplefsapp

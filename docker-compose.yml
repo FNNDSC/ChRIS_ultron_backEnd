@@ -7,7 +7,7 @@ services:
     profiles:
       - tools
     volumes:
-      - "./chrisomatic-just:/etc/chrisomatic:ro"
+      - "./chrisomatic:/etc/chrisomatic:ro"
       - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
     working_dir: /etc/chrisomatic
     userns_mode: host
