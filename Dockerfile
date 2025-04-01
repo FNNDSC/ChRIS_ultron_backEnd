@@ -37,6 +37,6 @@ ARG ENVIRONMENT=production
 RUN pip install -r /tmp/requirements/$ENVIRONMENT.txt && rm -rf /tmp/requirements
 COPY chris_backend/ ./
 RUN if [ "$ENVIRONMENT" = "production" ]; then \
-    env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; fi
+    env DJANGO_SETTINGS_MODULE=config.settings.common python manage.py collectstatic; fi
 
 CMD ["granian", "--host", "0.0.0.0", "--interface", "asginl", "config.asgi:application"]
