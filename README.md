@@ -160,10 +160,6 @@ from core.storage import connect_storage
 storage = connect_storage(settings)
 ```
 
-### Alternative Development Script
-
-Old development scripts usage is described in [OLD_DEVELOP.md](./OLD_DEVELOP.md).
-
 ### IDE Setup
 
 Visual Studio Code and PyCharm both support using Docker containers to run the Python interpreter. Run `just build`, then point your IDE to use the container image `localhost/fnndsc/cube:dev`.
