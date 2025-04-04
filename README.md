@@ -114,9 +114,9 @@ just --list --unsorted
 
 ### Development Tips and Tricks
 
-#### Recreate containers after changing `docker-compose_just.yml`
+#### Recreate containers after changing `docker-compose.yml`
 
-If you modify `docker-compose_just.yml`, you need to recreate/restart the affected services.
+If you modify `docker-compose.yml`, you need to recreate/restart the affected services.
 
 ```shell
 just up
