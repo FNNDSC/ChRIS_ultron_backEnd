@@ -7,7 +7,7 @@ from .models import UserProxy
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
-    username = serializers.CharField(min_length=4, max_length=32,
+    username = serializers.CharField(min_length=4, max_length=32, required=False,
                                      validators=[UniqueValidator(
                                          queryset=User.objects.all())])
     email = serializers.EmailField(required=True,
@@ -19,6 +19,12 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         fields = ('url', 'id', 'username', 'email', 'password', 'is_staff', 'groups')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['username'].read_only = True
 
     def create(self, validated_data):
         """
@@ -36,6 +42,17 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
             raise serializers.ValidationError(
                 ["This field may not contain commas or forward slashes."])
         return username
+
+    def validate(self, data):
+        """
+        Overriden to validate that required fields are in data when creating a new
+        user.
+        """
+        if not self.instance:  # on create
+            if 'username' not in data:
+                raise serializers.ValidationError(
+                    {'username': ["This field is required."]})
+        return data
 
 
 class GroupSerializer(serializers.HyperlinkedModelSerializer):

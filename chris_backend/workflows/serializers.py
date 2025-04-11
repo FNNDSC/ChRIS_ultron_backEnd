@@ -41,6 +41,13 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                   'registering_jobs', 'finished_jobs', 'errored_jobs', 'cancelled_jobs',
                   'nodes_info', 'pipeline', 'plugin_instances')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['previous_plugin_inst_id'].read_only = True
+            self.fields['nodes_info'].read_only = True
+
     def create(self, validated_data):
         """
         Overriden to delete 'previous_plugin_inst_id' and 'nodes_info' from serializer

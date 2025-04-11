@@ -103,14 +103,6 @@ class UserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         template_data = {"upload_path": "", "public": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'fname' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('fname', None)  # shoud not change on update
-        return super(UserFileDetail, self).update(request, *args, **kwargs)
-
 
 class UserFileResource(generics.GenericAPIView):
     """

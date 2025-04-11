@@ -45,6 +45,12 @@ class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
                   'status', 'pacs_identifier', 'owner_username', 'result',
                   'retrieve_list')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['query'].read_only = True  # set to read-only before validation
+
     def create(self, validated_data):
         """
         Overriden to rise a serializer error when attempting to create a PACSQuery

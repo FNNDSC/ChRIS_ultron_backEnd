@@ -370,6 +370,17 @@ class PluginAdminSerializer(PluginSerializer):
         fields = PluginSerializer.Meta.fields + ('fname', 'plugin_store_url',
                                                  'compute_names')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['version'].read_only = True
+            self.fields['dock_image'].read_only = True
+            self.fields['execshell'].read_only = True
+            self.fields['selfpath'].read_only = True
+            self.fields['selfexec'].read_only = True
+            self.fields['plugin_store_url'].read_only = True
+
     def create(self, validated_data):
         """
         Overriden to validate and save all the plugin descriptors and parameters
@@ -785,20 +796,6 @@ class PluginAdminDetail(generics.RetrieveUpdateDestroyAPIView):
         response = super(PluginAdminDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'compute_names': ''}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove descriptors that are not allowed to be updated before
-        serializer validation.
-        """
-        data = self.request.data
-        data.pop('version', None)
-        data.pop('dock_image', None)
-        data.pop('execshell', None)
-        data.pop('selfpath', None)
-        data.pop('selfexec', None)
-        data.pop('plugin_store_url', None)
-        return super(PluginAdminDetail, self).update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
         """

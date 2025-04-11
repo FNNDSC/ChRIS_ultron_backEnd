@@ -276,15 +276,6 @@ class FileBrowserFolderGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIVi
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'grp_name' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('grp_name', None)  # shoud not change on update
-        return super(FileBrowserFolderGroupPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
-
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -391,15 +382,6 @@ class FileBrowserFolderUserPermissionDetail(generics.RetrieveUpdateDestroyAPIVie
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'username' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('username', None)  # shoud not change on update
-        return super(FileBrowserFolderUserPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
-
     def perform_destroy(self, instance):
         """
         Overriden to remove the user permission for the link file in the SHARED folder
@@ -465,14 +447,6 @@ class FileBrowserFileDetail(generics.RetrieveUpdateDestroyAPIView):
         response = super(FileBrowserFileDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"public": "", "new_file_path": ""}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'fname' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('fname', None)  # shoud not change on update
-        return super(FileBrowserFileDetail, self).update(request, *args, **kwargs)
 
 
 class FileBrowserFileResource(generics.GenericAPIView):
@@ -587,15 +561,6 @@ class FileBrowserFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPIView
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'grp_name' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('grp_name', None)  # shoud not change on update
-        return super(FileBrowserFileGroupPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
-
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -702,15 +667,6 @@ class FileBrowserFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIView)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'username' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('username', None)  # shoud not change on update
-        return super(FileBrowserFileUserPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
-
     def perform_destroy(self, instance):
         """
         Overriden to remove the user permission for the link file in the SHARED folder
@@ -777,15 +733,6 @@ class FileBrowserLinkFileDetail(generics.RetrieveUpdateDestroyAPIView):
                                                                   **kwargs)
         template_data = {"public": "", "new_link_file_path": ""}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'fname' and 'path' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('fname', None)  # shoud not change on update
-        request.data.pop('path', None)  # shoud not change on update
-        return super(FileBrowserLinkFileDetail, self).update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -918,15 +865,6 @@ class FileBrowserLinkFileGroupPermissionDetail(generics.RetrieveUpdateDestroyAPI
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'grp_name' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('grp_name', None)  # shoud not change on update
-        return super(FileBrowserLinkFileGroupPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
-
     def perform_destroy(self, instance):
         """
         Overriden to remove the group permission for the link file in the SHARED folder
@@ -1032,15 +970,6 @@ class FileBrowserLinkFileUserPermissionDetail(generics.RetrieveUpdateDestroyAPIV
                          self).retrieve(request,*args, **kwargs)
         template_data = {"permission": ""}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove 'username' if provided by the user before serializer
-        validation.
-        """
-        request.data.pop('username', None)  # shoud not change on update
-        return super(FileBrowserLinkFileUserPermissionDetail, self).update(request,
-                                                                          *args, **kwargs)
 
     def perform_destroy(self, instance):
         """

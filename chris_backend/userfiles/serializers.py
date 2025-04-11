@@ -21,6 +21,12 @@ class UserFileSerializer(ChrisFileSerializer):
                   'owner_username', 'file_resource', 'parent_folder', 'group_permissions',
                   'user_permissions','owner')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['fname'].read_only = True  # set to read-only before validation
+
     def create(self, validated_data):
         """
         Overriden to set the file's saving path and parent folder.

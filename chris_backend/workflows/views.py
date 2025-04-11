@@ -190,16 +190,6 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
         template_data = {'title': ''}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove descriptors that are not allowed to be updated before
-        serializer validation.
-        """
-        data = self.request.data
-        data.pop('previous_plugin_inst_id', None)
-        data.pop('nodes_info', None)
-        return super(WorkflowDetail, self).update(request, *args, **kwargs)
-
     def destroy(self, request, *args, **kwargs):
         """
         Overriden to cancel all the associated plugin instances before attempting to

@@ -68,6 +68,17 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'output_folder', 'feed', 'plugin', 'workflow', 'compute_resource',
                   'descendants', 'parameters', 'splits')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is None: # on create
+            self.fields['status'].read_only = True  # set to read-only before validation
+        else: # on update
+            self.fields['gpu_limit'].read_only = True
+            self.fields['number_of_workers'].read_only = True
+            self.fields['cpu_limit'].read_only = True
+            self.fields['memory_limit'].read_only = True
+
     def validate_previous(self, previous_id):
         """
         Custom method to check that an id is provided for previous instance when
