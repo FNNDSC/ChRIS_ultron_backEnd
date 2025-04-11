@@ -252,15 +252,6 @@ class PACSQueryDetail(generics.RetrieveUpdateDestroyAPIView):
         template_data = {'title': '', 'description': ''}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove descriptors that are not allowed to be updated before
-        serializer validation.
-        """
-        data = self.request.data
-        data.pop('query', None)
-        return super(PACSQueryDetail, self).update(request, *args, **kwargs)
-
 
 class PACSRetrieveList(generics.ListCreateAPIView):
     """

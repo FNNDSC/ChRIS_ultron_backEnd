@@ -103,22 +103,6 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
             template_data['locked'] = ""
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove parameters that are not allowed to be used on update,
-        include required parameters if not in the request and delete 'locked' parameter
-        if the pipeline is not locked.
-        """
-        request.data.pop('plugin_tree', None)
-        request.data.pop('plugin_inst_id', None)
-        pipeline = self.get_object()
-        if not pipeline.locked and 'locked' in request.data:
-            # this pipeline was made available to the public so it cannot be locked
-            del request.data['locked']
-        if 'name' not in request.data:
-            request.data['name'] = pipeline.name  # name is required in the serializer
-        return super(PipelineDetail, self).update(request, *args, **kwargs)
-
     # def destroy(self, request, *args, **kwargs):
     #     """
     #     Overriden to check that the pipeline is locked before attempting to delete it.

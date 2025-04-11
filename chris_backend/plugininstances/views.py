@@ -33,14 +33,6 @@ class PluginInstanceList(generics.ListCreateAPIView):
     queryset = Plugin.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
 
-    def create(self, request, *args, **kwargs):
-        """
-        Overriden to remove descriptors from the request that must take their default
-        value on creation.
-        """
-        self.request.data.pop('status', None)
-        return super(PluginInstanceList, self).create(request, *args, **kwargs)
-
     def perform_create(self, serializer):
         """
         Overriden to associate an owner, a plugin and a previous plugin instance with 
@@ -175,18 +167,6 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         response = super(PluginInstanceDetail, self).retrieve(request, *args, **kwargs)
         template_data = {'title': '', 'status': ''}
         return services.append_collection_template(response, template_data)
-
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to remove descriptors that are not allowed to be updated before
-        serializer validation.
-        """
-        data = self.request.data
-        data.pop('gpu_limit', None)
-        data.pop('number_of_workers', None)
-        data.pop('cpu_limit', None)
-        data.pop('memory_limit', None)
-        return super(PluginInstanceDetail, self).update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         """

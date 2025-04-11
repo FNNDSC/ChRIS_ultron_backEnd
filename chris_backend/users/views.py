@@ -77,14 +77,6 @@ class UserDetail(generics.RetrieveUpdateAPIView):
         template_data = {"password": "", "email": ""}
         return services.append_collection_template(response, template_data)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Overriden to add required username before serializer validation.
-        """
-        user = self.get_object()
-        request.data['username'] = user.username
-        return super(UserDetail, self).update(request, *args, **kwargs)
-
     def perform_update(self, serializer):
         """
         Overriden to update user's password and email when requested by a PUT request.

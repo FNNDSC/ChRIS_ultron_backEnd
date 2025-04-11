@@ -48,6 +48,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     plugin_tree = serializers.JSONField(write_only=True, required=False)
     plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
                                               required=False)
+    name = serializers.CharField(required=False)
     owner_username = serializers.ReadOnlyField(source='owner.username')
     plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
     plugin_pipings = serializers.HyperlinkedIdentityField(
@@ -64,6 +65,13 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                   'plugin_tree', 'plugin_inst_id', 'owner_username', 'creation_date',
                   'modification_date', 'plugins', 'plugin_pipings', 'default_parameters',
                   'workflows', 'json_repr')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['plugin_tree'].read_only = True
+            self.fields['plugin_inst_id'].read_only = True
 
     def create(self, validated_data):
         """
@@ -143,10 +151,18 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         """
-        Overriden to validate that at least one of two fields are in data when
-        creating a new pipeline.
+        Overriden to validate that required fields are in data when creating a new
+        pipeline. Also to delete 'locked' parameter if the pipeline is not locked.
         """
-        if not self.instance:  # this validation only happens on create and not on update
+        if self.instance:
+            if not self.instance.locked and 'locked' in data:
+                # this pipeline was made available to the public so it cannot be locked
+                del data['locked']
+        else:
+            if 'name' not in data:
+                raise serializers.ValidationError(
+                    {'name': ["This field is required."]})
+
             if 'plugin_tree' not in data and 'plugin_inst_id' not in data:
                 raise serializers.ValidationError(
                     {'non_field_errors': ["At least one of the fields 'plugin_tree' "

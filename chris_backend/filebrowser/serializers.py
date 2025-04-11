@@ -183,6 +183,12 @@ class FileBrowserFolderGroupPermissionSerializer(serializers.HyperlinkedModelSer
         fields = ('url', 'id', 'permission', 'folder_id', 'folder_path', 'group_id',
                   'group_name', 'folder', 'group', 'grp_name')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['grp_name'].read_only = True  # set to read-only before validation
+
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a group that
@@ -248,6 +254,12 @@ class FileBrowserFolderUserPermissionSerializer(serializers.HyperlinkedModelSeri
         fields = ('url', 'id', 'permission', 'folder_id', 'folder_path', 'user_id',
                   'user_username', 'folder', 'user', 'username')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['username'].read_only = True  # set to read-only before validation
+
     def create(self, validated_data):
         """
         Overriden to handle the error when trying to create a permission for a user that
@@ -310,6 +322,12 @@ class FileBrowserFileSerializer(ChrisFileSerializer):
         fields = ('url', 'id', 'creation_date', 'fname', 'fsize', 'public',
                   'new_file_path', 'owner_username', 'file_resource', 'parent_folder',
                   'group_permissions', 'user_permissions', 'owner')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['fname'].read_only = True  # set to read-only before validation
 
     def update(self, instance, validated_data):
         """
@@ -414,6 +432,12 @@ class FileBrowserFileGroupPermissionSerializer(serializers.HyperlinkedModelSeria
         fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'group_id',
                   'group_name', 'file', 'group', 'grp_name')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['grp_name'].read_only = True  # set to read-only before validation
+
     def get_file_fname(self, obj) -> str:
         return obj.file.fname.name
 
@@ -481,6 +505,12 @@ class FileBrowserFileUserPermissionSerializer(serializers.HyperlinkedModelSerial
         model = FileUserPermission
         fields = ('url', 'id', 'permission', 'file_id', 'file_fname', 'user_id',
                   'user_username', 'file', 'user', 'username')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['username'].read_only = True  # set to read-only before validation
 
     def get_file_fname(self, obj) -> str:
         return obj.file.fname.name
@@ -551,6 +581,13 @@ class FileBrowserLinkFileSerializer(ChrisFileSerializer):
                   'new_link_file_path', 'owner_username', 'file_resource',
                   'linked_folder', 'linked_file', 'parent_folder', 'group_permissions',
                   'user_permissions', 'owner')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['fname'].read_only = True  # set to read-only before validation
+            self.fields['path'].read_only = True
 
     def update(self, instance, validated_data):
         """
@@ -711,6 +748,12 @@ class FileBrowserLinkFileGroupPermissionSerializer(serializers.HyperlinkedModelS
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname',
                   'group_id', 'group_name', 'link_file', 'group', 'grp_name')
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['grp_name'].read_only = True  # set to read-only before validation
+
     def get_link_file_fname(self, obj) -> str:
         return obj.link_file.fname.name
 
@@ -778,6 +821,12 @@ class FileBrowserLinkFileUserPermissionSerializer(serializers.HyperlinkedModelSe
         model = LinkFileUserPermission
         fields = ('url', 'id', 'permission', 'link_file_id', 'link_file_fname', 'user_id',
                   'user_username', 'link_file', 'user', 'username')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None: # on update
+            self.fields['username'].read_only = True  # set to read-only before validation
 
     def get_link_file_fname(self, obj) -> str:
         return obj.link_file.fname.name
