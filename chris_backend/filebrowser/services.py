@@ -36,8 +36,7 @@ def get_folder_children_queryset(folder, user=None):
         return folder.children.all()
 
     lookup = models.Q(owner=user) | models.Q(public=True) | models.Q(
-        shared_users=user) | models.Q(shared_groups__pk__in=[g.id for g
-                                                             in user.groups.all()])
+        shared_users=user) | models.Q(shared_groups__in=user.groups.all())
     return folder.children.filter(lookup)
 
 
@@ -52,8 +51,7 @@ def get_folder_files_queryset(folder, user=None):
         return folder.chris_files.all()
 
     lookup = models.Q(owner=user) | models.Q(public=True) | models.Q(
-        shared_users=user) | models.Q(shared_groups__pk__in=[g.id for g
-                                                             in user.groups.all()])
+        shared_users=user) | models.Q(shared_groups__in=user.groups.all())
     return folder.chris_files.filter(lookup)
 
 
@@ -68,6 +66,5 @@ def get_folder_link_files_queryset(folder, user=None):
         return folder.chris_link_files.all()
 
     lookup = models.Q(owner=user) | models.Q(public=True) | models.Q(
-        shared_users=user) | models.Q(shared_groups__pk__in=[g.id for g
-                                                             in user.groups.all()])
+        shared_users=user) | models.Q(shared_groups__in=user.groups.all())
     return folder.chris_link_files.filter(lookup)

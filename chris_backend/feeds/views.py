@@ -165,9 +165,8 @@ class TagFeedList(generics.ListAPIView):
         if not user.is_authenticated:
             return tag.feeds.filter(public=True)
 
-        group_ids = [g.id for g in user.groups.all()]
         lookup = Q(owner=user) | Q(public=True) | Q(shared_users=user) | Q(
-            shared_groups__pk__in=group_ids)
+            shared_groups__in=user.groups.all())
         return tag.feeds.filter(lookup)
 
 
@@ -261,9 +260,8 @@ class TagTaggingList(generics.ListCreateAPIView):
         if not user.is_authenticated:
             return Tagging.objects.filter(tag=tag).filter(feed__public=True)
 
-        group_ids = [g.id for g in user.groups.all()]
         lookup = Q(feed__owner=user) | (Q(feed__public=True) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__pk__in=group_ids))
+            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all()))
         return Tagging.objects.filter(tag=tag).filter(lookup)
 
 
@@ -299,8 +297,8 @@ class FeedList(generics.ListAPIView):
         if user.username == 'chris':
             return Feed.objects.exclude(public=True)
 
-        group_ids = [g.id for g in user.groups.all()]
-        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__pk__in=group_ids)
+        lookup = Q(owner=user) | Q(shared_users=user) | Q(
+            shared_groups__in=user.groups.all())
         return Feed.objects.filter(lookup)
 
     def list(self, request, *args, **kwargs):
@@ -368,8 +366,8 @@ class FeedListQuerySearch(generics.ListAPIView):
         if user.username == 'chris':
             return Feed.objects.exclude(public=True)
 
-        group_ids = [g.id for g in user.groups.all()]
-        lookup = Q(owner=user) | Q(shared_users=user) | Q(shared_groups__pk__in=group_ids)
+        lookup = Q(owner=user) | Q(shared_users=user) | Q(
+            shared_groups__in=user.groups.all())
         return Feed.objects.filter(lookup)
 
 
