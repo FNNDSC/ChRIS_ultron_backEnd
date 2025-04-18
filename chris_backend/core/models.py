@@ -175,18 +175,19 @@ class ChrisFolder(models.Model):
         Custom method to determine whether a user has been granted a permission
         to access the folder (perhaps through one of its groups).
         """
+        grp_qs = user.groups.all()
+
         if not permission:
-            lookup = models.Q(shared_folders=self) | models.Q(groups__shared_folders=self)
-            qs = User.objects.filter(username=user.username).filter(lookup)
+            if FolderUserPermission.objects.filter(folder=self, user=user).exists():
+                return True
+            qs = FolderGroupPermission.objects.filter(folder=self, group__in=grp_qs)
         else:
             p = validate_permission(permission)
             if FolderUserPermission.objects.filter(folder=self, user=user,
                                                    permission=p).exists():
                 return True
-
-            user_grp_ids = [g.id for g in user.groups.all()]
             qs = FolderGroupPermission.objects.filter(folder=self, permission=p,
-                                                      group__pk__in=user_grp_ids)
+                                                      group__in=grp_qs)
         return qs.exists()
 
     def grant_group_permission(self, group, permission):
@@ -593,18 +594,19 @@ class ChrisFile(models.Model):
         Custom method to determine whether a user has been granted a permission to
         access the file (perhaps through one of its groups).
         """
+        grp_qs = user.groups.all()
+
         if not permission:
-            lookup = models.Q(shared_files=self) | models.Q(groups__shared_files=self)
-            qs = User.objects.filter(username=user.username).filter(lookup)
+            if FileUserPermission.objects.filter(file=self, user=user).exists():
+                return True
+            qs = FileGroupPermission.objects.filter(file=self, group__in=grp_qs)
         else:
             p = validate_permission(permission)
             if FileUserPermission.objects.filter(file=self, user=user,
                                                  permission=p).exists():
                 return True
-
-            user_grp_ids = [g.id for g in user.groups.all()]
             qs = FileGroupPermission.objects.filter(file=self, permission=p,
-                                                    group__pk__in=user_grp_ids)
+                                                    group__in=grp_qs)
         return qs.exists()
 
     def grant_group_permission(self, group, permission):
@@ -879,19 +881,19 @@ class ChrisLinkFile(models.Model):
         Custom method to determine whether a user has been granted a permission to
         access the link file (perhaps through one of its groups).
         """
+        grp_qs = user.groups.all()
+
         if not permission:
-            lookup = models.Q(shared_link_files=self) | models.Q(
-                groups__shared_link_files=self)
-            qs = User.objects.filter(username=user.username).filter(lookup)
+            if LinkFileUserPermission.objects.filter(link_file=self, user=user).exists():
+                return True
+            qs = LinkFileGroupPermission.objects.filter(link_file=self, group__in=grp_qs)
         else:
             p = validate_permission(permission)
             if LinkFileUserPermission.objects.filter(link_file=self, user=user,
                                                      permission=p).exists():
                 return True
-
-            user_grp_ids = [g.id for g in user.groups.all()]
             qs = LinkFileGroupPermission.objects.filter(link_file=self, permission=p,
-                                                        group__pk__in=user_grp_ids)
+                                                        group__in=grp_qs)
         return qs.exists()
 
     def grant_group_permission(self, group, permission):
