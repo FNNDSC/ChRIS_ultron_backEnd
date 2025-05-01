@@ -38,7 +38,6 @@ class UserProxy(User):
     class Meta:
         ordering = ('-username',)
         proxy = True
-        app_label = 'auth'
 
     def save(self, *args, **kwargs):
         """
