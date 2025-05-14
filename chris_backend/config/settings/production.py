@@ -54,6 +54,14 @@ DATABASES['default']['USER'] = get_secret('POSTGRES_USER')
 DATABASES['default']['PASSWORD'] = get_secret('POSTGRES_PASSWORD')
 DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
+DATABASE_CONN_POOL = get_secret('DATABASE_CONN_POOL', env.bool)
+if DATABASE_CONN_POOL:
+    DATABASE_CONN_POOL_MIN_SIZE = get_secret('DATABASE_CONN_POOL_MIN_SIZE', env.int)
+    DATABASE_CONN_POOL_MAX_SIZE = get_secret('DATABASE_CONN_POOL_MAX_SIZE', env.int)
+    DATABASE_CONN_POOL_TIMEOUT = get_secret('DATABASE_CONN_POOL_TIMEOUT', env.float)
+    DATABASES['default']['OPTIONS'] = {'pool': {'min_size': DATABASE_CONN_POOL_MIN_SIZE,
+                                                'max_size': DATABASE_CONN_POOL_MAX_SIZE,
+                                                'timeout': DATABASE_CONN_POOL_TIMEOUT}}
 
 
 # STORAGE CONFIGURATION

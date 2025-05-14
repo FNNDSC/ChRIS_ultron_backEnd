@@ -1,13 +1,13 @@
 # Local development dependencies go here
 -r base.txt
-django-debug-toolbar==5.0.1
-django-extensions==3.2.3
+django-debug-toolbar==5.2.0
+django-extensions==4.1
 collection-json==0.1.1
-coverage==7.6.12
-pylint==3.3.4
-flake8==7.1.2
+coverage==7.8.0
+pylint==3.3.7
+flake8==7.2.0
 isort==6.0.1
-pudb==2024.1.3
+pudb==2025.1
 daphne==4.1.2  # required by (django) channels.testing
 granian[reload]
 https://github.com/msbrogli/rpudb/archive/master.zip
