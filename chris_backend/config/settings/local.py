@@ -124,6 +124,7 @@ DATABASES['default']['PASSWORD'] = 'Chris1234'
 DATABASES['default']['TEST'] = {'NAME': 'test_chris_dev'}
 DATABASES['default']['HOST'] = 'chris_dev_db'
 DATABASES['default']['PORT'] = '5432'
+DATABASES['default']['OPTIONS'] = {'pool': {'min_size': 1, 'max_size': 2, 'timeout': 10}}
 
 # Mail settings
 # ------------------------------------------------------------------------------
