@@ -69,25 +69,49 @@ class FeedModelTests(TestCase):
         """
         self.assertEqual(Note.objects.count(), 1)
 
-    def test_get_plugin_instances_status_count(self):
+    def test_add_jobs_status_count(self):
         """
-        Test whether custom get_plugin_instances_status_count method properly returns
-        the number of plugin instances with a specific status.
+        Test whether custom add_jobs_status_count method properly adds the number of
+        associated plugin instances per execution status to each element of a Feed
+        queryset.
+        """
+        feed = Feed.add_jobs_status_count(Feed.objects.all()).get(name=self.feed_name)
+        count = feed.created_jobs
+        self.assertEqual(count, 1)
+        count = feed.waiting_jobs
+        self.assertEqual(count, 0)
+        count = feed.scheduled_jobs
+        self.assertEqual(count, 0)
+        count = feed.started_jobs
+        self.assertEqual(count, 0)
+        count = feed.registering_jobs
+        self.assertEqual(count, 0)
+        count = feed.finished_jobs
+        self.assertEqual(count, 0)
+        count = feed.errored_jobs
+        self.assertEqual(count, 0)
+        count = feed.cancelled_jobs
+        self.assertEqual(count, 0)
+
+    def test_get_jobs_status_count(self):
+        """
+        Test whether custom get_jobs_status_count method properly returns
+        the number of plugin instances per execution status.
         """
         feed = Feed.objects.get(name=self.feed_name)
-        count = feed.get_plugin_instances_status_count('created')
+        count = feed.get_jobs_status_count()['created_jobs']
         self.assertEqual(count, 1)
-        count = feed.get_plugin_instances_status_count('waiting')
+        count = feed.get_jobs_status_count()['waiting_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('scheduled')
+        count = feed.get_jobs_status_count()['scheduled_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('started')
+        count = feed.get_jobs_status_count()['started_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('registeringFiles')
+        count = feed.get_jobs_status_count()['registering_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('finishedSuccessfully')
+        count = feed.get_jobs_status_count()['finished_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('finishedWithError')
+        count = feed.get_jobs_status_count()['errored_jobs']
         self.assertEqual(count, 0)
-        count = feed.get_plugin_instances_status_count('cancelled')
+        count = feed.get_jobs_status_count()['cancelled_jobs']
         self.assertEqual(count, 0)

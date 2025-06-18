@@ -92,6 +92,9 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         if 'max_gpu_limit' in data:
             data['max_gpu_limit'] = self.validate_app_gpu_descriptor(
                 {'name': 'max_gpu_limit', 'value': data['max_gpu_limit']})
+        else:
+            if ('min_gpu_limit' in data) and (data['min_gpu_limit'] > 0):
+                data['max_gpu_limit'] = Plugin.defaults['max_limit']
 
         if 'min_cpu_limit' in data:
             data['min_cpu_limit'] = self.validate_app_cpu_descriptor(
