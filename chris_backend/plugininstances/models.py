@@ -37,7 +37,8 @@ class PluginInstance(models.Model):
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created',
+                              db_index=True)
     summary = models.CharField(max_length=4000, blank=True)
     raw = models.TextField(blank=True)
     size = models.BigIntegerField(default=0)

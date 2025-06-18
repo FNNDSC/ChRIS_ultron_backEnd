@@ -136,7 +136,7 @@ class FeedSerializerTests(SerializerTests):
 
     def setUp(self):
         super(FeedSerializerTests, self).setUp()
-        feed = Feed.objects.get(name=self.feedname)
+        feed = Feed.add_jobs_status_count(Feed.objects.all()).get(name=self.feedname)
         self.feed_serializer = FeedSerializer(feed)
 
     def test_get_started_jobs(self):

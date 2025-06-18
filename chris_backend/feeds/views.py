@@ -163,11 +163,11 @@ class TagFeedList(generics.ListAPIView):
         tag = self.get_object()
 
         if not user.is_authenticated:
-            return tag.feeds.filter(public=True)
+            return Feed.add_jobs_status_count(tag.feeds.filter(public=True))
 
         lookup = Q(owner=user) | Q(public=True) | Q(shared_users=user) | Q(
             shared_groups__in=user.groups.all())
-        return tag.feeds.filter(lookup)
+        return Feed.add_jobs_status_count(tag.feeds.filter(lookup))
 
 
 class FeedTaggingList(generics.ListCreateAPIView):
@@ -295,11 +295,11 @@ class FeedList(generics.ListAPIView):
 
         # if the user is chris then return all the non-public feeds in the system
         if user.username == 'chris':
-            return Feed.objects.exclude(public=True)
+            return Feed.add_jobs_status_count(Feed.objects.exclude(public=True))
 
         lookup = Q(owner=user) | Q(shared_users=user) | Q(
             shared_groups__in=user.groups.all())
-        return Feed.objects.filter(lookup)
+        return Feed.add_jobs_status_count(Feed.objects.filter(lookup))
 
     def list(self, request, *args, **kwargs):
         """
@@ -364,11 +364,11 @@ class FeedListQuerySearch(generics.ListAPIView):
 
         # if the user is chris then return all the non-public feeds in the system
         if user.username == 'chris':
-            return Feed.objects.exclude(public=True)
+            return Feed.add_jobs_status_count(Feed.objects.exclude(public=True))
 
         lookup = Q(owner=user) | Q(shared_users=user) | Q(
             shared_groups__in=user.groups.all())
-        return Feed.objects.filter(lookup)
+        return Feed.add_jobs_status_count(Feed.objects.filter(lookup))
 
 
 class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -376,7 +376,7 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
     A feed view.
     """
     http_method_names = ['get', 'put', 'delete']
-    queryset = Feed.objects.all()
+    queryset = Feed.add_jobs_status_count(Feed.objects.all())
     serializer_class = FeedSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
                           IsOwnerOrChrisOrHasPermissionOrPublicReadOnly,)
@@ -402,7 +402,7 @@ class PublicFeedList(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the feeds
         that are public.
         """
-        return Feed.objects.filter(public=True)
+        return Feed.add_jobs_status_count(Feed.objects.filter(public=True))
 
     def list(self, request, *args, **kwargs):
         """
@@ -428,7 +428,7 @@ class PublicFeedListQuerySearch(generics.ListAPIView):
         Overriden to return a custom queryset that is only comprised by the feeds
         that are public.
         """
-        return Feed.objects.filter(public=True)
+        return Feed.add_jobs_status_count(Feed.objects.filter(public=True))
 
 
 class FeedGroupPermissionList(generics.ListCreateAPIView):

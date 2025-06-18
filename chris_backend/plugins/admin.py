@@ -534,11 +534,19 @@ class PluginAdminSerializer(PluginSerializer):
                     app_repr['min_gpu_limit'] = self.validate_app_gpu_descriptor(
                         app_repr['min_gpu_limit'])
 
-                if ('max_gpu_limit' in app_repr) and (app_repr['max_gpu_limit'] == ''):
-                    del app_repr['max_gpu_limit']
-                elif 'max_gpu_limit' in app_repr:
-                    app_repr['max_gpu_limit'] = self.validate_app_gpu_descriptor(
-                        app_repr['max_gpu_limit'])
+                if 'max_gpu_limit' in app_repr:
+                    if app_repr['max_gpu_limit'] == '':
+                        if ('min_gpu_limit' in app_repr) and (
+                                app_repr['min_gpu_limit'] > 0):
+                            app_repr['max_gpu_limit'] = Plugin.defaults['max_limit']
+                        else:
+                            del app_repr['max_gpu_limit']
+                    else:
+                        app_repr['max_gpu_limit'] = self.validate_app_gpu_descriptor(
+                            app_repr['max_gpu_limit'])
+                else:
+                    if ('min_gpu_limit' in app_repr) and (app_repr['min_gpu_limit'] > 0):
+                        app_repr['max_gpu_limit'] = Plugin.defaults['max_limit']
 
                 if ('min_cpu_limit' in app_repr) and (app_repr['min_cpu_limit'] == ''):
                     del app_repr['min_cpu_limit']

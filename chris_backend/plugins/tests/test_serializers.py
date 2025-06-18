@@ -241,7 +241,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['min_number_of_workers'] = 4
-        plg_serializer.validate_app_workers_descriptor = mock.Mock()
+        plg_serializer.validate_app_workers_descriptor = mock.Mock(return_value=4)
         plg_serializer.validate(data)
         plg_serializer.validate_app_workers_descriptor.assert_called_with(
             {'name': 'min_number_of_workers', 'value': 4})
@@ -256,7 +256,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['max_number_of_workers'] = 5
-        plg_serializer.validate_app_workers_descriptor = mock.Mock()
+        plg_serializer.validate_app_workers_descriptor = mock.Mock(return_value=5)
         plg_serializer.validate(data)
         plg_serializer.validate_app_workers_descriptor.assert_called_with(
             {'name': 'max_number_of_workers', 'value': 5})
@@ -271,7 +271,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['min_gpu_limit'] = 1
-        plg_serializer.validate_app_gpu_descriptor = mock.Mock()
+        plg_serializer.validate_app_gpu_descriptor = mock.Mock(return_value=1)
         plg_serializer.validate(data)
         plg_serializer.validate_app_gpu_descriptor.assert_called_with(
             {'name': 'min_gpu_limit', 'value': 1})
@@ -286,7 +286,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['max_gpu_limit'] = 2
-        plg_serializer.validate_app_gpu_descriptor = mock.Mock()
+        plg_serializer.validate_app_gpu_descriptor = mock.Mock(return_value=2)
         plg_serializer.validate(data)
         plg_serializer.validate_app_gpu_descriptor.assert_called_with(
             {'name': 'max_gpu_limit', 'value': 2})
@@ -301,7 +301,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['min_cpu_limit'] = 100
-        plg_serializer.validate_app_cpu_descriptor = mock.Mock()
+        plg_serializer.validate_app_cpu_descriptor = mock.Mock(return_value=100)
         plg_serializer.validate(data)
         plg_serializer.validate_app_cpu_descriptor.assert_called_with(
             {'name': 'min_cpu_limit', 'value': 100})
@@ -316,7 +316,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['max_cpu_limit'] = 200
-        plg_serializer.validate_app_cpu_descriptor = mock.Mock()
+        plg_serializer.validate_app_cpu_descriptor = mock.Mock(return_value=200)
         plg_serializer.validate(data)
         plg_serializer.validate_app_cpu_descriptor.assert_called_with(
             {'name': 'max_cpu_limit', 'value': 200})
@@ -331,7 +331,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['min_memory_limit'] = 10000
-        plg_serializer.validate_app_memory_descriptor = mock.Mock()
+        plg_serializer.validate_app_memory_descriptor = mock.Mock(return_value=10000)
         plg_serializer.validate(data)
         plg_serializer.validate_app_memory_descriptor.assert_called_with(
             {'name': 'min_memory_limit', 'value': 10000})
@@ -346,7 +346,7 @@ class PluginSerializerTests(SerializerTests):
         data = self.plugin_repr.copy()
         del data['parameters']
         data['max_memory_limit'] = 100000
-        plg_serializer.validate_app_memory_descriptor = mock.Mock()
+        plg_serializer.validate_app_memory_descriptor = mock.Mock(return_value=10000)
         plg_serializer.validate(data)
         plg_serializer.validate_app_memory_descriptor.assert_called_with(
             {'name': 'max_memory_limit', 'value': 100000})
