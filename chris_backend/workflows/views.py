@@ -113,7 +113,7 @@ class WorkflowList(generics.ListCreateAPIView):
         Custom method to get the actual workflows' queryset.
         """
         pipeline = self.get_object()
-        return self.filter_queryset(pipeline.workflows.all())
+        return Workflow.add_jobs_status_count(pipeline.workflows.all())
 
     def create_plugin_inst(self, data: WorkflowPluginInstanceTemplate, previous:
     PluginInstance, workflow: Workflow) -> PluginInstance:
@@ -146,7 +146,7 @@ class AllWorkflowList(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = WorkflowSerializer
-    queryset = Workflow.objects.all()
+    queryset = Workflow.add_jobs_status_count(Workflow.objects.all())
     permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -168,7 +168,7 @@ class AllWorkflowListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = WorkflowSerializer
-    queryset = Workflow.objects.all()
+    queryset = Workflow.add_jobs_status_count(Workflow.objects.all())
     permission_classes = (permissions.IsAuthenticated,)
     filterset_class = WorkflowFilter
 
@@ -179,7 +179,7 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     http_method_names = ['get', 'put', 'delete']
     serializer_class = WorkflowSerializer
-    queryset = Workflow.objects.all()
+    queryset = Workflow.add_jobs_status_count(Workflow.objects.all())
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrChrisOrReadOnly,)
 
     def retrieve(self, request, *args, **kwargs):
