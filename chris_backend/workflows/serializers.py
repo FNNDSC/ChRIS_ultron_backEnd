@@ -218,7 +218,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         """
         if 'created' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'created'.")
-        return obj.get_plugin_instances_status_count('created')
+        return obj.created_jobs if hasattr(obj, 'created_jobs') else 0
 
     def get_waiting_jobs(self, obj) -> int:
         """
@@ -227,7 +227,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         if 'waiting' not in [status[0] for status in STATUS_CHOICES]:
             msg = "Undefined plugin instance execution status: 'waiting'."
             raise KeyError(msg)
-        return obj.get_plugin_instances_status_count('waiting')
+        return obj.waiting_jobs if hasattr(obj, 'waiting_jobs') else 0
 
     def get_scheduled_jobs(self, obj) -> int:
         """
@@ -235,7 +235,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         """
         if 'scheduled' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'scheduled'.")
-        return obj.get_plugin_instances_status_count('scheduled')
+        return obj.scheduled_jobs if hasattr(obj, 'scheduled_jobs') else 0
 
     def get_started_jobs(self, obj) -> int:
         """
@@ -243,7 +243,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         """
         if 'started' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'started'.")
-        return obj.get_plugin_instances_status_count('started')
+        return obj.started_jobs if hasattr(obj, 'started_jobs') else 0
 
     def get_registering_jobs(self, obj) -> int:
         """
@@ -252,7 +252,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         if 'registeringFiles' not in [status[0] for status in STATUS_CHOICES]:
             msg = "Undefined plugin instance execution status: 'registeringFiles'."
             raise KeyError(msg)
-        return obj.get_plugin_instances_status_count('registeringFiles')
+        return obj.registering_jobs if hasattr(obj, 'registering_jobs') else 0
 
     def get_finished_jobs(self, obj) -> int:
         """
@@ -261,7 +261,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         if 'finishedSuccessfully' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: "
                            "'finishedSuccessfully'.")
-        return obj.get_plugin_instances_status_count('finishedSuccessfully')
+        return obj.finished_jobs if hasattr(obj, 'finished_jobs') else 0
 
     def get_errored_jobs(self, obj) -> int:
         """
@@ -270,7 +270,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         if 'finishedWithError' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: "
                            "'finishedWithError'.")
-        return obj.get_plugin_instances_status_count('finishedWithError')
+        return obj.errored_jobs if hasattr(obj, 'errored_jobs') else 0
 
     def get_cancelled_jobs(self, obj) -> int:
         """
@@ -278,4 +278,4 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
         """
         if 'cancelled' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'cancelled'.")
-        return obj.get_plugin_instances_status_count('cancelled')
+        return obj.cancelled_jobs if hasattr(obj, 'cancelled_jobs') else 0
