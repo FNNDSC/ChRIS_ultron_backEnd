@@ -23,7 +23,7 @@ up: (docker-compose '--profile=cube up -d')
 
 # Attach to the chris container.
 [group('(3) development')]
-attach: (docker-compose '--profile=cube attach chris')
+attach: (docker-compose '--profile=cube attach chris | grep -Fv "\"GET /api/v1/users/ HTTP/1.1\" 200"')
 
 # Open a Python shell.
 [group('(3) development')]
