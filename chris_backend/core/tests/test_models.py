@@ -28,6 +28,27 @@ class ModelTests(TestCase):
         logging.disable(logging.NOTSET)
 
 
+class ChrisFolderModelTests(ModelTests):
+
+    def setUp(self):
+        super(ChrisFolderModelTests, self).setUp()
+
+    def test_get_first_existing_folder_ancestor(self):
+        """
+        Test whether custom get_first_existing_folder_ancestor method returns the
+        closest ancestor folder (by path prefix including the passed path itself) that
+        exists in the DB.
+        """
+        folder = ChrisFolder.get_first_existing_folder_ancestor('')
+        self.assertEqual(folder.path, '')
+        folder = ChrisFolder.get_first_existing_folder_ancestor('home')
+        self.assertEqual(folder.path, 'home')
+        folder = ChrisFolder.get_first_existing_folder_ancestor('home/12345678/999999')
+        self.assertEqual(folder.path, 'home')
+        folder = ChrisFolder.get_first_existing_folder_ancestor('home/12345678/file.txt')
+        self.assertEqual(folder.path, 'home')
+
+
 class ChrisFileModelTests(ModelTests):
 
     def setUp(self):

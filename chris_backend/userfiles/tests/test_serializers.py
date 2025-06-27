@@ -42,17 +42,28 @@ class UserFileSerializerTests(TestCase):
     def test_create(self):
         """
         Test whether overriden 'create' method successfully creates a new UserFile with
-        the correct path and parent folder
+        the correct path, parent folder and permissions.
         """
+        chris_user = User.objects.get(username=self.chris_username)
         user = User.objects.get(username=self.username)
+        ancestor_folder_path = f'home/{self.username}/uploads/ancestor'
+        (ancestor_folder, _) = ChrisFolder.objects.get_or_create(path=ancestor_folder_path,
+                                                               owner=user)
+        ancestor_folder.grant_public_access()
+        ancestor_folder.grant_user_permission(chris_user, 'w')
+
         f = ContentFile('Test file'.encode())
         f.name = 'file1.txt'
-        validated_data = {'upload_path': f'home/{self.username}/uploads/file1.txt',
+        validated_data = {'upload_path': ancestor_folder_path + '/upload_folder/file1.txt',
                           'owner': user, 'fname': f}
+
         userfiles_serializer = UserFileSerializer()
         user_file = userfiles_serializer.create(validated_data)
-        self.assertEqual(user_file.fname.name, f'home/{self.username}/uploads/file1.txt')
-        self.assertEqual(user_file.parent_folder.path, f'home/{self.username}/uploads')
+
+        self.assertEqual(user_file.fname.name, ancestor_folder_path + '/upload_folder/file1.txt')
+        self.assertEqual(user_file.parent_folder.path, ancestor_folder_path + '/upload_folder')
+        self.assertTrue(user_file.public)
+        self.assertTrue(user_file.has_user_permission(chris_user, 'w'))
         user_file.delete()
 
     def test_update(self):

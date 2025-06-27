@@ -167,7 +167,7 @@ class TagFeedList(generics.ListAPIView):
 
         lookup = Q(owner=user) | Q(public=True) | Q(shared_users=user) | Q(
             shared_groups__in=user.groups.all())
-        return Feed.add_jobs_status_count(tag.feeds.filter(lookup))
+        return Feed.add_jobs_status_count(tag.feeds.filter(lookup).distinct())
 
 
 class FeedTaggingList(generics.ListCreateAPIView):
@@ -262,7 +262,7 @@ class TagTaggingList(generics.ListCreateAPIView):
 
         lookup = Q(feed__owner=user) | (Q(feed__public=True) | Q(
             feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all()))
-        return Tagging.objects.filter(tag=tag).filter(lookup)
+        return Tagging.objects.filter(tag=tag).filter(lookup).distinct()
 
 
 class TaggingDetail(generics.RetrieveDestroyAPIView):

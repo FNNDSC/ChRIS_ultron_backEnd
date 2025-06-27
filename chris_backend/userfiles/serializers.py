@@ -29,7 +29,9 @@ class UserFileSerializer(ChrisFileSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to set the file's saving path and parent folder.
+        Overriden to set the file's saving path and parent folder. It also creates
+        non-existent ancestor folders and sets their permissions to be the same as the
+        first existing ancestor folder.
         """
         # user file will be stored at: SWIFT_CONTAINER_NAME/<upload_path>
         # where <upload_path> must start with home/<username>/
@@ -37,15 +39,41 @@ class UserFileSerializer(ChrisFileSerializer):
         folder_path = os.path.dirname(upload_path)
         owner = validated_data['owner']
 
-        try:
-            parent_folder = ChrisFolder.objects.get(path=folder_path)
-        except ChrisFolder.DoesNotExist:
+        parent_folder = ancestor_folder = ChrisFolder.get_first_existing_folder_ancestor(
+            upload_path)
+        if ancestor_folder.path != folder_path:
             parent_folder = ChrisFolder.objects.create(path=folder_path, owner=owner)
 
         validated_data['parent_folder'] = parent_folder
         user_file = UserFile(**validated_data)
         user_file.fname.name = upload_path
         user_file.save()
+
+        if ancestor_folder.path == folder_path:
+            top_created_obj = user_file
+        else:
+            parent_folder_path_parts = folder_path.split('/')
+            ancestor_folder_path_parts = ancestor_folder.path.split('/')
+            next_part = parent_folder_path_parts[len(ancestor_folder_path_parts)]
+            top_created_obj_path = ancestor_folder.path + '/' + next_part
+
+            if top_created_obj_path == folder_path:
+                top_created_obj = parent_folder
+            else:
+                top_created_obj = ChrisFolder.objects.get(path=top_created_obj_path)
+
+        if ancestor_folder.public:
+            top_created_obj.grant_public_access()
+            user_file.public = True  # update object before returning it
+
+        for perm in ancestor_folder.get_groups_permissions_queryset():
+            top_created_obj.grant_group_permission(perm.group, perm.permission)
+
+        for perm in ancestor_folder.get_users_permissions_queryset():
+            top_created_obj.grant_user_permission(perm.user, perm.permission)
+
+        if owner != ancestor_folder.owner:
+            top_created_obj.grant_user_permission(ancestor_folder.owner, 'w')
         return user_file
 
     def update(self, instance, validated_data):
@@ -93,22 +121,18 @@ class UserFileSerializer(ChrisFileSerializer):
         if not upload_path.startswith('home/'):
             raise serializers.ValidationError(["Invalid path. Path must start with "
                                                "'home/'."])
+
+        ancestor_folder = ChrisFolder.get_first_existing_folder_ancestor(upload_path)
+
+        if ancestor_folder.path == upload_path:
+            raise serializers.ValidationError([f"A folder with path '{upload_path}' "
+                                               f"already exists."])
         user = self.context['request'].user
-        folder_path = os.path.dirname(upload_path)
-
-        while True:
-            try:
-                folder = ChrisFolder.objects.get(path=folder_path)
-            except ChrisFolder.DoesNotExist:
-                folder_path = os.path.dirname(folder_path)
-            else:
-                break
-
-        if not (folder.owner == user or folder.public or
-                folder.has_user_permission(user, 'w')):
+        if not (ancestor_folder.owner == user or ancestor_folder.public or
+                ancestor_folder.has_user_permission(user, 'w')):
             raise serializers.ValidationError([f"Invalid path. User does not have write "
                                                f"permission under the folder "
-                                               f"'{folder_path}'."])
+                                               f"'{ancestor_folder.path}'."])
         return upload_path
 
     def validate(self, data):

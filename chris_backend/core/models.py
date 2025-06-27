@@ -5,6 +5,7 @@ import io
 import os
 
 from django.db import models
+from django.db.models.functions import Length
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.conf import settings
@@ -190,6 +191,20 @@ class ChrisFolder(models.Model):
                                                       group__in=grp_qs)
         return qs.exists()
 
+    def get_groups_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to groups to access the
+        folder.
+        """
+        return FolderGroupPermission.objects.filter(folder=self)
+
+    def get_users_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to users to access the
+        folder.
+        """
+        return FolderUserPermission.objects.filter(folder=self)
+
     def grant_group_permission(self, group, permission):
         """
         Custom method to grant a group a permission to access the folder and all its
@@ -336,6 +351,30 @@ class ChrisFolder(models.Model):
         for lf in link_files:
             lf.public = public_tf
         ChrisLinkFile.objects.bulk_update(link_files, ['public'])
+
+    @classmethod
+    def get_first_existing_folder_ancestor(cls, path):
+        """
+        Custom class method to return the closest ancestor folder (by path prefix
+        including the passed path itself) that exists in the DB.
+        """
+        if not path:
+            try:
+                return cls.objects.get(path='')
+            except cls.DoesNotExist:
+                return None
+
+        parts = path.strip().strip('/').split('/')
+        ancestor_paths = ['/'.join(parts[:i]) for i in range(len(parts), 0, -1)]
+        ancestor_paths.append('')
+
+        return (
+            cls.objects
+            .filter(path__in=ancestor_paths)
+            .annotate(path_length=Length('path'))
+            .order_by('-path_length')
+            .first()
+        )
 
 
 @receiver(post_delete, sender=ChrisFolder)
@@ -608,6 +647,20 @@ class ChrisFile(models.Model):
             qs = FileGroupPermission.objects.filter(file=self, permission=p,
                                                     group__in=grp_qs)
         return qs.exists()
+
+    def get_groups_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to groups to access the
+        file.
+        """
+        return FileGroupPermission.objects.filter(file=self)
+
+    def get_users_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to users to access the
+        file.
+        """
+        return FileUserPermission.objects.filter(file=self)
 
     def grant_group_permission(self, group, permission):
         """
@@ -895,6 +948,20 @@ class ChrisLinkFile(models.Model):
             qs = LinkFileGroupPermission.objects.filter(link_file=self, permission=p,
                                                         group__in=grp_qs)
         return qs.exists()
+
+    def get_groups_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to groups to access the
+        link file.
+        """
+        return LinkFileGroupPermission.objects.filter(link_file=self)
+
+    def get_users_permissions_queryset(self):
+        """
+        Custom method to get the queryset of permissions granted to users to access the
+        link file.
+        """
+        return LinkFileUserPermission.objects.filter(link_file=self)
 
     def grant_group_permission(self, group, permission):
         """

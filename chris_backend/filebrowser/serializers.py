@@ -38,19 +38,42 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Overriden to set the parent folder.
+        Overriden to set the parent folder. It also creates non-existent ancestors and
+        sets their permissions to be the same as the first existing ancestor.
         """
         path = validated_data['path']
         parent_path = os.path.dirname(path)
         owner = validated_data['owner']
 
-        try:
-            parent_folder = ChrisFolder.objects.get(path=parent_path)
-        except ChrisFolder.DoesNotExist:
-            parent_folder = ChrisFolder.objects.create(path=parent_path, owner=owner)
+        parent = ancestor = ChrisFolder.get_first_existing_folder_ancestor(path)
+        if ancestor.path != parent_path:
+            parent = ChrisFolder.objects.create(path=parent_path, owner=owner)
 
-        validated_data['parent'] = parent_folder
-        return super(FileBrowserFolderSerializer, self).create(validated_data)
+        validated_data['parent'] = parent
+        folder = super(FileBrowserFolderSerializer, self).create(validated_data)
+
+        if ancestor.path == parent_path:
+            top_created_folder = folder
+        else:
+            path_parts = path.split('/')
+            ancestor_path_parts = ancestor.path.split('/')
+            next_part = path_parts[len(ancestor_path_parts)]
+            top_created_folder = ChrisFolder.objects.get(
+                path=ancestor.path + '/' + next_part)
+
+        if ancestor.public:
+            top_created_folder.grant_public_access()
+            folder.public = True  # update object before returning it
+
+        for perm in ancestor.get_groups_permissions_queryset():
+            top_created_folder.grant_group_permission(perm.group, perm.permission)
+
+        for perm in ancestor.get_users_permissions_queryset():
+            top_created_folder.grant_user_permission(perm.user, perm.permission)
+
+        if owner != ancestor.owner:
+            top_created_folder.grant_user_permission(ancestor.owner, 'w')
+        return folder
 
     def update(self, instance, validated_data):
         """
@@ -98,29 +121,19 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
         if not path.startswith('home/'):
             raise serializers.ValidationError(["Invalid path. Path must start with "
                                                "'home/'."])
-        try:
-            ChrisFolder.objects.get(path=path)
-        except ChrisFolder.DoesNotExist:
-            pass
-        else:
+
+        ancestor = ChrisFolder.get_first_existing_folder_ancestor(path)
+
+        if ancestor.path == path:
             raise serializers.ValidationError([f"Folder with path '{path}' already "
                                                f"exists."])
         user = self.context['request'].user
-        parent_folder_path = os.path.dirname(path)
 
-        while True:
-            try:
-                parent_folder = ChrisFolder.objects.get(path=parent_folder_path)
-            except ChrisFolder.DoesNotExist:
-                parent_folder_path = os.path.dirname(parent_folder_path)
-            else:
-                break
-
-        if not (parent_folder.owner == user or parent_folder.public or
-                parent_folder.has_user_permission(user, 'w')):
+        if not (ancestor.owner == user or ancestor.public or
+                ancestor.has_user_permission(user, 'w')):
             raise serializers.ValidationError([f"Invalid path. User do not have write "
                                                f"permission under the folder "
-                                               f"'{parent_folder_path}'."])
+                                               f"'{ancestor.path}'."])
         return path
 
     def validate_public(self, public):
