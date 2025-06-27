@@ -43,7 +43,7 @@ class Workflow(models.Model):
                                          then=1), output_field=IntegerField())),
             cancelled_jobs=Count(Case(When(plugin_instances__status='cancelled', then=1),
                                     output_field=IntegerField()))
-        )
+        ).order_by('-creation_date')
 
     def get_jobs_status_count(self):
         """
