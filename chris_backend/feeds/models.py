@@ -8,7 +8,9 @@ from django.dispatch import receiver
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder
+from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
+                         FolderUserPermission, FileGroupPermission, FileUserPermission,
+                         LinkFileGroupPermission, LinkFileUserPermission)
 from userfiles.models import UserFile
 
 
@@ -239,18 +241,121 @@ class FeedGroupPermission(models.Model):
     def save(self, *args, **kwargs):
         """
         Overriden to grant the group write permission to all the folders, files and link
-        files within the feed.
+        files within the feed's folder. In addition, the same permission is applied to
+        all objects pointed by the linked files under the feed's folder if they are owned
+        by the feed's owner.
         """
         super(FeedGroupPermission, self).save(*args, **kwargs)
-        self.feed.folder.grant_group_permission(self.group, 'w')
+
+        feed_folder = self.feed.folder
+        feed_folder.grant_group_permission(self.group, 'w')
+
+        linked_paths = ChrisLinkFile.objects.filter(
+            fname__startswith=feed_folder.path + '/'
+        ).values_list('path', flat=True)
+
+        if linked_paths:
+            linked_owned_folder_paths = ChrisFolder.objects.filter(
+                path__in=linked_paths,
+                owner=feed_folder.owner
+            ).values_list('path', flat=True)
+
+            if linked_owned_folder_paths:
+                lookup = models.Q()
+
+                for path in linked_owned_folder_paths:
+                    lookup |= models.Q(path=path)
+                    lookup |= models.Q(path__startswith=path + '/')
+
+                folders = ChrisFolder.objects.filter(lookup)
+                objs = []
+                for folder in folders:
+                    perm = FolderGroupPermission(folder=folder, group=self.group,
+                                                 permission='w')
+                    objs.append(perm)
+                FolderGroupPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                          update_fields=['permission'],
+                                                          unique_fields=['folder_id',
+                                                                         'group_id'])
+
+            lookup = models.Q(fname__in=linked_paths, owner=feed_folder.owner)
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(fname__startswith=path + '/')
+
+            files = ChrisFile.objects.filter(lookup)
+            objs = []
+            for f in files:
+                perm = FileGroupPermission(file=f, group=self.group, permission='w')
+                objs.append(perm)
+            FileGroupPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                    update_fields=['permission'],
+                                                    unique_fields=['file_id', 'group_id'])
+
+            link_files = ChrisLinkFile.objects.filter(lookup)
+            objs = []
+            for lf in link_files:
+                perm = LinkFileGroupPermission(link_file=lf, group=self.group,
+                                               permission='w')
+                objs.append(perm)
+            LinkFileGroupPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                        update_fields=['permission'],
+                                                        unique_fields=['link_file_id',
+                                                                       'group_id'])
 
     def delete(self, *args, **kwargs):
         """
         Overriden to remove the group's write permission to all the folders, files and
-        link files within the feed.
+        link files within the feed's folder. In addition, the same permission is removed
+        for all objects pointed by the linked files under the feed's folder if they are
+        owned by the feed's owner.
         """
         super(FeedGroupPermission, self).delete(*args, **kwargs)
-        self.feed.folder.remove_group_permission(self.group, 'w')
+
+        feed_folder = self.feed.folder
+        feed_folder.remove_group_permission(self.group, 'w')
+
+        linked_paths = ChrisLinkFile.objects.filter(
+            fname__startswith=feed_folder.path + '/'
+        ).values_list('path', flat=True)
+
+        if linked_paths:
+            linked_owned_folder_paths = ChrisFolder.objects.filter(
+                path__in=linked_paths,
+                owner=feed_folder.owner
+            ).values_list('path', flat=True)
+
+            if linked_owned_folder_paths:
+                lookup = models.Q()
+
+                for path in linked_owned_folder_paths:
+                    lookup |= models.Q(path=path)
+                    lookup |= models.Q(path__startswith=path + '/')
+
+                folders = ChrisFolder.objects.filter(lookup)
+
+                FolderGroupPermission.objects.filter(folder__in=folders,
+                                                     group=self.group,
+                                                     permission='w').delete()
+
+            lookup = models.Q(file__fname__in=linked_paths,
+                              file__owner=feed_folder.owner,
+                              group=self.group, permission='w')
+
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(file__fname__startswith=path + '/',
+                                   group=self.group, permission='w')
+
+            FileGroupPermission.objects.filter(lookup).delete()
+
+            lookup = models.Q(link_file__fname__in=linked_paths,
+                              link_file__owner=feed_folder.owner,
+                              group=self.group, permission='w')
+
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(link_file__fname__startswith=path + '/',
+                                   group=self.group, permission='w')
+
+            LinkFileGroupPermission.objects.filter(lookup).delete()
 
 
 class FeedGroupPermissionFilter(FilterSet):
@@ -274,18 +379,119 @@ class FeedUserPermission(models.Model):
     def save(self, *args, **kwargs):
         """
         Overriden to grant the user write permission to all the folders, files and link
-        files within the feed.
+        files within the feed's folder. In addition, the same permission is applied to
+        all objects pointed by the linked files under the feed's folder if they are owned
+        by the feed's owner.
         """
         super(FeedUserPermission, self).save(*args, **kwargs)
-        self.feed.folder.grant_user_permission(self.user, 'w')
+
+        feed_folder = self.feed.folder
+        feed_folder.grant_user_permission(self.user, 'w')
+
+        linked_paths = ChrisLinkFile.objects.filter(
+            fname__startswith=feed_folder.path + '/'
+        ).values_list('path', flat=True)
+
+        if linked_paths:
+            linked_owned_folder_paths = ChrisFolder.objects.filter(
+                path__in=linked_paths,
+                owner=feed_folder.owner
+            ).values_list('path', flat=True)
+
+            if linked_owned_folder_paths:
+                lookup = models.Q()
+
+                for path in linked_owned_folder_paths:
+                    lookup |= models.Q(path=path)
+                    lookup |= models.Q(path__startswith=path + '/')
+
+                folders = ChrisFolder.objects.filter(lookup)
+                objs = []
+                for folder in folders:
+                    perm = FolderUserPermission(folder=folder, user=self.user,
+                                                permission='w')
+                    objs.append(perm)
+                FolderUserPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                          update_fields=['permission'],
+                                                          unique_fields=['folder_id',
+                                                                         'user_id'])
+
+            lookup = models.Q(fname__in=linked_paths, owner=feed_folder.owner)
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(fname__startswith=path + '/')
+
+            files = ChrisFile.objects.filter(lookup)
+            objs = []
+            for f in files:
+                perm = FileUserPermission(file=f, user=self.user, permission='w')
+                objs.append(perm)
+            FileUserPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                    update_fields=['permission'],
+                                                    unique_fields=['file_id', 'user_id'])
+
+            link_files = ChrisLinkFile.objects.filter(lookup)
+            objs = []
+            for lf in link_files:
+                perm = LinkFileUserPermission(link_file=lf, user=self.user, permission='w')
+                objs.append(perm)
+            LinkFileUserPermission.objects.bulk_create(objs, update_conflicts=True,
+                                                        update_fields=['permission'],
+                                                        unique_fields=['link_file_id',
+                                                                       'user_id'])
 
     def delete(self, *args, **kwargs):
         """
         Overriden to remove the user's write permission to all the folders, files and
-        link files within the feed.
+        link files within the feed's folder. In addition, the same permission is removed
+        for all objects pointed by the linked files under the feed's folder if they are
+        owned by the feed's owner.
         """
         super(FeedUserPermission, self).delete(*args, **kwargs)
-        self.feed.folder.remove_user_permission(self.user, 'w')
+
+        feed_folder = self.feed.folder
+        feed_folder.remove_user_permission(self.user, 'w')
+
+        linked_paths = ChrisLinkFile.objects.filter(
+            fname__startswith=feed_folder.path + '/'
+        ).values_list('path', flat=True)
+
+        if linked_paths:
+            linked_owned_folder_paths = ChrisFolder.objects.filter(
+                path__in=linked_paths,
+                owner=feed_folder.owner
+            ).values_list('path', flat=True)
+
+            if linked_owned_folder_paths:
+                lookup = models.Q()
+
+                for path in linked_owned_folder_paths:
+                    lookup |= models.Q(path=path)
+                    lookup |= models.Q(path__startswith=path + '/')
+
+                folders = ChrisFolder.objects.filter(lookup)
+                FolderUserPermission.objects.filter(folder__in=folders,
+                                                    user=self.user,
+                                                    permission='w').delete()
+
+            lookup = models.Q(file__fname__in=linked_paths,
+                              file__owner=feed_folder.owner,
+                              user=self.user, permission='w')
+
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(file__fname__startswith=path + '/',
+                                   user=self.user, permission='w')
+
+            FileUserPermission.objects.filter(lookup).delete()
+
+            lookup = models.Q(link_file__fname__in=linked_paths,
+                              link_file__owner=feed_folder.owner,
+                              user=self.user, permission='w')
+
+            for path in linked_owned_folder_paths:
+                lookup |= models.Q(link_file__fname__startswith=path + '/',
+                                   user=self.user, permission='w')
+
+            LinkFileUserPermission.objects.filter(lookup).delete()
 
 
 class FeedUserPermissionFilter(FilterSet):
