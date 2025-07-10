@@ -1,8 +1,10 @@
 
 import logging
 from functools import wraps
+from datetime import timedelta
 
 from django.db.models import Q
+from django.utils import timezone
 
 from celery import shared_task
 
@@ -67,6 +69,17 @@ def cancel_plugin_instance(plg_inst_id):
     plugin_inst = PluginInstance.objects.get(pk=plg_inst_id)
     plg_inst_manager = PluginInstanceManager(plugin_inst)
     plg_inst_manager.cancel_plugin_instance_app_exec()
+
+
+@shared_task
+def delete_plugin_instance_job_from_remote(plg_inst_id):
+    """
+    Delete a plugin instance's app job from the remote compute.
+    """
+    plugin_inst = PluginInstance.objects.get(pk=plg_inst_id)
+    plg_inst_manager = PluginInstanceManager(plugin_inst)
+    plg_inst_manager.delete_plugin_instance_job_from_remote()
+    plugin_inst.save()  # remove error code from DB if successful delete
 
 
 @shared_task(bind=True)
@@ -141,6 +154,20 @@ def cancel_waiting_plugin_instances():
                     plg_inst.status = 'cancelled'
                     plg_inst.save()
                     break
+
+
+@shared_task
+def delete_plugin_instances_jobs_from_remote():
+    """
+    Collect all plugin instances whose remote app job finished after two days ago
+    but failed to be deleted from the remote compute environment. Then schedule a new
+    delete request for all of them.
+    """
+    cutoff = timezone.now() - timedelta(days=2)  # hardcoded cutoff delta
+
+    instances = PluginInstance.objects.filter(error_code='CODE12', end_date__gt=cutoff)
+    for plg_inst in instances:
+        delete_plugin_instance_job_from_remote.delay(plg_inst.id)  # call async task
 
 
 @shared_task  # toy task for testing celery stuff

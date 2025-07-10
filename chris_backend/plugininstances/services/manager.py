@@ -247,13 +247,12 @@ class PluginInstanceManager(object):
             d_resp = self.pfcon_client.submit_job(job_id, job_descriptors, dfile, timeout)
         except PfconRequestException:
             # FIXME HACK
-            # Under some conditions, the requests library will produce a "Connection Aborted"
-            # error instead of a 401 response. This happens when pfcon responds eagerly
-            # to an invalid token and closes the connection while CUBE is trying to transmit
-            # a large zip file.
+            # Under some conditions, the requests library will produce a
+            # "Connection Aborted" error instead of a 401 response. This happens when
+            # pfcon responds eagerly to an invalid token and closes the connection.
             # The temporary workaround is to catch a wider range of Exceptions here.
             # Ideally we only want to try again in the event that we know the token is
-            # invalid, PfconRequestInvalidTokenException, however PfconRequestInvalidTokenException
+            # invalid, PfconRequestInvalidTokenException, however this exception
             # is not correctly raised in all the situations where it should be.
             #
             logger.exception(f'Error while submitting job {job_id} to pfcon url '
@@ -330,6 +329,22 @@ class PluginInstanceManager(object):
                         f'from pfcon url -->{self.pfcon_client.url}<--')
             self._refresh_compute_resource_auth_token()
             d_resp = self.pfcon_client.get_job_status(job_id, timeout)
+        except PfconRequestException:
+            # FIXME HACK
+            # Under some conditions, the requests library will produce a
+            # "Connection Aborted" error instead of a 401 response. This happens when
+            # pfcon responds eagerly to an invalid token and closes the connection.
+            # The temporary workaround is to catch a wider range of Exceptions here.
+            # Ideally we only want to try again in the event that we know the token is
+            # invalid, PfconRequestInvalidTokenException, however this exception
+            # is not correctly raised in all the situations where it should be.
+            #
+            logger.exception(f'Error while getting status for job {job_id} from pfcon '
+                             f'url -->{self.pfcon_client.url}<--, auth token might have '
+                             f'expired, will try refreshing token and resubmitting job '
+                             f'status request')
+            self._refresh_compute_resource_auth_token()
+            d_resp = self.pfcon_client.get_job_status(job_id, timeout)
         return d_resp
 
     def cancel_plugin_instance_app_exec(self):
@@ -355,9 +370,11 @@ class PluginInstanceManager(object):
         except PfconRequestException as e:
             logger.error(f'[CODE12,{job_id}]: Error deleting job from '
                          f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
+            self.c_plugin_inst.error_code = 'CODE12'
         else:
             logger.info(f'Successfully deleted job {job_id} from pfcon at '
                         f'url -->{pfcon_url}<--')
+            self.c_plugin_inst.error_code = ''
 
     def _delete_job(self, job_id, timeout=500):
         """
@@ -368,6 +385,22 @@ class PluginInstanceManager(object):
         except PfconRequestInvalidTokenException:
             logger.info(f'Auth token has expired while requesting to delete job {job_id} '
                         f'from pfcon url -->{self.pfcon_client.url}<--')
+            self._refresh_compute_resource_auth_token()
+            self.pfcon_client.delete_job(job_id, timeout)
+        except PfconRequestException:
+            # FIXME HACK
+            # Under some conditions, the requests library will produce a
+            # "Connection Aborted" error instead of a 401 response. This happens when
+            # pfcon responds eagerly to an invalid token and closes the connection.
+            # The temporary workaround is to catch a wider range of Exceptions here.
+            # Ideally we only want to try again in the event that we know the token is
+            # invalid, PfconRequestInvalidTokenException, however this exception
+            # is not correctly raised in all the situations where it should be.
+            #
+            logger.exception(f'Error while requesting to delete job {job_id} from pfcon '
+                             f'url -->{self.pfcon_client.url}<--, auth token might have '
+                             f'expired, will try refreshing token and resubmitting job '
+                             f'delete request')
             self._refresh_compute_resource_auth_token()
             self.pfcon_client.delete_job(job_id, timeout)
 
