@@ -27,11 +27,14 @@ task_routes = {
     'plugininstances.tasks.run_plugin_instance': {'queue': 'main1'},
     'plugininstances.tasks.check_plugin_instance_exec_status': {'queue': 'main2'},
     'plugininstances.tasks.cancel_plugin_instance': {'queue': 'main2'},
+    'plugininstances.tasks.delete_plugin_instance_job_from_remote': {'queue': 'main2'},
     'plugininstances.tasks.schedule_waiting_plugin_instances':
         {'queue': 'periodic'},
     'plugininstances.tasks.check_started_plugin_instances_exec_status':
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_waiting_plugin_instances':
+        {'queue': 'periodic'},
+    'plugininstances.tasks.delete_plugin_instances_jobs_from_remote':
         {'queue': 'periodic'},
     'pacsfiles.tasks.send_pacs_query': {'queue': 'main2'},
     'pacsfiles.tasks.register_pacs_series': {'queue': 'main2'}
@@ -58,6 +61,10 @@ app.conf.beat_schedule = {
     'cancel-waiting-plugin-instances-every-30-seconds': {
         'task': 'plugininstances.tasks.cancel_waiting_plugin_instances',
         'schedule': POLL_INTERVAL,
+    },
+    'delete-plugin-instances-jobs-from-remote-every-7200-seconds': {
+        'task': 'plugininstances.tasks.delete_plugin_instances_jobs_from_remote',
+        'schedule': 7200.0,
     },
 }
 
