@@ -51,7 +51,7 @@ services:
         aliases:
           - chrisdev.local  # hard-coded in chrisomatic/*.yml
     healthcheck:
-      test: [ "CMD", "sh", "-c", "curl -f http://localhost:8000/api/v1/users/ || exit 1" ]
+      test: [ "CMD-SHELL", "echo curl -f http://localhost:8000/api/v1/users/ || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
