@@ -14,6 +14,7 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
                                    validators=[UniqueValidator(
                                        queryset=User.objects.all())])
     password = serializers.CharField(min_length=8, max_length=100, write_only=True)
+    is_staff = serializers.ReadOnlyField()
     groups = serializers.HyperlinkedIdentityField(view_name='user-group-list')
 
     class Meta:
