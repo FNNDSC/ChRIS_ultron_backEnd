@@ -55,6 +55,7 @@ from pfconclient.exceptions import (PfconRequestException,
 from django.utils import timezone
 from django.conf import settings
 from django.db.utils import IntegrityError
+from rest_framework.authtoken.models import Token
 
 from core.storage import connect_storage
 from core.utils import json_zip2str
@@ -217,8 +218,11 @@ class PluginInstanceManager(object):
         username = plugin_inst.owner.username
         email = plugin_inst.owner.email
 
+        token,_ = Token.objects.get_or_create(user=plugin_inst.owner)
+
         env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={plugin_inst.id}',
-               f'CHRIS_USER_USERNAME={username}', f'CHRIS_USER_EMAIL={email}']
+               f'CHRIS_USER_USERNAME={username}', f'CHRIS_USER_EMAIL={email}',
+               f'CHRIS_USER_TOKEN={token.key}']
 
         if plugin_type != 'fs':
             prev_id = plugin_inst.previous.id
