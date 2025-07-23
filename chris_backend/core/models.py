@@ -581,12 +581,19 @@ class ChrisFile(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Overriden to ensure file paths never start or end with slashes.
+        Overriden to ensure file paths never start or end with slashes. Also, to delete
+        a leftover file in storage if any error happens when saving the file.
         """
         path = self.fname.name
         if path.startswith('/') or path.endswith('/'):
             raise ValueError('Paths starting or ending with slashes are not allowed.')
-        super(ChrisFile, self).save(*args, **kwargs)
+        try:
+            super(ChrisFile, self).save(*args, **kwargs)
+        except Exception:
+            storage_manager = connect_storage(settings)
+            if storage_manager.obj_exists(path):
+                storage_manager.delete_obj(path)
+            raise
 
     def move(self, new_path):
         """
