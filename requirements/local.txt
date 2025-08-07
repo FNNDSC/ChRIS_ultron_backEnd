@@ -9,5 +9,4 @@ flake8==7.2.0
 isort==6.0.1
 pudb==2025.1
 daphne==4.1.2  # required by (django) channels.testing
-granian[reload]
 https://github.com/msbrogli/rpudb/archive/master.zip
