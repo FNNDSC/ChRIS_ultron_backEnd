@@ -263,9 +263,10 @@ class PluginInstanceFilter(FilterSet):
 class PluginInstanceLock(models.Model):
     plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE,
                                        related_name='lock')
+    start_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.plugin_inst.id
+        return str(self.plugin_inst.id)
 
 
 class PluginInstanceSplit(models.Model):
