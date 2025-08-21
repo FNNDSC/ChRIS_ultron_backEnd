@@ -372,13 +372,20 @@ class PluginInstanceManager(object):
         try:
             self._delete_job(job_id)
         except PfconRequestException as e:
-            logger.error(f'[CODE12,{job_id}]: Error deleting job from '
-                         f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
-            self.c_plugin_inst.error_code = 'CODE12'
+            if '404' in str(e):
+                logger.error(f'Job {job_id} not found in remote fcon '
+                             f'url -->{self.pfcon_client.url}<--, detail: {str(e)}')
+                if self.c_plugin_inst.error_code == 'CODE12':
+                    self.c_plugin_inst.error_code = ''  # avoid retrying delete
+            else:
+                logger.error(f'[CODE12,{job_id}]: Error deleting job from '
+                             f'pfcon at url -->{pfcon_url}<--, detail: {str(e)}')
+                self.c_plugin_inst.error_code = 'CODE12'
         else:
             logger.info(f'Successfully deleted job {job_id} from pfcon at '
                         f'url -->{pfcon_url}<--')
-            self.c_plugin_inst.error_code = ''
+            if self.c_plugin_inst.error_code == 'CODE12':
+                self.c_plugin_inst.error_code = ''
 
     def _delete_job(self, job_id, timeout=500):
         """
@@ -913,9 +920,16 @@ class PluginInstanceManager(object):
         try:
             plg_inst_lock.save()
         except IntegrityError:
-            pass  # another async task has already entered here
+            # another async task has already entered the lock section of the code
+            # only update (atomically) if status='started' to avoid concurrency problems
+            PluginInstance.objects.filter(
+                id=self.c_plugin_inst.id,
+                status='started').update(status='registeringFiles')
         else:
-            # only one concurrent async task should get here
+            # only one concurrent async task should execute this lock section of the code
+            self.c_plugin_inst.status = 'registeringFiles'
+            self.c_plugin_inst.save(update_fields=['status'])
+
             pfcon_url = self.pfcon_client.url
             job_id = self.str_job_id
             logger.info(f'Sending job data file request to pfcon url -->{pfcon_url}<-- '
@@ -932,25 +946,24 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.error_code = 'CODE03'
                 self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
-                # data successfully downloaded so update summary and instance status
-                d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
-                d_jobStatusSummary['pullPath']['status'] = True
-                self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-                self.c_plugin_inst.status = 'registeringFiles'
-                self.c_plugin_inst.save()  # inform FE about status change
-
                 try:
+                    # data successfully downloaded so update summary and instance status
+                    d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
+                    d_jobStatusSummary['pullPath']['status'] = True
+                    self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                    self.c_plugin_inst.save(update_fields=['summary'])
+
                     if self.pfcon_client.pfcon_innetwork:
-                        logger.info('Checking that all remote output files for job %s '
-                                    'exist in file storage', job_id)
+                        logger.info('Checking that all remote output files for job '
+                                    '%s exist in file storage', job_id)
                         self.check_files_from_json_exist(job_file_content)
                     else:
-                        logger.info('Uploading remote output files for job %s to file '
-                                    'storage', job_id)
+                        logger.info('Uploading remote output files for job %s to '
+                                    'file storage', job_id)
                         self.unpack_zip_file(job_file_content)
 
-                    logger.info('Copying local output files for job %s in file storage',
-                                job_id)
+                    logger.info('Copying local output files for job %s in file '
+                                'storage',job_id)
                     # upload files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
@@ -1011,9 +1024,16 @@ class PluginInstanceManager(object):
         try:
             plg_inst_lock.save()
         except IntegrityError:
-            pass  # another async task has already entered here
+            # another async task has already entered the lock section of the code
+            # only update (atomically) if status='started' to avoid concurrency problems
+            PluginInstance.objects.filter(
+                id=self.c_plugin_inst.id,
+                status='started').update(status='registeringFiles')
         else:
-            # only one concurrent async task should get here
+            # only one concurrent async task should execute this lock section of the code
+            self.c_plugin_inst.status = 'registeringFiles'
+            self.c_plugin_inst.save(update_fields=['status'])
+
             pfcon_url = self.pfcon_client.url
             job_id = self.str_job_id
             logger.info(f'Sending job data file request to pfcon url -->{pfcon_url}<-- '
@@ -1030,14 +1050,13 @@ class PluginInstanceManager(object):
                 self.c_plugin_inst.error_code = 'CODE03'
                 self.c_plugin_inst.status = 'cancelled'  # giving up
             else:
-                # data successfully downloaded so update summary and instance status
-                d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
-                d_jobStatusSummary['pullPath']['status'] = True
-                self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
-                self.c_plugin_inst.status = 'registeringFiles'
-                self.c_plugin_inst.save()  # inform FE about status change
-
                 try:
+                    # data successfully downloaded so update summary and instance status
+                    d_jobStatusSummary = json.loads(self.c_plugin_inst.summary)
+                    d_jobStatusSummary['pullPath']['status'] = True
+                    self.c_plugin_inst.summary = json.dumps(d_jobStatusSummary)
+                    self.c_plugin_inst.save(update_fields=['summary'])
+
                     if self.pfcon_client.pfcon_innetwork:
                         logger.info('Checking that all remote output files for job %s '
                                     'exist in file storage', job_id)
