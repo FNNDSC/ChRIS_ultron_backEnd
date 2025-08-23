@@ -155,13 +155,17 @@ if AUTH_LDAP:
     AUTH_LDAP_BIND_PASSWORD = get_secret('AUTH_LDAP_BIND_PASSWORD')
     AUTH_LDAP_USER_SEARCH_ROOT = get_secret('AUTH_LDAP_USER_SEARCH_ROOT')
 
+    _user_search = env.str('AUTH_LDAP_USER_SEARCH_FILTER', default='(uid=%(user)s)')
     AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
-                                       '(uid=%(user)s)')
-    AUTH_LDAP_USER_ATTR_MAP = {
-        'first_name': 'givenName',
-        'last_name': 'sn',
-        'email': 'mail'
-    }
+                                       _user_search)
+    AUTH_LDAP_USER_ATTR_MAP = env.dict(
+        'AUTH_LDAP_USER_ATTR_MAP',
+        default={
+            'first_name': 'givenName',
+            'last_name': 'sn',
+            'email': 'mail'
+        }
+    )
     AUTHENTICATION_BACKENDS = (
         'django_auth_ldap.backend.LDAPBackend',
         'django.contrib.auth.backends.ModelBackend',
