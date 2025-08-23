@@ -125,7 +125,7 @@ class FeedTagList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+                                 kwargs={"pk": feed.id})}
         return services.append_collection_links(response, links)
 
     def get_tags_queryset(self, user):
@@ -153,7 +153,7 @@ class TagFeedList(generics.ListAPIView):
         response = services.get_list_response(self, queryset)
         tag = self.get_object()
         links = {'tag': reverse('tag-detail', request=request,
-                                   kwargs={"pk": tag.id})}
+                                kwargs={"pk": tag.id})}
         return services.append_collection_links(response, links)
 
     def get_feeds_queryset(self, user):
@@ -202,7 +202,7 @@ class FeedTaggingList(generics.ListCreateAPIView):
         response = services.get_list_response(self, queryset)
         feed = self.get_object()
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+                                 kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
         template_data = {"tag_id": ""}
         return services.append_collection_template(response, template_data)
@@ -246,7 +246,7 @@ class TagTaggingList(generics.ListCreateAPIView):
         response = services.get_list_response(self, queryset)
         tag = self.get_object()
         links = {'tag': reverse('tag-detail', request=request,
-                                   kwargs={"pk": tag.id})}
+                                kwargs={"pk": tag.id})}
         response = services.append_collection_links(response, links)
         template_data = {"feed_id": ""}
         return services.append_collection_template(response, template_data)
@@ -285,7 +285,7 @@ class FeedList(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset that is only comprised by the feeds 
+        Overriden to return a custom queryset that is only comprised by the feeds
         owned by the currently authenticated user and those that have been shared with
         the user.
         """
@@ -354,7 +354,7 @@ class FeedListQuerySearch(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Overriden to return a custom queryset that is only comprised by the feeds 
+        Overriden to return a custom queryset that is only comprised by the feeds
         owned by the currently authenticated user and those that have been shared with
         the user.
         """
@@ -464,7 +464,7 @@ class FeedGroupPermissionList(generics.ListCreateAPIView):
         response = services.append_collection_querylist(response, query_list)
 
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+                                 kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
 
         template_data = {"grp_name": ""}
@@ -561,7 +561,7 @@ class FeedUserPermissionList(generics.ListCreateAPIView):
         response = services.append_collection_querylist(response, query_list)
 
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+                                 kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
 
         template_data = {"username": ""}
@@ -659,7 +659,7 @@ class CommentList(generics.ListCreateAPIView):
 
         # append document-level link relations
         links = {'feed': reverse('feed-detail', request=request,
-                                   kwargs={"pk": feed.id})}
+                                 kwargs={"pk": feed.id})}
         response = services.append_collection_links(response, links)
 
         # append write template
