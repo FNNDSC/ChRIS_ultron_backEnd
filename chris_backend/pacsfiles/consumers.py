@@ -33,12 +33,10 @@ _SLEEP_TIME_SECOND = 0.1
 
 
 class PACSFileProgressSSE(View):
-    '''
     permission_classes = (
         permissions.IsAuthenticated,
         IsChrisOrIsPACSUserReadOnly,
     )
-    '''
 
     async def get(self: Self, request: Request, *args, **kwargs):
         return StreamingHttpResponse(self.pacs_file_progress_sse(request, *args, **kwargs), content_type="text/event-stream")
