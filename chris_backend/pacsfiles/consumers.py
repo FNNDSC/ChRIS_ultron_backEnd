@@ -1,5 +1,5 @@
 import json
-from typing import Self
+from typing import Optional, Self
 from django.http import HttpRequest, StreamingHttpResponse
 import rest_framework.permissions
 from channels.db import database_sync_to_async
@@ -52,69 +52,80 @@ class PACSFileProgressSSE(View):
         queue = asyncio.Queue()
         the_progress = {each: 0 for each in series_instance_uids}
 
-        client = None
+        # 1. client
+        client, err = await self._get_client()
+        if err is not None:
+            yield self._event_response(self._err_msg(f'unable to connect nats: e: {err}'))
+            return
+
+        # 2. subscribe
+        err = await self._subscribe(client, pacs_name, series_instance_uids, queue)
+        if err is not None:
+            errmsg = f'unable to subscribe: e: {err}'
+            print(f'[ERROR] consumer.pacs_file_progress_sse: pacs_name: {pacs_name} e: {err}')  # noqa
+            yield self._event_response(self._err_msg(await self._safe_close_client(client, errmsg)))
+            return
+
+        # 3. loop for queue.
+        is_last_iteration_processed = False
+        err = None
+        while True:
+            if is_last_iteration_processed and self._is_all_end(the_progress):
+                break
+
+            msg, err = await self._get_msg(queue)
+            if err:
+                break
+
+            if not msg:
+                await asyncio.sleep(_SLEEP_TIME_SECOND)
+                is_last_iteration_processed = False
+                continue
+
+            self._process_msg(msg, the_progress)
+            is_last_iteration_processed = True
+            yield self._event_response(msg)
+
+        # 4. close client
+        errmsg = '' if not err else f'unable to get msg: e: {err}'
+        err = await self._safe_close_client(client, errmsg)
+
+        # 5. final yield.
+        yield self._event_response(self._all_done() if not err else self._err_msg(err))
+
+    async def _get_client(self: Self) -> tuple[Optional[LonkClient], Optional[Exception]]:
+        client: Optional[LonkClient] = None
         try:
-            client: LonkClient = await LonkClient.connect(
+            client = await LonkClient.connect(
                 settings.NATS_ADDRESS
             )
         except Exception as e:
-            client = None
-            print(f'[ERROR] consumer.pacs_file_progress_sse: pacs_name: {pacs_name} unable to connect nats: e: {e}')  # noqa
-            yield self._event_response(self._err_msg(f'unable to connect nats: e: {e}'))
-            return
+            return None, e
 
         if client is None:
-            print(f'[ERROR] consumer.pacs_file_progress_sse: pacs_name: {pacs_name} unable to connect nats: e: unknown')  # noqa
-            yield self._event_response(self._err_msg(f'unable to connect nats: e: unknown'))
-            return
+            return None, Exception('(unknown)')
 
-        errmsg = ''
+        return client, None
+
+    async def _subscribe(self: Self, client: LonkClient, pacs_name: str, series_instance_uids: list[str], queue: asyncio.Queue) -> Optional[Exception]:
         try:
             for each_series_uid in series_instance_uids:
                 await client.subscribe(pacs_name, each_series_uid, lambda msg: queue.put(msg))
         except Exception as e:
-            errmsg = f'unable to subscribe: e: {e}'
+            return e
 
-        if errmsg:
-            print(f'[ERROR] consumer.pacs_file_progress_sse: pacs_name: {pacs_name} e: {errmsg}')  # noqa
-            yield self._event_response(self._err_msg(await self._safe_close_client(client, errmsg)))
-            return
+        return None
 
-        is_last_iteration_processed = False
-        is_to_break = False
+    async def _get_msg(self: Self, queue: asyncio.Queue) -> tuple[Optional[Lonk], Optional[Exception]]:
         try:
-            while True:
-                if is_last_iteration_processed and self._is_all_end(the_progress):
-                    break
-
-                msg = None
-                try:
-                    msg: Lonk = queue.get_nowait()
-                    if not msg:  # not processed and continue
-                        is_last_iteration_processed = False
-                        await asyncio.sleep(_SLEEP_TIME_SECOND)
-                        continue
-
-                    is_last_iteration_processed = True
-
-                    self._process_msg(msg, the_progress)
-                    yield self._event_response(msg)
-                except asyncio.QueueEmpty as e:
-                    await asyncio.sleep(_SLEEP_TIME_SECOND)
-                    is_last_iteration_processed = False
-                except Exception as e:
-                    print(f'[ERROR] pacs_file_progress_sse (in loop): e: {e}')
-                    errmsg = f'unable to pacs_file_progress_sse (in loop) e: {e}'
-                    is_to_break = True
-
-                if is_to_break:
-                    break
+            msg: Lonk = queue.get_nowait()
+            if not msg:
+                return None, None
+            return msg, None
+        except asyncio.QueueEmpty as e:
+            return None, None
         except Exception as e:
-            print(f'[ERROR] pacs_file_progress_sse (unknown): e: {e}')
-            errmsg = f'unable to pacs_file_progress_sse (unknown) e: {e}'
-
-        ret = await self._safe_close_client(client, errmsg)
-        yield self._event_response(self._all_done() if not ret else self._err_msg(ret))
+            return None, e
 
     def _event_response(self: Self, data: dict):
         return f'event: message\ndata: {json.dumps(data)}\n\n'
@@ -142,15 +153,15 @@ class PACSFileProgressSSE(View):
         elif 'ndicom' in message:
             the_progress[series_uid] = message['ndicom']
 
-    async def _safe_close_client(self: Self, client: LonkClient, errmsg: str):
+    async def _safe_close_client(self: Self, client: Optional[LonkClient], err: Optional[Exception]) -> Optional[Exception]:
         if client is None:
-            return '' if not errmsg else errmsg
+            return err
 
         try:
             await client.close()
-            return '' if not errmsg else errmsg
+            return err
         except Exception as e:
-            return f'unable to close nats: e: {e} errmsg: {errmsg}'
+            return Exception(f'unable to close nats: e: {e} err: {err}')
 
     def _get_info(self: Self, request: Request) -> tuple[str, list[str]]:
         pacs_names = request.GET.get('pacs_name', [])
