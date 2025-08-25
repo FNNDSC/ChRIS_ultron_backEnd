@@ -16,21 +16,18 @@ from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from workflows.models import Workflow
 
-if settings.DEBUG:
-    import pdb, pudb
-
 
 logger = logging.getLogger(__name__)
 
 
-STATUS_CHOICES = [("created",               "Default initial"),
-                  ("waiting",               "Waiting to be scheduled"),
-                  ("scheduled",             "Scheduled on worker"),
-                  ("started",               "Started on compute env"),
-                  ("registeringFiles",      "Registering output files"),
-                  ("finishedSuccessfully",  "Finished successfully"),
-                  ("finishedWithError",     "Finished with error"),
-                  ("cancelled",             "Cancelled")]
+STATUS_CHOICES = [("created", "Default initial"),
+                  ("waiting", "Waiting to be scheduled"),
+                  ("scheduled", "Scheduled on worker"),
+                  ("started", "Started on compute env"),
+                  ("registeringFiles", "Registering output files"),
+                  ("finishedSuccessfully", "Finished successfully"),
+                  ("finishedWithError", "Finished with error"),
+                  ("cancelled", "Cancelled")]
 
 
 class PluginInstance(models.Model):
@@ -259,6 +256,7 @@ class PluginInstanceFilter(FilterSet):
             return previous_queryset
         previous = previous_queryset.first()
         return previous.next.all()
+
 
 class PluginInstanceLock(models.Model):
     plugin_inst = models.OneToOneField(PluginInstance, on_delete=models.CASCADE,

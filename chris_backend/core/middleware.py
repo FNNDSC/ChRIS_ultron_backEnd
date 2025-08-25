@@ -10,6 +10,7 @@ class RenderedResponse(HttpResponse):
     """
     An HttpResponse that renders its content into Collection+JSON or JSON.
     """
+
     def __init__(self, data, **kwargs):
         request = data.pop('request')
         mime = request.META.get('HTTP_ACCEPT')
