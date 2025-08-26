@@ -63,11 +63,6 @@ from core.models import ChrisInstance, ChrisFolder, ChrisFile, ChrisLinkFile
 from plugininstances.models import PluginInstance, PluginInstanceLock
 from userfiles.models import UserFile
 
-if settings.DEBUG:
-    import pdb, pudb, rpudb
-    from celery.contrib import rdb
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -86,7 +81,7 @@ class PluginInstanceManager(object):
         self.pfcon_client = pfcon.Client(cr.compute_url, cr.compute_auth_token)
         self.pfcon_client.pfcon_innetwork = cr.compute_innetwork
 
-        self.plugin_inst_output_files = set() # set of obj names in object storage
+        self.plugin_inst_output_files = set()  # set of obj names in object storage
 
         self.storage_manager = connect_storage(settings)
         self.storage_env = settings.STORAGE_ENV
@@ -218,7 +213,7 @@ class PluginInstanceManager(object):
         username = plugin_inst.owner.username
         email = plugin_inst.owner.email
 
-        token,_ = Token.objects.get_or_create(user=plugin_inst.owner)
+        token, _ = Token.objects.get_or_create(user=plugin_inst.owner)
 
         env = [f'CHRIS_JID={job_id}', f'CHRIS_PLG_INST_ID={plugin_inst.id}',
                f'CHRIS_USER_USERNAME={username}', f'CHRIS_USER_EMAIL={email}',
@@ -672,7 +667,7 @@ class PluginInstanceManager(object):
         plg_inst_output_path = self.c_plugin_inst.get_output_path()
         job_output_path = json_file_content['job_output_path']
 
-        if  job_output_path != plg_inst_output_path:
+        if job_output_path != plg_inst_output_path:
             err_msg = f'Received {job_output_path} != {plg_inst_output_path} output path'
             logger.error(f'[CODE16,{job_id}]: Inconsistency between received '
                          f'JSON file and storage, detail: {err_msg}')
@@ -813,8 +808,8 @@ class PluginInstanceManager(object):
 
         NB: This preservation could exhaust DB string lengths!
         """
-        job_id                  : str = self.str_job_id
-        outputdir               : str = self.c_plugin_inst.get_output_path()
+        job_id: str = self.str_job_id
+        outputdir: str = self.c_plugin_inst.get_output_path()
 
         for param_flag in unextpath_parameters_dict:
             # each parameter value is a string of one or more paths separated by comma
@@ -963,7 +958,7 @@ class PluginInstanceManager(object):
                         self.unpack_zip_file(job_file_content)
 
                     logger.info('Copying local output files for job %s in file '
-                                'storage',job_id)
+                                'storage', job_id)
                     # upload files from unextracted path parameters
                     d_unextpath_params, _ = self.get_plugin_instance_path_parameters()
                     if d_unextpath_params:
@@ -993,7 +988,7 @@ class PluginInstanceManager(object):
         """
         try:
             json_content = self.pfcon_client.get_job_json_data(job_id, job_output_path,
-                                                              timeout)
+                                                               timeout)
         except PfconRequestInvalidTokenException:
             logger.info(f'Auth token has expired while getting json data for job'
                         f' {job_id} from pfcon url -->{self.pfcon_client.url}<--')
@@ -1066,7 +1061,7 @@ class PluginInstanceManager(object):
                                     'storage', job_id)
                         self.unpack_zip_file(job_file_content)
 
-                    self._register_output_files() # register output files in the DB
+                    self._register_output_files()  # register output files in the DB
                 except Exception:
                     pass  # giving up
             self.c_plugin_inst.status = 'finishedWithError'

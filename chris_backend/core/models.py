@@ -15,7 +15,7 @@ import django_filters
 from django_filters.rest_framework import FilterSet
 
 from .storage import connect_storage
-#from django.core.files.base import ContentFile
+# from django.core.files.base import ContentFile
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ class ChrisFolder(models.Model):
         storage_manager = connect_storage(settings)
         storage_manager.move_path(path, new_path)
 
-        prefix = path + '/' # avoid sibling folders with paths that start with path
+        prefix = path + '/'  # avoid sibling folders with paths that start with path
 
         folders = [self] + list(ChrisFolder.objects.filter(path__startswith=prefix))
         for folder in folders:
@@ -544,7 +544,7 @@ class FolderUserPermission(models.Model):
         prefix = path + '/'  # avoid sibling folders with paths that start with path
 
         FolderUserPermission.objects.filter(folder__path__startswith=prefix, user=user,
-                                             permission=permission).delete()
+                                            permission=permission).delete()
 
         FileUserPermission.objects.filter(file__fname__startswith=prefix, user=user,
                                           permission=permission).delete()
@@ -1099,6 +1099,7 @@ class ChrisLinkFile(models.Model):
             pass
         else:
             lf.delete()
+
 
 @receiver(post_delete, sender=ChrisLinkFile)
 def auto_delete_file_from_storage(sender, instance, **kwargs):

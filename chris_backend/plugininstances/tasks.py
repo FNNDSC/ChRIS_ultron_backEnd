@@ -137,6 +137,7 @@ def schedule_waiting_plugin_instances(self):  # task is passed info about itself
         plg_inst.save(update_fields=['status'])
         run_plugin_instance.delay(plg_inst.id)  # call async task
 
+
 @shared_task
 def check_started_plugin_instances_exec_status():
     """
@@ -202,9 +203,10 @@ def cancel_plugin_instances_stuck_in_lock():
     lookup = Q(status='started') | Q(status='registeringFiles')
 
     instances = PluginInstance.objects.filter(lookup).filter(lock__start_date__lt=cutoff)
-    instances.update(error_code='CODE18')
 
     for plg_inst in instances:
+        plg_inst.error_code = 'CODE18'
+        plg_inst.save(update_fields=['error_code'])
         cancel_plugin_instance.delay(plg_inst.id)  # call async task
 
 
@@ -219,7 +221,8 @@ def cancel_plugin_inst_on_task_failure(sender=None, task_id=None, exception=None
     # list of task names we want to handle
     handled_tasks = {
         'plugininstances.tasks.run_plugin_instance',
-        'plugininstances.tasks.check_plugin_instance_exec_status'
+        'plugininstances.tasks.check_plugin_instance_exec_status',
+        'plugininstances.tasks.cancel_plugin_instance'
     }
     if sender.name not in handled_tasks:
         return  # ignore other tasks

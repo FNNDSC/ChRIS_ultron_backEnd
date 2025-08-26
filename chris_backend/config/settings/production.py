@@ -176,6 +176,11 @@ USE_X_FORWARDED_HOST = get_secret('DJANGO_USE_X_FORWARDED_HOST', env.bool)
 # ------------------------------------------------------------------------------
 AUTH_LDAP = get_secret('AUTH_LDAP', env.bool)
 if AUTH_LDAP:
+
+    if not env.bool('AUTH_LDAP_VERIFY_TLS', default=True):
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+        ldap.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
+
     AUTH_LDAP_SERVER_URI = get_secret('AUTH_LDAP_SERVER_URI')
     AUTH_LDAP_BIND_DN = get_secret('AUTH_LDAP_BIND_DN')
     AUTH_LDAP_BIND_PASSWORD = get_secret('AUTH_LDAP_BIND_PASSWORD')
