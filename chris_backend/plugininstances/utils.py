@@ -3,11 +3,6 @@ from plugininstances.tasks import run_plugin_instance
 from plugininstances.models import PluginInstance
 
 
-def set_plg_inst_status(plg_inst, status):
-    plg_inst.status = status
-    plg_inst.save()
-
-
 def run_if_ready(plg_inst, previous):
     """
     Set the status of ``plg_inst`` accordingly depending on the status of its previous
@@ -27,25 +22,25 @@ def run_if_ready(plg_inst, previous):
         for parent in parents:
             if parent.status in ('created', 'waiting', 'scheduled',
                                  'registeringFiles', 'started'):
-                set_plg_inst_status(plg_inst, 'waiting')
+                plg_inst.set_status('waiting')
                 all_parents_finished = False
                 break
             if parent.status in ('finishedWithError', 'cancelled'):
-                set_plg_inst_status(plg_inst, 'cancelled')
+                plg_inst.set_status('cancelled')
                 all_parents_finished = False
                 break
 
         if all_parents_finished:
-            set_plg_inst_status(plg_inst, 'scheduled')
+            plg_inst.set_status('scheduled')
             run_plugin_instance.delay(plg_inst.id)  # call async task
 
     elif previous is None or previous.status == 'finishedSuccessfully':
-        set_plg_inst_status(plg_inst, 'scheduled') # changes to 'scheduled' right away
+        plg_inst.set_status('scheduled') # changes to 'scheduled' right away
         run_plugin_instance.delay(plg_inst.id)  # call async task
 
     elif previous.status in ('created', 'waiting', 'scheduled',
                              'registeringFiles', 'started'):
-        set_plg_inst_status(plg_inst, 'waiting')
+        plg_inst.set_status('waiting')
 
     elif previous.status in ('finishedWithError', 'cancelled'):
-        set_plg_inst_status(plg_inst, 'cancelled')
+        plg_inst.set_status('cancelled')

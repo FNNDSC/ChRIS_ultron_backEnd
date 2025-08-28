@@ -36,6 +36,8 @@ task_routes = {
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_plugin_instances_stuck_in_lock':
         {'queue': 'periodic'},
+    'plugininstances.tasks.cancel_plugin_instances_stuck_in_scheduled_status':
+        {'queue': 'periodic'},
     'plugininstances.tasks.delete_plugin_instances_jobs_from_remote':
         {'queue': 'periodic'},
     'pacsfiles.tasks.send_pacs_query': {'queue': 'main2'},
@@ -66,6 +68,10 @@ app.conf.beat_schedule = {
     },
     'cancel-plugin-instances-stuck-in-lock-every-7200-seconds': {
         'task': 'plugininstances.tasks.cancel_plugin_instances_stuck_in_lock',
+        'schedule': 7200.0,
+    },
+    'cancel-plugin-instances-stuck-in-scheduled_status-every-7200-seconds': {
+        'task': 'plugininstances.tasks.cancel_plugin_instances_stuck_in_scheduled_status',
         'schedule': 7200.0,
     },
     'delete-plugin-instances-jobs-from-remote-every-7200-seconds': {

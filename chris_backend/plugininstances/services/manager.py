@@ -185,12 +185,14 @@ class PluginInstanceManager(object):
             self.c_plugin_inst.status = 'started'
             self.c_plugin_inst.summary = self.get_job_status_summary()  # initial status
             self.c_plugin_inst.raw = json_zip2str(d_resp)
-            self.c_plugin_inst.save()
 
             # https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/408
             now = timezone.now()
             self.c_plugin_inst.start_date = now
             self.c_plugin_inst.end_date = now
+            self.c_plugin_inst.save()
+
+
 
     @staticmethod
     def _assemble_exec(selfpath: Optional[str], selfexec: str, execshell: Optional[str]) -> List[str]:

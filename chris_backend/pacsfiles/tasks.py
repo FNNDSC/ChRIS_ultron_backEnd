@@ -1,4 +1,5 @@
 
+import logging
 from typing import Optional
 
 from django.contrib.auth.models import User
@@ -8,14 +9,22 @@ from .models import PACSQuery
 from .serializers import PACSSeriesSerializer
 
 
+logger = logging.getLogger(__name__)
+
+
 @shared_task
 def send_pacs_query(pacs_query_id):
     """
     Send PACS query.
     """
     #from celery.contrib import rdb;rdb.set_trace()
-    pacs_query = PACSQuery.objects.get(pk=pacs_query_id)
-    pacs_query.send()
+    try:
+        pacs_query = PACSQuery.objects.get(pk=pacs_query_id)
+    except PACSQuery.DoesNotExist:
+        logger.error(f"PACS query with id {pacs_query_id} not found when running "
+                     f"send_pacs_query task.")
+    else:
+        pacs_query.send()
 
 
 @shared_task

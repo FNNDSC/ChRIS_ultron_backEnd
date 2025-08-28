@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.conf import settings
+from django.utils import timezone
 
 import django_filters
 from django_filters.rest_framework import FilterSet
@@ -185,6 +186,17 @@ class PluginInstance(models.Model):
         the plugin instance object.
         """
         return str(self.output_folder.path)
+
+    def set_status(self, status):
+        self.status = status
+
+        if status == 'scheduled':
+            now = timezone.now()
+            self.start_date = now  # save scheduling date
+            self.end_date = now
+            self.save(update_fields=['start_date', 'end_date', 'status'])
+        else:
+            self.save(update_fields=['status'])
 
 
 @receiver(post_delete, sender=PluginInstance)
