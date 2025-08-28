@@ -53,6 +53,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
             if parameter.name in request_data:
                 data = {'value': request_data[parameter.name]}
                 param_type = parameter.type
+
                 if param_type in ('path', 'unextpath'):
                     # these serializers need the user to be passed
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](
@@ -64,6 +65,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                         previous=previous)
                 else:
                     parameter_serializer = PARAMETER_SERIALIZERS[param_type](data=data)
+
                 parameter_serializer.is_valid(raise_exception=True)
                 parameter_serializers.append((parameter, parameter_serializer))
             elif not parameter.optional:
@@ -174,13 +176,16 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         if 'status' in self.request.data:
             instance = self.get_object()
+
             if instance.status != 'cancelled':
                 descendants = instance.get_descendant_instances()
+
                 if instance.status == 'started':
                     cancel_plugin_instance.delay(instance.id)  # call async task
-                for plg_inst in descendants:
-                    plg_inst.status = 'cancelled'
-                    plg_inst.save()
+
+                PluginInstance.objects.filter(
+                    pk__in=[inst.id for inst in descendants]
+                ).update(status='cancelled')
 
         super(PluginInstanceDetail, self).perform_update(serializer)
 
@@ -191,13 +196,17 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         """
         instance = self.get_object()
         descendants = instance.get_descendant_instances()
+
         if instance.status == 'started':
             cancel_plugin_instance(instance.id)
+
+        plg_inst_ids = []
         for plg_inst in descendants:
             if plg_inst.status not in ('finishedSuccessfully', 'finishedWithError',
                                        'cancelled'):
-                plg_inst.status = 'cancelled'
-                plg_inst.save()
+                plg_inst_ids.append(plg_inst.id)
+
+        PluginInstance.objects.filter(pk__in=plg_inst_ids).update(status='cancelled')
         return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
 
 
@@ -256,6 +265,7 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
 
         created_plg_inst_ids = []
         filter_list = serializer.validated_data.get('filter', '').split(',')
+
         for f in filter_list:
             plg_inst = PluginInstance.objects.create(
                 plugin=plg_topologcopy, owner=user, previous=instance,

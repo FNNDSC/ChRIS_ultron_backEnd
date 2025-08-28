@@ -181,7 +181,7 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
             with mock.patch.object(tasks.PluginInstanceManager, 'run_plugin_instance_app',
                                    side_effect=Exception):
                 with mock.patch("logging.Logger._log"):  # disable the error logging
-                    tasks.run_plugin_instance.delay(self.plg_inst.id)
+                    tasks.run_plugin_instance.delay(self.plg_inst.id)  # call async task
 
                     for _ in range(10):
                         time.sleep(3)
@@ -198,7 +198,7 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
             with mock.patch.object(tasks.PluginInstanceManager, 'check_plugin_instance_app_exec_status',
                                    side_effect=Exception):
                 with mock.patch("logging.Logger._log"):  # disable the error logging
-                    tasks.check_plugin_instance_exec_status.delay(self.plg_inst.id)
+                    tasks.check_plugin_instance_exec_status.delay(self.plg_inst.id)  # call async task
 
                     for _ in range(10):
                         time.sleep(3)
@@ -215,7 +215,7 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
             with mock.patch.object(tasks.PluginInstanceManager, 'cancel_plugin_instance_app_exec',
                                 side_effect=Exception):
                 with mock.patch("logging.Logger._log"):  # disable the error logging
-                    tasks.cancel_plugin_instance.delay(self.plg_inst.id)
+                    tasks.cancel_plugin_instance.delay(self.plg_inst.id)  # call async task
 
             for _ in range(10):
                 time.sleep(3)
@@ -237,7 +237,7 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
 
         with mock.patch.object(tasks.PluginInstanceManager,'delete_plugin_instance_job_from_remote',
                                return_value=None) as delete_remote_job_mock:
-            tasks.cancel_plugin_instances_stuck_in_lock.delay()
+            tasks.cancel_plugin_instances_stuck_in_lock.delay()  # call async task
 
             for _ in range(10):
                 time.sleep(3)
@@ -246,3 +246,18 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
 
             self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
             delete_remote_job_mock.assert_called_with()
+
+    @tag('integration')
+    def test_task_cancel_plugin_instances_stuck_in_scheduled_status_during_async_run(self):
+        self.plg_inst.status = 'scheduled'
+        self.plg_inst.start_date = timezone.now() - timedelta(minutes=241)  # hardcoded cutoff delta in tasks.py
+        self.plg_inst.save(update_fields=['status', 'start_date'])
+
+        tasks.cancel_plugin_instances_stuck_in_scheduled_status.delay()  # call async task
+
+        for _ in range(10):
+            time.sleep(3)
+            self.plg_inst.refresh_from_db()
+            if self.plg_inst.status == 'cancelled': break
+
+        self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled

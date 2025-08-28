@@ -119,22 +119,21 @@ def schedule_waiting_plugin_instances(self):  # task is passed info about itself
 
     for plg_inst in ts_instances:
         param = plg_inst.string_param.filter(plugin_param__name='plugininstances').first()
+
         if param and param.value:
             parent_ids = [int(parent_id) for parent_id in param.value.split(',')]
             parents = PluginInstance.objects.filter(pk__in=parent_ids)
             finished = [parent.status == 'finishedSuccessfully' for parent in parents]
+
             if all(finished):
-                plg_inst.status = 'scheduled'
-                plg_inst.save(update_fields=['status'])
+                plg_inst.set_status('scheduled')
                 run_plugin_instance.delay(plg_inst.id)  # call async task
         else:
-            plg_inst.status = 'scheduled'
-            plg_inst.save(update_fields=['status'])
+            plg_inst.set_status('scheduled')
             run_plugin_instance.delay(plg_inst.id)  # call async task
 
     for plg_inst in all_instances.difference(ts_instances):
-        plg_inst.status = 'scheduled'
-        plg_inst.save(update_fields=['status'])
+        plg_inst.set_status('scheduled')
         run_plugin_instance.delay(plg_inst.id)  # call async task
 
 
@@ -166,16 +165,21 @@ def cancel_waiting_plugin_instances():
         status='waiting'
     ).filter(plugin__meta__type='ts')
 
+    plg_inst_ids = []
+
     for plg_inst in ts_instances:
         param = plg_inst.string_param.filter(plugin_param__name='plugininstances').first()
+
         if param and param.value:
             parent_ids = [int(parent_id) for parent_id in param.value.split(',')]
             parents = PluginInstance.objects.filter(pk__in=parent_ids)
+
             for parent in parents:
                 if parent.status in ('finishedWithError', 'cancelled'):
-                    plg_inst.status = 'cancelled'
-                    plg_inst.save(update_fields=['status'])
+                    plg_inst_ids.append(plg_inst.id)
                     break
+
+    PluginInstance.objects.filter(pk__in=plg_inst_ids).update(status='cancelled')
 
 
 @shared_task
@@ -208,6 +212,19 @@ def cancel_plugin_instances_stuck_in_lock():
         plg_inst.error_code = 'CODE18'
         plg_inst.save(update_fields=['error_code'])
         cancel_plugin_instance.delay(plg_inst.id)  # call async task
+
+
+@shared_task
+def cancel_plugin_instances_stuck_in_scheduled_status():
+    """
+    Cancel all plugin instances stuck in 'scheduled' status (e.g. because of a periodic
+    or normal worker crash).
+    """
+    cutoff = timezone.now() - timedelta(minutes=240)  # hardcoded cutoff delta
+
+    PluginInstance.objects.filter(
+        status='scheduled', start_date__lt=cutoff
+    ).update(status='cancelled', error_code = 'CODE18')
 
 
 @task_failure.connect
