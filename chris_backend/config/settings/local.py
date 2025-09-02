@@ -80,10 +80,10 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances',
             'pipelines', 'userfiles', 'pacsfiles', 'users', 'filebrowser',
             'workflows']:
     LOGGING['loggers'][app] = {
-            'level': 'DEBUG',
-            'handlers': ['console_verbose', 'file'],
-            'propagate': False  # required to avoid double logging with root logger
-        }
+        'level': 'DEBUG',
+        'handlers': ['console_verbose', 'file'],
+        'propagate': False  # required to avoid double logging with root logger
+    }
 
 # Storage Settings
 STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
@@ -132,24 +132,6 @@ EMAIL_HOST = 'localhost'
 EMAIL_PORT = 1025
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# django-debug-toolbar
-# ------------------------------------------------------------------------------
-MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
-INSTALLED_APPS += ['debug_toolbar']
-
-INTERNAL_IPS = ['127.0.0.1',]
-
-DEBUG_TOOLBAR_CONFIG = {
-    'DISABLE_PANELS': [
-        'debug_toolbar.panels.redirects.RedirectsPanel',
-    ],
-    'SHOW_TEMPLATE_CONTEXT': True,
-}
-
-# django-extensions
-# ------------------------------------------------------------------------------
-INSTALLED_APPS += ['django_extensions']
-
 # TESTING
 # ------------------------------------------------------------------------------
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
@@ -172,7 +154,7 @@ PFDCM_ADDRESS = 'http://pfdcm:4005'
 
 # Celery settings
 
-#CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
+# CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
 CELERY_BROKER_URL = 'amqp://queue:5672'
 
 #: Only add pickle to this list if your broker is secured
