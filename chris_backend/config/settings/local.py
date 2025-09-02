@@ -21,6 +21,9 @@ from django.core.exceptions import ImproperlyConfigured
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+# as for urls for dev env
+ROOT_URLCONF = 'config.local_urls'
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
@@ -131,6 +134,24 @@ DATABASES['default']['OPTIONS'] = {'pool': {'min_size': 1, 'max_size': 2, 'timeo
 EMAIL_HOST = 'localhost'
 EMAIL_PORT = 1025
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# django-debug-toolbar
+# ------------------------------------------------------------------------------
+MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+INSTALLED_APPS += ['debug_toolbar']
+
+INTERNAL_IPS = ['127.0.0.1',]
+
+DEBUG_TOOLBAR_CONFIG = {
+    'DISABLE_PANELS': [
+        'debug_toolbar.panels.redirects.RedirectsPanel',
+    ],
+    'SHOW_TEMPLATE_CONTEXT': True,
+}
+
+# django-extensions
+# ------------------------------------------------------------------------------
+INSTALLED_APPS += ['django_extensions']
 
 # TESTING
 # ------------------------------------------------------------------------------

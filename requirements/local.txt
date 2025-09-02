@@ -1,5 +1,7 @@
 # Local development dependencies go here
 -r base.txt
+django-debug-toolbar==5.2.0  # for Jorge's needs of dev env
+django-extensions==4.1  # for Jorge's needs of dev env
 collection-json==0.1.1  # required in collectionjson.tests.test_renderers
 coverage==7.8.0  # test coverage
 pylint==3.3.7  # lint
