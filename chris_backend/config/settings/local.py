@@ -21,6 +21,9 @@ from django.core.exceptions import ImproperlyConfigured
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+# as for urls for dev env
+ROOT_URLCONF = 'config.local_urls'
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 
@@ -80,10 +83,10 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances',
             'pipelines', 'userfiles', 'pacsfiles', 'users', 'filebrowser',
             'workflows']:
     LOGGING['loggers'][app] = {
-            'level': 'DEBUG',
-            'handlers': ['console_verbose', 'file'],
-            'propagate': False  # required to avoid double logging with root logger
-        }
+        'level': 'DEBUG',
+        'handlers': ['console_verbose', 'file'],
+        'propagate': False  # required to avoid double logging with root logger
+    }
 
 # Storage Settings
 STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
@@ -172,7 +175,7 @@ PFDCM_ADDRESS = 'http://pfdcm:4005'
 
 # Celery settings
 
-#CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
+# CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
 CELERY_BROKER_URL = 'amqp://queue:5672'
 
 #: Only add pickle to this list if your broker is secured
