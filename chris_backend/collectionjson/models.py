@@ -1,5 +1,5 @@
 
-from collectionjson.tests.models import Dummy, Idiot, Moron, Simple
+from collectionjson.tests.models import Dummy, Person, Employee, Simple
 
 
 

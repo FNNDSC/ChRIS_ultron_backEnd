@@ -9,7 +9,7 @@ from rest_framework.routers import DefaultRouter
 
 from collectionjson import services
 
-from .models import Moron
+from .models import Employee
 from . import views
 
 
@@ -33,13 +33,13 @@ class FunctionTests(SimpleGetTest):
     Test top-level functions in the services module
     """
 
-    endpoint = '/rest-api/moron/'
+    endpoint = '/rest-api/employee/'
     
     def setUp(self):
 
        # create two objects
-       Moron.objects.get_or_create(name='bob')
-       Moron.objects.get_or_create(name='paul')
+       Employee.objects.get_or_create(name='bob')
+       Employee.objects.get_or_create(name='paul')
 
        super(FunctionTests, self).setUp()
 
@@ -66,10 +66,10 @@ class FunctionTests(SimpleGetTest):
         to its response argument
         """
         response = self.response
-        links = {"morons": self.endpoint}
+        links = {"employees": self.endpoint}
         response = services.append_collection_links(response, links)
         self.assertEqual(response.data['collection_links'],
-                         {'morons': self.endpoint})
+                         {'employees': self.endpoint})
 
     def test_append_collection_template(self):
         """
@@ -96,7 +96,7 @@ class FunctionTests(SimpleGetTest):
 
 
 router = DefaultRouter()
-router.register('moron', views.MoronModelViewSet)
+router.register('employee', views.EmployeeModelViewSet)
 urlpatterns = [
     path('rest-api/', include(router.urls)),
 ]

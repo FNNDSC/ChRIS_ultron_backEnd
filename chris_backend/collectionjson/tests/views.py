@@ -11,30 +11,30 @@ from rest_framework.exceptions import ParseError
 from collectionjson.renderers import CollectionJsonRenderer
 from collectionjson.parsers import CollectionJsonParser
 
-from .models import Dummy, Idiot, Moron, MoronFilter, Simple
-from .serializers import MoronHyperlinkedModelSerializer, IdiotHyperlinkedModelSerializer
+from .models import Dummy, Person, Employee, EmployeeFilter, Simple
+from .serializers import EmployeeHyperlinkedModelSerializer, PersonHyperlinkedModelSerializer
 from .serializers import DummyHyperlinkedModelSerializer, SimpleModelSerializer
 
 
-class MoronModelViewSet(ModelViewSet):
+class EmployeeModelViewSet(ModelViewSet):
     renderer_classes = (CollectionJsonRenderer, )
     parser_classes = (CollectionJsonParser, )
-    queryset = Moron.objects.all()
-    serializer_class = MoronHyperlinkedModelSerializer
+    queryset = Employee.objects.all()
+    serializer_class = EmployeeHyperlinkedModelSerializer
     filter_backends = (DjangoFilterBackend,)
-    filterset_class = MoronFilter
+    filterset_class = EmployeeFilter
     
 
-class MoronReadOnlyModelViewSet(ReadOnlyModelViewSet):
+class EmployeeReadOnlyModelViewSet(ReadOnlyModelViewSet):
     renderer_classes = (CollectionJsonRenderer, )
-    queryset = Moron.objects.all()
-    serializer_class = MoronHyperlinkedModelSerializer
+    queryset = Employee.objects.all()
+    serializer_class = EmployeeHyperlinkedModelSerializer
 
 
-class IdiotReadOnlyModelViewSet(ReadOnlyModelViewSet):
+class PersonReadOnlyModelViewSet(ReadOnlyModelViewSet):
     renderer_classes = (CollectionJsonRenderer, )
-    queryset = Idiot.objects.all()
-    serializer_class = IdiotHyperlinkedModelSerializer
+    queryset = Person.objects.all()
+    serializer_class = PersonHyperlinkedModelSerializer
 
 
 class DummyReadOnlyModelViewSet(ReadOnlyModelViewSet):

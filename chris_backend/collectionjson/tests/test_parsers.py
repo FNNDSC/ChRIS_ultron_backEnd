@@ -27,7 +27,7 @@ class SimplePOSTTest(TestCase):
 
 
 class TestCollectionJsonParser(SimplePOSTTest):
-    endpoint = '/rest-api/moron/'
+    endpoint = '/rest-api/employee/'
 
     def setUp(self):
         super(TestCollectionJsonParser, self).setUp()
@@ -53,7 +53,7 @@ class TestCollectionJsonParser(SimplePOSTTest):
 
 
 router = DefaultRouter()
-router.register('moron', views.MoronModelViewSet)
+router.register('employee', views.EmployeeModelViewSet)
 urlpatterns = [
     path('rest-api/', include(router.urls)),
 ]
