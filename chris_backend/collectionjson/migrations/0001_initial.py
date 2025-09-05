@@ -13,14 +13,14 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Idiot',
+            name='Person',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
-            name='Moron',
+            name='Employee',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100)),
@@ -38,8 +38,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100)),
-                ('idiots', models.ManyToManyField(to='collectionjson.idiot')),
-                ('moron', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='collectionjson.moron')),
+                ('persons', models.ManyToManyField(to='collectionjson.person')),
+                ('employee', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='collectionjson.employee')),
             ],
         ),
     ]

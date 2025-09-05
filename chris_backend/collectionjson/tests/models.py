@@ -3,21 +3,21 @@ from django.db import models
 from django_filters.rest_framework import FilterSet
 
 # Create your models here.
-class Moron(models.Model):
+class Employee(models.Model):
     name = models.CharField(max_length=100)
 
     class Meta:
         app_label = "collectionjson"
         
 
-class MoronFilter(FilterSet):
+class EmployeeFilter(FilterSet):
     
     class Meta:
-        model = Moron
+        model = Employee
         fields = ['name']
 
         
-class Idiot(models.Model):
+class Person(models.Model):
     name = models.CharField(max_length=100)
 
     class Meta:
@@ -26,8 +26,8 @@ class Idiot(models.Model):
 
 class Dummy(models.Model):
     name = models.CharField(max_length=100)
-    moron = models.ForeignKey('Moron', on_delete=models.CASCADE)
-    idiots = models.ManyToManyField('Idiot')
+    employee = models.ForeignKey('Employee', on_delete=models.CASCADE)
+    persons = models.ManyToManyField('Person')
 
     class Meta:
         app_label = "collectionjson"

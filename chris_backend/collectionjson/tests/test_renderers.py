@@ -10,16 +10,16 @@ from collection_json import Collection
 from rest_framework import status
 from rest_framework.routers import DefaultRouter
 
-from .models import Dummy, Idiot, Moron, Simple
+from .models import Dummy, Person, Employee, Simple
 from . import views
 
 
 def create_models():
     #import pdb; pdb.set_trace()
-    bob = Moron.objects.create(name='Bob LawLaw')
-    dummy = Dummy.objects.create(name='Yolo McSwaggerson', moron=bob)
-    dummy.idiots.add(Idiot.objects.create(name='frick'))
-    dummy.idiots.add(Idiot.objects.create(name='frack'))   
+    bob = Employee.objects.create(name='Bob LawLaw')
+    dummy = Dummy.objects.create(name='Yolo McSwaggerson', employee=bob)
+    dummy.persons.add(Person.objects.create(name='Peter'))
+    dummy.persons.add(Person.objects.create(name='Paul'))
 
 @override_settings(ROOT_URLCONF='collectionjson.tests.test_renderers')
 class SimpleGetTest(TestCase):
@@ -78,8 +78,8 @@ class TestCollectionJsonRenderer(SimpleGetTest):
         return next(x for x in links if x['rel'] == rel)
 
     def test_the_dummy_item_links_to_child_elements(self):
-        href = self.get_dummy().links.find(rel='moron')[0].href
-        self.assertTrue(href.startswith('http://testserver/rest-api/moron/'))
+        href = self.get_dummy().links.find(rel='employee')[0].href
+        self.assertTrue(href.startswith('http://testserver/rest-api/employee/'))
 
     def test_link_fields_are_rendered_as_links(self):
         href = self.get_dummy().links.find(rel='other_stuff')[0].href
@@ -91,12 +91,12 @@ class TestCollectionJsonRenderer(SimpleGetTest):
 
     def test_attribute_links_are_rendered_as_links(self):
         href = self.get_dummy().links.find(rel='some_link')[0].href
-        self.assertEqual(href, 'http://testserver/rest-api/moron/1/')
+        self.assertEqual(href, 'http://testserver/rest-api/employee/1/')
 
     def test_many_to_many_relationships_are_rendered_as_links(self):
-        idiots = self.get_dummy().links.find(rel='idiots')
-        self.assertTrue(idiots[0].href.startswith('http://testserver/rest-api/idiot/'))
-        self.assertTrue(idiots[1].href.startswith('http://testserver/rest-api/idiot/'))
+        persons = self.get_dummy().links.find(rel='persons')
+        self.assertTrue(persons[0].href.startswith('http://testserver/rest-api/person/'))
+        self.assertTrue(persons[1].href.startswith('http://testserver/rest-api/person/'))
 
 
 class TestNoSerializerViews(SimpleGetTest):
@@ -174,8 +174,8 @@ class TestEmpty(TestCase):
 
 router = DefaultRouter()
 router.register('dummy', views.DummyReadOnlyModelViewSet)
-router.register('moron', views.MoronReadOnlyModelViewSet)
-router.register('idiot', views.IdiotReadOnlyModelViewSet)
+router.register('employee', views.EmployeeReadOnlyModelViewSet)
+router.register('person', views.PersonReadOnlyModelViewSet)
 router.register('normal-model', views.SimpleViewSet)
 urlpatterns = [
     path('rest-api/', include(router.urls)),
