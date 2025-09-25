@@ -672,7 +672,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         #     # check that the check_plugin_instance_exec_status task was called with appropriate args
         #     delay_mock.assert_called_with(self.pl_inst.id)
 
-    @tag('integration', 'error-pman')
+    @tag('integration', 'error-pfcon')
     def test_integration_plugin_instance_detail_success(self):
 
         # add an FS plugin to the system

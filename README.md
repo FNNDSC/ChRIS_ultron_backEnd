@@ -233,22 +233,16 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - name: Build something else
-        uses: docker/build-push-action@v6
-        with:
-          tags: localhost/fnndsc/pman:dev
-          load: true
       - name: Run ChRIS backend integration tests
         uses: FNNDSC/ChRIS_ultron_backEnd@master
         # all inputs are optional
         with:
           engine: docker  # or podman
           command: test-integration  # or test-unit, ...
-        # optionally change image used for pman, pfcon, or cube
+        # optionally change image used for pfcon, or cube
         env:
           CUBE_IMAGE: localhost/fnndsc/cube:dev
           PFCON_IMAGE: localhost/fnndsc/pfcon:dev
-          PMAN_IMAGE: localhost/fnndsc/pman:dev
 ```
 
 ## Documentation

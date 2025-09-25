@@ -9,7 +9,7 @@ django-storage-swift==1.4.0
 celery==5.5.2
 django-celery-beat==2.8.1
 python-chrisstoreclient==1.0.0
-python-pfconclient==3.2.0
+python-pfconclient==3.3.0
 django-auth-ldap==5.2.0
 PyYAML==6.0.2
 whitenoise[brotli]==6.9.0
