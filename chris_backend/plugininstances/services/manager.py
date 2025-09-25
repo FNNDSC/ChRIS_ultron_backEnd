@@ -369,7 +369,7 @@ class PluginInstanceManager(object):
         try:
             self._delete_job(job_id)
         except PfconRequestException as e:
-            if '404' in str(e):
+            if e.code == 404:
                 logger.error(f'Job {job_id} not found in remote fcon '
                              f'url -->{self.pfcon_client.url}<--, detail: {str(e)}')
                 if self.c_plugin_inst.error_code == 'CODE12':

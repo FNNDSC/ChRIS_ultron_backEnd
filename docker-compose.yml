@@ -124,45 +124,31 @@ services:
   pfcon:
     image: ${PFCON_IMAGE:-ghcr.io/fnndsc/pfcon:latest}
     environment:
-      COMPUTE_SERVICE_URL: http://pman:5010/api/v1/
       SECRET_KEY: secret
       PFCON_USER: pfcon
       PFCON_PASSWORD: pfcon1234
       PFCON_INNETWORK: "true"
       STORAGE_ENV: "fslink"
       STOREBASE_MOUNT: /var/local/storeBase
+      CONTAINER_ENV: docker
+      CONTAINER_USER: "${UID}:${GID}"
+      ENABLE_HOME_WORKAROUND: "yes"
+      JOB_LABELS: "org.chrisproject.miniChRIS=plugininstance"
+      REMOVE_JOBS: "yes"
     # port is hard-coded in chris_backend/config/settings/local.py
     command: gunicorn -b 0.0.0.0:30005 -w 8 -t 120 pfcon.wsgi:application
     ports:
       - "30005:30005"
     volumes:
       - chris_files:/var/local/storeBase
-    user: ${UID}:${GID}
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
     networks:
       local:
         aliases:
           - pfcon.remote  # hard-coded in chris_backend/config/settings/local.py
+    userns_mode: "host"
     labels:
       org.chrisproject.role: "pfcon"
-
-  pman:
-    image: ${PMAN_IMAGE:-ghcr.io/fnndsc/pman:latest}
-    environment:
-      CONTAINER_ENV: docker
-      CONTAINER_USER: "${UID}:${GID}"
-      ENABLE_HOME_WORKAROUND: "yes"
-      JOB_LABELS: "org.chrisproject.miniChRIS=plugininstance"
-      SECRET_KEY: secret
-      REMOVE_JOBS: "yes"
-    volumes:
-      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
-    depends_on:
-      - pfcon
-    ports:
-      - "5010:5010"
-    networks:
-      - local
-    userns_mode: "host"
 
   nats:
     image: docker.io/library/nats:2.10.20-alpine3.20

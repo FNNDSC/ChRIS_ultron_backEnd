@@ -81,7 +81,7 @@ nuke: reap-plugin-instances (docker-compose '--profile=cube --profile=tools down
 
 # Remove all plugin instance containers.
 [group('(2) shutdown')]
-reap-plugin-instances: (docker-compose 'run --rm pman python -c' '''
+reap-plugin-instances: (docker-compose 'run --rm pfcon python -c' '''
         '
         import os
         import docker

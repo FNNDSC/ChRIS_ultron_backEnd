@@ -172,7 +172,7 @@ class PluginInstanceManagerTests(TestCase):
         #     }
         #     post_mock.assert_called_with(msg)
 
-    @tag('integration', 'error-pman')
+    @tag('integration', 'error-pfcon')
     def test_integration_mananger_can_run_and_check_plugin_instance_app_exec_status(self):
         """
         Test whether the manager can check a plugin's app execution status.
