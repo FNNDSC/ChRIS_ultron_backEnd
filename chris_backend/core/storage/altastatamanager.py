@@ -168,11 +168,10 @@ class AltaStataManager(StorageManager):
             
             file_size = int(size_attr)
             
-            # Download the file content
-            # Use reasonable chunk size and parallel chunks
-            chunk_size = min(1024 * 1024, file_size)  # 1MB or file size, whichever is smaller
-            num_chunks = max(1, file_size // chunk_size)
-            
+            # Download the entire file with parallel chunks for better performance
+            # get_buffer parameters: path, time, offset, num_chunks, total_size
+            # Use 4 parallel chunks for files > 1MB, otherwise use 1 chunk
+            num_chunks = 4 if file_size > 1024 * 1024 else 1
             buffer = altastata.get_buffer(file_path, current_time, 0, num_chunks, file_size)
             return buffer
             
