@@ -8,12 +8,40 @@ Altastata is a secure cloud storage solution that provides encrypted, versioned 
 
 ## Prerequisites
 
-### 1. Altastata Account Setup
+### 1. System Requirements
+- **Java 8 or higher** (Java 17 recommended)
+- **Python 3.8 or higher**
+- **Altastata account** and credentials
+
+### 2. Install Altastata Package
+Install the official Altastata package from PyPI:
+
+```bash
+pip install altastata
+```
+
+**Note**: The package is available at [https://pypi.org/project/altastata/](https://pypi.org/project/altastata/) and includes all necessary dependencies including Py4J for Java integration.
+
+### 3. Verify Java Installation
+Ensure Java is properly installed and accessible:
+
+```bash
+# Check Java version
+java -version
+
+# Should show Java 8 or higher (Java 17 recommended)
+# Example output:
+# openjdk version "17.0.2" 2022-01-18
+# OpenJDK Runtime Environment (build 17.0.2+8-Ubuntu-120.04)
+# OpenJDK 64-Bit Server VM (build 17.0.2+8-Ubuntu-120.04, mixed mode, sharing)
+```
+
+### 4. Altastata Account Setup
 - Create an Altastata account
 - Set up your account directory with credentials
-- Ensure you have the `altastata-python-package` installed
+- Ensure you have the `altastata` package installed
 
-### 2. Account Directory Structure
+### 5. Account Directory Structure
 ```
 ~/.altastata/accounts/
 └── amazon.rsa.alice222/  # Your account directory
@@ -213,7 +241,18 @@ Error: No module named 'altastata'
 ```
 **Solution**: Install altastata-python-package
 
-#### 4. Permission Errors
+#### 4. Java-related Errors
+```
+Error: Java not found or version too old
+```
+**Solution**: Install Java 8 or higher (Java 17 recommended)
+
+```
+Error: Py4J gateway connection failed
+```
+**Solution**: Ensure Java is accessible and port 25333 is available
+
+#### 5. Permission Errors
 ```
 Error: Access denied to container
 ```
