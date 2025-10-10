@@ -80,8 +80,8 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
-    'core.middleware.ResponseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'core.middleware.ResponseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
