@@ -20,10 +20,11 @@ env = Env()
 env.read_env()  # also read .env file, if it exists
 
 
-def get_secret(setting, secret_type=env):
-    """Get the secret variable or return explicit exception."""
+def get_secret(setting, secret_type=env, default=None):
+    """Get and return the secret variable or rise explicit exception."""
     try:
-        return secret_type(setting)
+        return secret_type(setting) if default is None else secret_type(setting,
+                                                                        default=default)
     except EnvValidationError as e:
         raise ImproperlyConfigured(str(e))
 
@@ -55,6 +56,7 @@ DATABASES['default']['PASSWORD'] = get_secret('POSTGRES_PASSWORD')
 DATABASES['default']['HOST'] = get_secret('DATABASE_HOST')
 DATABASES['default']['PORT'] = get_secret('DATABASE_PORT')
 DATABASE_CONN_POOL = get_secret('DATABASE_CONN_POOL', env.bool)
+
 if DATABASE_CONN_POOL:
     DATABASE_CONN_POOL_MIN_SIZE = get_secret('DATABASE_CONN_POOL_MIN_SIZE', env.int)
     DATABASE_CONN_POOL_MAX_SIZE = get_secret('DATABASE_CONN_POOL_MAX_SIZE', env.int)
@@ -67,6 +69,7 @@ if DATABASE_CONN_POOL:
 # STORAGE CONFIGURATION
 # ------------------------------------------------------------------------------
 STORAGE_ENV = get_secret('STORAGE_ENV')
+
 if STORAGE_ENV not in ('swift', 'fslink', 'filesystem'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
@@ -132,8 +135,12 @@ LOGGING = {
 
 # CORSHEADERS
 # ------------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = get_secret('DJANGO_CORS_ALLOW_ALL_ORIGINS', env.bool)
-CORS_ALLOWED_ORIGINS = get_secret('DJANGO_CORS_ALLOWED_ORIGINS', env.list)
+CORS_ALLOW_ALL_ORIGINS = get_secret('DJANGO_CORS_ALLOW_ALL_ORIGINS', env.bool,
+                                    default=False)
+CORS_ALLOWED_ORIGINS = get_secret('DJANGO_CORS_ALLOWED_ORIGINS', env.list,
+                                  default=[])
+CORS_ALLOWED_ORIGIN_REGEXES = get_secret('DJANGO_CORS_ALLOWED_ORIGIN_REGEXES',
+                                         env.list, default=CORS_ALLOWED_ORIGINS)
 
 # client checks Allow header to know if sign-ups are allowed by getting api/v1/users/
 # https://github.com/FNNDSC/ChRIS_ui/commit/dd045b3e678bd5338567aeea4eaa4551a27bb63f
@@ -175,9 +182,9 @@ USE_X_FORWARDED_HOST = get_secret('DJANGO_USE_X_FORWARDED_HOST', env.bool)
 # LDAP AUTH CONFIGURATION
 # ------------------------------------------------------------------------------
 AUTH_LDAP = get_secret('AUTH_LDAP', env.bool)
-if AUTH_LDAP:
 
-    if not env.bool('AUTH_LDAP_VERIFY_TLS', default=True):
+if AUTH_LDAP:
+    if not get_secret('AUTH_LDAP_VERIFY_TLS', env.bool, default=True):
         ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
         ldap.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
 
@@ -188,28 +195,33 @@ if AUTH_LDAP:
     AUTH_LDAP_GROUP_SEARCH_ROOT = get_secret('AUTH_LDAP_GROUP_SEARCH_ROOT')
     AUTH_LDAP_CHRIS_ADMIN_GROUP = get_secret('AUTH_LDAP_CHRIS_ADMIN_GROUP')
 
-    _user_search = env.str('AUTH_LDAP_USER_SEARCH_FILTER', default='(uid=%(user)s)')
+    _user_search = get_secret('AUTH_LDAP_USER_SEARCH_FILTER', env.str,
+                              default='(uid=%(user)s)')
     AUTH_LDAP_USER_SEARCH = LDAPSearch(AUTH_LDAP_USER_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
                                        _user_search)
-    AUTH_LDAP_USER_ATTR_MAP = env.dict(
+    AUTH_LDAP_USER_ATTR_MAP = get_secret(
         'AUTH_LDAP_USER_ATTR_MAP',
+        env.dict,
         default={
             'first_name': 'givenName',
             'last_name': 'sn',
             'email': 'mail'
         }
     )
-    _group_search = env.str('AUTH_LDAP_GROUP_SEARCH_FILTER', default='(objectClass=groupOfNames)')
+    _group_search = get_secret('AUTH_LDAP_GROUP_SEARCH_FILTER', env.str,
+                               default='(objectClass=groupOfNames)')
     AUTH_LDAP_GROUP_SEARCH = LDAPSearch(AUTH_LDAP_GROUP_SEARCH_ROOT, ldap.SCOPE_SUBTREE,
                                         _group_search)
     AUTH_LDAP_GROUP_TYPE = GroupOfNamesType()
-    AUTH_LDAP_USER_FLAGS_BY_GROUP = env.dict(
+    AUTH_LDAP_USER_FLAGS_BY_GROUP = get_secret(
         'AUTH_LDAP_USER_FLAGS_BY_GROUP',
+        env.dict,
         default={
             'is_staff': f'cn={AUTH_LDAP_CHRIS_ADMIN_GROUP},{AUTH_LDAP_GROUP_SEARCH_ROOT}'
         }
     )
-    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = env.list('AUTH_LDAP_MIRROR_GROUPS_EXCEPT', default=['all_users'])
+    AUTH_LDAP_MIRROR_GROUPS_EXCEPT = get_secret('AUTH_LDAP_MIRROR_GROUPS_EXCEPT',
+                                                env.list, default=['all_users'])
 
     AUTHENTICATION_BACKENDS = (
         'users.models.CustomLDAPBackend',
