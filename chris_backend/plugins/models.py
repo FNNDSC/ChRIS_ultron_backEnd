@@ -182,7 +182,7 @@ class Plugin(models.Model):
 
     class Meta:
         unique_together = [['meta', 'version'], ['meta', 'dock_image']]
-        ordering = ('meta', '-creation_date',)
+        ordering = ('meta', '-version',)
 
     def __str__(self):
         return self.meta.name
@@ -201,7 +201,7 @@ class Plugin(models.Model):
 
 class PluginFilter(FilterSet):
     """
-    Filter class for the Plugin model.
+    Filter class for the Plugin model with custom sorting.
     """
     min_creation_date = django_filters.IsoDateTimeFilter(field_name="creation_date",
                                                          lookup_expr='gte')
@@ -220,6 +220,7 @@ class PluginFilter(FilterSet):
     name_title_category = django_filters.CharFilter(method='search_name_title_category')
     compute_resource_id = django_filters.CharFilter(field_name='compute_resources__id',
                                                     lookup_expr='exact')
+    sort = django_filters.CharFilter(method='apply_sort')
 
     def search_name_title_category(self, queryset, name, value):
         """
@@ -232,11 +233,20 @@ class PluginFilter(FilterSet):
         lookup = lookup | models.Q(meta__category__icontains=value)
         return queryset.filter(lookup)
 
+    def apply_sort(self, queryset, name, value):
+        """
+        Custom method to sort by user-specified field, keeping 'meta' as primary ordering.
+        """
+        allowed_fields = ('version', '-version', 'creation_date', '-creation_date')
+        if value in allowed_fields:
+            return queryset.order_by('meta', value)
+        return queryset
+
     class Meta:
         model = Plugin
         fields = ['id', 'name', 'name_exact', 'version', 'dock_image', 'type', 'category',
                   'min_creation_date', 'max_creation_date', 'title',  'public_repo',
-                  'description', 'name_title_category', 'compute_resource_id']
+                  'description', 'name_title_category', 'compute_resource_id', 'sort']
 
 
 class PluginParameter(models.Model):
