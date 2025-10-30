@@ -860,7 +860,7 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
 class PluginInstanceListQuerySearchViewTests(ViewTests):
     """
-    Test the plugininstance-list-query-search view.
+    Test the allplugininstance-list-query-search view.
     """
 
     def setUp(self):
@@ -868,18 +868,27 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
 
         user = User.objects.get(username=self.username)
         
-        # create two plugin instances
+        # create three plugin instances
         plugin = Plugin.objects.get(meta__name="pacspull")
+        PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        inst.status = 'finishedSuccessfully'  # set second instance's status
+        inst.save()
 
         plugin = Plugin.objects.get(meta__name="mri_convert")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, previous=inst,
             compute_resource=plugin.compute_resources.all()[0])
-        # set second instance's status
-        inst.status = 'finishedSuccessfully'
+
+        inst.status = 'finishedSuccessfully'  # set third instance's status
         inst.save()
+
+        inst.feed.public = True  # second and third instances now belongs to a public feed
+        inst.feed.save()
 
         self.list_url = reverse("allplugininstance-list-query-search") + '?status=created'
 
@@ -890,9 +899,17 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         self.assertContains(response, 'created')
         self.assertNotContains(response,'finishedSuccessfully')
 
-    def test_plugin_instance_query_search_list_failure_unauthenticated(self):
+    def test_plugin_instance_query_search_list_success_but_empty_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
+
+    def test_plugin_instance_query_search_list_success_unauthenticated(self):
+        list_url = reverse("allplugininstance-list-query-search") + '?status=finishedSuccessfully'
+        response = self.client.get(list_url)
+        # response should only contain the instances that match the query
+        self.assertContains(response, 'finishedSuccessfully')
+        self.assertNotContains(response, 'created')
 
 
 class PluginInstanceDescendantListViewTests(ViewTests):
