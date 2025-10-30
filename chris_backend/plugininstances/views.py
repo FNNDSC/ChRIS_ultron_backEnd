@@ -1,4 +1,5 @@
 
+from django.db.models import Q
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.reverse import reverse
@@ -14,8 +15,7 @@ from .models import BoolParameter, PathParameter, UnextpathParameter
 from .serializers import PARAMETER_SERIALIZERS
 from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializer
 from .serializers import PluginInstanceSerializer
-from .permissions import (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
-                          IsOwnerOrReadOnly, IsAuthenticatedReadOnlyOrPublicReadOnly,
+from .permissions import (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance)
 from .tasks import run_plugin_instance, cancel_plugin_instance
 from .utils import run_if_ready
@@ -92,6 +92,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         queryset = self.get_plugin_instances_queryset()
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
+
         # append document-level link relations
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id}),
@@ -99,6 +100,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
                                               request=request, kwargs={"pk": plugin.id})
                  }
         response = services.append_collection_links(response, links)
+
         # append write template
         param_names = plugin.get_plugin_parameter_names()
         template_data = {'title': '', 'compute_resource_name': '', 'previous_id': '',
@@ -112,8 +114,9 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         Custom method to get the actual plugin instances' queryset.
         """
+        user = self.request.user
         plugin = self.get_object()
-        return self.filter_queryset(plugin.instances.all())
+        return plugin.instances.filter(owner=user)
 
 
 @extend_schema_view(
@@ -125,8 +128,6 @@ class AllPluginInstanceList(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -140,6 +141,26 @@ class AllPluginInstanceList(generics.ListAPIView):
         links = {'plugins': reverse('plugin-list', request=request)}
         return services.append_collection_links(response, links)
 
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the plugin
+        instances in public feeds if the user is not authenticated. For the superuser
+        'chris' all plugin instances are retuned. For other users all the plugin instances
+        in public feeds or owned by the user or belonging to feeds that have been shared
+        with the user are returned.
+        """
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return PluginInstance.objects.filter(feed__public=True)
+
+        if user.username == 'chris':
+            return PluginInstance.objects.all()
+
+        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
+            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
+        return PluginInstance.objects.filter(lookup)
+
 
 class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     """
@@ -147,9 +168,27 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = PluginInstanceFilter
+
+    def get_queryset(self):
+        """
+        Overriden to return a custom queryset that is only comprised by the plugin
+        instances in public feeds if the user is not authenticated. For the superuser
+        'chris' all plugin instances are retuned. For other users all the plugin instances
+        in public feeds or owned by the user or belonging to feeds that have been shared
+        with the user are returned.
+        """
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return PluginInstance.objects.filter(feed__public=True)
+
+        if user.username == 'chris':
+            return PluginInstance.objects.all()
+
+        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
+            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
+        return PluginInstance.objects.filter(lookup)
 
         
 class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -159,7 +198,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (IsOwnerOrChrisOrAuthenticatedReadOnlyOrPublicReadOnly,
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance,)
 
     def retrieve(self, request, *args, **kwargs):
@@ -218,7 +257,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -242,7 +281,7 @@ class PluginInstanceSplitList(generics.ListCreateAPIView):
     http_method_names = ['get', 'post']
     serializer_class = PluginInstanceSplitSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (permissions.IsAuthenticated, IsOwnerOrReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def perform_create(self, serializer):
         """
@@ -317,7 +356,7 @@ class PluginInstanceSplitDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     queryset = PluginInstanceSplit.objects.all()
     serializer_class = PluginInstanceSplitSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
 
 class PluginInstanceParameterList(generics.ListAPIView):
@@ -327,7 +366,7 @@ class PluginInstanceParameterList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = GenericParameterSerializer
     queryset = PluginInstance.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -352,7 +391,7 @@ class StrParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['string']
     queryset = StrParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
     
 
 class IntParameterDetail(generics.RetrieveAPIView):
@@ -362,7 +401,7 @@ class IntParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['integer']
     queryset = IntParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
 
 class FloatParameterDetail(generics.RetrieveAPIView):
@@ -372,7 +411,7 @@ class FloatParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['float']
     queryset = FloatParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
     
 
 class BoolParameterDetail(generics.RetrieveAPIView):
@@ -382,7 +421,7 @@ class BoolParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['boolean']
     queryset = BoolParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
 
 class PathParameterDetail(generics.RetrieveAPIView):
@@ -392,7 +431,7 @@ class PathParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['path']
     queryset = PathParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
 
 class UnextpathParameterDetail(generics.RetrieveAPIView):
@@ -402,4 +441,4 @@ class UnextpathParameterDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = PARAMETER_SERIALIZERS['unextpath']
     queryset = UnextpathParameter.objects.all()
-    permission_classes = (IsAuthenticatedReadOnlyOrPublicReadOnly,)
+    permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
