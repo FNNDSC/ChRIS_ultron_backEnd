@@ -29,4 +29,3 @@ cube:
     # these two are hard-coded in make.sh to be part of example pipelines
     - dock_image: fnndsc/pl-simpledsapp
     - dock_image: fnndsc/pl-s3retrieve
-    - dock_image: localhost/dbg-bigfiles
