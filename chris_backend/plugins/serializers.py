@@ -44,6 +44,7 @@ class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PluginSerializer(serializers.HyperlinkedModelSerializer):
+    VERSION_PATTERN = re.compile(r"^[0-9.]+$")
     name = serializers.ReadOnlyField(source='meta.name')
     title = serializers.ReadOnlyField(source='meta.title')
     public_repo = serializers.ReadOnlyField(source='meta.public_repo')
@@ -135,9 +136,9 @@ class PluginSerializer(serializers.HyperlinkedModelSerializer):
         if not isinstance(version, str):
             raise serializers.ValidationError(["Invalid type for plugin app version "
                                                "field. Must be a string."])
-        if not re.match(r"^[0-9.]+$", version):
-            raise serializers.ValidationError(["Invalid plugin app version number "
-                                               "format %s." % version])
+        if not self.VERSION_PATTERN.match(version):
+            raise serializers.ValidationError([f"Invalid plugin app version number "
+                                               f"format {version}."])
         return version
 
     @staticmethod
