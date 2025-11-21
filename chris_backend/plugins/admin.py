@@ -28,7 +28,20 @@ plugin_readonly_fields = [fld.name for fld in Plugin._meta.fields if
                           fld.name != 'compute_resources']
 
 
+class ComputeResourceAdminForm(forms.ModelForm):
+
+    def clean(self):
+        """
+        Overriden to remove the compute_auth_token field if blank.
+        """
+        if 'compute_auth_token' in self.cleaned_data:
+            if self.cleaned_data['compute_auth_token'].strip() == '':
+                del self.cleaned_data['compute_auth_token']
+        return self.cleaned_data
+
+
 class ComputeResourceAdmin(admin.ModelAdmin):
+    form = ComputeResourceAdminForm
     readonly_fields = ['creation_date', 'modification_date']
     list_display = ('name', 'compute_url', 'compute_innetwork', 'description', 'id')
     list_filter = ['name', 'creation_date', 'modification_date']

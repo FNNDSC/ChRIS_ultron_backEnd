@@ -23,6 +23,44 @@ from plugins.models import PluginMeta, Plugin, PluginParameter
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 
 
+class ComputeResourceFormTests(TestCase):
+    """
+    Test ComputeResourceAdminForm.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.WARNING)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        # re-enable logging
+        logging.disable(logging.NOTSET)
+
+    def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.WARNING)
+
+        (self.compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
+
+    def test_clean_removes_compute_auth_token_if_blank(self):
+        """
+        Test whether overriden clean method removes compute_auth_token descriptor from
+        the form if it is a blank string.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        form = compute_resource_admin.form
+        form.instance = self.compute_resource
+        form.cleaned_data = {'compute_auth_token': ''}
+        cleaned_data = form.clean(form)
+        self.assertNotIn('compute_auth_token', cleaned_data)
+
+
 class ComputeResourceAdminTests(TestCase):
     """
     Test ComputeResourceAdmin.
