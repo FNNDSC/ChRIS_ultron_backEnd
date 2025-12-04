@@ -192,8 +192,6 @@ class PluginInstanceManager(object):
             self.c_plugin_inst.end_date = now
             self.c_plugin_inst.save()
 
-
-
     @staticmethod
     def _assemble_exec(selfpath: Optional[str], selfexec: str, execshell: Optional[str]) -> List[str]:
         entrypoint_path = selfexec
@@ -442,13 +440,13 @@ class PluginInstanceManager(object):
         raise NameError('Presumable eventual consistency problem.')
 
     def get_plugin_instance_app_cmd_args(self) -> List[str]:
-        # append flags to save input meta data (passed options) and
-        # output meta data (output description)
-        app_args = ['--saveinputmeta', '--saveoutputmeta']
+        app_args = []
+
         # append the parameters to app's argument list
         for param_inst in self.l_plugin_inst_param_instances:
             param = param_inst.plugin_param
             value = param_inst.value
+
             if param.action == 'store':
                 app_args.append(param.flag)
                 app_args.append(str(value))  # convert all argument values to string
@@ -465,9 +463,11 @@ class PluginInstanceManager(object):
         """
         path_parameters_dict = {}
         unextpath_parameters_dict = {}
+
         for param_inst in self.l_plugin_inst_param_instances:
             param = param_inst.plugin_param
             value = param_inst.value
+
             if param.type == 'unextpath':
                 unextpath_parameters_dict[param.flag] = value
             if param.type == 'path':
