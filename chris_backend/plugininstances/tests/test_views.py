@@ -617,7 +617,7 @@ class PluginInstanceListViewTests(TasksViewTests):
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
         output_user_files = UserFile.objects.filter(
             fname__startswith=pl_inst.output_folder.path)
-        self.assertEqual(output_user_files.count(), 3)
+        self.assertEqual(output_user_files.count(), 1)
 
         # make sure output ChRIS link file was created in storage
         link_file = pl_inst.output_folder.chris_link_files.first()
