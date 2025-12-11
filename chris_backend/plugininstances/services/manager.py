@@ -140,7 +140,7 @@ class PluginInstanceManager(object):
         }
 
         job_zip_file_content = None
-        job_timeout = 1000
+        job_timeout = 3000
 
         if self.pfcon_client.pfcon_innetwork:
             output_dir = self.c_plugin_inst.get_output_path()
