@@ -94,9 +94,9 @@ services:
       - local
 
   db:
-    image: docker.io/library/postgres:17
+    image: docker.io/library/postgres:18
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     environment:
       - POSTGRES_DB=chris_dev
       - POSTGRES_USER=chris
