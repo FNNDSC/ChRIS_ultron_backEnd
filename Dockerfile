@@ -30,7 +30,7 @@
 # docker build --build-arg http_proxy=${PROXY} --build-arg ENVIRONMENT=local -t local/chris:dev .
 #
 
-FROM registry.access.redhat.com/ubi9/python-311:1-17.1692772360
+FROM registry.access.redhat.com/ubi9/python-312:1-1765312055
 
 COPY --chown=default:root ./requirements/ /tmp/requirements
 ARG ENVIRONMENT=production

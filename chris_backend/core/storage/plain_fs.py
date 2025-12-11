@@ -58,7 +58,7 @@ class FilesystemManager(StorageManager):
         src_path = self.__base / src
         dst_path = self.__base / dst
         dst_path.parent.mkdir(parents=True, exist_ok=True)
-        src_path.link_to(dst_path)
+        dst_path.hardlink_to(src_path)
 
     def delete_obj(self, file_path: str) -> None:
         (self.__base / file_path).unlink()

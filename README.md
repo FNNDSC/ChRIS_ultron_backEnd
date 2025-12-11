@@ -168,7 +168,7 @@ Not all text editors support using Docker, or configuring the LSP might be incon
 
 #### Installing Python Dependencies On-The-Metal
 
-The traditional but worst approach is to install Python 3.11, then run
+The traditional but worst approach is to install Python 3.12, then run
 
 ```shell
 python -m venv venv
@@ -178,12 +178,12 @@ pip install -r requirements/local.txt
 
 Some dependencies (such as `python-ldap`) build C code during installation,
 requiring `clang` to be installed. Alternatively, my recommendation is to use
-`micromamba` to install Python 3.11 and `python-ldap`, then use `pip` to
+`micromamba` to install Python 3.12 and `python-ldap`, then use `pip` to
 install everything else.
 [Install micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html), then run
 
 ```shell
-micromamba create -p ./.mambaenv -c conda-forge -y python=3.11 python-ldap=3.4
+micromamba create -p ./.mambaenv -c conda-forge -y python=3.12 python-ldap=3.4
 micromamba -p ./.mambaenv run pip install -r requirements/local.txt
 ```
 
