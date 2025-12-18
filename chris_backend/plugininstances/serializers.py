@@ -11,9 +11,10 @@ from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
 from plugins.enums import TYPES
 from plugins.models import Plugin
 
+from .models import ACTIVE_STATUSES
 from .models import PluginInstance, PluginInstanceSplit
-from .models import FloatParameter, IntParameter, BoolParameter
-from .models import PathParameter, UnextpathParameter, StrParameter
+from .models import (FloatParameter, IntParameter, BoolParameter, PathParameter,
+                     UnextpathParameter, StrParameter)
 
 
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
@@ -33,6 +34,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     raw = serializers.ReadOnlyField()
     owner_username = serializers.ReadOnlyField(source='owner.username')
     size = serializers.ReadOnlyField()
+    active = serializers.SerializerMethodField()
     error_code = serializers.ReadOnlyField()
     previous = serializers.HyperlinkedRelatedField(
         view_name='plugininstance-detail', read_only=True, allow_null=True
@@ -61,7 +63,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
         model = PluginInstance
         fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
                   'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
-                  'feed_id', 'start_date', 'end_date', 'output_path', 'status',
+                  'feed_id', 'start_date', 'end_date', 'output_path', 'status', 'active',
                   'pipeline_id', 'pipeline_name', 'workflow_id', 'summary', 'raw',
                   'owner_username', 'cpu_limit', 'memory_limit', 'number_of_workers',
                   'gpu_limit', 'size', 'error_code', 'output_folder', 'previous',
@@ -78,6 +80,12 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
             self.fields['number_of_workers'].read_only = True
             self.fields['cpu_limit'].read_only = True
             self.fields['memory_limit'].read_only = True
+
+    def get_active(self, obj) -> bool:
+        """
+        Overriden to get the "active" status of the plugin instance.
+        """
+        return obj.status in ACTIVE_STATUSES
 
     def validate_previous(self, previous_id):
         """

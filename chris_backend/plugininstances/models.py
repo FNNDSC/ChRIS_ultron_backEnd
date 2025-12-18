@@ -30,6 +30,10 @@ STATUS_CHOICES = [("created", "Default initial"),
                   ("finishedWithError", "Finished with error"),
                   ("cancelled", "Cancelled")]
 
+ACTIVE_STATUSES = ['created', 'waiting', 'scheduled', 'started', 'registeringFiles']
+
+INACTIVE_STATUSES = ['finishedSuccessfully', 'finishedWithError', 'cancelled']
+
 
 class PluginInstance(models.Model):
     title = models.CharField(max_length=100, blank=True)
@@ -232,11 +236,12 @@ class PluginInstanceFilter(FilterSet):
                                                lookup_expr='exact')
     plugin_type = django_filters.CharFilter(field_name='plugin__meta__type',
                                             lookup_expr='exact')
+    active = django_filters.BooleanFilter(method='filter_by_active_status')
 
     class Meta:
         model = PluginInstance
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
-                  'max_end_date', 'root_id', 'previous_id', 'title', 'status',
+                  'max_end_date', 'root_id', 'previous_id', 'title', 'status', 'active',
                   'owner_username', 'feed_id', 'plugin_id', 'plugin_name',
                   'plugin_name_exact', 'plugin_version', 'plugin_type', 'workflow_id']
 
@@ -268,6 +273,14 @@ class PluginInstanceFilter(FilterSet):
             return previous_queryset
         previous = previous_queryset.first()
         return previous.next.all()
+
+    def filter_by_active_status(self, queryset, name, value):
+        """
+        Custom method to return the plugin instances in a queryset with an
+        "active" status.
+        """
+        statuses = ACTIVE_STATUSES if value else INACTIVE_STATUSES
+        return queryset.filter(status__in=statuses)
 
 
 class PluginInstanceLock(models.Model):
