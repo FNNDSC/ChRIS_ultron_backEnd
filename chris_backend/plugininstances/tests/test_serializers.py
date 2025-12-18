@@ -8,7 +8,7 @@ from django.conf import settings
 from rest_framework import serializers
 
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
-from plugininstances.models import PluginInstance
+from plugininstances.models import PluginInstance, ACTIVE_STATUSES, INACTIVE_STATUSES
 from core.models import ChrisFolder
 from core.storage.helpers import mock_storage
 from plugininstances.serializers import PluginInstanceSerializer
@@ -255,6 +255,23 @@ class PluginInstanceSerializerTests(SerializerTests):
             plg_inst_serializer.validate_value_within_interval(1, 2, 4)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_value_within_interval(5, 2, 4)
+
+    def test_get_active(self):
+        """
+        Test whether overriden get_active method correctly returns the "active"
+        status of the plugin instance.
+        """
+        data = self.data
+        plg_inst_serializer = PluginInstanceSerializer(data=data)
+        plg_inst_mock = mock.Mock()
+
+        for status in ACTIVE_STATUSES:
+            plg_inst_mock.status = status
+            self.assertTrue(plg_inst_serializer.get_active(plg_inst_mock))
+
+        for status in INACTIVE_STATUSES:
+            plg_inst_mock.status = status
+            self.assertFalse(plg_inst_serializer.get_active(plg_inst_mock))
 
 
 class PathParameterSerializerTests(SerializerTests):

@@ -867,12 +867,17 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         super(PluginInstanceListQuerySearchViewTests, self).setUp()
 
         user = User.objects.get(username=self.username)
-        
-        # create three plugin instances
-        plugin = Plugin.objects.get(meta__name="pacspull")
-        PluginInstance.objects.get_or_create(
-            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacsquery', type='fs')
+        (plugin_fs, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin_fs.compute_resources.set([self.compute_resource])
+        plugin_fs.save()
+
+        # create three plugin instances
+        PluginInstance.objects.get_or_create(
+            plugin=plugin_fs, owner=user, compute_resource=plugin_fs.compute_resources.all()[0])
+
+        plugin = Plugin.objects.get(meta__name="pacspull")
         (inst, tf) = PluginInstance.objects.get_or_create(
             plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
 
@@ -894,10 +899,29 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
 
     def test_plugin_instance_query_search_list_success(self):
         self.client.login(username=self.username, password=self.password)
+
         response = self.client.get(self.list_url)
         # response should only contain the instances that match the query
         self.assertContains(response, 'created')
+        self.assertEqual(len(response.data['results']), 1)
         self.assertNotContains(response,'finishedSuccessfully')
+
+    def test_plugin_instance_query_search_list_success_active(self):
+        self.client.login(username=self.username, password=self.password)
+
+        list_url = reverse("allplugininstance-list-query-search") + '?active=true'
+        response = self.client.get(list_url)
+        # response should only contain the instances that are active
+        self.assertContains(response, 'created')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertNotContains(response,'finishedSuccessfully')
+
+        list_url = reverse("allplugininstance-list-query-search") + '?active=false'
+        response = self.client.get(list_url)
+        # response should only contain the instances that are not active
+        self.assertContains(response, 'finishedSuccessfully')
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertNotContains(response, 'created')
 
     def test_plugin_instance_query_search_list_success_but_empty_unauthenticated(self):
         response = self.client.get(self.list_url)
@@ -909,6 +933,7 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         response = self.client.get(list_url)
         # response should only contain the instances that match the query
         self.assertContains(response, 'finishedSuccessfully')
+        self.assertEqual(len(response.data['results']), 2)
         self.assertNotContains(response, 'created')
 
 
