@@ -188,13 +188,13 @@ class PACSQueryListViewTests(PACSViewTests):
 
         self.create_read_url = reverse("pacsquery-list", kwargs={"pk": pacs.id})
 
-        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
-        pacs_query, _ = PACSQuery.objects.get_or_create(title='query10', query=query,
+        self.query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query10', query=self.query,
                                                         owner=user, pacs=pacs)
 
         self.post = json.dumps(
             {"template": {"data": [{"name": "title", "value": 'test1'},
-                                   {"name": "query", "value": json.dumps(query)}]}})
+                                   {"name": "query", "value": json.dumps(self.query)}]}})
 
     def test_pacs_query_list_success(self):
         self.client.login(username=self.username, password=self.password)
@@ -217,7 +217,7 @@ class PACSQueryListViewTests(PACSViewTests):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_pacs_query_create_success(self):
+    def test_pacs_query_create_success_execute(self):
         with mock.patch.object(views.send_pacs_query, 'delay',
                                return_value=None) as delay_mock:
             # make API request
@@ -228,6 +228,25 @@ class PACSQueryListViewTests(PACSViewTests):
 
             # check that the send_pacs_query task was called with appropriate args
             delay_mock.assert_called_with(response.data['id'])
+            self.assertEqual(response.data['status'], 'created')
+
+    def test_pacs_query_create_success_do_not_execute(self):
+
+        post = json.dumps(
+            {"template": {"data": [{"name": "title", "value": 'test2'},
+                                   {"name": "execute", "value": False},
+                                   {"name": "query", "value": json.dumps(self.query)}]}})
+
+        with mock.patch.object(views.send_pacs_query, 'delay',
+                               return_value=None) as delay_mock:
+            # make API request
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(self.create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            # check that the send_pacs_query task was not called
+            delay_mock.assert_not_called()
             self.assertEqual(response.data['status'], 'created')
 
     def test_pacs_query_create_failure_unauthenticated(self):
@@ -357,6 +376,44 @@ class PACSQueryDetailViewTests(PACSViewTests):
         response = self.client.put(self.read_update_delete_url, data=self.put,
                                    content_type=self.content_type)
         self.assertContains(response, "Test query")
+
+    def test_pacs_query_update_success_execute(self):
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        user = User.objects.get(username=self.username)
+        query = {'SeriesInstanceUID': '2.3.15.2.1057'}
+
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query2', execute=False,
+                                                        query=query, owner=user, pacs=pacs)
+        read_update_delete_url = reverse("pacsquery-detail", kwargs={"pk":pacs_query.id})
+
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Test query2"},
+                                  {"name": "execute", "value": True}]}})
+
+        self.client.login(username=self.username, password=self.password)
+
+        with mock.patch.object(views.send_pacs_query, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.put(read_update_delete_url, data=put,
+                                       content_type=self.content_type)
+            # check that the send_pacs_query task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+            self.assertContains(response, "Test query2")
+
+    def test_pacs_query_update_success_do_not_execute_again(self):
+        put = json.dumps({
+            "template": {"data": [{"name": "title", "value": "Test query"},
+                                  {"name": "execute", "value": True}]}})
+
+        self.client.login(username=self.username, password=self.password)
+
+        with mock.patch.object(views.send_pacs_query, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.put(self.read_update_delete_url, data=put,
+                                       content_type=self.content_type)
+            # check that the send_pacs_query task was not called
+            delay_mock.assert_not_called()
+            self.assertContains(response, "Test query")
 
     def test_pacs_query_update_failure_unauthenticated(self):
         response = self.client.put(self.read_update_delete_url, data=self.put,

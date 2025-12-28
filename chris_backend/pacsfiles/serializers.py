@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PACSSerializer(serializers.HyperlinkedModelSerializer):
+    active = serializers.BooleanField(required=False, default=True)
     folder_path = serializers.ReadOnlyField(source='folder.path')
     folder = serializers.HyperlinkedRelatedField(view_name='chrisfolder-detail',
                                                  read_only=True)
@@ -32,17 +33,20 @@ class PACSSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
+    title = serializers.CharField(max_length=300, required=False)
     query = serializers.JSONField(binary=True, required=False)
     pacs_identifier = serializers.ReadOnlyField(source='pacs.identifier')
     owner_username = serializers.ReadOnlyField(source='owner.username')
     result = serializers.ReadOnlyField()
     status = serializers.ReadOnlyField()
+    # explicitly set default to True for boolean fields
+    execute = serializers.BooleanField(required=False, default=True)
     retrieve_list = serializers.HyperlinkedIdentityField(view_name='pacsretrieve-list')
 
     class Meta:
         model = PACSQuery
         fields = ('url', 'id', 'creation_date', 'title', 'query', 'description',
-                  'status', 'pacs_identifier', 'owner_username', 'result',
+                  'status', 'pacs_identifier', 'owner_username',  'execute', 'result',
                   'retrieve_list')
 
     def __init__(self, *args, **kwargs):
@@ -83,11 +87,25 @@ class PACSQuerySerializer(serializers.HyperlinkedModelSerializer):
                          f'for pacs {pacs.identifier}')
             raise serializers.ValidationError([error_msg])
 
+    def validate_execute(self, execute):
+        """
+        Overriden to validate a change of execute status.
+        """
+        instance = self.instance
+        if instance and instance.execute and not execute:
+            msg = "Can not change field execute from true to false."
+            raise serializers.ValidationError([msg])
+        return execute
+
     def validate(self, data):
         """
-        Overriden to validate that the query field is in data when creating a new query.
+        Overriden to validate that required fields are in data when creating a new query.
         """
         if not self.instance:  # on create
+            if 'title' not in data:
+                raise serializers.ValidationError(
+                    {'title': ["This field is required."]})
+
             if 'query' not in data:
                 raise serializers.ValidationError(
                     {'query': ["This field is required."]})
