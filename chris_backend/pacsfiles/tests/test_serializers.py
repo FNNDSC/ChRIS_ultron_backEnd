@@ -1,7 +1,6 @@
 
 import logging
 import io
-import os
 
 from django.contrib.auth.models import User
 from django.test import TestCase, tag
@@ -110,6 +109,37 @@ class PACSQuerySerializerTests(SerializerTests):
         pacs_query_serializer = PACSQuerySerializer(pacs_query, data)
         with self.assertRaises(serializers.ValidationError):
             pacs_query_serializer.update(pacs_query, data)
+
+    def test_validate_execute(self):
+        """
+        Test whether overriden validate_execute method raises a serializers.ValidationError
+        when the execute field changes from true to false.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        query = {'SeriesInstanceUID': '1.3.12.2.1107'}
+
+        pacs_query, _ = PACSQuery.objects.get_or_create(title='query5', query=query,
+                                                        owner=user, pacs=pacs)
+        pacs_query_serializer = PACSQuerySerializer(pacs_query)
+
+        with self.assertRaises(serializers.ValidationError):
+            pacs_query_serializer.validate_execute(False)
+
+
+    def test_validate_validates_required_query_field_on_create(self):
+        """
+        Test whether overriden validate method validates that the query field must
+        be provided when creating a new PACS query.
+        """
+        user = User.objects.get(username=self.username)
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+
+        data = {'title': 'query6', 'owner': user, 'pacs': pacs}
+        pacs_query_serializer = PACSQuerySerializer(data=data)
+
+        with self.assertRaises(serializers.ValidationError):
+            pacs_query_serializer.validate(data)
 
 
 class PACSSeriesSerializerTests(SerializerTests):

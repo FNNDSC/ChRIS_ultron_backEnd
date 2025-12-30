@@ -55,6 +55,7 @@ class PACSQuery(models.Model):
     title = models.CharField(max_length=300, db_index=True)
     query = models.JSONField()
     description = models.CharField(max_length=700, blank=True)
+    execute = models.BooleanField(blank=True, default=True)
     result = models.TextField(blank=True)
     status = models.CharField(max_length=10, choices=PACS_QUERY_STATUS_CHOICES,
                               default='created')
@@ -108,8 +109,8 @@ class PACSQueryFilter(FilterSet):
     class Meta:
         model = PACSQuery
         fields = ['id', 'min_creation_date', 'max_creation_date', 'title_exact',
-                  'title', 'status', 'description', 'pacs_id', 'pacs_identifier',
-                  'owner_username']
+                  'title', 'status', 'execute', 'description', 'pacs_id',
+                  'pacs_identifier', 'owner_username']
 
 
 PACS_RETRIEVE_STATUS_CHOICES = PACS_QUERY_STATUS_CHOICES

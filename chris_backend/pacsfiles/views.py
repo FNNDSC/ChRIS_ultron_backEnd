@@ -156,7 +156,7 @@ class PACSQueryList(generics.ListCreateAPIView):
         response = services.append_collection_links(response, links)
 
         # append write template
-        template_data = {'title': '', 'query': '', 'description': ''}
+        template_data = {'title': '', 'query': '', 'description': '', 'execute': ''}
         return services.append_collection_template(response, template_data)
 
     def get_pacs_queries_queryset(self):
@@ -175,11 +175,13 @@ class PACSQueryList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         """
         Overriden to associate the owner and the pacs with the PACS query before first
-        saving to the DB. Then the PACS query operation is sent to the remote PACS.
+        saving to the DB. Then the PACS query operation is sent to the remote PACS if
+        the execute field is set to True.
         """
         pacs = self.get_object()
         pacs_query = serializer.save(owner=self.request.user, pacs=pacs)
-        send_pacs_query.delay(pacs_query.id)  # call async task
+        if pacs_query.execute:
+            send_pacs_query.delay(pacs_query.id)  # call async task
 
 
 class AllPACSQueryList(generics.ListAPIView):
@@ -249,8 +251,21 @@ class PACSQueryDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template to the response.
         """
         response = super(PACSQueryDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'title': '', 'description': ''}
+        template_data = {'title': '', 'description': '', 'execute': ''}
         return services.append_collection_template(response, template_data)
+
+    def perform_update(self, serializer):
+        """
+        Overriden to execute the PACS query if the execute field changes from False
+        to True.
+        """
+        if 'execute' in self.request.data:
+            instance = self.get_object()
+
+            if self.request.data['execute'] and not instance.execute:
+                send_pacs_query.delay(instance.id)  # call async task
+
+        super(PACSQueryDetail, self).perform_update(serializer)
 
 
 class PACSRetrieveList(generics.ListCreateAPIView):
