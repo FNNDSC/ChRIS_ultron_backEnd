@@ -172,7 +172,7 @@ class PACSSeries(models.Model):
     PatientID = models.CharField(max_length=100, db_index=True)
     PatientName = models.CharField(max_length=150, blank=True)
     PatientBirthDate = models.DateField(blank=True, null=True)
-    PatientAge = models.IntegerField(blank=True, null=True)
+    PatientAge = models.CharField(max_length=100, blank=True, null=True)
     PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'),
                                                          ('O', 'Other')], blank=True)
     StudyDate = models.DateField(db_index=True)

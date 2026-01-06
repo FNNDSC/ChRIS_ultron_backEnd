@@ -16,6 +16,23 @@ services:
     networks:
       - local
 
+  db_migrate:
+    image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
+    command: python manage.py migrate --noinput
+    environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.local"
+      STORAGE_ENV: "fslink"
+    volumes:
+      - chris_files:/data:rw
+      - ./chris_backend:/opt/app-root/src
+    profiles:
+      - migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - local
+
   chris:
     image: ${CUBE_IMAGE:-localhost/fnndsc/cube:dev}
     build:
