@@ -5,7 +5,7 @@ import json
 from unittest import mock
 from unittest.mock import ANY
 
-from django.test import TestCase
+from django.test import TestCase, tag
 from django import forms
 from django.utils import timezone
 from django.conf import settings
@@ -14,9 +14,10 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from rest_framework import status
 from rest_framework import serializers
+from pfconclient.exceptions import PfconRequestException
 
 from plugins import admin as pl_admin
-from plugins.models import PluginMeta, Plugin, PluginParameter
+from plugins.models import ComputeResource, PluginMeta, Plugin, PluginParameter
 
 
 
@@ -47,18 +48,112 @@ class ComputeResourceFormTests(TestCase):
         (self.compute_resource, tf) = pl_admin.ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL)
 
-    def test_clean_removes_compute_auth_token_if_blank(self):
+    def test_clean_fetches_compute_auth_token_and_config_info(self):
         """
-        Test whether overriden clean method removes compute_auth_token descriptor from
-        the form if it is a blank string.
+        Test whether overriden clean method fetches an auth token and configuration
+        info from the remote compute environment.
         """
         compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
                                                                pl_admin.admin.site)
         form = compute_resource_admin.form
         form.instance = self.compute_resource
-        form.cleaned_data = {'compute_auth_token': ''}
-        cleaned_data = form.clean(form)
-        self.assertNotIn('compute_auth_token', cleaned_data)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        form.cleaned_data = {'compute_url': compute_url, 'compute_innetwork': True,
+                             'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        compute_auth_url = ComputeResource.get_default_auth_url(compute_url)
+        token = 'my_token'
+
+        with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
+                               return_value=token) as get_auth_token_mock:
+
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink'}
+
+            with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
+                                   return_value=d_resp) as get_server_info_mock:
+                cleaned_data = form.clean(form)
+
+                self.assertEqual(cleaned_data['compute_auth_token'], token)
+
+                get_auth_token_mock.assert_called_with(compute_auth_url, 'user',
+                                                       'pass1234')
+                get_server_info_mock.assert_called()
+
+    def test_clean_raises_validation_error_if_fails_to_fetch_auth_token(self):
+        """
+        Test whether overriden clean method raises form validation error if it fails
+        to fetch an auth token from the remote compute environment.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        form = compute_resource_admin.form
+        form.instance = self.compute_resource
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        form.cleaned_data = {'compute_url': compute_url, 'compute_innetwork': True,
+                             'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
+                               side_effect=PfconRequestException('Error')):
+            with self.assertRaises(forms.ValidationError):
+                form.clean(form)
+
+    def test_clean_raises_validation_error_if_fails_to_fetch_config_info(self):
+        """
+        Test whether overriden clean method raises form validation error if it fails
+        to fetch the configuration info from the remote compute environment.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        form = compute_resource_admin.form
+        form.instance = self.compute_resource
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        form.cleaned_data = {'compute_url': compute_url, 'compute_innetwork': True,
+                             'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        token = 'my_token'
+
+        with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
+                               return_value=token):
+            with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
+                                   side_effect=PfconRequestException('Error')):
+                with self.assertRaises(forms.ValidationError):
+                    form.clean(form)
+
+    def test_clean_raises_validation_error_if_configuration_mismatch(self):
+        """
+        Test whether overriden clean method raises form validation error if there is
+        a configuration mismatch with the server info from the remote compute environment.
+        """
+        compute_resource_admin = pl_admin.ComputeResourceAdmin(pl_admin.ComputeResource,
+                                                               pl_admin.admin.site)
+        form = compute_resource_admin.form
+        form.instance = self.compute_resource
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        form.cleaned_data = {'compute_url': compute_url, 'compute_innetwork': True,
+                             'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        token = 'my_token'
+
+        with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
+                               return_value=token):
+
+            d_resp = {'pfcon_innetwork': False, 'storage_env': 'fslink'}
+
+            with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
+                                   return_value=d_resp):
+                with self.assertRaises(forms.ValidationError):
+                    form.clean(form)
+
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'filesystem'}
+
+            with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
+                                   return_value=d_resp):
+                with self.assertRaises(forms.ValidationError):
+                    form.clean(form)
 
 
 class ComputeResourceAdminTests(TestCase):
@@ -485,14 +580,17 @@ class ComputeResourceAdminListViewTests(PluginAdminFormTests):
             {"template": {"data": [{"name": "name",
                                     "value": "moc"},
                                    {"name": "compute_url",
-                                    "value": "http://pfcon.local:30005/api/v1/1/"},
+                                    "value": "http://pfcon.remote:30005/api/v1/"},
                                    {"name": "compute_user",
-                                    "value": "mocuser"},
+                                    "value": "pfcon"},
                                    {"name": "compute_password",
-                                    "value": "mocuser1234"},
+                                    "value": "pfcon1234"},
+                                   {"name": "compute_innetwork",
+                                    "value": True},
                                    {"name": "description",
                                     "value": "moc compute env"}
                                    ]}})
+
         self.admin_username = 'admin'
         self.admin_password = 'adminpass'
         self.username = 'foo'
@@ -505,6 +603,7 @@ class ComputeResourceAdminListViewTests(PluginAdminFormTests):
         User.objects.create_user(username=self.username,
                                  password=self.password)
 
+    @tag('integration')
     def test_compute_resource_create_success(self):
         self.client.login(username=self.admin_username, password=self.admin_password)
         response = self.client.post(self.create_read_url, data=self.post,

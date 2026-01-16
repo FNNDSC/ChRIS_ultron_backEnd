@@ -34,7 +34,7 @@ class ComputeResource(models.Model):
         Overriden to save a default value for the auth url.
         """
         if not self.compute_auth_url:
-            self.compute_auth_url = str(self.compute_url) + 'auth-token/'  # set default
+            self.compute_auth_url = self.get_default_auth_url(self.compute_url)  # set default
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -56,6 +56,13 @@ class ComputeResource(models.Model):
         registered with this single compute resource.
         """
         return [pl.id for pl in self.plugins.all() if pl.compute_resources.count() == 1]
+
+    @staticmethod
+    def get_default_auth_url(compute_url):
+        """
+        Custom method to get the default value for the compute_auth_url.
+        """
+        return str(compute_url) + 'auth-token/'  # compute default
 
 
 class ComputeResourceFilter(FilterSet):
