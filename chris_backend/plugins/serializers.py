@@ -2,7 +2,10 @@
 import re
 
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import serializers
+from pfconclient import client as pfcon
+from pfconclient.exceptions import PfconRequestException
 
 from .models import ComputeResource, PluginMeta, Plugin, PluginParameter
 from .models import (DefaultFloatParameter, DefaultIntParameter, DefaultBoolParameter,
@@ -16,6 +19,7 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                                              write_only=True)
     compute_auth_token = serializers.CharField(max_length=500, write_only=True,
                                                required=False)
+    compute_innetwork = serializers.BooleanField(required=False, default=False)
 
     class Meta:
         model = ComputeResource
@@ -23,6 +27,50 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                   'compute_url', 'compute_auth_url', 'compute_innetwork', 'compute_user',
                   'compute_password', 'compute_auth_token', 'description',
                   'max_job_exec_seconds')
+
+    def validate(self, data):
+        """
+        Overriden to validate that the remote compute resource configuration
+        matches the compute resource descriptor values being registered.
+        """
+        compute_url = data['compute_url']
+        token = data.get('compute_auth_token')
+
+        if not token:
+            compute_auth_url = data.get(
+                'compute_auth_url', ComputeResource.get_default_auth_url(compute_url)
+            )
+            try:
+                token = pfcon.Client.get_auth_token(compute_auth_url, data['compute_user'],
+                                                    data['compute_password'])
+                data['compute_auth_token'] = token
+            except PfconRequestException as e:
+                raise serializers.ValidationError(
+                    {'non_field_errors': [f"Could not register the compute resource, "
+                                          f"detail: {str(e)}."]})
+
+        pfcon_client = pfcon.Client(compute_url, token)
+
+        try:
+            d_resp = pfcon_client.get_server_info()
+        except PfconRequestException as e:
+            raise serializers.ValidationError(
+                {'non_field_errors': [f"Could not register the compute resource, "
+                                      f"detail: {str(e)}."]})
+
+        compute_innetwork = data.get('compute_innetwork', False)
+
+        if compute_innetwork != d_resp['pfcon_innetwork']:
+            raise serializers.ValidationError({
+                'compute_innetwork': ["This field must match the remote compute "
+                                      "resource configuration."]})
+
+        if compute_innetwork and settings.STORAGE_ENV != d_resp['storage_env']:
+            raise serializers.ValidationError(
+                {'non_field_errors': ["The remote compute resource's 'storage_env' must "
+                                      "match this server's STORAGE_ENV setting when "
+                                      "configured in-network."]})
+        return data
 
 
 class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):

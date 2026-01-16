@@ -5,11 +5,12 @@ from unittest import mock
 from django.test import TestCase
 from django.conf import settings
 from rest_framework import serializers
+from pfconclient.exceptions import PfconRequestException
 
 from plugins.models import (ComputeResource, PluginMeta, Plugin, PluginParameter,
                             DefaultStrParameter)
-from plugins.serializers import (PluginMetaSerializer, PluginSerializer,
-                                 PluginParameterSerializer)
+from plugins.serializers import (ComputeResourceSerializer, PluginMetaSerializer,
+                                 PluginSerializer, PluginParameterSerializer, pfcon)
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -72,6 +73,127 @@ class SerializerTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+
+class ComputeResourceSerializerTests(SerializerTests):
+
+    def test_validate_fetches_config_info(self):
+        """
+        Test whether overriden validate method just uses an auth token if passed
+        and fetches the configuration info from the remote compute environment.
+        """
+        cr_serializer = ComputeResourceSerializer(self.compute_resource)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        token = 'my_token'
+
+        data = {'compute_url': compute_url, 'compute_innetwork': True,
+                'compute_user': 'user', 'compute_password': 'pass1234',
+                'compute_auth_token': token}
+
+        d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink'}
+
+        with mock.patch.object(pfcon.Client, 'get_server_info',
+                               return_value=d_resp) as get_server_info_mock:
+            validated_data = cr_serializer.validate(data)
+
+            self.assertEqual(validated_data['compute_auth_token'], token)
+            get_server_info_mock.assert_called()
+
+    def test_validate_fetches_compute_auth_token_if_not_passed(self):
+        """
+        Test whether overriden validate method fetches an auth token if not passed
+        as well a configuration info from the remote compute environment.
+        """
+        cr_serializer = ComputeResourceSerializer(self.compute_resource)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        data = {'compute_url': compute_url, 'compute_innetwork': True,
+                'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        compute_auth_url = ComputeResource.get_default_auth_url(compute_url)
+        token = 'my_token'
+
+        with mock.patch.object(pfcon.Client, 'get_auth_token',
+                               return_value=token) as get_auth_token_mock:
+
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink'}
+
+            with mock.patch.object(pfcon.Client, 'get_server_info',
+                                   return_value=d_resp) as get_server_info_mock:
+                validated_data = cr_serializer.validate(data)
+
+                self.assertEqual(validated_data['compute_auth_token'], token)
+
+                get_auth_token_mock.assert_called_with(compute_auth_url, 'user',
+                                                       'pass1234')
+                get_server_info_mock.assert_called()
+
+    def test_validate_raises_validation_error_if_fails_to_fetch_auth_token(self):
+        """
+        Test whether overriden validate method raises validation error if it fails
+        to fetch an auth token from the remote compute environment.
+        """
+        cr_serializer = ComputeResourceSerializer(self.compute_resource)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        data = {'compute_url': compute_url, 'compute_innetwork': True,
+                'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        with mock.patch.object(pfcon.Client, 'get_auth_token',
+                               side_effect=PfconRequestException('Error')):
+            with self.assertRaises(serializers.ValidationError):
+                cr_serializer.validate(data)
+
+    def test_validate_raises_validation_error_if_fails_to_fetch_config_info(self):
+        """
+        Test whether overriden validate method raises validation error if it fails
+        to fetch the configuration info from the remote compute environment.
+        """
+        cr_serializer = ComputeResourceSerializer(self.compute_resource)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        data = {'compute_url': compute_url, 'compute_innetwork': True,
+                'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        token = 'my_token'
+
+        with mock.patch.object(pfcon.Client, 'get_auth_token',
+                               return_value=token):
+            with mock.patch.object(pfcon.Client, 'get_server_info',
+                                   side_effect=PfconRequestException('Error')):
+                with self.assertRaises(serializers.ValidationError):
+                    cr_serializer.validate(data)
+
+    def test_validate_raises_validation_error_if_configuration_mismatch(self):
+        """
+        Test whether overriden validate method raises validation error if there is
+        a configuration mismatch with the server info from the remote compute environment.
+        """
+        cr_serializer = ComputeResourceSerializer(self.compute_resource)
+
+        compute_url = 'http://pfcon.com/api/v1/'
+        data = {'compute_url': compute_url, 'compute_innetwork': True,
+                'compute_user': 'user', 'compute_password': 'pass1234'}
+
+        token = 'my_token'
+
+        with mock.patch.object(pfcon.Client, 'get_auth_token',
+                               return_value=token):
+
+            d_resp = {'pfcon_innetwork': False, 'storage_env': 'fslink'}
+
+            with mock.patch.object(pfcon.Client, 'get_server_info',
+                                   return_value=d_resp):
+                with self.assertRaises(serializers.ValidationError):
+                    cr_serializer.validate(data)
+
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'filesystem'}
+
+            with mock.patch.object(pfcon.Client, 'get_server_info',
+                                   return_value=d_resp):
+                with self.assertRaises(serializers.ValidationError):
+                    cr_serializer.validate(data)
 
 
 class PluginMetaSerializerTests(SerializerTests):

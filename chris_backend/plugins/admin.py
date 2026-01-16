@@ -10,10 +10,12 @@ from django import forms
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib import messages
+from django.conf import settings
 from rest_framework import generics, permissions, serializers
 from rest_framework.reverse import reverse
-
 from collectionjson import services
+from pfconclient import client as pfcon
+from pfconclient.exceptions import PfconRequestException
 
 from .enums import TYPES
 from .models import PluginMeta, Plugin, ComputeResource
@@ -32,11 +34,44 @@ class ComputeResourceAdminForm(forms.ModelForm):
 
     def clean(self):
         """
-        Overriden to remove the compute_auth_token field if blank.
+        Overriden to validate that the remote compute resource configuration matches
+        the compute resource descriptor values being registered.
         """
-        if 'compute_auth_token' in self.cleaned_data:
-            if self.cleaned_data['compute_auth_token'].strip() == '':
-                del self.cleaned_data['compute_auth_token']
+        data = self.cleaned_data
+        compute_url = data.get('compute_url', '')
+
+        compute_auth_url = data.get('compute_auth_url', '')
+        if not compute_auth_url:
+            compute_auth_url = ComputeResource.get_default_auth_url(compute_url)
+
+        try:
+            token = pfcon.Client.get_auth_token(compute_auth_url,
+                                                data.get('compute_user', ''),
+                                                data.get('compute_password', ''))
+            self.cleaned_data['compute_auth_token'] = token
+        except PfconRequestException as e:
+            raise forms.ValidationError(f"Could not register the compute resource, "
+                                        f"detail: {str(e)}.")
+
+        pfcon_client = pfcon.Client(compute_url, token)
+
+        try:
+            d_resp = pfcon_client.get_server_info()
+        except PfconRequestException as e:
+            raise forms.ValidationError(f"Could not register the compute resource, "
+                                        f"detail: {str(e)}.")
+
+        compute_innetwork = data.get('compute_innetwork', False)
+
+        if compute_innetwork != d_resp['pfcon_innetwork']:
+
+            raise forms.ValidationError("'Compute innetwork' must match the remote "
+                                        "compute resource configuration.")
+
+        if compute_innetwork and settings.STORAGE_ENV != d_resp['storage_env']:
+            raise forms.ValidationError("The remote compute resource's 'storage_env' "
+                                        "must match this server's STORAGE_ENV setting "
+                                        "when configured in-network.")
         return self.cleaned_data
 
 
