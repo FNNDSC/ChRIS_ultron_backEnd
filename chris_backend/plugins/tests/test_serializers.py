@@ -1,10 +1,11 @@
-
 import logging
 from unittest import mock
 
 from django.test import TestCase
 from django.conf import settings
+from django.contrib.auth.models import User, AnonymousUser
 from rest_framework import serializers
+from rest_framework.test import APIRequestFactory
 from pfconclient.exceptions import PfconRequestException
 
 from plugins.models import (ComputeResource, PluginMeta, Plugin, PluginParameter,
@@ -194,6 +195,38 @@ class ComputeResourceSerializerTests(SerializerTests):
                                    return_value=d_resp):
                 with self.assertRaises(serializers.ValidationError):
                     cr_serializer.validate(data)
+
+    def test_to_representation_anonymous_hides_sensitive_urls(self):
+        """
+        Test whether overriden to_representation removes compute_url and
+        compute_auth_url when the request user is anonymous (not authenticated).
+        """
+        factory = APIRequestFactory()
+        request = factory.get('/')
+        request.user = AnonymousUser()
+
+        serializer = ComputeResourceSerializer(self.compute_resource, context={'request': request})
+        representation = serializer.to_representation(self.compute_resource)
+
+        self.assertNotIn('compute_url', representation)
+        self.assertNotIn('compute_auth_url', representation)
+
+    def test_to_representation_authenticated_shows_sensitive_urls(self):
+        """
+        Test whether overriden to_representation keeps compute_url and
+        compute_auth_url when the request user is authenticated.
+        """
+        # create and use an authenticated user on the request
+        user = User.objects.create_user(username='ser_test_user', password='pw')
+        factory = APIRequestFactory()
+        request = factory.get('/')
+        request.user = user
+
+        serializer = ComputeResourceSerializer(self.compute_resource, context={'request': request})
+        representation = serializer.to_representation(self.compute_resource)
+
+        self.assertIn('compute_url', representation)
+        self.assertIn('compute_auth_url', representation)
 
 
 class PluginMetaSerializerTests(SerializerTests):

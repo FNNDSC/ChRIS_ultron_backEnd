@@ -17,7 +17,6 @@ class ComputeResourceList(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = ComputeResourceSerializer
     queryset = ComputeResource.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -25,9 +24,11 @@ class ComputeResourceList(generics.ListAPIView):
         response.
         """
         response = super(ComputeResourceList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('computeresource-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request)}
         return services.append_collection_links(response, links)
@@ -40,7 +41,6 @@ class ComputeResourceListQuerySearch(generics.ListAPIView):
     http_method_names = ['get']
     serializer_class = ComputeResourceSerializer
     queryset = ComputeResource.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
     filterset_class = ComputeResourceFilter
 
 
@@ -51,7 +51,6 @@ class ComputeResourceDetail(generics.RetrieveAPIView):
     http_method_names = ['get']
     serializer_class = ComputeResourceSerializer
     queryset = ComputeResource.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
 
 
 class PluginMetaList(generics.ListAPIView):
@@ -68,10 +67,12 @@ class PluginMetaList(generics.ListAPIView):
         response.
         """
         response = super(PluginMetaList, self).list(request, *args, **kwargs)
+
         # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request),
                  'plugins': reverse('plugin-list', request=request)}
         response = services.append_collection_links(response, links)
+
         # append query list
         query_list = [reverse('pluginmeta-list-query-search', request=request)]
         return services.append_collection_querylist(response, query_list)
@@ -112,6 +113,7 @@ class PluginMetaPluginList(generics.ListAPIView):
         queryset = self.get_plugins_queryset()
         response = services.get_list_response(self, queryset)
         meta = self.get_object()
+
         links = {'meta': reverse('pluginmeta-detail', request=request,
                                  kwargs={"pk": meta.id})}
         return services.append_collection_links(response, links)
@@ -138,9 +140,11 @@ class PluginList(generics.ListAPIView):
         response.
         """
         response = super(PluginList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('plugin-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
         links = {'feeds': reverse('feed-list', request=request),
                  'plugin_metas': reverse('pluginmeta-list', request=request)}
@@ -164,7 +168,6 @@ class PluginComputeResourceList(generics.ListAPIView):
     http_method_names = ['get']
     queryset = Plugin.objects.all()
     serializer_class = ComputeResourceSerializer
-    permission_classes = (permissions.IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         """
@@ -174,6 +177,7 @@ class PluginComputeResourceList(generics.ListAPIView):
         queryset = self.get_computeresources_queryset()
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
+
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}
         return services.append_collection_links(response, links)
@@ -211,6 +215,7 @@ class PluginParameterList(generics.ListAPIView):
         queryset = self.get_plugin_parameters_queryset()
         response = services.get_list_response(self, queryset)
         plugin = self.get_object()
+
         links = {'plugin': reverse('plugin-detail', request=request,
                                    kwargs={"pk": plugin.id})}
         return services.append_collection_links(response, links)

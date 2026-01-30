@@ -23,9 +23,13 @@ class ViewTests(TestCase):
 
         self.username = 'foo'
         self.password = 'bar'
+        self.compute_resource_name = 'host'
+        self.compute_resource_desc = 'compute resource'
+
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name=self.compute_resource_name, compute_url=COMPUTE_RESOURCE_URL,
+            description=self.compute_resource_desc)
 
         # create API user
         User.objects.create_user(username=self.username,
@@ -70,9 +74,10 @@ class ComputeResourceListViewTests(ViewTests):
         response = self.client.get(self.list_url)
         self.assertContains(response, COMPUTE_RESOURCE_URL)
 
-    def test_compute_resource_list_failure_unauthenticated(self):
+    def test_compute_resource_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, self.compute_resource_desc)
+        self.assertNotContains(response, COMPUTE_RESOURCE_URL)
 
 
 class ComputeResourceListQuerySearchViewTests(ViewTests):
@@ -82,16 +87,18 @@ class ComputeResourceListQuerySearchViewTests(ViewTests):
 
     def setUp(self):
         super(ComputeResourceListQuerySearchViewTests, self).setUp()
-        self.list_url = reverse("computeresource-list-query-search") + '?name=host'
+        self.list_url = reverse(
+            "computeresource-list-query-search") + f'?name={self.compute_resource_name}'
 
     def test_compute_resource_list_query_search_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         self.assertContains(response, COMPUTE_RESOURCE_URL)
 
-    def test_compute_resource_list_query_search_failure_unauthenticated(self):
+    def test_compute_resource_list_query_search_success_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, self.compute_resource_desc)
+        self.assertNotContains(response, COMPUTE_RESOURCE_URL)
 
 
 class ComputeResourceDetailViewTests(ViewTests):
@@ -110,9 +117,10 @@ class ComputeResourceDetailViewTests(ViewTests):
         response = self.client.get(self.read_url)
         self.assertContains(response, COMPUTE_RESOURCE_URL)
 
-    def test_compute_resource_detail_failure_unauthenticated(self):
+    def test_compute_resource_detail_success_unauthenticated(self):
         response = self.client.get(self.read_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, self.compute_resource_desc)
+        self.assertNotContains(response, COMPUTE_RESOURCE_URL)
 
 
 class PluginMetaListViewTests(ViewTests):
@@ -261,7 +269,9 @@ class PluginComputeResourceListViewTests(ViewTests):
 
     def test_plugin_compute_resource_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertContains(response, self.compute_resource_name)
+        self.assertNotContains(response, COMPUTE_RESOURCE_URL)
+        self.assertNotContains(response, "new")
 
 
 class PluginDetailViewTests(ViewTests):
