@@ -1,4 +1,3 @@
-
 import re
 
 from django.utils import timezone
@@ -71,6 +70,23 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                                       "match this server's STORAGE_ENV setting when "
                                       "configured in-network."]})
         return data
+
+    def to_representation(self, instance):
+        """
+        Overriden to hide certain sensitive fields from responses when the request
+        user is not authenticated. DRF automatically injects the request into the
+        serializer `context` when used in the standard views, so we rely on
+        `self.context.get('request')` here.
+        """
+        representation = super().to_representation(instance)
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+
+        if not (request and getattr(request, 'user', None)
+                and request.user.is_authenticated):
+            # Remove sensitive URL fields for anonymous requests
+            representation.pop('compute_url', None)
+            representation.pop('compute_auth_url', None)
+        return representation
 
 
 class PluginMetaSerializer(serializers.HyperlinkedModelSerializer):
