@@ -47,11 +47,13 @@ class PfdcmClient(object):
         Send a PACS query dictionary to pfdcm.
         """
         headers = {'Content-Type': self.content_type, 'Accept': self.content_type}
+
         data = {
             'PACSservice' : {'value': pacs_name},
             'listenerService' : {'value': 'default'},
             'PACSdirective' : query
         }
+
         for i in range(5):
             try:
                 resp = post(self.pacs_query_url, json=data, timeout=timeout,
@@ -75,13 +77,16 @@ class PfdcmClient(object):
         Send a PACS query dictionary to pfdcm to initiate a PACS retrieve.
         """
         headers = {'Content-Type': self.content_type, 'Accept': self.content_type}
+
+        query['then'] = 'retrieve'
+        query['withFeedBack'] = True
+
         data = {
             'PACSservice' : {'value': pacs_name},
             'listenerService' : {'value': 'default'},
-            'PACSdirective' : query,
-            'withFeedBack': True,
-            'then': 'retrieve'
+            'PACSdirective' : query
         }
+
         for i in range(5):
             try:
                 resp = post(self.pacs_retrieve_url, json=data, timeout=timeout,
