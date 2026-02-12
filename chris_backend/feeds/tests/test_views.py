@@ -1,17 +1,24 @@
 
 import logging
 import json
+import time
+from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase, tag
 from django.urls import reverse
 from django.contrib.auth.models import User, Group
 from django.conf import settings
 from rest_framework import status
 
+from celery.contrib.testing.worker import start_worker
+from core.celery import app as celery_app
+from core.celery import task_routes
+
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance
 from feeds.models import (Note, Tag, Tagging, Feed, FeedGroupPermission,
                           FeedUserPermission, Comment)
+from feeds import views
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -79,7 +86,75 @@ class ViewTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
-        
+
+
+class TasksViewTests(TransactionTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        logging.disable(logging.WARNING)
+        super().setUpClass()
+        # route tasks to this worker by using the default 'celery' queue
+        # that is exclusively used for the automated tests
+        celery_app.conf.update(task_routes=None)
+        cls.celery_worker = start_worker(celery_app,
+                                         concurrency=1,
+                                         perform_ping_check=False)
+        cls.celery_worker.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.celery_worker.__exit__(None, None, None)
+        # reset routes to the original queues
+        celery_app.conf.update(task_routes=task_routes)
+        logging.disable(logging.NOTSET)
+
+    def setUp(self):
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
+
+        self.content_type = 'application/vnd.collection+json'
+
+        self.username = 'foo'
+        self.password = 'foopass'
+        self.other_username = 'booo'
+        self.other_password = 'booopass'
+
+        self.plugin_name = "pacspull"
+        self.plugin_type = "fs"
+        self.plugin_parameters = {'mrn': {'type': 'string', 'optional': False},
+                                  'img_type': {'type': 'string', 'optional': True}}
+        self.feedname = "Feed1"
+
+        (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
+            name="host", compute_url=COMPUTE_RESOURCE_URL)
+
+        # create users
+        other_user = User.objects.create_user(username=self.other_username,
+                                              password=self.other_password)
+        user = User.objects.create_user(username=self.username,
+                                        password=self.password)
+
+        # assign predefined group
+        all_grp = Group.objects.get(name='all_users')
+
+        other_user.groups.set([all_grp])
+        user.groups.set([all_grp])
+
+        # create plugin
+        (pl_meta, tf) = PluginMeta.objects.get_or_create(name='pacspull', type='fs')
+        (plugin, tf) = Plugin.objects.get_or_create(meta=pl_meta, version='0.1')
+        plugin.compute_resources.set([self.compute_resource])
+        plugin.save()
+
+        # create a feed by creating a "fs" plugin instance
+        pl_inst = PluginInstance.objects.create(plugin=plugin, owner=user, title='test',
+                                                compute_resource=
+                                                plugin.compute_resources.all()[0])
+        pl_inst.feed.name = self.feedname
+        pl_inst.feed.save()
 
 class NoteDetailViewTests(ViewTests):
     """
@@ -224,7 +299,7 @@ class FeedListQuerySearchViewTests(ViewTests):
         self.assertNotContains(response, "Feed2")
         
 
-class FeedDetailViewTests(ViewTests):
+class FeedDetailViewTests(TasksViewTests):
     """
     Test the feed-detail view.
     """
@@ -274,8 +349,24 @@ class FeedDetailViewTests(ViewTests):
 
     def test_feed_delete_success(self):
         self.client.login(username=self.username, password=self.password)
+
+        with mock.patch.object(views.delete_feed, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.delete(self.read_update_delete_url)
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+            # check that the delete_feed task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+
+    @tag('integration')
+    def test_integration_feed_delete_success(self):
+        self.client.login(username=self.username, password=self.password)
         response = self.client.delete(self.read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        for _ in range(10):
+            time.sleep(3)
+            if Feed.objects.count() == 0: break
         self.assertEqual(Feed.objects.count(), 0)
 
     def test_feed_delete_failure_unauthenticated(self):

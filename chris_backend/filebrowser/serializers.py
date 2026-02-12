@@ -33,6 +33,7 @@ class FileBrowserFolderSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ChrisFolder
         fields = ('url', 'id', 'creation_date', 'path', 'public', 'owner_username',
+                  'deletion_status', 'deletion_requested_at', 'deletion_error',
                   'parent', 'children', 'files', 'link_files', 'group_permissions',
                   'user_permissions', 'owner')
 

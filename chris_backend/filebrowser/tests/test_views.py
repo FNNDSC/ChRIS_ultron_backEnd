@@ -3,14 +3,19 @@ import logging
 import io
 import os
 import json
+import time
 from unittest import mock
 
-from django.test import TestCase, tag
+from django.test import TestCase,TransactionTestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.urls import reverse
-
 from rest_framework import status
+
+from celery.contrib.testing.worker import start_worker
+from core.celery import app as celery_app
+from core.celery import task_routes
+
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
                          FolderUserPermission, FileGroupPermission, FileUserPermission,
                          LinkFileGroupPermission, LinkFileUserPermission)
@@ -19,6 +24,7 @@ from users.models import UserProxy
 from userfiles.models import UserFile
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance
+from filebrowser import views
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -29,7 +35,6 @@ class FileBrowserViewTests(TestCase):
     """
     Generic filebrowser view tests' setup and tearDown.
     """
-
     content_type = 'application/vnd.collection+json'
 
     # superuser chris (owner of root and top-level folders)
@@ -65,6 +70,56 @@ class FileBrowserViewTests(TestCase):
 
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+
+class FileBrowserTasksViewTests(TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        logging.disable(logging.WARNING)
+        super().setUpClass()
+        # route tasks to this worker by using the default 'celery' queue
+        # that is exclusively used for the automated tests
+        celery_app.conf.update(task_routes=None)
+        cls.celery_worker = start_worker(celery_app,
+                                         concurrency=1,
+                                         perform_ping_check=False)
+        cls.celery_worker.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.celery_worker.__exit__(None, None, None)
+        # reset routes to the original queues
+        celery_app.conf.update(task_routes=task_routes)
+        logging.disable(logging.NOTSET)
+
+    def setUp(self):
+        super(FileBrowserTasksViewTests, self).setUp()
+        self.content_type = 'application/vnd.collection+json'
+
+        # superuser chris (owner of root and top-level folders)
+        self.chris_username = 'chris'
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
+
+        # normal users
+        self.username = 'foo'
+        self.password = 'foopass'
+        self.other_username = 'booo'
+        self.other_password = 'booopass'
+
+        # create users with their home folders setup
+        UserProxy.objects.create_user(username=self.username, password=self.password)
+        UserProxy.objects.create_user(username=self.other_username,
+                                      password=self.other_password)
+
+    def tearDown(self):
+        storage_manager = connect_storage(settings)
+
+        for username in [self.username, self.other_username]:
+            User.objects.get(username=username).delete()
+            home = f'home/{username}'
+            if storage_manager.path_exists(home):
+                storage_manager.delete_path(home)
 
 
 class FileBrowserFolderListViewTests(FileBrowserViewTests):
@@ -273,7 +328,7 @@ class FileBrowserFolderListQuerySearchViewTests(FileBrowserViewTests):
         response = self.client.get(read_url)
         self.assertFalse(response.data['results'])
 
-class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
+class FileBrowserFolderDetailViewTests(FileBrowserTasksViewTests):
     """
     Test the chrisfolder-detail view.
     """
@@ -390,8 +445,33 @@ class FileBrowserFolderDetailViewTests(FileBrowserViewTests):
         read_update_delete_url = reverse("chrisfolder-detail",
                                          kwargs={"pk": folder.id})
         self.client.login(username=self.username, password=self.password)
+
+        with mock.patch.object(views.delete_folder, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.delete(read_update_delete_url)
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+            # check that the delete_folder task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+
+    @tag('integration')
+    def test_integration_filebrowserfolder_delete_success(self):
+        # create a folder
+        owner = User.objects.get(username=self.username)
+        folder, _ = ChrisFolder.objects.get_or_create(
+            path=f'home/{self.username}/uploads/test', owner=owner)
+
+        read_update_delete_url = reverse("chrisfolder-detail",
+                                         kwargs={"pk": folder.id})
+        self.client.login(username=self.username, password=self.password)
+        folder_count = ChrisFolder.objects.count()
         response = self.client.delete(read_update_delete_url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        for _ in range(10):
+            time.sleep(3)
+            if ChrisFolder.objects.count() == folder_count - 1: break
+        self.assertEqual(ChrisFolder.objects.count(), folder_count - 1)
 
     def test_filebrowserfolder_delete_failure_home_folder(self):
         folder = ChrisFolder.objects.get(path=f'home/{self.username}')

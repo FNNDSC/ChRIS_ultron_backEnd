@@ -146,7 +146,8 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
                   'PatientSex', 'StudyDate', 'AccessionNumber', 'Modality',
                   'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
                   'SeriesInstanceUID', 'SeriesDescription', 'pacs_name',
-                  'pacs_identifier', 'folder')
+                  'pacs_identifier',  'deletion_status', 'deletion_requested_at',
+                  'deletion_error', 'folder')
 
     def create(self, validated_data):
         """

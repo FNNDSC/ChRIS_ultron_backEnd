@@ -1,7 +1,7 @@
 
 from django.db.models import Q
-from rest_framework import generics
-from rest_framework import permissions
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError
 from drf_spectacular.utils import extend_schema_view, extend_schema
@@ -9,15 +9,14 @@ from drf_spectacular.utils import extend_schema_view, extend_schema
 from collectionjson import services
 from plugins.models import Plugin
 
-from .models import PluginInstance, PluginInstanceFilter, PluginInstanceSplit
-from .models import StrParameter, FloatParameter, IntParameter
-from .models import BoolParameter, PathParameter, UnextpathParameter
-from .serializers import PARAMETER_SERIALIZERS
-from .serializers import GenericParameterSerializer, PluginInstanceSplitSerializer
-from .serializers import PluginInstanceSerializer
+from .models import (PluginInstance, PluginInstanceFilter, PluginInstanceSplit,
+                     StrParameter, FloatParameter, IntParameter, BoolParameter,
+                     PathParameter, UnextpathParameter)
+from .serializers import (PARAMETER_SERIALIZERS, GenericParameterSerializer,
+                          PluginInstanceSplitSerializer, PluginInstanceSerializer)
 from .permissions import (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance)
-from .tasks import run_plugin_instance, cancel_plugin_instance
+from .tasks import run_plugin_instance, cancel_plugin_instance, delete_plugin_instance
 from .utils import run_if_ready
 
 
@@ -231,7 +230,9 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         """
         Overriden to cancel the plugin instance execution before deleting it. All the
-        descendant instances are also cancelled before they are deleted by the DB CASCADE.
+        descendant instances are also cancelled before they are deleted by the DB
+        CASCADE. Then asyncronously delete the plugin instance and its folder/files
+        from storage.
         """
         instance = self.get_object()
         descendants = instance.get_descendant_instances()
@@ -246,7 +247,12 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
                 plg_inst_ids.append(plg_inst.id)
 
         PluginInstance.objects.filter(pk__in=plg_inst_ids).update(status='cancelled')
-        return super(PluginInstanceDetail, self).destroy(request, *args, **kwargs)
+
+        if instance.mark_deletion_pending():
+            delete_plugin_instance.delay(instance.id)  # async task
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
 class PluginInstanceDescendantList(generics.ListAPIView):

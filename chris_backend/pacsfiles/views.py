@@ -4,7 +4,8 @@ from pathlib import Path
 from django.http import FileResponse
 from django.contrib.auth.models import User, Group
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
@@ -13,10 +14,11 @@ from collectionjson import services
 from core.renderers import BinaryFileRenderer
 from core.models import ChrisFolder
 from core.views import TokenAuthSupportQueryString
+
 from .models import (PACS, PACSFilter, PACSQuery, PACSQueryFilter, PACSRetrieve,
                      PACSRetrieveFilter, PACSSeries, PACSSeriesFilter, PACSFile,
                      PACSFileFilter)
-from .tasks import send_pacs_query
+from .tasks import send_pacs_query, delete_pacs_series
 from .serializers import (PACSSerializer,  PACSQuerySerializer, PACSRetrieveSerializer,
                           PACSSeriesSerializer, PACSFileSerializer)
 from .services import PfdcmClient
@@ -402,15 +404,27 @@ class PACSSeriesListQuerySearch(generics.ListAPIView):
     filterset_class = PACSSeriesFilter
 
 
-class PACSSeriesDetail(generics.RetrieveAPIView):
+class PACSSeriesDetail(generics.RetrieveDestroyAPIView):
     """
     A PACS Series view.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'delete']
     queryset = PACSSeries.objects.all()
     serializer_class = PACSSeriesSerializer
     permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to asyncronously delete the PACS series and its folder/files from
+        storage.
+        """
+        instance = self.get_object()
+
+        if instance.mark_deletion_pending():
+            delete_pacs_series.delay(instance.id)  # async task
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
 class PACSFileList(generics.ListAPIView):
     """

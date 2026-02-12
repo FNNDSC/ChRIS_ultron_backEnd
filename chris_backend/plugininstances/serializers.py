@@ -66,7 +66,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'feed_id', 'start_date', 'end_date', 'output_path', 'status', 'active',
                   'pipeline_id', 'pipeline_name', 'workflow_id', 'summary', 'raw',
                   'owner_username', 'cpu_limit', 'memory_limit', 'number_of_workers',
-                  'gpu_limit', 'size', 'error_code', 'output_folder', 'previous',
+                  'gpu_limit', 'size', 'error_code', 'deletion_status',
+                  'deletion_requested_at', 'deletion_error', 'output_folder', 'previous',
                   'output_folder', 'feed', 'plugin', 'workflow', 'compute_resource',
                   'descendants', 'parameters', 'splits')
 

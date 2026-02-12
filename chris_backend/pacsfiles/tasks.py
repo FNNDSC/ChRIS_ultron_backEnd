@@ -5,12 +5,30 @@ from typing import Optional
 from django.contrib.auth.models import User
 
 from celery import shared_task
-from .models import PACSQuery
+from .models import PACSQuery, PACSSeries
 from .serializers import PACSSeriesSerializer
 
 
 logger = logging.getLogger(__name__)
 
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3})
+def delete_pacs_series(self, pacs_series_id):
+    try:
+        pacs_series = PACSSeries.objects.get(id=pacs_series_id)
+
+        if not pacs_series.is_pending_deletion():
+            return # idempotent safety
+
+        pacs_series.delete()
+    except PACSSeries.DoesNotExist:
+        pass
+    except Exception as e:
+        PACSSeries.objects.filter(id=pacs_series_id).update( # atomic update
+            deletion_status=PACSSeries.DeletionStatus.FAILED,
+            deletion_error=str(e)
+        )
+        raise
 
 @shared_task
 def send_pacs_query(pacs_query_id):

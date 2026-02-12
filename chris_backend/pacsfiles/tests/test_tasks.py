@@ -1,9 +1,8 @@
-import logging
-import json
-import io
-from unittest import mock
 
-from django.test import TestCase, tag
+import logging
+from unittest.mock import patch, Mock
+
+from django.test import TestCase, tag, override_settings
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.urls import reverse
@@ -11,10 +10,72 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
+from celery.exceptions import Retry
+
 from core.models import ChrisFolder
 from core.storage import connect_storage
 from pacsfiles.models import PACS, PACSSeries, PACSFile
-from pacsfiles.tasks import register_pacs_series
+from pacsfiles.tasks import register_pacs_series, delete_pacs_series
+
+
+class DeletePacSSeriesTaskTests(TestCase):
+    def setUp(self):
+        # avoid cluttered console output (for instance logging all the http requests)
+        logging.disable(logging.WARNING)
+
+    def tearDown(self):
+        # re-enable logging
+        logging.disable(logging.NOTSET)
+
+    def test_not_pending_does_not_call_delete(self):
+        mock_series = Mock()
+        mock_series.is_pending_deletion.return_value = False
+        mock_series.delete = Mock()
+
+        with patch('pacsfiles.tasks.PACSSeries.objects.get', return_value=mock_series):
+            result = delete_pacs_series.apply(args=(1,))
+            # synchronous apply returns an EagerResult; .get() returns the task return value
+            self.assertIsNone(result.get())
+            mock_series.delete.assert_not_called()
+
+    @override_settings(
+        CELERY_TASK_ALWAYS_EAGER=True,
+        CELERY_TASK_EAGER_PROPAGATES=True,
+    )
+    def test_exception_updates_status_and_retries(self):
+        mock_series = Mock()
+        mock_series.is_pending_deletion.return_value = True
+        mock_series.delete.side_effect = Exception("delete failed")
+
+        mock_filter_qs = Mock()
+
+        with patch(
+            "pacsfiles.tasks.PACSSeries.objects.get",
+            return_value=mock_series
+        ), patch(
+            "pacsfiles.tasks.PACSSeries.objects.filter",
+            return_value=mock_filter_qs
+        ):
+
+            with self.assertRaises(Retry) as context:
+                delete_pacs_series.apply(args=(1,)).get()
+
+            self.assertIsInstance(context.exception.exc, Exception)
+            self.assertEqual(str(context.exception.exc), "delete failed")
+            self.assertEqual(mock_series.delete.call_count, 1)
+            self.assertEqual(mock_filter_qs.update.call_count, 1)
+
+            # Inspect last update call
+            _, kwargs = mock_filter_qs.update.call_args
+
+            self.assertEqual(
+                kwargs["deletion_status"],
+                PACSSeries.DeletionStatus.FAILED
+            )
+            self.assertEqual(
+                kwargs["deletion_error"],
+                "delete failed"
+            )
 
 
 class PACSSeriesCreateTests(TestCase):

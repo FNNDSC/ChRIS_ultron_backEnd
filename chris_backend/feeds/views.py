@@ -1,7 +1,8 @@
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
@@ -14,6 +15,7 @@ from .models import (Feed, FeedFilter, FeedGroupPermission, FeedGroupPermissionF
 from .serializers import (FeedSerializer, FeedGroupPermissionSerializer,
                           FeedUserPermissionSerializer, NoteSerializer,
                           TagSerializer, TaggingSerializer, CommentSerializer)
+from .tasks import delete_feed
 from .permissions import (
     IsChrisOrFeedOwnerOrHasFeedPermissionOrPublicFeedReadOnly, IsOwnerOrChrisOrReadOnly,
     IsOwnerOrChrisOrHasPermissionOrPublicReadOnly, IsOwnerOrChrisOrHasPermissionReadOnly,
@@ -388,6 +390,19 @@ class FeedDetail(generics.RetrieveUpdateDestroyAPIView):
         response = super(FeedDetail, self).retrieve(request, *args, **kwargs)
         template_data = {"name": "", "public": ""}
         return services.append_collection_template(response, template_data)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Overriden to asyncronously delete the feed and its folder/files from
+        storage.
+        """
+        instance = self.get_object()
+
+        if instance.mark_deletion_pending():
+            delete_feed.delay(instance.id)  # async task
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
 class PublicFeedList(generics.ListAPIView):

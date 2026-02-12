@@ -4,7 +4,8 @@ from pathlib import Path
 
 from django.http import Http404, FileResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, serializers
+from rest_framework import generics, permissions, serializers, status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
@@ -29,6 +30,7 @@ from .serializers import (FileBrowserFolderSerializer,
                           FileBrowserLinkFileSerializer,
                           FileBrowserLinkFileGroupPermissionSerializer,
                           FileBrowserLinkFileUserPermissionSerializer)
+from .tasks import delete_folder
 from .services import (get_folder_queryset,
                        get_folder_children_queryset,
                        get_folder_files_queryset,
@@ -142,7 +144,8 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         """
-        Overriden to verify that the user's home or feeds folder is not being deleted.
+        Overriden to verify that the user's home or feeds folder is not being deleted
+        then asyncronously delete the folder and its folder/files from storage.
         """
         username = request.user.username
         folder = self.get_object()
@@ -155,7 +158,11 @@ class FileBrowserFolderDetail(generics.RetrieveUpdateDestroyAPIView):
                     {'non_field_errors':
                          [f"Deleting folder '{folder.path}' is not allowed."]})
 
-        return super(FileBrowserFolderDetail, self).destroy(request, *args, **kwargs)
+        if folder.mark_deletion_pending():
+            delete_folder.delay(folder.id)  # async task
+
+        serializer = self.get_serializer(folder)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
 class FileBrowserFolderChildList(generics.ListAPIView):

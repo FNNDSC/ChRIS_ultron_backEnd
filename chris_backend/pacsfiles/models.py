@@ -9,7 +9,7 @@ from django.conf import settings
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder, ChrisFile
+from core.models import AsyncDeletableModel, ChrisFolder, ChrisFile
 from core.utils import filter_files_by_n_slashes, json_zip2str
 from core.storage import connect_storage
 from .services import PfdcmClient
@@ -167,7 +167,7 @@ class PACSRetrieveFilter(FilterSet):
                   'owner_username']
 
 
-class PACSSeries(models.Model):
+class PACSSeries(AsyncDeletableModel):
     creation_date = models.DateTimeField(auto_now_add=True)
     PatientID = models.CharField(max_length=100, db_index=True)
     PatientName = models.CharField(max_length=150, blank=True)
@@ -230,7 +230,8 @@ class PACSSeriesFilter(FilterSet):
                   'PatientName', 'PatientSex', 'PatientAge', 'min_PatientAge',
                   'max_PatientAge', 'PatientBirthDate', 'StudyDate', 'AccessionNumber',
                   'ProtocolName', 'StudyInstanceUID', 'StudyDescription',
-                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_id', 'pacs_identifier']
+                  'SeriesInstanceUID', 'SeriesDescription', 'pacs_id', 'pacs_identifier',
+                  'deletion_status']
 
 
 class PACSFile(ChrisFile):
