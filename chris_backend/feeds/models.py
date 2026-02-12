@@ -8,13 +8,14 @@ from django.dispatch import receiver
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, FolderGroupPermission,
-                         FolderUserPermission, FileGroupPermission, FileUserPermission,
-                         LinkFileGroupPermission, LinkFileUserPermission)
+from core.models import (AsyncDeletableModel, ChrisFolder, ChrisFile, ChrisLinkFile,
+                         FolderGroupPermission, FolderUserPermission, FileGroupPermission,
+                         FileUserPermission, LinkFileGroupPermission,
+                         LinkFileUserPermission)
 from userfiles.models import UserFile
 
 
-class Feed(models.Model):
+class Feed(AsyncDeletableModel):
     creation_date = models.DateTimeField(auto_now_add=True)
     modification_date = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=200, blank=True, db_index=True)
@@ -197,7 +198,8 @@ class FeedFilter(FilterSet):
     class Meta:
         model = Feed
         fields = ['id', 'name', 'name_exact', 'name_startswith', 'min_id', 'max_id',
-                  'min_creation_date', 'max_creation_date', 'files_fname_icontains']
+                  'min_creation_date', 'max_creation_date', 'files_fname_icontains',
+                  'deletion_status']
 
     def filter_by_fname_icontains(self, queryset, name, value):
         """

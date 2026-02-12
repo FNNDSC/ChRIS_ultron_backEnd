@@ -40,6 +40,10 @@ task_routes = {
         {'queue': 'periodic'},
     'plugininstances.tasks.delete_plugin_instances_jobs_from_remote':
         {'queue': 'periodic'},
+    'plugininstances.tasks.delete_plugin_instance': {'queue': 'main2'},
+    'feeds.tasks.delete_feed': {'queue': 'main2'},
+    'filebrowser.tasks.delete_folder': {'queue': 'main2'},
+    'pacsfiles.tasks.delete_pacs_series': {'queue': 'main2'},
     'pacsfiles.tasks.send_pacs_query': {'queue': 'main2'},
     'pacsfiles.tasks.register_pacs_series': {'queue': 'main2'}
 }

@@ -41,6 +41,24 @@ def skip_if_running(f):
     return wrapped
 
 
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3})
+def delete_plugin_instance(self, plugin_inst_id):
+    try:
+        plugin_inst = PluginInstance.objects.get(id=plugin_inst_id)
+
+        if not plugin_inst.is_pending_deletion():
+            return # idempotent safety
+
+        plugin_inst.delete()
+    except PluginInstance.DoesNotExist:
+        pass
+    except Exception as e:
+        PluginInstance.objects.filter(id=plugin_inst_id).update(  # atomic update
+            deletion_status=PluginInstance.DeletionStatus.FAILED,
+            deletion_error=str(e)
+        )
+        raise
+
 @shared_task
 def run_plugin_instance(plg_inst_id):
     """

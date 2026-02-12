@@ -118,7 +118,8 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'public',
                   'owner_username', 'folder_path', 'created_jobs', 'waiting_jobs',
                   'scheduled_jobs', 'started_jobs', 'registering_jobs',
-                  'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'folder', 'note',
+                  'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'deletion_status',
+                  'deletion_requested_at', 'deletion_error', 'folder', 'note',
                   'group_permissions', 'user_permissions', 'tags', 'taggings',
                   'comments', 'plugin_instances', 'owner')
 

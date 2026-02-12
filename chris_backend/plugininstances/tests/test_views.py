@@ -825,6 +825,33 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
     def test_plugin_instance_delete_success(self):
         user = User.objects.get(username=self.username)
+
+        # create two plugin instances
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        (fs_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, compute_resource=plugin.compute_resources.all()[0])
+
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+        (ds_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, previous=fs_inst,
+            compute_resource=plugin.compute_resources.all()[0])
+
+        url = reverse("plugininstance-detail", kwargs={"pk": ds_inst.id})
+
+        self.client.login(username=self.username, password=self.password)
+
+        with mock.patch.object(views.delete_plugin_instance, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.delete(url)
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+            # check that the delete_plugin_instance task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+
+    @tag('integration')
+    def test_integration_plugin_instance_delete_success(self):
+        user = User.objects.get(username=self.username)
+
         # create two plugin instances
         plugin = Plugin.objects.get(meta__name="pacspull")
         (fs_inst, tf) = PluginInstance.objects.get_or_create(
@@ -840,7 +867,11 @@ class PluginInstanceDetailViewTests(TasksViewTests):
 
         self.client.login(username=self.username, password=self.password)
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        for _ in range(10):
+            time.sleep(3)
+            if PluginInstance.objects.count() == 0: break
         self.assertEqual(PluginInstance.objects.count(), inst_count-1)
 
     def test_plugin_instance_delete_failure_unauthenticated(self):

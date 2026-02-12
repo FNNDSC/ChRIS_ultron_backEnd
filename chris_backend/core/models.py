@@ -7,6 +7,7 @@ import os
 from django.db import models
 from django.db.models.functions import Length
 from django.db.models.signals import post_delete
+from django.utils import timezone
 from django.dispatch import receiver
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -33,6 +34,42 @@ def validate_permission(permission):
         raise ValueError(f"Invalid permission '{permission}'. Allowed values "
                          f"are: {perm_list}.")
     return permission
+
+
+class AsyncDeletableModel(models.Model):
+    class DeletionStatus(models.TextChoices):
+        INACTIVE = 'inactive'
+        PENDING = 'pending'
+        FAILED = 'failed'
+
+    deletion_status = models.CharField(max_length=10, choices=DeletionStatus.choices,
+                                       default=DeletionStatus.INACTIVE)
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    deletion_error = models.TextField(blank=True)
+
+    class Meta:
+        abstract = True
+
+    def is_pending_deletion(self) -> bool:
+        return self.deletion_status == self.DeletionStatus.PENDING
+
+    def mark_deletion_pending(self) -> bool:
+        """
+        Returns True if deletion was scheduled by this call.
+        Returns False if it was already pending.
+        """
+        if self.is_pending_deletion():
+            return False
+
+        self.deletion_status = self.DeletionStatus.PENDING
+        self.deletion_requested_at = timezone.now()
+        self.save(update_fields=['deletion_status', 'deletion_requested_at'])
+        return True
+
+    def mark_deletion_failed(self, error: Exception | str):
+        self.deletion_status = self.DeletionStatus.FAILED
+        self.deletion_error = str(error)
+        self.save(update_fields=['deletion_status', 'deletion_error'])
 
 
 class ChrisInstance(models.Model):
@@ -71,7 +108,7 @@ class ChrisInstance(models.Model):
         return obj
 
 
-class ChrisFolder(models.Model):
+class ChrisFolder(AsyncDeletableModel):
     creation_date = models.DateTimeField(auto_now_add=True)
     path = models.CharField(max_length=1024, unique=True)  # folder's path
     public = models.BooleanField(blank=True, default=False, db_index=True)

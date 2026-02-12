@@ -1,6 +1,7 @@
 
 import logging
 import json
+import time
 import io
 from unittest import mock
 
@@ -9,6 +10,10 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.urls import reverse
 from rest_framework import status
+
+from celery.contrib.testing.worker import start_worker
+from core.celery import app as celery_app
+from core.celery import task_routes
 
 from core.models import ChrisFolder
 from core.storage import connect_storage
@@ -21,7 +26,7 @@ CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 class PACSViewTests(TestCase):
     """
-    Generic pacs series view tests' setup and tearDown.
+    Generic pacs view tests' setup and tearDown.
     """
 
     def setUp(self):
@@ -91,6 +96,88 @@ class PACSViewTests(TestCase):
         self.storage_manager.delete_obj(self.path + '/file1.dcm')
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+
+class PACSTasksViewTests(TransactionTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        logging.disable(logging.WARNING)
+        super().setUpClass()
+        # route tasks to this worker by using the default 'celery' queue
+        # that is exclusively used for the automated tests
+        celery_app.conf.update(task_routes=None)
+        cls.celery_worker = start_worker(celery_app,
+                                         concurrency=1,
+                                         perform_ping_check=False)
+        cls.celery_worker.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.celery_worker.__exit__(None, None, None)
+        # reset routes to the original queues
+        celery_app.conf.update(task_routes=task_routes)
+        logging.disable(logging.NOTSET)
+
+    def setUp(self):
+        # create superuser chris (owner of root folders)
+        self.chris_username = 'chris'
+        self.chris_password = CHRIS_SUPERUSER_PASSWORD
+
+        self.content_type = 'application/vnd.collection+json'
+        self.username = 'test'
+        self.password = 'testpass'
+        self.other_username = 'boo'
+        self.other_password = 'far'
+        self.another_username = 'loo'
+        self.another_password = 'tar'
+
+        pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
+
+        user = User.objects.create_user(username=self.another_username,
+                                        password=self.another_password)
+        user.groups.set([pacs_grp])
+
+        user = User.objects.create_user(username=self.username, password=self.password)
+        user.groups.set([pacs_grp])
+
+        User.objects.create_user(username=self.other_username,
+                                 password=self.other_password)
+
+        # create a PACS file in the DB "already registered" to the server)
+        self.storage_manager = connect_storage(settings)
+        # upload file to storage
+        self.path = 'SERVICES/PACS/MyPACS/123456-crazy/brain_crazy_study/SAG_T1_MPRAGE'
+        with io.StringIO("test file") as file1:
+            self.storage_manager.upload_obj(self.path + '/file1.dcm', file1.read(),
+                                            content_type='text/plain')
+
+        self.pacs_name = 'MyPACS'
+        folder_path = f'SERVICES/PACS/{self.pacs_name}'
+        owner = User.objects.get(username=self.chris_username)
+        (pacs_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                             owner=owner)
+        pacs = PACS(folder=pacs_folder, identifier=self.pacs_name)
+        pacs.save()
+
+        (series_folder, _) = ChrisFolder.objects.get_or_create(path=self.path,
+                                                               owner=owner)
+
+        PACSSeries.objects.get_or_create(PatientID='123456',
+                                         PatientName='crazy',
+                                         PatientSex='O',
+                                         StudyDate='2020-07-15',
+                                         StudyInstanceUID='1.1.3432.54.6545674765.765434',
+                                         StudyDescription='brain_crazy_study',
+                                         SeriesInstanceUID='2.4.3432.54.845674765.763345',
+                                         SeriesDescription='SAG T1 MPRAGE',
+                                         pacs=pacs,
+                                         folder=series_folder)
+
+        pacs_file = PACSFile(owner=owner, parent_folder=series_folder)
+        pacs_file.fname.name = self.path + '/file1.dcm'
+        pacs_file.save()
 
 
 class PACSListViewTests(PACSViewTests):
@@ -705,7 +792,7 @@ class PACSSeriesListQuerySearchViewTests(PACSViewTests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class PACSSeriesDetailViewTests(PACSViewTests):
+class PACSSeriesDetailViewTests(PACSTasksViewTests):
     """
     Test the pacsseries-detail view.
     """
@@ -713,21 +800,51 @@ class PACSSeriesDetailViewTests(PACSViewTests):
     def setUp(self):
         super(PACSSeriesDetailViewTests, self).setUp()
         pacs_series = PACSSeries.objects.get(PatientID='123456')
-        self.read_url = reverse("pacsseries-detail",
-                                kwargs={"pk": pacs_series.id})
+        self.read_delete_url = reverse("pacsseries-detail", kwargs={"pk": pacs_series.id})
 
     def test_pacs_series_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_delete_url)
         self.assertContains(response, 'brain_crazy_study')
 
     def test_pacs_series_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_pacs_series_detail_failure_access_denied(self):
         self.client.login(username=self.other_username, password=self.other_password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pacs_series_delete_success(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+
+        with mock.patch.object(views.delete_pacs_series, 'delay',
+                               return_value=None) as delay_mock:
+            response = self.client.delete(self.read_delete_url)
+            self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+            # check that the delete_feed task was called with appropriate args
+            delay_mock.assert_called_with(response.data['id'])
+
+    @tag('integration')
+    def test_integration_pacs_series_delete_success(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+        for _ in range(10):
+            time.sleep(3)
+            if PACSSeries.objects.count() == 0: break
+        self.assertEqual(PACSSeries.objects.count(), 0)
+
+    def test_pacs_series_delete_failure_unauthenticated(self):
+        response = self.client.delete(self.read_delete_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pacs_series_delete_failure_access_denied(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.delete(self.read_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 

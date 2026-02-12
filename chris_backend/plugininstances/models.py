@@ -10,7 +10,7 @@ from django.utils import timezone
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder
+from core.models import AsyncDeletableModel, ChrisFolder
 from feeds.models import Feed
 from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
@@ -35,7 +35,7 @@ ACTIVE_STATUSES = ['created', 'waiting', 'scheduled', 'started', 'registeringFil
 INACTIVE_STATUSES = ['finishedSuccessfully', 'finishedWithError', 'cancelled']
 
 
-class PluginInstance(models.Model):
+class PluginInstance(AsyncDeletableModel):
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
@@ -243,7 +243,8 @@ class PluginInstanceFilter(FilterSet):
         fields = ['id', 'min_start_date', 'max_start_date', 'min_end_date',
                   'max_end_date', 'root_id', 'previous_id', 'title', 'status', 'active',
                   'owner_username', 'feed_id', 'plugin_id', 'plugin_name',
-                  'plugin_name_exact', 'plugin_version', 'plugin_type', 'workflow_id']
+                  'plugin_name_exact', 'plugin_version', 'plugin_type', 'workflow_id',
+                  'deletion_status']
 
     def filter_by_root_id(self, queryset, name, value):
         """
