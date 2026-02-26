@@ -67,8 +67,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
                   'pipeline_id', 'pipeline_name', 'workflow_id', 'summary', 'raw',
                   'owner_username', 'cpu_limit', 'memory_limit', 'number_of_workers',
                   'gpu_limit', 'size', 'error_code', 'deletion_status',
-                  'deletion_requested_at', 'deletion_error', 'output_folder', 'previous',
-                  'output_folder', 'feed', 'plugin', 'workflow', 'compute_resource',
+                  'deletion_requested_at', 'deletion_error', 'previous', 'output_folder',
+                  'feed', 'plugin', 'workflow', 'compute_resource',
                   'descendants', 'parameters', 'splits')
 
     def __init__(self, *args, **kwargs):
@@ -190,6 +190,19 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     def validate_value_within_interval(val, min_val, max_val):
         if val < min_val or val > max_val:
             raise serializers.ValidationError(["This field value is out of range."])
+
+
+class PartialPluginInstanceSerializer(PluginInstanceSerializer):
+    """
+    A compact serializer exposing only a small subset of PluginInstance fields.
+    """
+    class Meta(PluginInstanceSerializer.Meta):
+        fields = ('url', 'id', 'title', 'previous_id', 'compute_resource_name',
+                  'plugin_id', 'plugin_name', 'plugin_version', 'plugin_type',
+                  'feed_id', 'start_date', 'end_date', 'output_path', 'status', 'active',
+                  'owner_username', 'cpu_limit', 'memory_limit', 'number_of_workers',
+                  'gpu_limit', 'size', 'error_code', 'deletion_status', 'deletion_error',
+                  'output_folder')
 
 
 class PluginInstanceSplitSerializer(serializers.HyperlinkedModelSerializer):

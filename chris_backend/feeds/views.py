@@ -7,7 +7,7 @@ from rest_framework.reverse import reverse
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from collectionjson import services
-from plugininstances.serializers import PluginInstanceSerializer
+from plugininstances.serializers import PartialPluginInstanceSerializer
 
 from .models import (Feed, FeedFilter, FeedGroupPermission, FeedGroupPermissionFilter,
                      FeedUserPermission, FeedUserPermissionFilter, Tag, TagFilter,
@@ -739,7 +739,7 @@ class FeedPluginInstanceList(generics.ListAPIView):
     """
     http_method_names = ['get']
     queryset = Feed.objects.all()
-    serializer_class = PluginInstanceSerializer
+    serializer_class = PartialPluginInstanceSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
                           IsOwnerOrChrisOrHasPermissionOrPublicReadOnly)
 
