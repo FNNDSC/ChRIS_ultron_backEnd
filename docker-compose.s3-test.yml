@@ -1,0 +1,49 @@
+# Minimal compose for testing the S3 storage adapter against MinIO.
+# Usage:
+#   docker compose -f docker-compose.s3-test.yml up -d
+#   docker compose -f docker-compose.s3-test.yml run --rm s3-test
+#   docker compose -f docker-compose.s3-test.yml down -v
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    networks:
+      - s3test
+
+  s3-test:
+    image: python:3.12-slim
+    working_dir: /opt/test
+    volumes:
+      - ./chris_backend:/opt/test/chris_backend:ro
+      - ./tests:/opt/test/tests:ro
+    environment:
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_NAME: chris-test
+      PYTHONPATH: /opt/test/chris_backend
+    command: >
+      bash -c "
+        pip install -q boto3 &&
+        python tests/test_s3manager.py
+      "
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - s3test
+
+networks:
+  s3test:

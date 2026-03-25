@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+1# -*- coding: utf-8 -*-
 """
 Local settings
 
@@ -90,7 +90,7 @@ for app in ['collectionjson', 'core', 'feeds', 'plugins', 'plugininstances',
 
 # Storage Settings
 STORAGE_ENV = os.getenv('STORAGE_ENV', 'swift')
-if STORAGE_ENV not in ('swift', 'fslink', 'filesystem'):
+if STORAGE_ENV not in ('swift', 'fslink', 'filesystem', 's3'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
 STORAGES['default'] = {'BACKEND': 'swift.storage.SwiftStorage'}
@@ -102,16 +102,30 @@ SWIFT_CONNECTION_PARAMS = {'user': SWIFT_USERNAME,
                            'key': SWIFT_KEY,
                            'authurl': SWIFT_AUTH_URL}
 MEDIA_ROOT = None
+S3_BUCKET_NAME = None
+S3_CONNECTION_PARAMS = None
+
 if STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = '/data'  # local filesystem storage settings
+elif STORAGE_ENV == 's3':
+    STORAGES['default'] = {'BACKEND': 's3.storage.S3Storage'}
+    S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'users')
+    S3_CONNECTION_PARAMS = {
+        'endpoint_url': os.getenv('S3_ENDPOINT_URL', 'http://minio:9000'),
+        'access_key': os.getenv('S3_ACCESS_KEY', 'minioadmin'),
+        'secret_key': os.getenv('S3_SECRET_KEY', 'minioadmin'),
+        'region_name': os.getenv('S3_REGION', None),
+    }
 
 try:
     verify_storage_connection(
         STORAGES=STORAGES,
         MEDIA_ROOT=MEDIA_ROOT,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
-        SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
+        SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS,
+        S3_BUCKET_NAME=S3_BUCKET_NAME,
+        S3_CONNECTION_PARAMS=S3_CONNECTION_PARAMS,
     )
 except Exception as e:
     raise ImproperlyConfigured(str(e))
