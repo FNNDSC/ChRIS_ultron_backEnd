@@ -11,12 +11,12 @@ from plugins.models import Plugin
 
 from .models import (PluginInstance, PluginInstanceFilter, PluginInstanceSplit,
                      StrParameter, FloatParameter, IntParameter, BoolParameter,
-                     PathParameter, UnextpathParameter)
+                     PathParameter, UnextpathParameter, ACTIVE_STATUSES)
 from .serializers import (PARAMETER_SERIALIZERS, GenericParameterSerializer,
                           PluginInstanceSplitSerializer, PluginInstanceSerializer)
 from .permissions import (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance)
-from .tasks import run_plugin_instance, cancel_plugin_instance, delete_plugin_instance
+from .tasks import cancel_plugin_instance_job, delete_plugin_instance
 from .utils import run_if_ready
 
 
@@ -218,8 +218,8 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
             if instance.status != 'cancelled':
                 descendants = instance.get_descendant_instances()
 
-                if instance.status == 'started':
-                    cancel_plugin_instance.delay(instance.id)  # call async task
+                if instance.status in ACTIVE_STATUSES:
+                    cancel_plugin_instance_job.delay(instance.id)  # call async task
 
                 PluginInstance.objects.filter(
                     pk__in=[inst.id for inst in descendants]
@@ -237,13 +237,12 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         descendants = instance.get_descendant_instances()
 
-        if instance.status == 'started':
-            cancel_plugin_instance(instance.id)
+        if instance.status in ACTIVE_STATUSES:
+            cancel_plugin_instance_job(instance.id)
 
         plg_inst_ids = []
         for plg_inst in descendants:
-            if plg_inst.status not in ('finishedSuccessfully', 'finishedWithError',
-                                       'cancelled'):
+            if plg_inst.status in ACTIVE_STATUSES:
                 plg_inst_ids.append(plg_inst.id)
 
         PluginInstance.objects.filter(pk__in=plg_inst_ids).update(status='cancelled')

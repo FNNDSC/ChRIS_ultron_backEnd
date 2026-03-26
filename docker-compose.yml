@@ -46,6 +46,8 @@ services:
         condition: service_started
       cube-nonroot-user-volume-fix:
         condition: service_completed_successfully
+      pfcon: # just for chrisomatic to be able to register pfcon at startup
+        condition: service_started
     networks:
       local:
         aliases:

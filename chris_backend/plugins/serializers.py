@@ -18,13 +18,16 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                                              write_only=True)
     compute_auth_token = serializers.CharField(max_length=500, write_only=True,
                                                required=False)
-    compute_innetwork = serializers.BooleanField(required=False, default=False)
+    compute_innetwork = serializers.ReadOnlyField()
+    compute_requires_copy_job = serializers.ReadOnlyField()
+    compute_requires_upload_job = serializers.ReadOnlyField()
 
     class Meta:
         model = ComputeResource
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name',
-                  'compute_url', 'compute_auth_url', 'compute_innetwork', 'compute_user',
-                  'compute_password', 'compute_auth_token', 'description',
+                  'compute_url', 'compute_auth_url', 'compute_innetwork',
+                  'compute_requires_copy_job', 'compute_requires_upload_job',
+                  'compute_user', 'compute_password', 'compute_auth_token', 'description',
                   'max_job_exec_seconds')
 
     def validate(self, data):
@@ -40,7 +43,8 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                 'compute_auth_url', ComputeResource.get_default_auth_url(compute_url)
             )
             try:
-                token = pfcon.Client.get_auth_token(compute_auth_url, data['compute_user'],
+                token = pfcon.Client.get_auth_token(compute_auth_url,
+                                                    data['compute_user'],
                                                     data['compute_password'])
                 data['compute_auth_token'] = token
             except PfconRequestException as e:
@@ -57,18 +61,17 @@ class ComputeResourceSerializer(serializers.HyperlinkedModelSerializer):
                 {'non_field_errors': [f"Could not register the compute resource, "
                                       f"detail: {str(e)}."]})
 
-        compute_innetwork = data.get('compute_innetwork', False)
-
-        if compute_innetwork != d_resp['pfcon_innetwork']:
-            raise serializers.ValidationError({
-                'compute_innetwork': ["This field must match the remote compute "
-                                      "resource configuration."]})
+        compute_innetwork = d_resp['pfcon_innetwork']
 
         if compute_innetwork and settings.STORAGE_ENV != d_resp['storage_env']:
             raise serializers.ValidationError(
                 {'non_field_errors': ["The remote compute resource's 'storage_env' must "
                                       "match this server's STORAGE_ENV setting when "
                                       "configured in-network."]})
+
+        data['compute_innetwork'] = compute_innetwork
+        data['compute_requires_copy_job'] = d_resp['requires_copy_job']
+        data['compute_requires_upload_job'] = d_resp['requires_upload_job']
         return data
 
     def to_representation(self, instance):

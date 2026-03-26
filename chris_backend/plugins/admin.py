@@ -61,23 +61,23 @@ class ComputeResourceAdminForm(forms.ModelForm):
             raise forms.ValidationError(f"Could not register the compute resource, "
                                         f"detail: {str(e)}.")
 
-        compute_innetwork = data.get('compute_innetwork', False)
-
-        if compute_innetwork != d_resp['pfcon_innetwork']:
-
-            raise forms.ValidationError("'Compute innetwork' must match the remote "
-                                        "compute resource configuration.")
+        compute_innetwork = d_resp['pfcon_innetwork']
 
         if compute_innetwork and settings.STORAGE_ENV != d_resp['storage_env']:
             raise forms.ValidationError("The remote compute resource's 'storage_env' "
                                         "must match this server's STORAGE_ENV setting "
                                         "when configured in-network.")
+        
+        self.cleaned_data['compute_innetwork'] = compute_innetwork
+        self.cleaned_data['compute_requires_copy_job'] = d_resp['requires_copy_job']
+        self.cleaned_data['compute_requires_upload_job'] = d_resp['requires_upload_job']
         return self.cleaned_data
 
 
 class ComputeResourceAdmin(admin.ModelAdmin):
     form = ComputeResourceAdminForm
-    readonly_fields = ['creation_date', 'modification_date']
+    readonly_fields = ['creation_date', 'modification_date', 'compute_innetwork',
+                       'compute_requires_copy_job', 'compute_requires_upload_job']
     list_display = ('name', 'compute_url', 'compute_innetwork', 'description', 'id')
     list_filter = ['name', 'creation_date', 'modification_date']
     search_fields = ['name', 'description']
@@ -87,8 +87,8 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         Overriden to only show the read/write fields in the add compute resource page.
         """
         self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
-                       'compute_password', 'compute_auth_token', 'compute_innetwork',
-                       'description', 'max_job_exec_seconds']
+                       'compute_password', 'compute_auth_token', 'description', 
+                       'max_job_exec_seconds']
         return admin.ModelAdmin.add_view(self, request, form_url, extra_context)
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -97,6 +97,7 @@ class ComputeResourceAdmin(admin.ModelAdmin):
         """
         self.fields = ['name', 'compute_url', 'compute_auth_url', 'compute_user',
                        'compute_password', 'compute_auth_token', 'compute_innetwork',
+                       'compute_requires_copy_job', 'compute_requires_upload_job',
                        'description', 'max_job_exec_seconds', 'creation_date',
                        'modification_date']
         return admin.ModelAdmin.change_view(self, request, object_id, form_url,
@@ -375,8 +376,8 @@ class ComputeResourceAdminList(generics.ListCreateAPIView):
         # append write template
         template_data = {'name': '', 'compute_url': '', 'compute_auth_url': '',
                          'compute_user': '', 'compute_password': '',
-                         'compute_auth_token': '', 'compute_innetwork': '',
-                         'description': '', 'max_job_exec_seconds': ''}
+                         'compute_auth_token': '', 'description': '', 
+                         'max_job_exec_seconds': ''}
         return services.append_collection_template(response, template_data)
 
 
