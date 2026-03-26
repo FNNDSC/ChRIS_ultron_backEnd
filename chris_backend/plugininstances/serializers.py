@@ -30,7 +30,7 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     workflow_id = serializers.ReadOnlyField(source='workflow.id')
     feed_id = serializers.ReadOnlyField(source='feed.id')
     output_path = serializers.ReadOnlyField(source='output_folder.path')
-    summary = serializers.ReadOnlyField()
+    summary = serializers.JSONField(binary=True, read_only=True)
     raw = serializers.ReadOnlyField()
     owner_username = serializers.ReadOnlyField(source='owner.username')
     size = serializers.ReadOnlyField()

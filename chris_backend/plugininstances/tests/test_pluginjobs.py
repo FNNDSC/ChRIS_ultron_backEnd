@@ -3,6 +3,7 @@ import logging
 import os
 import io
 import time
+import uuid
 from unittest import mock
 
 from django.test import TestCase, tag
@@ -11,22 +12,29 @@ from django.conf import settings
 
 from pfconclient import client as pfcon
 
+from core.models import ChrisInstance
 from core.storage import connect_storage
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
 from plugininstances.models import PluginInstance, PathParameter, ComputeResource
-from plugininstances.services import manager
+from plugininstances.services import pluginjobs, copyjobs
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
-class PluginInstanceManagerTests(TestCase):
+class PluginInstanceAppJobTests(TestCase):
     
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
+
+        # use a unique job_id_prefix to avoid pfcon job ID collisions with
+        # stale jobs from prior test runs
+        chris_inst = ChrisInstance.load()
+        chris_inst.job_id_prefix = f'test-{uuid.uuid4().hex[:8]}-'
+        chris_inst.save(update_fields=['job_id_prefix'])
 
         # create superuser chris (owner of root folders)
         self.chris_username = 'chris'
@@ -69,7 +77,8 @@ class PluginInstanceManagerTests(TestCase):
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
             name="host", compute_url=COMPUTE_RESOURCE_URL, compute_user='pfcon',
-            compute_password='pfcon1234', compute_innetwork=pfcon_client.pfcon_innetwork)
+            compute_password='pfcon1234', compute_innetwork=pfcon_client.pfcon_innetwork,
+            compute_requires_copy_job=False)
 
         # create a plugin
         data = self.plg_meta_data.copy()
@@ -99,22 +108,22 @@ class PluginInstanceManagerTests(TestCase):
     def test_assemble_exec(self):
         self.assertListEqual(
             ['python', '/usr/local/src/script.py'],
-            manager.PluginInstanceManager._assemble_exec('/usr/local/src', 'script.py', 'python')
+            pluginjobs.PluginInstanceAppJob._assemble_exec('/usr/local/src', 'script.py', 'python')
         )
         self.assertListEqual(
             ['python', 'script.py'],
-            manager.PluginInstanceManager._assemble_exec(None, 'script.py', 'python')
+            pluginjobs.PluginInstanceAppJob._assemble_exec(None, 'script.py', 'python')
         )
         self.assertListEqual(
             ['rust_is_better_than_python'],
-            manager.PluginInstanceManager._assemble_exec(None, 'rust_is_better_than_python', None)
+            pluginjobs.PluginInstanceAppJob._assemble_exec(None, 'rust_is_better_than_python', None)
         )
 
-    def test_mananger_can_run_registered_plugin_app(self):
+    def test_plugin_job_can_run_registered_plugin_app(self):
         """
-        Test whether the manager can run an already registered plugin app.
+        Test whether the plugin job can run an already registered plugin app.
         """
-        with mock.patch.object(manager, 'json_zip2str',
+        with mock.patch.object(pluginjobs, 'json_zip2str',
                                return_value='raw') as json_zip2str_mock:
             user = User.objects.get(username=self.username)
             plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
@@ -125,88 +134,73 @@ class PluginInstanceManagerTests(TestCase):
             PathParameter.objects.get_or_create(plugin_inst=pl_inst,
                                                 plugin_param=pl_param,
                                                 value=self.username)
-            plg_inst_manager = manager.PluginInstanceManager(pl_inst)
-            plg_inst_manager.get_job_status_summary = mock.Mock(return_value='summary')
-            plg_inst_manager.pfcon_client.submit_job = mock.Mock(
+            plg_inst_app_job = pluginjobs.PluginInstanceAppJob(pl_inst)
+            plg_inst_app_job.get_job_status_summary = mock.Mock(return_value='summary')
+            plg_inst_app_job.pfcon_client.submit_job = mock.Mock(
                 return_value='dictionary')
 
-            # call run_plugin_instance_app method
-            plg_inst_manager.run_plugin_instance_app()
+            # call run method
+            plg_inst_app_job.run()
 
             self.assertEqual(pl_inst.status, 'started')
             self.assertEqual(pl_inst.summary, 'summary')
             self.assertEqual(pl_inst.raw, 'raw')
-            plg_inst_manager.pfcon_client.submit_job.assert_called_once()
-            plg_inst_manager.get_job_status_summary.assert_called_once()
+            plg_inst_app_job.pfcon_client.submit_job.assert_called_once()
+            plg_inst_app_job.get_job_status_summary.assert_called_once()
             json_zip2str_mock.assert_called_once()
 
-    def test_mananger_can_check_plugin_instance_app_exec_status(self):
-        """
-        Test whether the manager can check a plugin's app execution status
-        """
-        pass
-        #    response_mock = mock.Mock()
-        #    response_mock.status_code = 200
-        #    with mock.patch.object(manager.requests, 'post',
-        #                          return_value=response_mock) as post_mock:
-        #
-        #     user = User.objects.get(username=self.username)
-        #     plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
-        #     (pl_inst, tf) = PluginInstance.objects.get_or_create(
-        #         plugin=plugin, owner=user,
-        #         compute_resource=plugin.compute_resources.all()[0])
-        #     pl_param = plugin.parameters.all()[0]
-        #     PathParameter.objects.get_or_create(plugin_inst=pl_inst,
-        #                                         plugin_param=pl_param,
-        #                                         value=self.username)
-        #     plg_inst_manager = manager.PluginInstanceManager(pl_inst)
-        #     plg_inst_manager.check_plugin_instance_app_exec_status()
-        #     self.assertEqual(pl_inst.status, 'started')
-        #     msg = {
-        #         "action": "status",
-        #         "meta": {
-        #             "remote": {
-        #                 "key": plg_inst_manager.str_job_id
-        #             }
-        #         }
-        #     }
-        #     post_mock.assert_called_with(msg)
-
     @tag('integration', 'error-pfcon')
-    def test_integration_mananger_can_run_and_check_plugin_instance_app_exec_status(self):
+    def test_integration_plugin_job_can_run_and_check_exec_status(self):
         """
-        Test whether the manager can check a plugin's app execution status.
+        Test whether the plugin job can run copy and plugin app jobs and check
+        execution status.
         """
+        self.compute_resource.compute_requires_copy_job = True
+        self.compute_resource.save(update_fields=['compute_requires_copy_job'])
+
         # upload a file to the storage user's space
         user_space_path = 'home/%s/uploads/' % self.username
         with io.StringIO('Test file') as f:
             self.storage_manager.upload_obj(user_space_path + 'test.txt', f.read(),
                                           content_type='text/plain')
 
-        # create a plugin's instance
+        # create a plugin's instance in 'copying' status
         user = User.objects.get(username=self.username)
         plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
         pl_inst = PluginInstance.objects.create(
-            plugin=plugin, owner=user, status='scheduled',
+            plugin=plugin, owner=user, status='copying',
             compute_resource=plugin.compute_resources.all()[0])
         pl_param = plugin.parameters.all()[0]
         PathParameter.objects.get_or_create(plugin_inst=pl_inst, plugin_param=pl_param,
                                             value=user_space_path)
 
-        # run the plugin instance
-        plg_inst_manager = manager.PluginInstanceManager(pl_inst)
-        plg_inst_manager.run_plugin_instance_app()
+        # run the copy job
+        plg_inst_copy_job = copyjobs.PluginInstanceCopyJob(pl_inst)
+        plg_inst_copy_job.run()
+        self.assertEqual(pl_inst.status, 'copying')
+
+        # poll copy job status until it finishes and auto-transitions to app job
+        maxLoopTries = 10
+        currentLoop = 1
+        time.sleep(5)
+        while currentLoop <= maxLoopTries:
+            plg_inst_copy_job.check_exec_status()
+            if pl_inst.status == 'started':
+                break
+            time.sleep(5)
+            currentLoop += 1
         self.assertEqual(pl_inst.status, 'started')
 
         # In the following we keep checking the status until the job ends with
         # 'finishedSuccessfully'. The code runs in a lazy loop poll with a
         # max number of attempts at 10 second intervals.
+        plg_inst_app_job = pluginjobs.PluginInstanceAppJob(pl_inst)
         maxLoopTries = 10
         currentLoop = 1
         b_checkAgain = True
         time.sleep(10)
         while b_checkAgain:
-            str_responseStatus = plg_inst_manager.check_plugin_instance_app_exec_status()
+            str_responseStatus = plg_inst_app_job.check_exec_status()
             if str_responseStatus == 'finishedSuccessfully':
                 b_checkAgain = False
             elif currentLoop < maxLoopTries:
@@ -225,9 +219,9 @@ class PluginInstanceManagerTests(TestCase):
         self.storage_manager.delete_obj(user_space_path + 'test.txt')
 
     @tag('integration')
-    def test_integration_mananger_can_register_output_files(self):
+    def test_integration_plugin_job_can_register_output_files(self):
         """
-        Test whether the manager can register output files.
+        Test whether the plugin job can register output files.
         """
         # create a plugin's instance
         user_space_path = 'home/%s/uploads/' % self.username
@@ -252,12 +246,12 @@ class PluginInstanceManagerTests(TestCase):
             self.storage_manager.upload_obj(outputdir + '/, ,/SAG,T1,MPRAGE/test2.txt',
                                             f.read(), content_type='text/plain')
 
-        plg_inst_manager = manager.PluginInstanceManager(pl_inst)
-        plg_inst_manager.plugin_inst_output_files = {
+        plg_inst_app_job = pluginjobs.PluginInstanceAppJob(pl_inst)
+        plg_inst_app_job.plugin_inst_output_files = {
             outputdir + '/, ,/SAG,T1,MPRAGE/tes,t1.txt',
             outputdir + '/, ,/SAG,T1,MPRAGE/test2.txt'}
 
-        plg_inst_manager._register_output_files()
+        plg_inst_app_job._register_output_files()
 
         self.assertEqual(pl_inst.get_output_path(), outputdir)
 
@@ -271,11 +265,11 @@ class PluginInstanceManagerTests(TestCase):
         self.assertIn(outputdir + '/SAGT1MPRAGE/test1.txt', fnames)
         self.assertIn(outputdir + '/SAGT1MPRAGE/test2.txt', fnames)
 
-        self.assertEqual(len(plg_inst_manager.plugin_inst_output_files), 2)
+        self.assertEqual(len(plg_inst_app_job.plugin_inst_output_files), 2)
         self.assertIn(outputdir + '/SAGT1MPRAGE/test1.txt',
-                      plg_inst_manager.plugin_inst_output_files)
+                      plg_inst_app_job.plugin_inst_output_files)
         self.assertIn(outputdir + '/SAGT1MPRAGE/test2.txt',
-                      plg_inst_manager.plugin_inst_output_files)
+                      plg_inst_app_job.plugin_inst_output_files)
 
         # delete files from storage
         self.storage_manager.delete_path(outputdir)
