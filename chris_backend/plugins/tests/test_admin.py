@@ -68,7 +68,8 @@ class ComputeResourceFormTests(TestCase):
         with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
                                return_value=token) as get_auth_token_mock:
 
-            d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink'}
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink',
+                      'requires_copy_job': True, 'requires_upload_job': False}
 
             with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
                                    return_value=d_resp) as get_server_info_mock:
@@ -141,14 +142,8 @@ class ComputeResourceFormTests(TestCase):
         with mock.patch.object(pl_admin.pfcon.Client, 'get_auth_token',
                                return_value=token):
 
-            d_resp = {'pfcon_innetwork': False, 'storage_env': 'fslink'}
-
-            with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
-                                   return_value=d_resp):
-                with self.assertRaises(forms.ValidationError):
-                    form.clean(form)
-
-            d_resp = {'pfcon_innetwork': True, 'storage_env': 'filesystem'}
+            d_resp = {'pfcon_innetwork': True, 'storage_env': 'filesystem',
+                      'requires_copy_job': True, 'requires_upload_job': False}
 
             with mock.patch.object(pl_admin.pfcon.Client, 'get_server_info',
                                    return_value=d_resp):

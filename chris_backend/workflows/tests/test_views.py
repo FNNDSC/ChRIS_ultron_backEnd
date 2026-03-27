@@ -11,7 +11,7 @@ from rest_framework import status
 
 from pipelines.models import Pipeline, PluginPiping, DEFAULT_PIPING_PARAMETER_MODELS
 from plugininstances.models import PluginInstance
-from plugininstances.utils import run_plugin_instance
+from plugininstances.tasks import run_plugin_instance_job
 from plugins.models import ComputeResource
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
@@ -43,7 +43,8 @@ class ViewTests(TestCase):
         self.password = 'foo-pass'
 
         (self.compute_resource, tf) = ComputeResource.objects.get_or_create(
-            name="host", compute_url=COMPUTE_RESOURCE_URL)
+            name="host", compute_url=COMPUTE_RESOURCE_URL,
+            compute_requires_copy_job=False)
 
         # create plugins
         (pl_meta, tf) = PluginMeta.objects.get_or_create(name=self.plugin_fs_name, type='fs')
@@ -159,8 +160,7 @@ class WorkflowListViewTests(ViewTests):
                                             "compute_resource_name": "host"}])}]}})
 
         plg_instances_count = PluginInstance.objects.count()
-        with mock.patch.object(run_plugin_instance, 'delay',
-                               return_value=None) as delay_mock:
+        with mock.patch('plugininstances.utils.run_plugin_instance_job') as run_job_mock:
             self.client.login(username=self.username, password=self.password)
             response = self.client.post(self.create_read_url, data=post,
                                         content_type=self.content_type)

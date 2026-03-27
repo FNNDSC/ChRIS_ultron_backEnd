@@ -93,8 +93,10 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
     folder_path = serializers.ReadOnlyField(source='folder.path')
     created_jobs = serializers.SerializerMethodField()
     waiting_jobs = serializers.SerializerMethodField()
+    copying_jobs = serializers.SerializerMethodField()
     scheduled_jobs = serializers.SerializerMethodField()
     started_jobs = serializers.SerializerMethodField()
+    uploading_jobs = serializers.SerializerMethodField()
     registering_jobs = serializers.SerializerMethodField()
     finished_jobs = serializers.SerializerMethodField()
     errored_jobs = serializers.SerializerMethodField()
@@ -117,10 +119,10 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         model = Feed
         fields = ('url', 'id', 'creation_date', 'modification_date', 'name', 'public',
                   'owner_username', 'folder_path', 'created_jobs', 'waiting_jobs',
-                  'scheduled_jobs', 'started_jobs', 'registering_jobs',
-                  'finished_jobs',  'errored_jobs', 'cancelled_jobs', 'deletion_status',
-                  'deletion_requested_at', 'deletion_error', 'folder', 'note',
-                  'group_permissions', 'user_permissions', 'tags', 'taggings',
+                  'copying_jobs', 'scheduled_jobs', 'started_jobs', 'uploading_jobs', 
+                  'registering_jobs', 'finished_jobs',  'errored_jobs', 'cancelled_jobs', 
+                  'deletion_status', 'deletion_requested_at', 'deletion_error', 'folder',
+                  'note', 'group_permissions', 'user_permissions', 'tags', 'taggings',
                   'comments', 'plugin_instances', 'owner')
 
     def update(self, instance, validated_data):
@@ -170,6 +172,15 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
             raise KeyError(msg)
         return obj.waiting_jobs if hasattr(obj, 'waiting_jobs') else 0
 
+    def get_copying_jobs(self, obj) -> int:
+        """
+        Overriden to get the number of plugin instances in 'copying' status.
+        """
+        if 'copying' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'copying'."
+            raise KeyError(msg)
+        return obj.copying_jobs if hasattr(obj, 'copying_jobs') else 0
+
     def get_scheduled_jobs(self, obj) -> int:
         """
         Overriden to get the number of plugin instances in 'scheduled' status.
@@ -185,6 +196,15 @@ class FeedSerializer(serializers.HyperlinkedModelSerializer):
         if 'started' not in [status[0] for status in STATUS_CHOICES]:
             raise KeyError("Undefined plugin instance execution status: 'started'.")
         return obj.started_jobs if hasattr(obj, 'started_jobs') else 0
+
+    def get_uploading_jobs(self, obj) -> int:
+        """
+        Overriden to get the number of plugin instances in 'uploading' status.
+        """
+        if 'uploading' not in [status[0] for status in STATUS_CHOICES]:
+            msg = "Undefined plugin instance execution status: 'uploading'."
+            raise KeyError(msg)
+        return obj.uploading_jobs if hasattr(obj, 'uploading_jobs') else 0
 
     def get_registering_jobs(self, obj) -> int:
         """

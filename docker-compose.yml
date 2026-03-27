@@ -40,12 +40,14 @@ services:
     depends_on: &CHRIS_DEPENDS
       db:
         condition: service_healthy
-      rabbitmq:
+      dragonflydb:
         condition: service_started
       nats:
         condition: service_started
       cube-nonroot-user-volume-fix:
         condition: service_completed_successfully
+      pfcon: # just for chrisomatic to be able to register pfcon at startup
+        condition: service_started
     networks:
       local:
         aliases:
@@ -112,14 +114,14 @@ services:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
-  rabbitmq:
-    image: docker.io/library/rabbitmq:4
+  dragonflydb:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.37.0
+    ulimits:
+      memlock: -1
     volumes:
-      - rabbitmq:/var/lib/rabbitmq
+      - dragonflydata:/data
     networks:
       local:
-        aliases:
-          - queue  # hard-coded in chris_backend/config/settings/local.py
 
   pfcon:
     image: ${PFCON_IMAGE:-ghcr.io/fnndsc/pfcon:latest}
@@ -254,7 +256,7 @@ services:
     user: ${UID}:${GID}
     stop_signal: SIGKILL
     depends_on:
-      rabbitmq:
+      dragonflydb:
         condition: service_started
       nats:
         condition: service_started
@@ -266,7 +268,7 @@ volumes:
   chris_files:
   db:
   lldap:
-  rabbitmq:
+  dragonflydata:
   orthanc:
   pfdcm:
 

@@ -4,7 +4,6 @@ import logging
 from django.db import models
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
-from django.conf import settings
 from django.utils import timezone
 
 import django_filters
@@ -23,28 +22,66 @@ logger = logging.getLogger(__name__)
 
 STATUS_CHOICES = [("created", "Default initial"),
                   ("waiting", "Waiting to be scheduled"),
+                  ("copying", "Copying files to compute env"),  # when supported
                   ("scheduled", "Scheduled on worker"),
                   ("started", "Started on compute env"),
+                  ("uploading", "Uploading files from compute env"),  # when supported
                   ("registeringFiles", "Registering output files"),
                   ("finishedSuccessfully", "Finished successfully"),
                   ("finishedWithError", "Finished with error"),
                   ("cancelled", "Cancelled")]
 
-ACTIVE_STATUSES = ['created', 'waiting', 'scheduled', 'started', 'registeringFiles']
+ACTIVE_STATUSES = ['created', 'waiting', 'copying', 'scheduled', 'started', 'uploading',
+                   'registeringFiles']
 
 INACTIVE_STATUSES = ['finishedSuccessfully', 'finishedWithError', 'cancelled']
 
+REMOTE_CLEANUP_STATUS_CHOICES = [
+    ('notStarted', 'Not started'),
+    ('deletingData', 'Deleting remote data'),
+    ('deletingContainers', 'Deleting remote containers'),
+    ('complete', 'Cleanup complete'),
+    ('failed', 'Cleanup failed'),
+]
+
+
+def get_default_job_status_summary() -> dict:
+    """
+    Get a default job status summary JSON.
+    """
+    return {
+        'pushPath': {'status': False},
+        'pullPath': {'status': False},
+        'compute': {
+            'submit': {'status': False},
+            'return': {'status': False,
+                       'job_status': '',
+                       'job_logs': ''
+                }
+            },
+        }
+
 
 class PluginInstance(AsyncDeletableModel):
+    MAX_COPY_RETRIES = 3
+    MAX_UPLOAD_RETRIES = 3
+    MAX_REMOTE_CLEANUP_RETRIES = 4
+
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='created',
                               db_index=True)
-    summary = models.CharField(max_length=4000, blank=True)
+    summary = models.JSONField(blank=True, default=get_default_job_status_summary)
     raw = models.TextField(blank=True)
     size = models.BigIntegerField(default=0)
     error_code = models.CharField(max_length=7, blank=True)
+    copy_retry_count = models.IntegerField(default=0)
+    upload_retry_count = models.IntegerField(default=0)
+    remote_cleanup_status = models.CharField(max_length=30,
+                                             choices=REMOTE_CLEANUP_STATUS_CHOICES,
+                                             default='notStarted')
+    remote_cleanup_retry_count = models.IntegerField(default=0)
     previous = models.ForeignKey("self", on_delete=models.CASCADE, null=True,
                                  related_name='next')
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE, related_name='instances')

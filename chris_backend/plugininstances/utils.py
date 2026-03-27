@@ -1,6 +1,6 @@
 
-from plugininstances.tasks import run_plugin_instance
-from plugininstances.models import PluginInstance
+from .tasks import run_plugin_instance_job
+from .models import PluginInstance
 
 
 def run_if_ready(plg_inst, previous):
@@ -20,7 +20,7 @@ def run_if_ready(plg_inst, previous):
         all_parents_finished = True
 
         for parent in parents:
-            if parent.status in ('created', 'waiting', 'scheduled',
+            if parent.status in ('created', 'waiting', 'copying', 'scheduled',
                                  'registeringFiles', 'started'):
                 plg_inst.set_status('waiting')
                 all_parents_finished = False
@@ -31,14 +31,22 @@ def run_if_ready(plg_inst, previous):
                 break
 
         if all_parents_finished:
-            plg_inst.set_status('scheduled')
-            run_plugin_instance.delay(plg_inst.id)  # call async task
+            if plg_inst.compute_resource.compute_requires_copy_job:
+                plg_inst.set_status('copying')
+                run_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceCopyJob')
+            else:
+                plg_inst.set_status('scheduled')
+                run_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceAppJob')
 
     elif previous is None or previous.status == 'finishedSuccessfully':
-        plg_inst.set_status('scheduled') # changes to 'scheduled' right away
-        run_plugin_instance.delay(plg_inst.id)  # call async task
+        if plg_inst.compute_resource.compute_requires_copy_job:
+            plg_inst.set_status('copying')
+            run_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceCopyJob')
+        else:
+            plg_inst.set_status('scheduled')
+            run_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceAppJob')
 
-    elif previous.status in ('created', 'waiting', 'scheduled',
+    elif previous.status in ('created', 'copying', 'waiting', 'scheduled',
                              'registeringFiles', 'started'):
         plg_inst.set_status('waiting')
 

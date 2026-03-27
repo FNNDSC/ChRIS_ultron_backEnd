@@ -9,6 +9,10 @@
 # The syntax and usage of `justfile` is similar to Makefile of GNU Make.
 # For more information, see https://just.systems/man/en/chapter_1.html
 
+# Storage mode: "fslink" (default) or "swift" (uses Swift object storage).
+# Usage: just storage=swift dev
+storage := "fslink"
+
 # Start the ChRIS backend in development mode, and attach to the live-reloading server.
 [group('(1) start-up')]
 dev: chrisomatic attach
@@ -36,7 +40,7 @@ bash: (run 'bash')
 # Run chrisomatic, a tool which adds plugins and users to CUBE.
 [group('(1) start-up')]
 chrisomatic *args: start
-    @just docker-compose --profile=cube run --rm chrisomatic chrisomatic {{ args }}
+    @just storage={{ storage }} docker-compose --profile=cube run --rm chrisomatic chrisomatic {{ args }}
 
 # Run chrisomatic with the contents of chrisomatic/postscript.yml
 [group('(1) start-up')]
@@ -53,7 +57,7 @@ makemigrations: (run 'python manage.py makemigrations')
 # Run tests, e.g. `just test pacsfiles`
 [group('(3) development')]
 test *args:
-    @just run python manage.py test --force-color {{ args }}
+    @just storage={{ storage }} run python manage.py test --force-color {{ args }}
 
 # Run all tests.
 [group('(3) development')]
@@ -105,17 +109,17 @@ pull: (docker-compose 'pull')
 # Get container logs.
 [group('(4) docker-compose')]
 logs *args:
-    @just docker-compose --profile=cube logs {{ args }}
+    @just storage={{ storage }} docker-compose --profile=cube logs {{ args }}
 
 # docker-compose ... run helper function.
 [group('(4) docker-compose')]
 run +command:
-    @just docker-compose --profile=cube run --rm chris {{ command }}
+    @just storage={{ storage }} docker-compose --profile=cube run --rm chris {{ command }}
 
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ command }}
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else { "" } }} {{ command }}
 
 # Get the container engine to use (docker or podman)
 [group('helper function')]
@@ -169,11 +173,11 @@ unset-preference:
 # Print the OpenAPI schema via drf-spectacular.
 [group('(3) development')]
 openapi:
-    @just run python manage.py spectacular --color
+    @just storage={{ storage }} run python manage.py spectacular --color
 
 # Print the OpenAPI schema using drf-spectacular, using workarounds for more
 # reliable client generation.
 [group('(3) development')]
 openapi-split:
-    env SPECTACULAR_SPLIT_REQUEST=true just openapi
+    env SPECTACULAR_SPLIT_REQUEST=true just storage={{ storage }} openapi
 

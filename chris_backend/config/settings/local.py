@@ -189,8 +189,7 @@ PFDCM_ADDRESS = 'http://pfdcm:4005'
 
 # Celery settings
 
-# CELERY_BROKER_URL = 'amqp://guest:guest@localhost'
-CELERY_BROKER_URL = 'amqp://queue:5672'
+CELERY_BROKER_URL = 'redis://dragonflydb:6379/0'
 
 #: Only add pickle to this list if your broker is secured
 #: from unwanted access (see userguide/security.html)
