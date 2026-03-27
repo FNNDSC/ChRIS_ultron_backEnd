@@ -70,7 +70,7 @@ if DATABASE_CONN_POOL:
 # ------------------------------------------------------------------------------
 STORAGE_ENV = get_secret('STORAGE_ENV')
 
-if STORAGE_ENV not in ('swift', 'fslink', 'filesystem'):
+if STORAGE_ENV not in ('swift', 'fslink', 'filesystem', 's3'):
     raise ImproperlyConfigured(f"Unsupported value '{STORAGE_ENV}' for STORAGE_ENV")
 
 if STORAGE_ENV == 'swift':
@@ -86,6 +86,20 @@ if STORAGE_ENV == 'swift':
         STORAGES=STORAGES,
         SWIFT_CONTAINER_NAME=SWIFT_CONTAINER_NAME,
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
+    )
+elif STORAGE_ENV == 's3':
+    STORAGES['default'] = {'BACKEND': 's3.storage.S3Storage'}
+    S3_BUCKET_NAME = get_secret('S3_BUCKET_NAME')
+    S3_CONNECTION_PARAMS = {
+        'endpoint_url': get_secret('S3_ENDPOINT_URL'),
+        'access_key': get_secret('S3_ACCESS_KEY'),
+        'secret_key': get_secret('S3_SECRET_KEY'),
+        'region_name': get_secret('S3_REGION', default=''),
+    }
+    verify_storage = lambda: verify_storage_connection(
+        STORAGES=STORAGES,
+        S3_BUCKET_NAME=S3_BUCKET_NAME,
+        S3_CONNECTION_PARAMS=S3_CONNECTION_PARAMS,
     )
 elif STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
