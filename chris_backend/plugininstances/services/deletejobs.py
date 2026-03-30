@@ -11,6 +11,7 @@ from pfconclient.client import JobType
 from pfconclient.exceptions import PfconRequestException
 
 from core.utils import json_zip2str
+from core.models import ChrisFolder
 from plugininstances.models import PluginInstance
 from .abstractjobs import PluginInstanceJob
 
@@ -224,13 +225,13 @@ class PluginInstanceDeleteJob(PluginInstanceJob):
         under it. This is needed to remove any orphan files that might be left in the
         output dir.
         """
-        outputfolder = self.c_plugin_inst.output_folder
+        output_folder = self.c_plugin_inst.output_folder
         
-        for folder in outputfolder.children.all():
+        for folder in output_folder.children.all():
             folder.delete()
-        for file in outputfolder.chris_files.all():
+        for file in output_folder.chris_files.all():
             file.delete()
-        for link_file in outputfolder.chris_link_files.all():
+        for link_file in output_folder.chris_link_files.all():
             link_file.delete()
 
-        self.storage_manager.delete_path(outputfolder.path)
+        self.storage_manager.delete_path(output_folder.path)

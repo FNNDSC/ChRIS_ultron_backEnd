@@ -30,17 +30,13 @@ task_routes = {
     'plugininstances.tasks.delete_plugin_instance_containers_from_remote': {'queue': 'main2'},
     'plugininstances.tasks.schedule_waiting_plugin_instances':
         {'queue': 'periodic'},
-    'plugininstances.tasks.check_started_plugin_instances_exec_status':
-        {'queue': 'periodic'},
-    'plugininstances.tasks.check_copying_plugin_instances_exec_status':
+    'plugininstances.tasks.check_running_plugin_instances_exec_status':
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_waiting_plugin_instances':
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_plugin_instances_stuck_in_lock':
         {'queue': 'periodic'},
     'plugininstances.tasks.cancel_plugin_instances_stuck_in_scheduled_status':
-        {'queue': 'periodic'},
-    'plugininstances.tasks.check_uploading_plugin_instances_exec_status':
         {'queue': 'periodic'},
     'plugininstances.tasks.handle_remote_cleanup':
         {'queue': 'periodic'},
@@ -68,20 +64,12 @@ app.conf.beat_schedule = {
         'task': 'plugininstances.tasks.schedule_waiting_plugin_instances',
         'schedule': POLL_INTERVAL,
     },
-    'check-started-plugin-instances-exec-status-every-30-seconds': {
-        'task': 'plugininstances.tasks.check_started_plugin_instances_exec_status',
-        'schedule': POLL_INTERVAL,
-    },
-    'check-created-plugin-instances-copy-exec-status-every-30-seconds': {
-        'task': 'plugininstances.tasks.check_copying_plugin_instances_exec_status',
+    'check-running-plugin-instances-exec-status-every-30-seconds': {
+        'task': 'plugininstances.tasks.check_running_plugin_instances_exec_status',
         'schedule': POLL_INTERVAL,
     },
     'cancel-waiting-plugin-instances-every-30-seconds': {
         'task': 'plugininstances.tasks.cancel_waiting_plugin_instances',
-        'schedule': POLL_INTERVAL,
-    },
-    'check-registeringfiles-upload-exec-status': {
-        'task': 'plugininstances.tasks.check_uploading_plugin_instances_exec_status',
         'schedule': POLL_INTERVAL,
     },
     'handle-remote-cleanup-every-60-seconds': {

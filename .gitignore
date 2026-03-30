@@ -26,3 +26,6 @@ chris_backend/.lesshist
 
 # created by `just prefer`
 .preference
+
+# created by `just set-storage`
+.storage
