@@ -354,7 +354,6 @@ def cancel_plugin_inst_on_task_failure(sender=None, task_id=None, exception=None
     # list of task names we want to handle
     handled_tasks = {
         'plugininstances.tasks.run_plugin_instance_job',
-        'plugininstances.tasks.check_plugin_instance_job_exec_status',
         'plugininstances.tasks.cancel_plugin_instance_job',
     }
     if sender.name not in handled_tasks:

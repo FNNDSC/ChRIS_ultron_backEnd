@@ -2,6 +2,7 @@
 import logging
 import json
 import time
+import warnings
 from unittest import mock
 
 from django.test import TestCase, TransactionTestCase, tag
@@ -93,10 +94,19 @@ class TasksViewTests(TransactionTestCase):
     @classmethod
     def setUpClass(cls):
         logging.disable(logging.WARNING)
+        logging.getLogger('plugininstances.tasks').setLevel(logging.CRITICAL)
+        warnings.filterwarnings('ignore', 'No directory at', UserWarning)
         super().setUpClass()
         # route tasks to this worker by using the default 'celery' queue
         # that is exclusively used for the automated tests
         celery_app.conf.update(task_routes=None)
+        # purge any stale messages from the default queue before starting
+        # the worker, so leftover tasks from previous runs don't produce noise
+        try:
+            with celery_app.connection_for_write() as conn:
+                conn.default_channel.queue_purge('celery')
+        except Exception:
+            pass
         cls.celery_worker = start_worker(celery_app,
                                          concurrency=1,
                                          perform_ping_check=False)
@@ -108,7 +118,27 @@ class TasksViewTests(TransactionTestCase):
         cls.celery_worker.__exit__(None, None, None)
         # reset routes to the original queues
         celery_app.conf.update(task_routes=task_routes)
+        logging.getLogger('plugininstances.tasks').setLevel(logging.NOTSET)
         logging.disable(logging.NOTSET)
+
+    def tearDown(self):
+        # purge any unstarted Celery tasks then wait for in-flight tasks to finish
+        # before the TransactionTestCase DB truncation to prevent spurious errors
+        # from stale cleanup tasks finding missing DB records
+        try:
+            celery_app.control.purge()
+        except Exception:
+            pass
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                active = celery_app.control.inspect(timeout=1).active() or {}
+                if all(len(tasks) == 0 for tasks in active.values()):
+                    break
+            except Exception:
+                break
+            time.sleep(0.5)
+        super().tearDown()
 
     def setUp(self):
         # create superuser chris (owner of root folders)
