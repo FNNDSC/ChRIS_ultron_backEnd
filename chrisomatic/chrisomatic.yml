@@ -19,7 +19,6 @@ cube:
       username: pfcon
       password: pfcon1234
       description: host Description
-      innetwork: true
 
   plugins:
     - name: pl-simplefsapp

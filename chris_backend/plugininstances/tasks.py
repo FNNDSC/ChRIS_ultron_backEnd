@@ -10,7 +10,7 @@ from django.conf import settings
 from celery import shared_task
 from celery.signals import task_failure
 
-from .models import PluginInstance
+from .models import PluginInstance, INACTIVE_STATUSES
 from .services.pluginjobs import PluginInstanceAppJob
 from .services.copyjobs import PluginInstanceCopyJob
 from .services.uploadjobs import PluginInstanceUploadJob
@@ -210,38 +210,28 @@ def _schedule_plugin_instance(plg_inst):
         
 
 @shared_task
-def check_started_plugin_instances_exec_status():
+def check_running_plugin_instances_exec_status():
     """
-    Check the execution status of the plugin jobs corresponding to all the plugin
-    instances with 'started' DB status.
+    Check the execution status of all the running jobs.
     """
-    instances = PluginInstance.objects.filter(status='started')
-    for plg_inst in instances:
-        check_plugin_instance_job_exec_status.delay(plg_inst.id, 'PluginInstanceAppJob')  # call async task
+    lookup = Q(status='started')
 
-
-@shared_task
-def check_copying_plugin_instances_exec_status():
-    """
-    Check the execution status of the copy jobs corresponding to all the plugin instances
-    in 'copying' DB status when remote compute requires copy jobs.
-    """
     if settings.STORAGE_ENV not in ('filesystem', 'zipfile'):
-        instances = PluginInstance.objects.filter(status='copying')
-        for plg_inst in instances:
+        lookup = Q(status='copying') | lookup
+
+    if settings.STORAGE_ENV not in ('filesystem', 'zipfile', 'fslink'):
+        lookup = lookup | Q(status='uploading')
+    
+    instances = PluginInstance.objects.filter(lookup)
+
+    for plg_inst in instances:
+        if plg_inst.status == 'copying':
             check_plugin_instance_job_exec_status.delay(plg_inst.id, 
-                                                        'PluginInstanceCopyJob')
-
-
-@shared_task
-def check_uploading_plugin_instances_exec_status():
-    """
-    Check the execution status of the upload jobs corresponding to all the plugin 
-    instances with 'uploading' DB status when remote compute requires upload jobs.
-    """
-    if settings.STORAGE_ENV not in ('filesystem', 'fslink', 'zipfile'):
-        instances = PluginInstance.objects.filter(status='uploading')
-        for plg_inst in instances:
+                                                        'PluginInstanceCopyJob')  # call async task
+        elif plg_inst.status == 'started':
+            check_plugin_instance_job_exec_status.delay(plg_inst.id, 
+                                                        'PluginInstanceAppJob')
+        elif plg_inst.status == 'uploading':
             check_plugin_instance_job_exec_status.delay(plg_inst.id, 
                                                         'PluginInstanceUploadJob')
 
@@ -316,18 +306,20 @@ def delete_plugin_instances_jobs_from_remote():
 @shared_task
 def cancel_plugin_instances_stuck_in_lock():
     """
-    Collect all plugin instances for which the check_plugin_instance_exec_status async
-    task is stuck or failed in the lock section of the code (e.g. because of a worker
-    crash). Then schedule a new cancel request for all of them.
+    Collect all plugin instances for which the check_plugin_instance_job_exec_status 
+    async task is stuck or failed in the lock section of the code (e.g. because of a 
+    worker crash). Then schedule a new cancel request for all of them.
     """
     cutoff = timezone.now() - timedelta(minutes=240)  # hardcoded cutoff delta
-    lookup = Q(status='started') | Q(status='uploading')| Q(status='registeringFiles')
 
-    instances = PluginInstance.objects.filter(lookup).filter(lock__start_date__lt=cutoff)
-
+    instances = PluginInstance.objects.filter(status='registeringFiles', 
+                                              lock__start_date__lt=cutoff)
     for plg_inst in instances:
         plg_inst.error_code = 'CODE18'
         plg_inst.save(update_fields=['error_code'])
+
+        logger.error(f"Plugin instance with id {plg_inst.id} stuck in lock. Sending "
+                     f"cancelling task for it. ")
         cancel_plugin_instance_job.delay(plg_inst.id)
 
 
@@ -340,12 +332,14 @@ def cancel_plugin_instances_stuck_in_scheduled_status():
     """
     cutoff = timezone.now() - timedelta(minutes=240)  # hardcoded cutoff delta
 
-    instances = PluginInstance.objects.filter(
-        status='scheduled', start_date__lt=cutoff
-    )
+    instances = PluginInstance.objects.filter(status='scheduled', start_date__lt=cutoff)
+
     for plg_inst in instances:
         plg_inst.error_code = 'CODE18'
         plg_inst.save(update_fields=['error_code'])
+
+        logger.error(f"Plugin instance with id {plg_inst.id} stuck in scheduled status. "
+                     f"Sending cancelling task for it. ")
         cancel_plugin_instance_job.delay(plg_inst.id)
 
 
@@ -360,7 +354,6 @@ def cancel_plugin_inst_on_task_failure(sender=None, task_id=None, exception=None
     # list of task names we want to handle
     handled_tasks = {
         'plugininstances.tasks.run_plugin_instance_job',
-        'plugininstances.tasks.check_plugin_instance_job_exec_status',
         'plugininstances.tasks.cancel_plugin_instance_job',
     }
     if sender.name not in handled_tasks:
@@ -378,12 +371,18 @@ def cancel_plugin_inst_on_task_failure(sender=None, task_id=None, exception=None
         logger.error(f"Plugin instance with id {plg_inst_id} does not exist for "
                      f"cancelling after crash in task {sender.name}.")
     else:
-        plugin_inst.error_code = 'CODE18'
-        plugin_inst.save(update_fields=['error_code'])
-
-        logger.info(f"Sending cancelling task for plugin instance with id {plg_inst_id} "
-                    f"after crash in task {sender.name}")
-        cancel_plugin_instance_job.delay(plg_inst_id)
+        if plugin_inst.status in INACTIVE_STATUSES:
+            job_class_name = _detect_job_class_name(plugin_inst)
+            job_class = JOB_CLASSES[job_class_name]
+            plg_inst_job = job_class(plugin_inst)
+            plg_inst_job.schedule_remote_cleanup()
+        else:
+            plugin_inst.error_code = 'CODE19'
+            plugin_inst.save(update_fields=['error_code'])
+            
+            logger.info(f"Sending cancelling task for plugin instance with id  "
+                        f"{plg_inst_id} after crash in task {sender.name}")
+            cancel_plugin_instance_job.delay(plg_inst_id)
 
 
 @shared_task  # toy task for testing celery stuff

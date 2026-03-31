@@ -92,7 +92,7 @@ class ComputeResourceSerializerTests(SerializerTests):
                 'compute_user': 'user', 'compute_password': 'pass1234',
                 'compute_auth_token': token}
 
-        d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink',
+        d_resp = {'pfcon_innetwork': True, 'storage_env': settings.STORAGE_ENV,
                   'requires_copy_job': True, 'requires_upload_job': False}
 
         with mock.patch.object(pfcon.Client, 'get_server_info',
@@ -119,7 +119,7 @@ class ComputeResourceSerializerTests(SerializerTests):
         with mock.patch.object(pfcon.Client, 'get_auth_token',
                                return_value=token) as get_auth_token_mock:
 
-            d_resp = {'pfcon_innetwork': True, 'storage_env': 'fslink',
+            d_resp = {'pfcon_innetwork': True, 'storage_env': settings.STORAGE_ENV,
                       'requires_copy_job': True, 'requires_upload_job': False}
 
             with mock.patch.object(pfcon.Client, 'get_server_info',

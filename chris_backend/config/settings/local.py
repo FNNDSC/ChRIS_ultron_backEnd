@@ -155,7 +155,7 @@ INSTALLED_APPS += ['django_extensions']
 
 # TESTING
 # ------------------------------------------------------------------------------
-TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+TEST_RUNNER = 'core.testrunner.TerminateConnectionsTestRunner'
 
 COMPUTE_RESOURCE_URL = 'http://pfcon.remote:30005/api/v1/'
 

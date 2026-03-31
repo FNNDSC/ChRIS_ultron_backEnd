@@ -97,10 +97,10 @@ class PluginInstanceTasksTests(TasksTests):
             tasks.cancel_plugin_instance_job(self.plg_inst.id, 'PluginInstanceAppJob')
             cancel_mock.assert_called_with()
 
-    def test_task_check_started_plugin_instances_exec_status(self):
+    def test_task_check_running_plugin_instances_exec_status(self):
         with mock.patch.object(tasks.check_plugin_instance_job_exec_status, 'delay',
                                return_value=None) as delay_mock:
-            tasks.check_started_plugin_instances_exec_status()
+            tasks.check_running_plugin_instances_exec_status()
 
             # check that the check_plugin_instance_job_exec_status task was called with appropriate args
             delay_mock.assert_called_with(self.plg_inst.id, 'PluginInstanceAppJob')
@@ -135,6 +135,25 @@ class TasksAsyncTests(TransactionTestCase):
         # reset routes to the original queues
         celery_app.conf.update(task_routes=task_routes)
         logging.disable(logging.NOTSET)
+
+    def tearDown(self):
+        # purge any unstarted Celery tasks then wait for in-flight tasks to finish
+        # before the TransactionTestCase DB truncation to prevent spurious errors
+        # from stale cleanup tasks finding missing DB records
+        try:
+            celery_app.control.purge()
+        except Exception:
+            pass
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                active = celery_app.control.inspect(timeout=1).active() or {}
+                if all(len(tasks) == 0 for tasks in active.values()):
+                    break
+            except Exception:
+                break
+            time.sleep(0.5)
+        super().tearDown()
 
     def setUp(self):
         # superuser chris (owner of root folders)
@@ -189,22 +208,6 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
                                    side_effect=Exception):
                 with mock.patch("logging.Logger._log"):  # disable the error logging
                     tasks.run_plugin_instance_job.delay(self.plg_inst.id, 'PluginInstanceAppJob')  # call async task
-
-                    for _ in range(10):
-                        time.sleep(3)
-                        self.plg_inst.refresh_from_db()
-                        if self.plg_inst.status == 'cancelled': break
-
-                    self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
-
-    @tag('integration')
-    def test_task_check_plugin_instance_exec_status_triggers_cancelling_when_exception_raised_during_async_run(self):
-        with mock.patch.object(tasks.PluginInstanceAppJob, 'schedule_remote_cleanup',
-                               return_value=None):
-            with mock.patch.object(tasks.PluginInstanceAppJob, 'check_exec_status',
-                                   side_effect=Exception):
-                with mock.patch("logging.Logger._log"):  # disable the error logging
-                    tasks.check_plugin_instance_job_exec_status.delay(self.plg_inst.id, 'PluginInstanceAppJob')  # call async task
 
                     for _ in range(10):
                         time.sleep(3)

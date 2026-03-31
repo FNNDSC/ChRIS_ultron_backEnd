@@ -11,7 +11,8 @@
 
 # Storage mode: "fslink" (default) or "swift" (uses Swift object storage).
 # Usage: just storage=swift dev
-storage := "fslink"
+# Or persist the preference: just set-storage swift
+storage := `if [ -f '.storage' ]; then cat .storage; else echo fslink; fi`
 
 # Start the ChRIS backend in development mode, and attach to the live-reloading server.
 [group('(1) start-up')]
@@ -169,6 +170,21 @@ prefer docker_or_podman:
 [group('(5) docker/podman preference')]
 unset-preference:
     rm -f .preference
+
+# Set a preference for storage mode ("fslink" or "swift").
+[group('(5) docker/podman preference')]
+set-storage mode:
+    @[ '{{ mode }}' = 'fslink' ] || [ '{{ mode }}' = 'swift' ] \
+        || ( \
+            >&2 echo 'argument must be either "fslink" or "swift"'; \
+            exit 1 \
+        )
+    echo '{{ mode }}' > .storage
+
+# Remove your preference for storage mode.
+[group('(5) docker/podman preference')]
+unset-storage:
+    rm -f .storage
 
 # Print the OpenAPI schema via drf-spectacular.
 [group('(3) development')]
