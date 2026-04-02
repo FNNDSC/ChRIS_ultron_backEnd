@@ -1,60 +1,34 @@
-#!/usr/bin/env python3
 """
 Integration tests for S3Manager against a real S3-compatible service (MinIO).
 
-Created: 2026-03-24
-Part of the ChRIS CUBE S3 storage adapter work (feature/s3-storage-adapter).
-Validates all StorageManager interface methods implemented by S3Manager
-against a live MinIO instance -- covers CRUD, path operations, batch delete,
-pagination, and the comma-sanitization logic inherited from SwiftManager.
+These tests only run when STORAGE_ENV=s3, i.e. when the S3 storage backend
+is active.  They validate all StorageManager interface methods implemented
+by S3Manager against the live MinIO instance started by docker-compose_s3.yml.
 
-Run via docker compose (recommended):
-    docker compose -f docker-compose.s3-test.yml up -d minio
-    docker compose -f docker-compose.s3-test.yml run --rm s3-test
-    docker compose -f docker-compose.s3-test.yml down -v
-
-Or locally (with MinIO running on localhost:9000):
-    S3_ENDPOINT_URL=http://localhost:9000 \
-    S3_ACCESS_KEY=minioadmin \
-    S3_SECRET_KEY=minioadmin \
-    S3_BUCKET_NAME=chris-test \
-    python tests/test_s3manager.py
+Run via justfile:
+    just set-storage s3
+    just test-integration
 """
 
-import os
-import sys
-import importlib.util
 import unittest
 
-# Load s3manager directly to avoid core/__init__.py pulling in Django/Celery.
-_base = os.path.join(os.path.dirname(__file__), '..', 'chris_backend', 'core', 'storage')
+from django.conf import settings
+from django.test import TestCase, tag
 
-def _load_module(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-_storagemanager = _load_module('storagemanager', os.path.join(_base, 'storagemanager.py'))
-sys.modules['core.storage.storagemanager'] = _storagemanager  # satisfy s3manager's import
-S3Manager = _load_module('s3manager', os.path.join(_base, 's3manager.py')).S3Manager
+from core.storage.s3manager import S3Manager
 
 
-def get_test_manager():
-    conn_params = {
-        'endpoint_url': os.environ.get('S3_ENDPOINT_URL', 'http://localhost:9000'),
-        'access_key': os.environ.get('S3_ACCESS_KEY', 'minioadmin'),
-        'secret_key': os.environ.get('S3_SECRET_KEY', 'minioadmin'),
-        'region_name': os.environ.get('S3_REGION', 'us-east-1'),
-    }
-    bucket = os.environ.get('S3_BUCKET_NAME', 'chris-test')
-    return S3Manager(bucket, conn_params)
+def _get_manager():
+    return S3Manager(settings.S3_BUCKET_NAME, settings.S3_CONNECTION_PARAMS)
 
 
-class TestS3ManagerConnection(unittest.TestCase):
+@tag('integration')
+@unittest.skipUnless(getattr(settings, 'STORAGE_ENV', '') == 's3',
+                     'S3 storage not configured')
+class S3ManagerConnectionTests(TestCase):
 
     def setUp(self):
-        self.manager = get_test_manager()
+        self.manager = _get_manager()
 
     def test_create_container(self):
         """Bucket creation should succeed (or be idempotent)."""
@@ -63,15 +37,19 @@ class TestS3ManagerConnection(unittest.TestCase):
         self.manager.create_container()
 
 
-class TestS3ManagerCRUD(unittest.TestCase):
+@tag('integration')
+@unittest.skipUnless(getattr(settings, 'STORAGE_ENV', '') == 's3',
+                     'S3 storage not configured')
+class S3ManagerCRUDTests(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.manager = get_test_manager()
+        super().setUpClass()
+        cls.manager = _get_manager()
         cls.manager.create_container()
 
     def tearDown(self):
-        # clean up test objects
+        super().tearDown()
         for key in self.manager.ls('test/'):
             self.manager.delete_obj(key)
 
@@ -125,14 +103,19 @@ class TestS3ManagerCRUD(unittest.TestCase):
         self.assertTrue(self.manager.obj_exists('test/src.txt'))
 
 
-class TestS3ManagerPathOps(unittest.TestCase):
+@tag('integration')
+@unittest.skipUnless(getattr(settings, 'STORAGE_ENV', '') == 's3',
+                     'S3 storage not configured')
+class S3ManagerPathOpsTests(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.manager = get_test_manager()
+        super().setUpClass()
+        cls.manager = _get_manager()
         cls.manager.create_container()
 
     def tearDown(self):
+        super().tearDown()
         for key in self.manager.ls('test/'):
             self.manager.delete_obj(key)
 
@@ -185,26 +168,31 @@ class TestS3ManagerPathOps(unittest.TestCase):
         self.manager.upload_obj('test/san2/,,.txt', b'renamed')
         self.manager.upload_obj('test/san2/good.txt', b'keep')
         result = self.manager.sanitize_obj_names('test/san2/')
-        # pure comma name → deleted
+        # pure comma name -> deleted
         self.assertIn('test/san2/,,', result)
         self.assertEqual(result['test/san2/,,'], '')
         self.assertFalse(self.manager.obj_exists('test/san2/,,'))
-        # comma stem + extension → renamed to .txt
+        # comma stem + extension -> renamed to .txt
         self.assertIn('test/san2/,,.txt', result)
         self.assertEqual(result['test/san2/,,.txt'], 'test/san2/.txt')
         # clean file untouched
         self.assertTrue(self.manager.obj_exists('test/san2/good.txt'))
 
 
-class TestS3ManagerLargeOps(unittest.TestCase):
+@tag('integration')
+@unittest.skipUnless(getattr(settings, 'STORAGE_ENV', '') == 's3',
+                     'S3 storage not configured')
+class S3ManagerLargeOpsTests(TestCase):
     """Test operations at moderate scale to validate pagination and batch delete."""
 
     @classmethod
     def setUpClass(cls):
-        cls.manager = get_test_manager()
+        super().setUpClass()
+        cls.manager = _get_manager()
         cls.manager.create_container()
 
     def tearDown(self):
+        super().tearDown()
         self.manager.delete_path('test/bulk/')
 
     def test_ls_many_objects(self):
@@ -222,10 +210,3 @@ class TestS3ManagerLargeOps(unittest.TestCase):
             self.manager.upload_obj(f'test/bulk/{i:04d}.dat', b'x')
         self.manager.delete_path('test/bulk/')
         self.assertEqual(self.manager.ls('test/bulk/'), [])
-
-
-if __name__ == '__main__':
-    print(f"Testing S3Manager against: {os.environ.get('S3_ENDPOINT_URL', 'http://localhost:9000')}")
-    print(f"Bucket: {os.environ.get('S3_BUCKET_NAME', 'chris-test')}")
-    print()
-    unittest.main(verbosity=2)

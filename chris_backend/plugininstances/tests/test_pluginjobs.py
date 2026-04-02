@@ -82,7 +82,7 @@ class PluginInstanceAppJobTests(TestCase):
                       'compute_password': 'pfcon1234',
                       'compute_innetwork': pfcon_client.pfcon_innetwork,
                       'compute_requires_copy_job': False,
-                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV == 'swift'})
+                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV in ('swift', 's3')})
 
         # create a plugin
         data = self.plg_meta_data.copy()

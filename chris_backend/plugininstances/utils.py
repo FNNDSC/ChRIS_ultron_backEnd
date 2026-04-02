@@ -1,6 +1,6 @@
 
 from .tasks import run_plugin_instance_job
-from .models import PluginInstance
+from .models import PluginInstance, ACTIVE_STATUSES
 
 
 def run_if_ready(plg_inst, previous):
@@ -20,8 +20,7 @@ def run_if_ready(plg_inst, previous):
         all_parents_finished = True
 
         for parent in parents:
-            if parent.status in ('created', 'waiting', 'copying', 'scheduled',
-                                 'registeringFiles', 'started'):
+            if parent.status in ACTIVE_STATUSES:
                 plg_inst.set_status('waiting')
                 all_parents_finished = False
                 break
@@ -46,8 +45,7 @@ def run_if_ready(plg_inst, previous):
             plg_inst.set_status('scheduled')
             run_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceAppJob')
 
-    elif previous.status in ('created', 'copying', 'waiting', 'scheduled',
-                             'registeringFiles', 'started'):
+    elif previous.status in ACTIVE_STATUSES:
         plg_inst.set_status('waiting')
 
     elif previous.status in ('finishedWithError', 'cancelled'):

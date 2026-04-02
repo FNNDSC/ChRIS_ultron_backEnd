@@ -109,14 +109,22 @@ if STORAGE_ENV in ('fslink', 'filesystem'):
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
     MEDIA_ROOT = '/data'  # local filesystem storage settings
 elif STORAGE_ENV == 's3':
-    STORAGES['default'] = {'BACKEND': 's3.storage.S3Storage'}
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'users')
     S3_CONNECTION_PARAMS = {
-        'endpoint_url': os.getenv('S3_ENDPOINT_URL', 'http://minio:9000'),
+        'endpoint_url': os.getenv('S3_ENDPOINT_URL', 'http://s3-service:9000'),
         'access_key': os.getenv('S3_ACCESS_KEY', 'minioadmin'),
         'secret_key': os.getenv('S3_SECRET_KEY', 'minioadmin'),
         'region_name': os.getenv('S3_REGION', None),
     }
+    # django-storages S3 settings (derived from ChRIS S3 config above)
+    AWS_STORAGE_BUCKET_NAME = S3_BUCKET_NAME
+    AWS_S3_ENDPOINT_URL = S3_CONNECTION_PARAMS['endpoint_url']
+    AWS_ACCESS_KEY_ID = S3_CONNECTION_PARAMS['access_key']
+    AWS_SECRET_ACCESS_KEY = S3_CONNECTION_PARAMS['secret_key']
+    AWS_S3_REGION_NAME = S3_CONNECTION_PARAMS.get('region_name') or 'us-east-1'
+    AWS_S3_ADDRESSING_STYLE = 'path'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 try:
     verify_storage_connection(

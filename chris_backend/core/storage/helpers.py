@@ -19,7 +19,7 @@ def connect_storage(settings) -> StorageManager:
         return SwiftManager(settings.SWIFT_CONTAINER_NAME, settings.SWIFT_CONNECTION_PARAMS)
     elif storage_name == 'FileSystemStorage':
         return FilesystemManager(settings.MEDIA_ROOT)
-    elif storage_name == 'S3Storage':
+    elif storage_name == 'S3Boto3Storage':
         return S3Manager(settings.S3_BUCKET_NAME, settings.S3_CONNECTION_PARAMS)
     raise ValueError(f'Unsupported storage system: {storage_name}')
 
