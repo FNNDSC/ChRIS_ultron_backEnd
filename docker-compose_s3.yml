@@ -1,0 +1,70 @@
+# Docker Compose override for S3-compatible object storage mode.
+# Layers on top of docker-compose.yml. Do not use directly.
+# Usage via justfile: just storage=s3 dev
+
+services:
+  chris:
+    environment:
+      STORAGE_ENV: "s3"
+      AWS_REQUEST_CHECKSUM_CALCULATION: "when_required"
+      AWS_RESPONSE_CHECKSUM_VALIDATION: "when_required"
+    depends_on:
+      s3-service:
+        condition: service_started
+
+  worker-mains:
+    environment:
+      STORAGE_ENV: "s3"
+      AWS_REQUEST_CHECKSUM_CALCULATION: "when_required"
+      AWS_RESPONSE_CHECKSUM_VALIDATION: "when_required"
+    depends_on:
+      s3-service:
+        condition: service_started
+
+  worker-periodic:
+    environment:
+      STORAGE_ENV: "s3"
+      AWS_REQUEST_CHECKSUM_CALCULATION: "when_required"
+      AWS_RESPONSE_CHECKSUM_VALIDATION: "when_required"
+    depends_on:
+      s3-service:
+        condition: service_started
+
+  celery-scheduler:
+    environment:
+      STORAGE_ENV: "s3"
+      AWS_REQUEST_CHECKSUM_CALCULATION: "when_required"
+      AWS_RESPONSE_CHECKSUM_VALIDATION: "when_required"
+    depends_on:
+      s3-service:
+        condition: service_started
+
+  pfcon:
+    environment:
+      STORAGE_ENV: "s3"
+      PFCON_OP_IMAGE: "ghcr.io/fnndsc/pfconopjob-s3"
+      S3_ENDPOINT_URL: "http://s3-service:9000"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_BUCKET_NAME: "users"
+      S3_REGION_NAME: "us-east-1"
+    depends_on:
+      s3-service:
+        condition: service_started
+
+  s3-service:
+    image: docker.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    volumes:
+      - s3_storage:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - local
+
+volumes:
+  s3_storage:

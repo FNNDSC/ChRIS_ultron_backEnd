@@ -9,7 +9,7 @@
 # The syntax and usage of `justfile` is similar to Makefile of GNU Make.
 # For more information, see https://just.systems/man/en/chapter_1.html
 
-# Storage mode: "fslink" (default) or "swift" (uses Swift object storage).
+# Storage mode: "fslink" (default), "swift" (Swift object storage), or "s3" (S3-compatible storage).
 # Usage: just storage=swift dev
 # Or persist the preference: just set-storage swift
 storage := `if [ -f '.storage' ]; then cat .storage; else echo fslink; fi`
@@ -120,7 +120,7 @@ run +command:
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else { "" } }} {{ command }}
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else if storage == "s3" { "-f docker-compose.yml -f docker-compose_s3.yml" } else { "" } }} {{ command }}
 
 # Get the container engine to use (docker or podman)
 [group('helper function')]
@@ -171,12 +171,12 @@ prefer docker_or_podman:
 unset-preference:
     rm -f .preference
 
-# Set a preference for storage mode ("fslink" or "swift").
+# Set a preference for storage mode ("fslink", "swift", or "s3").
 [group('(5) docker/podman preference')]
 set-storage mode:
-    @[ '{{ mode }}' = 'fslink' ] || [ '{{ mode }}' = 'swift' ] \
+    @[ '{{ mode }}' = 'fslink' ] || [ '{{ mode }}' = 'swift' ] || [ '{{ mode }}' = 's3' ] \
         || ( \
-            >&2 echo 'argument must be either "fslink" or "swift"'; \
+            >&2 echo 'argument must be "fslink", "swift", or "s3"'; \
             exit 1 \
         )
     echo '{{ mode }}' > .storage

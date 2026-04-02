@@ -88,7 +88,7 @@ if STORAGE_ENV == 'swift':
         SWIFT_CONNECTION_PARAMS=SWIFT_CONNECTION_PARAMS
     )
 elif STORAGE_ENV == 's3':
-    STORAGES['default'] = {'BACKEND': 's3.storage.S3Storage'}
+    STORAGES['default'] = {'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'}
     S3_BUCKET_NAME = get_secret('S3_BUCKET_NAME')
     S3_CONNECTION_PARAMS = {
         'endpoint_url': get_secret('S3_ENDPOINT_URL'),
@@ -96,6 +96,14 @@ elif STORAGE_ENV == 's3':
         'secret_key': get_secret('S3_SECRET_KEY'),
         'region_name': get_secret('S3_REGION', default=''),
     }
+    # django-storages S3 settings (derived from ChRIS S3 config above)
+    AWS_STORAGE_BUCKET_NAME = S3_BUCKET_NAME
+    AWS_S3_ENDPOINT_URL = S3_CONNECTION_PARAMS['endpoint_url']
+    AWS_ACCESS_KEY_ID = S3_CONNECTION_PARAMS['access_key']
+    AWS_SECRET_ACCESS_KEY = S3_CONNECTION_PARAMS['secret_key']
+    AWS_S3_REGION_NAME = S3_CONNECTION_PARAMS.get('region_name') or 'us-east-1'
+    AWS_S3_ADDRESSING_STYLE = 'path'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
     verify_storage = lambda: verify_storage_connection(
         STORAGES=STORAGES,
         S3_BUCKET_NAME=S3_BUCKET_NAME,

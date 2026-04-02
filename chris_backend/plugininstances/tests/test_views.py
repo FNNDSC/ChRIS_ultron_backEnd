@@ -72,7 +72,7 @@ class ViewTests(TestCase):
                       'compute_password': self.compute_password,
                       'compute_innetwork': pfcon_client.pfcon_innetwork,
                       'compute_requires_copy_job': False,
-                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV == 'swift'})
+                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV in ('swift', 's3')})
 
         # create users
         User.objects.create_user(username=self.other_username,
@@ -178,7 +178,7 @@ class TasksViewTests(TransactionTestCase):
                       'compute_password': self.compute_password,
                       'compute_innetwork': pfcon_client.pfcon_innetwork,
                       'compute_requires_copy_job': False,
-                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV == 'swift'})
+                      'compute_requires_upload_job': pfcon_client.pfcon_innetwork and settings.STORAGE_ENV in ('swift', 's3')})
 
         # create users
         User.objects.create_user(username=self.other_username,

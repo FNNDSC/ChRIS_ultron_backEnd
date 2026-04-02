@@ -81,7 +81,7 @@ With Podman, RabbitMQ might fail to start. Simply retry the command. See https:/
 ### Just Commands
 
 Development is handled by [`just`](https://just.systems).
-Running _CUBE_ in development mode is as-simple-as running the command
+Running _CUBE_ in development mode is as-simple-as running the command:
 
 ```shell
 just
@@ -112,11 +112,26 @@ List all `just` commands:
 just --list --unsorted
 ```
 
+### Just Commands for Object Storage Backend Environments (s3, swift)
+
+Just use the same commands as explained above but explicitly set the storage env at the beginning of the session. For instance running _CUBE_ in development mode with S3 storage is as-simple-as running the command:
+
+```shell
+just set-storage s3 
+just
+```
+
+You can later unset the storage env with:
+
+```shell
+just unset-storage
+```
+
 ### Development Tips and Tricks
 
 #### Recreate containers after changing `docker-compose.yml`
 
-If you modify `docker-compose.yml`, you need to recreate/restart the affected services.
+If you modify `docker-compose.yml` (or the override compose files when developing for other storage envs), you need to recreate/restart the affected services.
 
 ```shell
 just up
