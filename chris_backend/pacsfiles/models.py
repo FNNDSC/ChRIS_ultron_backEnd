@@ -13,6 +13,7 @@ from core.models import AsyncDeletableModel, ChrisFolder, ChrisFile
 from core.utils import filter_files_by_n_slashes, json_zip2str
 from core.storage import connect_storage
 from .services import PfdcmClient
+from .enums import PACS_QUERY_STATUS_CHOICES, PACS_RETRIEVE_STATUS_CHOICES
 
 
 logger = logging.getLogger(__name__)
@@ -42,12 +43,6 @@ class PACSFilter(FilterSet):
     class Meta:
         model = PACS
         fields = ['id', 'identifier', 'active']
-
-
-PACS_QUERY_STATUS_CHOICES = [("created",   "Default initial"),
-                             ("sent",      "Sent to PACS"),
-                             ("succeeded", "Finished successfully"),
-                             ("errored",   "Finished with error")]
 
 
 class PACSQuery(models.Model):
@@ -111,9 +106,6 @@ class PACSQueryFilter(FilterSet):
         fields = ['id', 'min_creation_date', 'max_creation_date', 'title_exact',
                   'title', 'status', 'execute', 'description', 'pacs_id',
                   'pacs_identifier', 'owner_username']
-
-
-PACS_RETRIEVE_STATUS_CHOICES = PACS_QUERY_STATUS_CHOICES
 
 
 class PACSRetrieve(models.Model):

@@ -8,7 +8,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiTypes
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -106,6 +106,9 @@ class PACSDetail(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated, IsChrisOrIsPACSUserReadOnly)
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="pacs_series_list")
+)
 class PACSSpecificSeriesList(generics.ListAPIView):
     """
     A view for the collection of PACS-specific series.
@@ -134,6 +137,9 @@ class PACSSpecificSeriesList(generics.ListAPIView):
         return self.filter_queryset(pacs.series_list.all())
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="pacs_query_list")
+)
 class PACSQueryList(generics.ListCreateAPIView):
     """
     A view for the collection of PACS-specific queries.
@@ -186,6 +192,9 @@ class PACSQueryList(generics.ListCreateAPIView):
             send_pacs_query.delay(pacs_query.id)  # call async task
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="all_pacs_query_list")
+)
 class AllPACSQueryList(generics.ListAPIView):
     """
     A view for the collection of all pacs queries.
@@ -357,6 +366,9 @@ class PACSRetrieveDetail(generics.RetrieveDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated, IsChrisOrOwnerOrIsPACSUserReadOnly)
 
 
+@extend_schema_view(
+    get=extend_schema(operation_id="all_pacs_series_list")
+)
 class PACSSeriesList(generics.ListCreateAPIView):
     """
     A view for the collection of all PACS Series.
