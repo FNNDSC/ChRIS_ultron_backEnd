@@ -17,6 +17,8 @@ from environs import Env
 
 from __version__ import __version__
 from plugins.enums import PLUGIN_TYPE_CHOICES, TYPE_CHOICES
+from plugininstances.enums import STATUS_CHOICES
+from pacsfiles.enums import PACS_QUERY_STATUS_CHOICES
 
 # Environment variables-based secrets
 env = Env()
@@ -200,6 +202,8 @@ SPECTACULAR_SETTINGS = {
     'ENUM_NAME_OVERRIDES': {
         'PluginType': PLUGIN_TYPE_CHOICES,
         'PluginParameterType': TYPE_CHOICES,
+        'PluginInstanceStatus': STATUS_CHOICES,
+        'PacsQueryStatus': PACS_QUERY_STATUS_CHOICES
     },
     'COMPONENT_SPLIT_REQUEST': env.bool("SPECTACULAR_SPLIT_REQUEST", False),
     'PREPROCESSING_HOOKS': [

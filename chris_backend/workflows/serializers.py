@@ -8,7 +8,7 @@ from rest_framework import serializers
 from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
 from plugininstances.serializers import PluginInstanceSerializer
-from plugininstances.models import STATUS_CHOICES
+from plugininstances.enums import STATUS_CHOICES
 from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
 from .models import Workflow
 

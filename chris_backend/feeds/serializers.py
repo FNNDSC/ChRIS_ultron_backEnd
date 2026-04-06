@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 
-from plugininstances.models import STATUS_CHOICES
+from plugininstances.enums import STATUS_CHOICES
 from .models import (Note, Feed, Tag, Tagging, Comment, FeedGroupPermission,
                      FeedUserPermission)
 
