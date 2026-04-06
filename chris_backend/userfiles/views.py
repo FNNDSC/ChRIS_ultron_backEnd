@@ -6,7 +6,7 @@ from django.http import FileResponse
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse, OpenApiTypes
 
 from collectionjson import services
 from core.renderers import BinaryFileRenderer
@@ -16,6 +16,14 @@ from .serializers import UserFileSerializer
 from .permissions import IsOwnerOrChris
 
 
+@extend_schema_view(
+    post=extend_schema(
+        request={
+            # Django only accepts multipart/form-data for file upload API.
+            "multipart/form-data": UserFileSerializer
+        }
+    )
+)
 class UserFileList(generics.ListCreateAPIView):
     """
     A view for the collection of user files.
