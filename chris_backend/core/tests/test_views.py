@@ -51,7 +51,7 @@ class FileDownloadTokenListViewTests(CoreViewTests):
                                         password=self.password)
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
-                           algorithm='HS256')
+                           algorithm='HS512')
         (self.token, tf) = FileDownloadToken.objects.get_or_create(token=token,
                                                                    owner=user)
         self.create_read_url = reverse("filedownloadtoken-list")
@@ -86,7 +86,7 @@ class FileDownloadTokenDetailViewTests(CoreViewTests):
                                         password=self.password)
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
-                           algorithm='HS256')
+                           algorithm='HS512')
         (self.token, tf) = FileDownloadToken.objects.get_or_create(token=token,
                                                                    owner=user)
         self.read_url = reverse("filedownloadtoken-detail",
