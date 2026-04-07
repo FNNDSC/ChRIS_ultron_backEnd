@@ -53,7 +53,7 @@ class FileDownloadTokenList(generics.ListCreateAPIView):
         user = self.request.user
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode({'user': user.username, 'nonce': str(uuid.uuid4()), 'exp': dt},
-                           settings.SECRET_KEY, algorithm='HS256')
+                           settings.SECRET_KEY, algorithm='HS512')
         serializer.save(token=token, owner=user)
 
     def list(self, request, *args, **kwargs):
@@ -137,7 +137,7 @@ class TokenAuthSupportQueryString(TokenAuthentication):
 def authenticate_token(token: str) -> User:
     err_msg = f'Invalid file download token: {token}'
     try:
-        info = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        info = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS512'])
     except jwt.ExpiredSignatureError:
         err_msg = f'Expired file download token: {token}'
         logger.error(err_msg)

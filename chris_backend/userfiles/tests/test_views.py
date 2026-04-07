@@ -209,7 +209,7 @@ class UserFileResourceViewTests(UserFileViewTests):
         user = User.objects.get(username=self.chris_username)
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
-                           algorithm='HS256')
+                           algorithm='HS512')
         FileDownloadToken.objects.get_or_create(token=token, owner=user)
         response = self.client.get(f'{self.download_url}?download_token={token}')
         self.assertEqual(response.status_code, 200)

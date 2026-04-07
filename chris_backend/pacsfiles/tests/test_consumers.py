@@ -184,6 +184,6 @@ class PACSFileProgressTests(TransactionTestCase):
         token = jwt.encode(
             {'user': self.user.username, 'exp': dt},
             settings.SECRET_KEY,
-            algorithm='HS256',
+            algorithm='HS512',
         )
         return FileDownloadToken.objects.create(token=token, owner=self.user)
