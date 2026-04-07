@@ -198,7 +198,7 @@ services:
         condition: service_healthy
 
   orthanc:
-    image: docker.io/jodogne/orthanc-plugins:1.12.3
+    image: docker.io/orthancteam/orthanc:25.12.3
     volumes:
       - ./orthanc.json:/etc/orthanc/orthanc.json:ro
       - orthanc:/var/lib/orthanc/db
