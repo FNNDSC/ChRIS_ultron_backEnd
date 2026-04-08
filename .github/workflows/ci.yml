@@ -22,7 +22,7 @@ jobs:
         if: matrix.engine == 'podman'
         run: systemctl --user start podman.service
       - uses: taiki-e/install-action@just
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
         uses: ./
         with:
@@ -34,13 +34,13 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Update __version__.py
         if: startsWith(github.ref, 'refs/tags/v')
         run: echo "__version__ = '${GITHUB_REF_NAME:1}'" > chris_backend/__version__.py
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             docker.io/fnndsc/cube
@@ -51,22 +51,22 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: true
           context: .
@@ -78,7 +78,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa #v5.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: taiki-e/install-action@just
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Update __version__.py
         if: startsWith(github.ref, 'refs/tags/v')
         run: echo "__version__ = '${GITHUB_REF_NAME:1}'" > chris_backend/__version__.py
@@ -102,7 +102,7 @@ jobs:
       - name: Generate OpenAPI schema (split)
         run: just openapi-split 2> spectacular_split.log > schema_split.yaml || (cat spectacular_split.log; exit 1)
       - name: Upload schema YAML files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openapi_schema
           path: schema*.yaml
@@ -124,7 +124,7 @@ jobs:
     needs: openapi
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: openapi_schema
       - name: Install the OpenAPI Generator
@@ -137,7 +137,7 @@ jobs:
             -p licenseUrl=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/LICENSE \
             -p pythonPackageName=chris_oag
       - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: ./dist
 
@@ -158,7 +158,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   draft-release:
     name: Draft GitHub Release
@@ -170,10 +170,10 @@ jobs:
     steps:
       - id: version
         run: echo "version=${GITHUB_REF_NAME:1}" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: openapi_schema
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe #v2.6.1
         with:
           draft: true
           prerelease: ${{ contains( github.ref_name, '-' ) }}
