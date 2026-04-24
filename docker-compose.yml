@@ -234,11 +234,11 @@ services:
     restart: "no"
 
   oxidicom:
-    image: ghcr.io/fnndsc/oxidicom:3.0.0
+    image: ghcr.io/fnndsc/oxidicom:4.0.0-alpha.1
     environment:
       # https://chrisproject.org/docs/oxidicom/deployment#environment-variables
       OXIDICOM_FILES_ROOT: /data
-      OXIDICOM_AMQP_ADDRESS: amqp://queue:5672
+      OXIDICOM_CELERY_BROKER: redis://dragonflydb:6379/0
       OXIDICOM_NATS_ADDRESS: nats:4222
       OXIDICOM_SCP_AET: ChRIS
       OXIDICOM_SCP_PROMISCUOUS: "true"
