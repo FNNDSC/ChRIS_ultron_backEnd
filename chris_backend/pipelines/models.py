@@ -11,9 +11,11 @@ from django.core.exceptions import ObjectDoesNotExist
 import django_filters
 from django_filters.rest_framework import FilterSet
 
-from core.models import ChrisFolder, ChrisFile
+from core.models import ChrisFile
 from core.storage import connect_storage
 from plugins.models import Plugin, PluginParameter
+from plugins.fields import CPUField, MemoryField
+from plugins.fields import MemoryInt, CPUInt
 
 
 logger = logging.getLogger(__name__)
@@ -276,6 +278,10 @@ def auto_delete_source_file_with_meta(sender, instance, **kwargs):
 
 class PluginPiping(models.Model):
     title = models.CharField(max_length=100)
+    cpu_limit = CPUField(null=True)
+    memory_limit = MemoryField(null=True)
+    number_of_workers = models.IntegerField(null=True)
+    gpu_limit = models.IntegerField(null=True)
     plugin = models.ForeignKey(Plugin, on_delete=models.CASCADE)
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
                                  related_name='plugin_pipings')
@@ -294,11 +300,10 @@ class PluginPiping(models.Model):
         Overriden to save the default plugin parameters' values associated with this
         piping.
         """
-        param_defaults = []
-        if 'parameter_defaults' in kwargs:
-            param_defaults = kwargs['parameter_defaults']
-            del kwargs['parameter_defaults']
+        param_defaults = kwargs.pop('parameter_defaults', [])
+        self._set_compute_defaults()
         super(PluginPiping, self).save(*args, **kwargs)
+
         plugin = self.plugin
         parameters = plugin.parameters.all()
         for parameter in parameters:
@@ -322,6 +327,19 @@ class PluginPiping(models.Model):
                 if param:
                     default_piping_param.value = param[0]['default']
                     default_piping_param.save()
+
+    def _set_compute_defaults(self):
+        """
+        Custom internal method to set compute-related defaults.
+        """
+        if not self.cpu_limit:
+            self.cpu_limit = CPUInt(self.plugin.min_cpu_limit)
+        if not self.memory_limit:
+            self.memory_limit = MemoryInt(self.plugin.min_memory_limit)
+        if not self.number_of_workers:
+            self.number_of_workers = self.plugin.min_number_of_workers
+        if not self.gpu_limit:
+            self.gpu_limit = self.plugin.min_gpu_limit
 
     def check_parameter_defaults(self):
         """

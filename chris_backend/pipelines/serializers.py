@@ -16,6 +16,7 @@ from core.models import ChrisFolder
 from core.serializers import ChrisFileSerializer
 from collectionjson.fields import ItemLinkField
 from plugins.enums import TYPES
+from plugins.fields import CPUInt, MemoryInt
 from plugins.models import Plugin
 from plugins.serializers import DEFAULT_PARAMETER_SERIALIZERS
 from plugininstances.models import PluginInstance
@@ -41,7 +42,72 @@ class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = PluginPiping
         fields = ('url', 'id', 'previous_id', 'title', 'plugin_id', 'plugin_name',
-                  'plugin_version', 'pipeline_id', 'previous', 'plugin', 'pipeline')
+                  'plugin_version', 'pipeline_id', 'cpu_limit', 'memory_limit',
+                  'number_of_workers', 'gpu_limit', 'previous', 'plugin', 'pipeline')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None:  # on update
+            self.fields['title'].read_only = True
+
+    def _get_plugin(self):
+        """
+        Custom internal method to return the Plugin associated to this piping. On update
+        the plugin is taken from the existing instance; on validation outside a view
+        (e.g. from PipelineSerializer.validate_plugin_tree) the plugin must be supplied
+        via the serializer's context.
+        """
+        if self.instance is not None:
+            return self.instance.plugin
+        return self.context['plugin']
+
+    def validate_gpu_limit(self, gpu_limit):
+        """
+        Overriden to validate gpu_limit is within the proper limits.
+        """
+        plugin = self._get_plugin()
+        self.validate_value_within_interval(gpu_limit,
+                                            plugin.min_gpu_limit,
+                                            plugin.max_gpu_limit)
+        return gpu_limit
+
+    def validate_number_of_workers(self, number_of_workers):
+        """
+        Overriden to validate number_of_workers is within the proper limits.
+        """
+        plugin = self._get_plugin()
+        self.validate_value_within_interval(number_of_workers,
+                                            plugin.min_number_of_workers,
+                                            plugin.max_number_of_workers)
+        return number_of_workers
+
+    def validate_cpu_limit(self, cpu_limit):
+        """
+        Overriden to validate cpu_limit is within the proper limits.
+        """
+        plugin = self._get_plugin()
+        self.validate_value_within_interval(cpu_limit,
+                                            plugin.min_cpu_limit,
+                                            plugin.max_cpu_limit)
+        return cpu_limit
+
+    def validate_memory_limit(self, memory_limit):
+        """
+        Overriden to validate memory_limit is within the proper limits.
+        """
+        plugin = self._get_plugin()
+        self.validate_value_within_interval(memory_limit,
+                                            plugin.min_memory_limit,
+                                            plugin.max_memory_limit)
+        return memory_limit
+
+    @staticmethod
+    def validate_value_within_interval(val, min_val, max_val):
+        if val is None:
+            return
+        if val < min_val or val > max_val:
+            raise serializers.ValidationError(["This field value is out of range."])
 
 
 class PipelineSerializer(serializers.HyperlinkedModelSerializer):
@@ -96,6 +162,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     raise serializers.ValidationError(
                         {'non_field_errors': ["The tree of plugin instances contain "
                                               "duplicated (perhaps empty) titles"]})
+                
                 titles.add(visited_instance.title)
                 inst_id_to_ix[visited_instance.id] = curr_ix
                 child_instances = list(visited_instance.next.all())
@@ -111,6 +178,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
 
                 tree_dict['tree'].append({'plugin_id': visited_instance.plugin,
                                           'title': visited_instance.title,
+                                          'cpu_limit': visited_instance.cpu_limit,
+                                          'memory_limit': visited_instance.memory_limit,
+                                          'number_of_workers': visited_instance.number_of_workers,
+                                          'gpu_limit': visited_instance.gpu_limit,
                                           'plugin_parameter_defaults': defaults,
                                           'child_indices': child_indices})
                 curr_ix = upper_ix - 1
@@ -168,6 +239,19 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                     {'non_field_errors': ["At least one of the fields 'plugin_tree' "
                                           "or 'plugin_inst_id' must be provided."]})
         return data
+    
+    def validate_name(self, name):
+        """
+        Overriden to validate the pipeline name is unique.
+        """
+        try:
+            Pipeline.objects.get(name=name)
+        except ObjectDoesNotExist:
+            pass
+        else:
+            msg = f'Pipeline with name {name} already exists.'
+            raise serializers.ValidationError([msg])
+        return name
 
     def validate_plugin_inst_id(self, plugin_inst_id):
         """
@@ -201,6 +285,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         except Exception:
             msg = ["Invalid tree list in %s" % plugin_tree]
             raise serializers.ValidationError(msg)
+        
         if len(plugin_list) == 0:
             msg = ["Invalid empty list in %s" % plugin_tree]
             raise serializers.ValidationError(msg)
@@ -214,17 +299,14 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             if title in title_to_ix:
                 raise serializers.ValidationError(
                     ["Pipeline tree can not contain duplicated titles"])
-            piping_serializer = PluginPipingSerializer(data={'title': title})
-            try:
-                piping_serializer.is_valid(raise_exception=True)
-            except serializers.ValidationError as e:
-                raise serializers.ValidationError([f"Invalid title: '{title}', "
-                                                   f"detail: {str(e)}"])
+
             title_to_ix[title] = ix
 
         plugin_is_ts_list = []
         found_root_node = False
+        
         for d in plugin_list:
+            current_title = d['title']
             try:
                 prev_title = d['previous']
                 if prev_title is None:
@@ -264,6 +346,23 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
                        "create a pipeline." % plg]
                 raise serializers.ValidationError(msg)
 
+            data = {'title': current_title}
+            if 'cpu_limit' in d:
+                data['cpu_limit'] = d['cpu_limit']
+            if 'memory_limit' in d:
+                data['memory_limit'] = d['memory_limit']
+            if 'number_of_workers' in d:
+                data['number_of_workers'] = d['number_of_workers']
+            if 'gpu_limit' in d:
+                data['gpu_limit'] = d['gpu_limit']
+
+            piping_serializer = PluginPipingSerializer(data=data, context={'plugin': plg})
+            try:
+                piping_serializer.is_valid(raise_exception=True)
+            except serializers.ValidationError as e:
+                raise serializers.ValidationError(
+                    [f"Invalid data for: '{current_title}', detail: {str(e)}"])
+            
             plugin_is_ts_list.append(plg.meta.type == 'ts')
 
             if 'plugin_parameter_defaults' in d:
@@ -401,40 +500,54 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         """
         Custom method to return a dictionary containing a list of nodes representing a
         tree of plugins and the index of the root of the tree. Each node is a dictionary
-        containing the node's title, plugin id, its parameter defaults and the
-        list of child indices.
+        containing the node's title, plugin id, its parameter defaults, the list of
+        child indices, and any per-piping resource overrides (cpu_limit, memory_limit,
+        number_of_workers, gpu_limit) that were present on the input node.
         """
+        resource_fields = ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit')
+
+        def _make_node(d):
+            node = {'plugin_id': d['plugin_id'],
+                    'title': d['title'],
+                    'plugin_parameter_defaults': d['plugin_parameter_defaults'],
+                    'child_indices': []}
+            for f in resource_fields:
+                if f in d:
+                    node[f] = d[f]
+            return node
+
         root_ix = [ix for ix,d in enumerate(tree_list) if d['previous'] is None][0]
         tree = [None] * len(tree_list)
-        plugin_id = tree_list[root_ix]['plugin_id']
-        title = tree_list[root_ix]['title']
-        defaults = tree_list[root_ix]['plugin_parameter_defaults']
-        tree[root_ix] = {'plugin_id': plugin_id,
-                         'title': title,
-                         'plugin_parameter_defaults': defaults,
-                         'child_indices': []}
+        tree[root_ix] = _make_node(tree_list[root_ix])
         for ix, d in enumerate(tree_list):
             if ix != root_ix:
                 if not tree[ix]:
-                    plugin_id = d['plugin_id']
-                    title = d['title']
-                    defaults = d['plugin_parameter_defaults']
-                    tree[ix] = {'plugin_id': plugin_id,
-                                'title': title,
-                                'plugin_parameter_defaults': defaults,
-                                'child_indices': []}
+                    tree[ix] = _make_node(d)
                 prev_ix = d['previous']
                 if tree[prev_ix]:
                     tree[prev_ix]['child_indices'].append(ix)
                 else:
-                    plugin_id = tree_list[prev_ix]['plugin_id']
-                    title = tree_list[prev_ix]['title']
-                    defaults = tree_list[prev_ix]['plugin_parameter_defaults']
-                    tree[prev_ix] = {'plugin_id': plugin_id,
-                                     'title': title,
-                                     'plugin_parameter_defaults': defaults,
-                                     'child_indices': [ix]}
+                    tree[prev_ix] = _make_node(tree_list[prev_ix])
+                    tree[prev_ix]['child_indices'].append(ix)
         return {'root_index': root_ix, 'tree': tree}
+
+    @staticmethod
+    def _piping_resource_kwargs(node):
+        """
+        Build the per-piping resource kwargs for PluginPiping.objects.create from a
+        canonical tree node. cpu_limit/memory_limit may arrive as Kubernetes-style
+        strings ('150m', '1Gi') from the YAML/JSON pipeline source path or as plain
+        ints from the plugin-instance path; CPUInt/MemoryInt accept both and yield
+        the int form the model field expects on save. None values are skipped so
+        the field's default applies.
+        """
+        converters = {'cpu_limit': CPUInt, 'memory_limit': MemoryInt}
+        kwargs = {}
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit'):
+            if f in node and node[f] is not None:
+                converter = converters.get(f)
+                kwargs[f] = converter(node[f]) if converter else node[f]
+        return kwargs
 
     @staticmethod
     def _add_plugin_tree_to_pipeline(pipeline, tree_dict):
@@ -447,8 +560,9 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
         tree = tree_dict['tree']
         root_plg = Plugin.objects.get(pk=tree[root_ix]['plugin_id'])
         title = tree[root_ix]['title']
+        root_kwargs = PipelineSerializer._piping_resource_kwargs(tree[root_ix])
         root_plg_piping = PluginPiping.objects.create(title=title, pipeline=pipeline,
-                                                      plugin=root_plg)
+                                                      plugin=root_plg, **root_kwargs)
         defaults = tree[root_ix]['plugin_parameter_defaults']
         root_plg_piping.save(parameter_defaults=defaults)
 
@@ -465,8 +579,10 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
             for ix in tree[curr_ix]['child_indices']:
                 plg = Plugin.objects.get(pk=tree[ix]['plugin_id'])
                 title = tree[ix]['title']
+                child_kwargs = PipelineSerializer._piping_resource_kwargs(tree[ix])
                 plg_piping = PluginPiping.objects.create(title=title, pipeline=pipeline,
-                                                         plugin=plg, previous=curr_piping)
+                                                         plugin=plg, previous=curr_piping,
+                                                         **child_kwargs)
                 defaults = tree[ix]['plugin_parameter_defaults']
                 plg_piping.save(parameter_defaults=defaults)
                 plg_pipings_dict[ix] = plg_piping
@@ -637,6 +753,14 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
                 'plugin_version': plugin_version,
                 'previous': node.get('previous')
             }
+            if 'cpu_limit' in node:
+                canonical_node['cpu_limit'] = node['cpu_limit']
+            if 'memory_limit' in node:
+                canonical_node['memory_limit'] = node['memory_limit']
+            if 'number_of_workers' in node:
+                canonical_node['number_of_workers'] = node['number_of_workers']
+            if 'gpu_limit' in node:
+                canonical_node['gpu_limit'] = node['gpu_limit']
             if plg_param_defaults:
                 canonical_node['plugin_parameter_defaults'] = plg_param_defaults
 

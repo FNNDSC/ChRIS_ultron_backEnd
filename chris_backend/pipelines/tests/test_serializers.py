@@ -15,8 +15,9 @@ from plugininstances.models import PluginInstance
 from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
-from pipelines.models import Pipeline
-from pipelines.serializers import PipelineSerializer, PipelineSourceFileSerializer
+from pipelines.models import Pipeline, PluginPiping
+from pipelines.serializers import (PipelineSerializer, PipelineSourceFileSerializer, 
+                                   PluginPipingSerializer)
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
@@ -162,6 +163,18 @@ class PipelineSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             pipeline_serializer.validate(data)
 
+    def test_validate_name(self):
+        """
+        Test whether overriden validate_name method raises a serializers.ValidationError
+        when a pipeline with the provided name already exists in the DB, and returns the
+        name unchanged when it is unique.
+        """
+        pipeline_serializer = PipelineSerializer(data={})
+        with self.assertRaises(serializers.ValidationError):
+            pipeline_serializer.validate_name(self.pipeline_name)
+        self.assertEqual(pipeline_serializer.validate_name('UniquePipelineName'),
+                         'UniquePipelineName')
+
     def test_validate_plugin_inst_id(self):
         """
         Test whether overriden validate_plugin_inst_id method validates that the plugin
@@ -304,16 +317,43 @@ class PipelineSerializerTests(SerializerTests):
 
     def test_validate_plugin_tree_raises_validation_error_if_title_too_long(self):
         """
-        Test whether overriden validate_plugin_tree method raises ValidationError if
-        internal call to validate_tree method raises ValueError exception.
+        Test whether overriden validate_plugin_tree method raises ValidationError when
+        a node's title exceeds the model's max_length=100. The check is performed by
+        PluginPipingSerializer's auto-generated title field.
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         pipeline_serializer = PipelineSerializer(pipeline)
         plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
-        title = 200 * 's'
-        tree = '[{"plugin_id": ' + str(plugin_ds.id) + ', "title": ' + title + ', previous": null}]'
+        long_title = 200 * 's'
+        tree = json.dumps([{'plugin_id': plugin_ds.id, 'title': long_title,
+                            'previous': None}])
         with self.assertRaises(serializers.ValidationError):
             pipeline_serializer.validate_plugin_tree(tree)
+
+    def test_validate_plugin_tree_error_message_reports_failing_node_title(self):
+        """
+        Regression test: when a non-last node fails per-node validation (e.g. its
+        cpu_limit is below the plugin's min_cpu_limit), the raised ValidationError
+        must reference that node's title, not the title of the last node in the tree.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        below_min_cpu = plugin_ds.min_cpu_limit - 1
+        failing_title = 'first-node'
+        last_title = 'last-node-different'
+        tree = json.dumps([
+            {'plugin_id': plugin_ds.id, 'title': failing_title, 'previous': None,
+             'cpu_limit': below_min_cpu},
+            {'plugin_id': plugin_ds.id, 'title': last_title, 'previous': failing_title},
+        ])
+
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            pipeline_serializer.validate_plugin_tree(tree)
+
+        msg = str(ctx.exception.detail)
+        self.assertIn(failing_title, msg)
+        self.assertNotIn(last_title, msg)
 
     def test_validate_plugin_parameter_defaults_raises_validation_error_if_missing_default(self):
         """
@@ -502,6 +542,38 @@ class PipelineSerializerTests(SerializerTests):
         tree_dict = pipeline_serializer.get_tree(tree_list)
         self.assertEqual(tree_dict, expected_tree_dict)
 
+    def test_get_tree_propagates_per_node_resource_fields(self):
+        """
+        Regression test: get_tree must carry per-node resource overrides
+        (cpu_limit, memory_limit, number_of_workers, gpu_limit) into the canonical
+        tree nodes, and only when present on the input node. Without this, the
+        resource values declared in a YAML/JSON pipeline source file silently fail
+        to propagate to the created PluginPiping rows.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+
+        tree_list = [
+            {'plugin_id': plugin_ds.id, 'title': 'root',
+             'plugin_parameter_defaults': [], 'previous': None,
+             'cpu_limit': '2500m', 'memory_limit': '512Mi',
+             'number_of_workers': 2, 'gpu_limit': 1},
+            {'plugin_id': plugin_ds.id, 'title': 'child',
+             'plugin_parameter_defaults': [], 'previous': 0},
+        ]
+        tree_dict = pipeline_serializer.get_tree(tree_list)
+
+        root = tree_dict['tree'][tree_dict['root_index']]
+        self.assertEqual(root['cpu_limit'], '2500m')
+        self.assertEqual(root['memory_limit'], '512Mi')
+        self.assertEqual(root['number_of_workers'], 2)
+        self.assertEqual(root['gpu_limit'], 1)
+
+        child = tree_dict['tree'][1]
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit'):
+            self.assertNotIn(f, child)
+
     def test__add_plugin_tree_to_pipeline(self):
         """
         Test whether custom internal _add_plugin_tree_to_pipeline method properly
@@ -567,6 +639,38 @@ class PipelineSerializerTests(SerializerTests):
         parent_ixs = [int(parent_ix) for parent_ix in param.value.split(',')]
         for ix in parent_ixs:
             self.assertIn(ix, plg_pip_ids)
+
+    def test__add_plugin_tree_to_pipeline_normalizes_string_resource_limits(self):
+        """
+        Regression test: when a tree node carries cpu_limit/memory_limit as
+        Kubernetes-style strings (the YAML/JSON pipeline source path), the created
+        PluginPiping must persist them as the equivalent integer values rather than
+        crashing in CPUField.get_prep_value with int('NNNm').
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline_serializer = PipelineSerializer(pipeline)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+
+        tree_dict = {
+            'root_index': 0,
+            'tree': [
+                {'plugin_id': plugin_ds.id, 'title': 'root',
+                 'plugin_parameter_defaults': [], 'child_indices': [1],
+                 'cpu_limit': '2500m', 'memory_limit': '2Gi',
+                 'number_of_workers': 3, 'gpu_limit': 1},
+                {'plugin_id': plugin_ds.id, 'title': 'child',
+                 'plugin_parameter_defaults': [], 'child_indices': []},
+            ],
+        }
+
+        pipeline_serializer._add_plugin_tree_to_pipeline(pipeline, tree_dict)
+
+        root = pipeline.plugin_pipings.get(title='root')
+        self.assertEqual(int(root.cpu_limit), 2500)
+        self.assertEqual(int(root.memory_limit), 2048)
+        self.assertEqual(root.number_of_workers, 3)
+        self.assertEqual(root.gpu_limit, 1)
+
 
 class PipelineSourceFileSerializerTests(SerializerTests):
 
@@ -735,3 +839,198 @@ class PipelineSourceFileSerializerTests(SerializerTests):
                                          '"plugin_parameter_defaults": [{"name": "plugininstances", "default": "simpledsapp1,simpledsapp2"}]}]'}
         self.assertEqual(PipelineSourceFileSerializer.get_json_pipeline_canonical_representation(pipeline_repr),
                          canonical_repr)
+
+
+class PluginPipingSerializerTests(SerializerTests):
+
+    def setUp(self):
+        super(PluginPipingSerializerTests, self).setUp()
+        self.plugin = Plugin.objects.get(meta__name=self.plugin_ds_name)
+
+    def _make_create_serializer(self):
+        """
+        Build a PluginPipingSerializer that mimics how PipelineSerializer.validate_plugin_tree
+        invokes it: no instance, plugin supplied via context.
+        """
+        return PluginPipingSerializer(data={}, context={'plugin': self.plugin})
+
+    def _make_update_serializer(self):
+        """
+        Build a PluginPipingSerializer that mimics a PUT to PluginPipingDetail: bound to
+        an existing PluginPiping whose plugin attribute is the test plugin.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        piping, _ = PluginPiping.objects.get_or_create(
+            title='existing-piping', pipeline=pipeline, plugin=self.plugin)
+        return PluginPipingSerializer(instance=piping, data={}, partial=True)
+
+    def test_validate_gpu_limit_out_of_range_on_create(self):
+        """
+        Test whether overriden validate_gpu_limit method raises a serializers.ValidationError
+        when the gpu_limit is not within the limits provided by the corresponding plugin
+        (create context: plugin supplied via serializer context).
+        """
+        s = self._make_create_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_gpu_limit(self.plugin.min_gpu_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_gpu_limit(self.plugin.max_gpu_limit + 1)
+
+    def test_validate_gpu_limit_out_of_range_on_update(self):
+        """
+        Test whether overriden validate_gpu_limit method raises a serializers.ValidationError
+        when the gpu_limit is not within the limits provided by the corresponding plugin
+        (update context: plugin taken from the bound instance).
+        """
+        s = self._make_update_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_gpu_limit(self.plugin.min_gpu_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_gpu_limit(self.plugin.max_gpu_limit + 1)
+
+    def test_validate_gpu_limit_none_does_not_raise_on_create(self):
+        """
+        Test whether overriden validate_gpu_limit method does not raise when gpu_limit
+        is None in the create context.
+        """
+        self.assertIsNone(self._make_create_serializer().validate_gpu_limit(None))
+
+    def test_validate_gpu_limit_none_does_not_raise_on_update(self):
+        """
+        Test whether overriden validate_gpu_limit method does not raise when gpu_limit
+        is None in the update context.
+        """
+        self.assertIsNone(self._make_update_serializer().validate_gpu_limit(None))
+
+    def test_validate_number_of_workers_out_of_range_on_create(self):
+        """
+        Test whether overriden validate_number_of_workers method raises a
+        serializers.ValidationError when the number_of_workers is not within the limits
+        provided by the corresponding plugin (create context).
+        """
+        s = self._make_create_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_number_of_workers(self.plugin.min_number_of_workers - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_number_of_workers(self.plugin.max_number_of_workers + 1)
+
+    def test_validate_number_of_workers_out_of_range_on_update(self):
+        """
+        Test whether overriden validate_number_of_workers method raises a
+        serializers.ValidationError when the number_of_workers is not within the limits
+        provided by the corresponding plugin (update context).
+        """
+        s = self._make_update_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_number_of_workers(self.plugin.min_number_of_workers - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_number_of_workers(self.plugin.max_number_of_workers + 1)
+
+    def test_validate_number_of_workers_none_does_not_raise_on_create(self):
+        """
+        Test whether overriden validate_number_of_workers method does not raise when
+        number_of_workers is None in the create context.
+        """
+        self.assertIsNone(
+            self._make_create_serializer().validate_number_of_workers(None))
+
+    def test_validate_number_of_workers_none_does_not_raise_on_update(self):
+        """
+        Test whether overriden validate_number_of_workers method does not raise when
+        number_of_workers is None in the update context.
+        """
+        self.assertIsNone(
+            self._make_update_serializer().validate_number_of_workers(None))
+
+    def test_validate_cpu_limit_out_of_range_on_create(self):
+        """
+        Test whether overriden validate_cpu_limit method raises a serializers.ValidationError
+        when the cpu_limit is not within the limits provided by the corresponding plugin
+        (create context).
+        """
+        s = self._make_create_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_cpu_limit(self.plugin.min_cpu_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_cpu_limit(self.plugin.max_cpu_limit + 1)
+
+    def test_validate_cpu_limit_out_of_range_on_update(self):
+        """
+        Test whether overriden validate_cpu_limit method raises a serializers.ValidationError
+        when the cpu_limit is not within the limits provided by the corresponding plugin
+        (update context).
+        """
+        s = self._make_update_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_cpu_limit(self.plugin.min_cpu_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_cpu_limit(self.plugin.max_cpu_limit + 1)
+
+    def test_validate_cpu_limit_none_does_not_raise_on_create(self):
+        """
+        Test whether overriden validate_cpu_limit method does not raise when cpu_limit
+        is None in the create context.
+        """
+        self.assertIsNone(self._make_create_serializer().validate_cpu_limit(None))
+
+    def test_validate_cpu_limit_none_does_not_raise_on_update(self):
+        """
+        Test whether overriden validate_cpu_limit method does not raise when cpu_limit
+        is None in the update context.
+        """
+        self.assertIsNone(self._make_update_serializer().validate_cpu_limit(None))
+
+    def test_validate_memory_limit_out_of_range_on_create(self):
+        """
+        Test whether overriden validate_memory_limit method raises a
+        serializers.ValidationError when the memory_limit is not within the limits
+        provided by the corresponding plugin (create context).
+        """
+        s = self._make_create_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_memory_limit(self.plugin.min_memory_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_memory_limit(self.plugin.max_memory_limit + 1)
+
+    def test_validate_memory_limit_out_of_range_on_update(self):
+        """
+        Test whether overriden validate_memory_limit method raises a
+        serializers.ValidationError when the memory_limit is not within the limits
+        provided by the corresponding plugin (update context).
+        """
+        s = self._make_update_serializer()
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_memory_limit(self.plugin.min_memory_limit - 1)
+        with self.assertRaises(serializers.ValidationError):
+            s.validate_memory_limit(self.plugin.max_memory_limit + 1)
+
+    def test_validate_memory_limit_none_does_not_raise_on_create(self):
+        """
+        Test whether overriden validate_memory_limit method does not raise when
+        memory_limit is None in the create context.
+        """
+        self.assertIsNone(self._make_create_serializer().validate_memory_limit(None))
+
+    def test_validate_memory_limit_none_does_not_raise_on_update(self):
+        """
+        Test whether overriden validate_memory_limit method does not raise when
+        memory_limit is None in the update context.
+        """
+        self.assertIsNone(self._make_update_serializer().validate_memory_limit(None))
+
+    def test_title_is_writable_on_create(self):
+        """
+        Test that the title field is writable when no instance is bound (create
+        context), so PipelineSerializer.validate_plugin_tree can validate it.
+        """
+        s = PluginPipingSerializer(data={'title': 'a-title'},
+                                   context={'plugin': self.plugin})
+        self.assertFalse(s.fields['title'].read_only)
+
+    def test_title_is_read_only_on_update(self):
+        """
+        Test that the title field is forced to read-only when an instance is bound
+        (update context), so a PUT to PluginPipingDetail can never rename the piping.
+        """
+        s = self._make_update_serializer()
+        self.assertTrue(s.fields['title'].read_only)

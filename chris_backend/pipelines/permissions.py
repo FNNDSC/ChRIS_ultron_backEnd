@@ -28,7 +28,8 @@ class IsChrisOrOwnerAndLockedOrNotLockedReadOnly(permissions.BasePermission):
     """
 
     def has_object_permission(self, request, view, obj):
-        pipeline = obj.plugin_piping.pipeline
+        pipeline = obj.plugin_piping.pipeline if hasattr(
+            obj, 'plugin_piping') else obj.pipeline
 
         if request.user.username == 'chris':
             # superuser 'chris' always has read/write access
