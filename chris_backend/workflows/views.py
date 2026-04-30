@@ -126,7 +126,11 @@ class WorkflowList(generics.ListCreateAPIView):
             previous=previous,
             title=data.title,
             compute_resource=data.compute_resource,
-            workflow=workflow
+            workflow=workflow,
+            cpu_limit=data.cpu_limit,
+            memory_limit=data.memory_limit,
+            number_of_workers=data.number_of_workers,
+            gpu_limit=data.gpu_limit,
         )
         for plugin_param, value in data.params:
             PARAMETER_MODELS[plugin_param.type].objects.create(

@@ -643,7 +643,7 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
         pipeline_repr = validated_data.pop('pipeline')
         pipeline_serializer = PipelineSerializer(data=pipeline_repr)
         pipeline_serializer.is_valid(raise_exception=True)
-        pipeline = pipeline_serializer.save(owner=owner)
+        pipeline = pipeline_serializer.save(owner=uploader)  # uploader owns the pipeline
 
         # file will be stored to Swift at:
         # SWIFT_CONTAINER_NAME/PIPELINES/<uploader_username>/<filename>

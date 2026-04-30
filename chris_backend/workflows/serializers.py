@@ -5,12 +5,14 @@ from typing import List, Optional
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from pipelines.serializers import DEFAULT_PIPING_PARAMETER_SERIALIZERS
+from pipelines.serializers import (DEFAULT_PIPING_PARAMETER_SERIALIZERS,
+                                    PluginPipingSerializer)
 from plugininstances.models import PluginInstance
-from plugininstances.serializers import PluginInstanceSerializer
 from plugininstances.enums import STATUS_CHOICES
 from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
 from .models import Workflow
+
+RESOURCE_FIELDS = ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit')
 
 
 class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
@@ -119,29 +121,28 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
             d_l = [d for d in input_node_list if d.get('piping_id') == piping.id]
             if d_l:
                 d = d_l[0]
+                # collect the user-supplied piping fields for validation before
+                # the canonical-form normalization below mutates the dict
+                piping_data = {f: d[f] for f in ('title', *RESOURCE_FIELDS) if f in d}
+
                 if 'title' in d:
                     title = d['title']
-                    if title in titles:
-                        raise serializers.ValidationError(
-                            [f"Workflow tree can not contain duplicated title: {title}"])
-                    titles.add(title)
-                    plg_inst_serializer = PluginInstanceSerializer(data={'title': title})
-                    try:
-                        plg_inst_serializer.is_valid(raise_exception=True)
-                    except Exception:
-                        msg = [f'Invalid title {title} for pipping with id {piping.id}']
-                        raise serializers.ValidationError(msg)
                 else:
                     title = piping.title
-                    if title in titles:
-                        raise serializers.ValidationError(
-                            [f"Workflow tree can not contain duplicated title: {title}"])
-                    titles.add(title)
                     d['title'] = title
+                if title in titles:
+                    raise serializers.ValidationError(
+                        [f"Workflow tree can not contain duplicated title: {title}"])
+                titles.add(title)
                 if 'compute_resource_name' not in d:
                     d['compute_resource_name'] = None
                 if 'plugin_parameter_defaults' not in d:
                     d['plugin_parameter_defaults'] = []
+                for f in RESOURCE_FIELDS:
+                    if f not in d:
+                        d[f] = None
+
+                self.validate_piping_overrides(piping, piping_data)
             else:
                 title = piping.title
                 if title in titles:
@@ -152,7 +153,11 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                     piping_id=piping.id,
                     compute_resource_name=None,
                     title=title,
-                    plugin_parameter_defaults=[]
+                    plugin_parameter_defaults=[],
+                    cpu_limit=None,
+                    memory_limit=None,
+                    number_of_workers=None,
+                    gpu_limit=None,
                 )
 
             cr_name = d.get('compute_resource_name')
@@ -171,6 +176,25 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                                                 piping_param_defaults)
             node_list.append(d)
         return node_list
+
+    @staticmethod
+    def validate_piping_overrides(piping, piping_data):
+        """
+        Helper method to validate the per-piping title and resource overrides
+        (cpu_limit, memory_limit, number_of_workers, gpu_limit) supplied for a
+        workflow node. Delegates to PluginPipingSerializer so the same
+        format-parsing and min/max range semantics used when building a pipeline
+        also apply here.
+        """
+        if not piping_data:
+            return
+        piping_serializer = PluginPipingSerializer(
+            data=piping_data, partial=True, context={'plugin': piping.plugin})
+        try:
+            piping_serializer.is_valid(raise_exception=True)
+        except serializers.ValidationError as e:
+            raise serializers.ValidationError(
+                [f"Invalid data for piping with id {piping.id}: {e.detail}"])
 
     @staticmethod
     def validate_piping_params(piping_id: PipingId, default_param, piping_param_defaults: List[GivenWorkflowPluginParameterDefault]):
@@ -206,7 +230,7 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
 
     def validate(self, data):
         """
-        Overriden to validate that a previous plugin instance id was passsed in the
+        Overriden to validate that a previous plugin instance id was passed in the
         create request.
         """
         if not self.instance:  # this validation only happens on create and not on update

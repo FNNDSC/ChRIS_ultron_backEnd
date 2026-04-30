@@ -9,7 +9,7 @@ from pipelines.models import Pipeline
 
 class Workflow(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
-    title = models.CharField(max_length=100, blank=True)
+    title = models.CharField(max_length=100, blank=True, db_index=True)
     pipeline = models.ForeignKey(Pipeline, on_delete=models.CASCADE,
                                  related_name='workflows')
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE)

@@ -176,6 +176,67 @@ class WorkflowListViewTests(ViewTests):
             for inst_id in parent_ids:
                 self.assertIn(inst_id, [inst_ds1.id, inst_ds2.id])
 
+    def test_workflow_create_with_resource_overrides(self):
+        """
+        cpu_limit/memory_limit/number_of_workers/gpu_limit overrides on the
+        nodes_info entry propagate to the created plugin instance.
+        """
+        post = json.dumps(
+            {"template": {"data": [{"name": "previous_plugin_inst_id", "value": self.pl_inst.id},
+                                   {"name": "nodes_info",
+                                    "value": json.dumps([
+                                        {"piping_id": self.pips[0].id,
+                                         "title": "Inst_ds1",
+                                         "compute_resource_name": "host",
+                                         "cpu_limit": "2000m",
+                                         "memory_limit": "1Gi",
+                                         "number_of_workers": 2,
+                                         "gpu_limit": 0,
+                                         "plugin_parameter_defaults": [
+                                             {"name": "dummyInt", "default": 3}]},
+                                        {"piping_id": self.pips[1].id,
+                                         "title": "Inst_ds2",
+                                         "compute_resource_name": "host"},
+                                        {"piping_id": self.pips[2].id,
+                                         "title": "Inst_ts",
+                                         "compute_resource_name": "host"}])}]}})
+
+        with mock.patch('plugininstances.utils.run_plugin_instance_job'):
+            self.client.login(username=self.username, password=self.password)
+            response = self.client.post(self.create_read_url, data=post,
+                                        content_type=self.content_type)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+            inst_ds1 = PluginInstance.objects.get(title="Inst_ds1")
+            self.assertEqual(int(inst_ds1.cpu_limit), 2000)
+            self.assertEqual(int(inst_ds1.memory_limit), 1024)
+            self.assertEqual(inst_ds1.number_of_workers, 2)
+            self.assertEqual(inst_ds1.gpu_limit, 0)
+
+            # the piping with no override gets the piping's stored defaults
+            inst_ds2 = PluginInstance.objects.get(title="Inst_ds2")
+            self.assertEqual(int(inst_ds2.cpu_limit), int(self.pips[1].cpu_limit))
+            self.assertEqual(int(inst_ds2.memory_limit), int(self.pips[1].memory_limit))
+            self.assertEqual(inst_ds2.number_of_workers, self.pips[1].number_of_workers)
+            self.assertEqual(inst_ds2.gpu_limit, self.pips[1].gpu_limit)
+
+    def test_workflow_create_rejects_out_of_range_resource(self):
+        """
+        A resource override outside the plugin's allowed range yields HTTP 400.
+        """
+        post = json.dumps(
+            {"template": {"data": [{"name": "previous_plugin_inst_id", "value": self.pl_inst.id},
+                                   {"name": "nodes_info",
+                                    "value": json.dumps([
+                                        {"piping_id": self.pips[0].id,
+                                         "cpu_limit": 500},  # below default min 1000m
+                                    ])}]}})
+
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.post(self.create_read_url, data=post,
+                                    content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_workflow_list_success(self):
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         owner = User.objects.get(username=self.username)

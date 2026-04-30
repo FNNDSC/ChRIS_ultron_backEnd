@@ -3,6 +3,7 @@ from typing import TypedDict, NewType, List, Any, Optional, Sequence, Tuple, Dic
 
 from pipelines.models import PluginPiping, DefaultPipingStrParameter, DefaultPipingIntParameter, \
     DefaultPipingFloatParameter, DefaultPipingBoolParameter
+from plugins.fields import CPUInt, MemoryInt
 from plugins.models import ComputeResource, PluginParameter
 
 PipingId = NewType('PipingId', int)
@@ -29,6 +30,10 @@ class GivenNodeInfo(TypedDict):
     compute_resource_name: Optional[ComputeResourceName]
     title: str
     plugin_parameter_defaults: List[GivenWorkflowPluginParameterDefault]
+    cpu_limit: Optional[Any]
+    memory_limit: Optional[Any]
+    number_of_workers: Optional[int]
+    gpu_limit: Optional[int]
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,10 @@ class WorkflowPluginInstanceTemplate:
     compute_resource: ComputeResource
     title: str
     params: Sequence[Tuple[PluginParameter, Any]]
+    cpu_limit: int
+    memory_limit: int
+    number_of_workers: int
+    gpu_limit: int
 
 
 @dataclass(frozen=True)
@@ -61,11 +70,32 @@ class WorkflowPluginInstanceTemplateFactory:
     def inflate(self, node_info: GivenNodeInfo) -> WorkflowPluginInstanceTemplate:
         piping = self.get_piping(node_info['piping_id'])
         return WorkflowPluginInstanceTemplate(
-            piping=self.get_piping(node_info['piping_id']),
+            piping=piping,
             compute_resource=self.get_compute_resource(piping, node_info['compute_resource_name']),
             title=node_info['title'],
-            params=self._reconcile_params(node_info['plugin_parameter_defaults'], piping)
+            params=self._reconcile_params(node_info['plugin_parameter_defaults'], piping),
+            cpu_limit=self._resolve_cpu(node_info.get('cpu_limit'), piping),
+            memory_limit=self._resolve_memory(node_info.get('memory_limit'), piping),
+            number_of_workers=self._resolve_int(node_info.get('number_of_workers'),
+                                                piping.number_of_workers),
+            gpu_limit=self._resolve_int(node_info.get('gpu_limit'), piping.gpu_limit),
         )
+
+    @staticmethod
+    def _resolve_cpu(value, piping: PluginPiping) -> int:
+        if value is None:
+            return piping.cpu_limit
+        return CPUInt(value)
+
+    @staticmethod
+    def _resolve_memory(value, piping: PluginPiping) -> int:
+        if value is None:
+            return piping.memory_limit
+        return MemoryInt(value)
+
+    @staticmethod
+    def _resolve_int(value, piping_value: int) -> int:
+        return piping_value if value is None else value
 
     @classmethod
     def _reconcile_params(cls,

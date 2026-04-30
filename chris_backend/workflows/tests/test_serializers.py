@@ -227,13 +227,21 @@ class WorkflowSerializerTests(SerializerTests):
                 piping_id=self.pips[0].id,
                 compute_resource_name=ComputeResourceName("host"),
                 title="pip1",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
                 title="pip2",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             )
         ]
         self.assertCountEqual(expected, actual)
@@ -250,13 +258,81 @@ class WorkflowSerializerTests(SerializerTests):
                 piping_id=self.pips[0].id,
                 compute_resource_name=None,
                 title="pip1",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
                 title="pip2",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             )
         ]
         self.assertCountEqual(expected, actual)
+
+    def test_validate_nodes_info_resource_overrides_accepted(self):
+        """
+        Valid cpu_limit/memory_limit/number_of_workers/gpu_limit overrides
+        (including Kubernetes-style string forms) round-trip through
+        canonicalization untouched.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        actual = workflow_serializer.validate_nodes_info(json.dumps([
+            {"piping_id": self.pips[0].id,
+             "cpu_limit": "2000m", "memory_limit": "1Gi",
+             "number_of_workers": 2, "gpu_limit": 0},
+        ]))
+        node = next(n for n in actual if n['piping_id'] == self.pips[0].id)
+        self.assertEqual(node['cpu_limit'], "2000m")
+        self.assertEqual(node['memory_limit'], "1Gi")
+        self.assertEqual(node['number_of_workers'], 2)
+        self.assertEqual(node['gpu_limit'], 0)
+        # the unmentioned piping defaults stay at None
+        other = next(n for n in actual if n['piping_id'] == self.pips[1].id)
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit'):
+            self.assertIsNone(other[f])
+
+    def test_validate_nodes_info_resource_out_of_range_rejected(self):
+        """
+        Resource override values outside [plugin.min_*, plugin.max_*] raise.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        # cpu below min (default min is 1000m)
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "cpu_limit": 500},
+            ]))
+        # gpu above max (default max is 0)
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "gpu_limit": 5},
+            ]))
+
+    def test_validate_nodes_info_resource_bad_format_rejected(self):
+        """
+        A cpu_limit value that doesn't parse as 'xm' raises.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "cpu_limit": "abc"},
+            ]))
