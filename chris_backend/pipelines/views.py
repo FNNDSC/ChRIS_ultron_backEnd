@@ -55,15 +55,18 @@ class PipelineList(generics.ListCreateAPIView):
         template to the response.
         """
         response = super(PipelineList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('pipeline-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
         links = {'plugins': reverse('plugin-list', request=request)}
         response = services.append_collection_links(response, links)
+
         # append write template
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': "",
-                         'locked': "", 'plugin_tree': "", 'plugin_inst_id': ""}
+        template_data = {'name': '', 'authors': '', 'category': '', 'description': '',
+                         'locked': '', 'plugin_tree': '', 'plugin_inst_id': ''}
         return services.append_collection_template(response, template_data)
 
 
@@ -97,10 +100,11 @@ class PipelineDetail(generics.RetrieveUpdateDestroyAPIView):
         Overriden to append a collection+json template.
         """
         response = super(PipelineDetail, self).retrieve(request, *args, **kwargs)
-        template_data = {'name': "", 'authors': "", 'category': "", 'description': ""}
+        template_data = {'name': '', 'authors': '', 'category': '', 'description': ''}
+
         pipeline = self.get_object()
         if pipeline.locked:
-            template_data['locked'] = ""
+            template_data['locked'] = ''
         return services.append_collection_template(response, template_data)
 
     # def destroy(self, request, *args, **kwargs):
@@ -146,9 +150,11 @@ class PipelineSourceFileList(generics.ListCreateAPIView):
         template to the response.
         """
         response = super(PipelineSourceFileList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('pipelinesourcefile-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+        
         # append write template
         template_data = {'type': '', 'fname': ''}
         return services.append_collection_template(response, template_data)
@@ -278,15 +284,23 @@ class PipelineDefaultParameterList(generics.ListAPIView):
         return self.filter_queryset(pipeline.get_default_parameters())
 
 
-class PluginPipingDetail(generics.RetrieveAPIView):
+class PluginPipingDetail(generics.RetrieveUpdateAPIView):
     """
     A plugin piping view.
     """
-    http_method_names = ['get']
+    http_method_names = ['get', 'put']
     queryset = PluginPiping.objects.all()
     serializer_class = PluginPipingSerializer
-    permission_classes = (IsChrisOrOwnerOrNotLockedReadOnly,)
+    permission_classes = (IsChrisOrOwnerAndLockedOrNotLockedReadOnly,)
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Overriden to append a collection+json template.
+        """
+        response = super(PluginPipingDetail, self).retrieve(request, *args, **kwargs)
+        template_data = {'cpu_limit': '', 'memory_limit': '', 'number_of_workers': '', 
+                         'gpu_limit': ''}
+        return services.append_collection_template(response, template_data)
 
 class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
     """
@@ -304,7 +318,7 @@ class DefaultPipingStrParameterDetail(generics.RetrieveUpdateAPIView):
         """
         response = super(DefaultPipingStrParameterDetail, self).retrieve(
             request, *args, **kwargs)
-        template_data = {"value": ""}
+        template_data = {"value": ''}
         return services.append_collection_template(response, template_data)
 
 
@@ -324,7 +338,7 @@ class DefaultPipingIntParameterDetail(generics.RetrieveUpdateAPIView):
         """
         response = super(DefaultPipingIntParameterDetail, self).retrieve(
             request, *args, **kwargs)
-        template_data = {"value": ""}
+        template_data = {"value": ''}
         return services.append_collection_template(response, template_data)
 
 
@@ -344,7 +358,7 @@ class DefaultPipingFloatParameterDetail(generics.RetrieveUpdateAPIView):
         """
         response = super(DefaultPipingFloatParameterDetail, self).retrieve(
             request, *args, **kwargs)
-        template_data = {"value": ""}
+        template_data = {"value": ''}
         return services.append_collection_template(response, template_data)
 
 
@@ -364,5 +378,5 @@ class DefaultPipingBoolParameterDetail(generics.RetrieveUpdateAPIView):
         """
         response = super(DefaultPipingBoolParameterDetail, self).retrieve(
             request, *args, **kwargs)
-        template_data = {"value": ""}
+        template_data = {"value": ''}
         return services.append_collection_template(response, template_data)

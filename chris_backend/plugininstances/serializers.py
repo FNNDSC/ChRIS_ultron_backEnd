@@ -188,6 +188,8 @@ class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
 
     @staticmethod
     def validate_value_within_interval(val, min_val, max_val):
+        if val is None:
+            return
         if val < min_val or val > max_val:
             raise serializers.ValidationError(["This field value is out of range."])
 

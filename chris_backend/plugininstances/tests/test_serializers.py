@@ -179,7 +179,7 @@ class PluginInstanceSerializerTests(SerializerTests):
 
     def test_validate_gpu_limit(self):
         """
-        Test whether custom validate_gpu_limit raises a serializers.ValidationError when
+        Test whether overriden validate_gpu_limit raises a serializers.ValidationError when
         the gpu_limit is not within the limits provided by the corresponding plugin.
         """
         data = self.data
@@ -192,10 +192,11 @@ class PluginInstanceSerializerTests(SerializerTests):
             plg_inst_serializer.validate_gpu_limit(plugin.min_gpu_limit-1)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_gpu_limit(plugin.max_gpu_limit+1)
+        self.assertIsNone(plg_inst_serializer.validate_gpu_limit(None))
 
     def test_validate_number_of_workers(self):
         """
-        Test whether custom validate_number_of_workers raises a serializers.ValidationError
+        Test whether overriden validate_number_of_workers raises a serializers.ValidationError
         when the number_of_workers is not within the limits provided by the corresponding
         plugin.
         """
@@ -209,10 +210,11 @@ class PluginInstanceSerializerTests(SerializerTests):
             plg_inst_serializer.validate_number_of_workers(plugin.min_number_of_workers-1)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_number_of_workers(plugin.max_number_of_workers+1)
+        self.assertIsNone(plg_inst_serializer.validate_number_of_workers(None))
 
     def test_validate_cpu_limit(self):
         """
-        Test whether custom validate_cpu_limit raises a serializers.ValidationError when
+        Test whether overriden validate_cpu_limit raises a serializers.ValidationError when
         the cpu_limit is not within the limits provided by the corresponding plugin.
         """
         data = self.data
@@ -225,10 +227,11 @@ class PluginInstanceSerializerTests(SerializerTests):
             plg_inst_serializer.validate_cpu_limit(plugin.min_cpu_limit-1)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_cpu_limit(plugin.max_cpu_limit+1)
+        self.assertIsNone(plg_inst_serializer.validate_cpu_limit(None))
 
     def test_validate_memory_limit(self):
         """
-        Test whether custom validate_memory_limit raises a serializers.ValidationError
+        Test whether overriden validate_memory_limit raises a serializers.ValidationError
         when the memory_limit is not within the limits provided by the corresponding
         plugin.
         """
@@ -242,6 +245,7 @@ class PluginInstanceSerializerTests(SerializerTests):
             plg_inst_serializer.validate_memory_limit(plugin.min_memory_limit-1)
         with self.assertRaises(serializers.ValidationError):
             plg_inst_serializer.validate_memory_limit(plugin.max_memory_limit+1)
+        self.assertIsNone(plg_inst_serializer.validate_memory_limit(None))
 
     def test_validate_value_within_interval(self):
         """

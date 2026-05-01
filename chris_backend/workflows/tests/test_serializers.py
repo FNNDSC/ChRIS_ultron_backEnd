@@ -227,13 +227,21 @@ class WorkflowSerializerTests(SerializerTests):
                 piping_id=self.pips[0].id,
                 compute_resource_name=ComputeResourceName("host"),
                 title="pip1",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
                 title="pip2",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             )
         ]
         self.assertCountEqual(expected, actual)
@@ -250,13 +258,264 @@ class WorkflowSerializerTests(SerializerTests):
                 piping_id=self.pips[0].id,
                 compute_resource_name=None,
                 title="pip1",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             ),
             GivenNodeInfo(
                 piping_id=self.pips[1].id,
                 compute_resource_name=None,
                 title="pip2",
-                plugin_parameter_defaults=[]
+                plugin_parameter_defaults=[],
+                cpu_limit=None,
+                memory_limit=None,
+                number_of_workers=None,
+                gpu_limit=None,
             )
         ]
         self.assertCountEqual(expected, actual)
+
+    def test_validate_nodes_info_resource_overrides_accepted(self):
+        """
+        Valid cpu_limit/memory_limit/number_of_workers/gpu_limit overrides
+        (including Kubernetes-style string forms) round-trip through
+        canonicalization untouched.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        actual = workflow_serializer.validate_nodes_info(json.dumps([
+            {"piping_id": self.pips[0].id,
+             "cpu_limit": "2000m", "memory_limit": "1Gi",
+             "number_of_workers": 2, "gpu_limit": 0},
+        ]))
+        node = next(n for n in actual if n['piping_id'] == self.pips[0].id)
+        self.assertEqual(node['cpu_limit'], "2000m")
+        self.assertEqual(node['memory_limit'], "1Gi")
+        self.assertEqual(node['number_of_workers'], 2)
+        self.assertEqual(node['gpu_limit'], 0)
+        # the unmentioned piping defaults stay at None
+        other = next(n for n in actual if n['piping_id'] == self.pips[1].id)
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit'):
+            self.assertIsNone(other[f])
+
+    def test_validate_nodes_info_resource_out_of_range_rejected(self):
+        """
+        Resource override values outside [plugin.min_*, plugin.max_*] raise.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        # cpu below min (default min is 1000m)
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "cpu_limit": 500},
+            ]))
+        # gpu above max (default max is 0)
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "gpu_limit": 5},
+            ]))
+
+    def test_validate_nodes_info_resource_bad_format_rejected(self):
+        """
+        A cpu_limit value that doesn't parse as 'xm' raises.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        workflow_serializer = WorkflowSerializer()
+        workflow_serializer.context['view'] = mock.Mock()
+        workflow_serializer.context['view'].get_object = mock.Mock(return_value=pipeline)
+
+        with self.assertRaises(serializers.ValidationError):
+            workflow_serializer.validate_nodes_info(json.dumps([
+                {"piping_id": self.pips[0].id, "cpu_limit": "abc"},
+            ]))
+
+
+class WorkflowSerializerHelperTests(SerializerTests):
+    """
+    Direct unit tests for the private helpers extracted from
+    ``WorkflowSerializer.validate_nodes_info`` and ``validate_piping_params``.
+    """
+
+    def setUp(self):
+        super(WorkflowSerializerHelperTests, self).setUp()
+        self.serializer = WorkflowSerializer()
+        # _build_canonical_node calls validate_piping_overrides, which only
+        # consults piping.plugin (no view context required).
+
+    # ---- _parse_nodes_info_json --------------------------------------------------
+
+    def test__parse_nodes_info_json_none_returns_empty_list(self):
+        self.assertEqual(WorkflowSerializer._parse_nodes_info_json(None), [])
+
+    def test__parse_nodes_info_json_bad_json_raises(self):
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._parse_nodes_info_json("not-json")
+
+    def test__parse_nodes_info_json_non_list_raises(self):
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._parse_nodes_info_json(json.dumps({"piping_id": 1}))
+
+    def test__parse_nodes_info_json_missing_piping_id_raises(self):
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._parse_nodes_info_json(
+                json.dumps([{"compute_resource_name": "host"}]))
+
+    def test__parse_nodes_info_json_round_trip(self):
+        payload = [{"piping_id": 1, "title": "x"}]
+        self.assertEqual(WorkflowSerializer._parse_nodes_info_json(
+            json.dumps(payload)), payload)
+
+    # ---- _register_title ---------------------------------------------------------
+
+    def test__register_title_adds_to_set(self):
+        titles = set()
+        WorkflowSerializer._register_title("a", titles)
+        self.assertIn("a", titles)
+
+    def test__register_title_raises_on_duplicate(self):
+        titles = {"a"}
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._register_title("a", titles)
+
+    # ---- _build_canonical_node ---------------------------------------------------
+
+    def test__build_canonical_node_unmentioned_uses_piping_defaults(self):
+        titles = set()
+        node = self.serializer._build_canonical_node(
+            self.pips[0], None, titles)
+        self.assertEqual(node['piping_id'], self.pips[0].id)
+        self.assertEqual(node['title'], self.pips[0].title)
+        self.assertEqual(node['plugin_parameter_defaults'], [])
+        for f in ('compute_resource_name', 'cpu_limit', 'memory_limit',
+                  'number_of_workers', 'gpu_limit'):
+            self.assertIsNone(node[f])
+        self.assertIn(self.pips[0].title, titles)
+
+    def test__build_canonical_node_supplied_fills_missing_keys(self):
+        titles = set()
+        raw = {"piping_id": self.pips[0].id, "title": "myTitle"}
+        node = self.serializer._build_canonical_node(
+            self.pips[0], raw, titles)
+        # supplied keys preserved
+        self.assertEqual(node['title'], "myTitle")
+        # missing keys defaulted in place
+        self.assertIsNone(node['compute_resource_name'])
+        self.assertEqual(node['plugin_parameter_defaults'], [])
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit'):
+            self.assertIsNone(node[f])
+        # the helper mutates the input dict (legacy behavior)
+        self.assertIs(node, raw)
+
+    def test__build_canonical_node_falls_back_to_piping_title(self):
+        titles = set()
+        raw = {"piping_id": self.pips[0].id}
+        node = self.serializer._build_canonical_node(
+            self.pips[0], raw, titles)
+        self.assertEqual(node['title'], self.pips[0].title)
+
+    def test__build_canonical_node_duplicate_title_raises(self):
+        titles = {self.pips[0].title}
+        with self.assertRaises(serializers.ValidationError):
+            self.serializer._build_canonical_node(
+                self.pips[0], None, titles)
+
+    def test__build_canonical_node_invalid_resource_override_raises(self):
+        titles = set()
+        raw = {"piping_id": self.pips[0].id, "cpu_limit": "abc"}
+        with self.assertRaises(serializers.ValidationError):
+            self.serializer._build_canonical_node(self.pips[0], raw, titles)
+
+    # ---- _validate_compute_resource ----------------------------------------------
+
+    def test__validate_compute_resource_none_passes(self):
+        # No compute resource name supplied -> no DB hit, no raise.
+        WorkflowSerializer._validate_compute_resource(self.pips[0], None)
+
+    def test__validate_compute_resource_known_passes(self):
+        WorkflowSerializer._validate_compute_resource(self.pips[0], "host")
+
+    def test__validate_compute_resource_unknown_raises(self):
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._validate_compute_resource(
+                self.pips[0], "no-such-resource")
+
+    # ---- _validate_piping_param_defaults -----------------------------------------
+
+    def test__validate_piping_param_defaults_passes_when_default_present(self):
+        # The 'dummyInt' default piping param has value=111111 in setUp, so no
+        # user-supplied default is required.
+        self.serializer._validate_piping_param_defaults(self.pips[0], [])
+
+    def test__validate_piping_param_defaults_user_supplied_passes(self):
+        self.serializer._validate_piping_param_defaults(
+            self.pips[0], [{"name": "dummyInt", "default": 7}])
+
+    # ---- _validate_supplied_param_default ----------------------------------------
+
+    def test__validate_supplied_param_default_none_raises(self):
+        default_param = self.pips[0].integer_param.first()
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._validate_supplied_param_default(
+                self.pips[0].id, default_param, None)
+
+    def test__validate_supplied_param_default_wrong_type_raises(self):
+        default_param = self.pips[0].integer_param.first()
+        with self.assertRaises(serializers.ValidationError):
+            WorkflowSerializer._validate_supplied_param_default(
+                self.pips[0].id, default_param, "not-an-int")
+
+    def test__validate_supplied_param_default_valid_passes(self):
+        default_param = self.pips[0].integer_param.first()
+        WorkflowSerializer._validate_supplied_param_default(
+            self.pips[0].id, default_param, 42)
+
+
+class WorkflowSerializerJobsCountFieldsTests(SerializerTests):
+    """
+    Verify the SerializerMethodField -> IntegerField swap preserves output
+    semantics: annotated workflows surface the annotated counts, non-annotated
+    workflows surface 0 in every count field.
+    """
+
+    def setUp(self):
+        super(WorkflowSerializerJobsCountFieldsTests, self).setUp()
+        self.owner = User.objects.get(username=self.username)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        (self.workflow, _) = Workflow.objects.get_or_create(
+            title='WfForCounts', pipeline=pipeline, owner=self.owner)
+
+    def _serialize(self, workflow):
+        ser = WorkflowSerializer(instance=workflow)
+        # The url/pipeline/plugin_instances fields are HyperlinkedIdentityField
+        # and require a request in context; we only care about the *_jobs ints.
+        ser.context['request'] = mock.Mock()
+        # Build the representation field-by-field, skipping URL fields, to avoid
+        # needing a fully-wired request.
+        from workflows.models import JOBS_STATUS_FIELDS
+        return {
+            field: ser.fields[field].to_representation(
+                ser.fields[field].get_attribute(workflow))
+            for field, _ in JOBS_STATUS_FIELDS
+        }
+
+    def test_non_annotated_workflow_serializes_zeros(self):
+        from workflows.models import JOBS_STATUS_FIELDS
+        out = self._serialize(self.workflow)
+        for field, _ in JOBS_STATUS_FIELDS:
+            self.assertEqual(out[field], 0, f"expected 0 for '{field}'")
+
+    def test_annotated_workflow_serializes_annotated_values(self):
+        from workflows.models import JOBS_STATUS_FIELDS
+        annotated = Workflow.add_jobs_status_count(
+            Workflow.objects.filter(pk=self.workflow.pk)).get()
+        out = self._serialize(annotated)
+        for field, _ in JOBS_STATUS_FIELDS:
+            self.assertEqual(out[field], 0)  # no plugin instances yet
