@@ -140,6 +140,96 @@ class PipelineModelTests(ModelTests):
         self.assertEqual(accessible_pipelines_user1[0], Pipeline.objects.all()[0])
         self.assertEqual(len(Pipeline.get_accesible_pipelines(user2)), 0)
 
+    def test_get_plugin_tree(self):
+        """
+        Test whether get_plugin_tree returns the BFS-ordered list of canonical
+        node dicts for the pipeline (one per piping, with plugin_id, title,
+        previous title, and plugin_parameter_defaults).
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        plugin_tree = pipeline.get_plugin_tree()
+        self.assertEqual(len(plugin_tree), 2)
+        self.assertEqual(plugin_tree[0]['title'], 'pip1')
+        self.assertIsNone(plugin_tree[0]['previous'])
+        self.assertEqual(plugin_tree[1]['title'], 'pip2')
+        self.assertEqual(plugin_tree[1]['previous'], 'pip1')
+
+    def test__build_tree_nodes_from_defaults(self):
+        """
+        Test that _build_tree_nodes_from_defaults aggregates default-parameter
+        rows into the per-piping node dicts and the auxiliary id/title/ts maps.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        defaults = pipeline.get_default_parameters()
+        nodes, id_to_title, is_ts = Pipeline._build_tree_nodes_from_defaults(defaults)
+        self.assertEqual(set(nodes.keys()), {'pip1', 'pip2'})
+        self.assertIsNone(nodes['pip1']['previous'])
+        self.assertEqual(nodes['pip2']['previous'], 'pip1')
+        self.assertEqual(id_to_title[self.pips[0].id], 'pip1')
+        self.assertEqual(id_to_title[self.pips[1].id], 'pip2')
+        # neither piping is a 'ts' plugin in the fixture
+        self.assertFalse(is_ts['pip1'])
+        self.assertFalse(is_ts['pip2'])
+        # one default parameter ('prefix') per piping
+        self.assertEqual(len(nodes['pip1']['plugin_parameter_defaults']), 1)
+        self.assertEqual(nodes['pip1']['plugin_parameter_defaults'][0]['name'],
+                         'prefix')
+
+    def test__resolve_ts_parent_titles_rewrites_ids(self):
+        """
+        Test that _resolve_ts_parent_titles replaces the comma-separated piping
+        ids in the 'plugininstances' default with the corresponding piping titles.
+        """
+        node = {'plugin_parameter_defaults': [
+            {'name': 'plugininstances', 'default': '7,9'},
+            {'name': 'other', 'default': 'x'},
+        ]}
+        Pipeline._resolve_ts_parent_titles(node, {7: 'a', 9: 'b'})
+        self.assertEqual(node['plugin_parameter_defaults'][0]['default'], 'a,b')
+        # other entries are untouched
+        self.assertEqual(node['plugin_parameter_defaults'][1]['default'], 'x')
+
+    def test__resolve_ts_parent_titles_empty_default(self):
+        """
+        Test that _resolve_ts_parent_titles is a no-op when 'plugininstances'
+        default is the empty string.
+        """
+        node = {'plugin_parameter_defaults': [
+            {'name': 'plugininstances', 'default': ''},
+        ]}
+        Pipeline._resolve_ts_parent_titles(node, {})
+        self.assertEqual(node['plugin_parameter_defaults'][0]['default'], '')
+
+    def test__build_title_adjacency(self):
+        """
+        Test that _build_title_adjacency identifies the root title and produces
+        the expected child-list dict.
+        """
+        nodes = {
+            'a': {'plugin_parameter_defaults': [], 'previous': None},
+            'b': {'plugin_parameter_defaults': [], 'previous': 'a'},
+            'c': {'plugin_parameter_defaults': [], 'previous': 'a'},
+            'd': {'plugin_parameter_defaults': [], 'previous': 'b'},
+        }
+        is_ts = {'a': False, 'b': False, 'c': False, 'd': False}
+        root, adjacency = Pipeline._build_title_adjacency(nodes, is_ts, {})
+        self.assertEqual(root, 'a')
+        self.assertEqual(set(adjacency['a']), {'b', 'c'})
+        self.assertEqual(adjacency['b'], ['d'])
+        self.assertEqual(adjacency['c'], [])
+        self.assertEqual(adjacency['d'], [])
+
+    def test__bfs_order_plugin_tree(self):
+        """
+        Test that _bfs_order_plugin_tree visits root first, then its children in
+        the order given by the adjacency, then their children, etc.
+        """
+        nodes = {'a': {'title': 'a'}, 'b': {'title': 'b'},
+                 'c': {'title': 'c'}, 'd': {'title': 'd'}}
+        adjacency = {'a': ['b', 'c'], 'b': ['d'], 'c': [], 'd': []}
+        ordered = Pipeline._bfs_order_plugin_tree('a', adjacency, nodes)
+        self.assertEqual([n['title'] for n in ordered], ['a', 'b', 'c', 'd'])
+
 
 class PluginPipingModelTests(ModelTests):
 

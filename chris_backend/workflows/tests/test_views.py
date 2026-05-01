@@ -11,11 +11,11 @@ from rest_framework import status
 
 from pipelines.models import Pipeline, PluginPiping, DEFAULT_PIPING_PARAMETER_MODELS
 from plugininstances.models import PluginInstance
-from plugininstances.tasks import run_plugin_instance_job
 from plugins.models import ComputeResource
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
 from workflows.models import Workflow
+from workflows.views import WorkflowList
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
@@ -359,3 +359,140 @@ class WorkflowPluginInstanceListViewTests(ViewTests):
     def test_workflow_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class WorkflowListPerformCreateHelperTests(ViewTests):
+    """
+    Direct unit tests for the private helpers extracted from
+    ``WorkflowList.perform_create``.
+    """
+
+    def setUp(self):
+        super(WorkflowListPerformCreateHelperTests, self).setUp()
+        self.view = WorkflowList()
+        self.view.request = mock.Mock()
+        self.view.request.user = User.objects.get(username=self.username)
+        self.pipeline = Pipeline.objects.get(name=self.pipeline_name)
+
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        (self.previous_plugin_inst, _) = PluginInstance.objects.get_or_create(
+            status='finishedSuccessfully', plugin=plugin_fs,
+            owner=self.view.request.user,
+            compute_resource=plugin_fs.compute_resources.all()[0])
+
+        (self.workflow, _) = Workflow.objects.get_or_create(
+            title='HelperWf', pipeline=self.pipeline, owner=self.view.request.user)
+
+    # ---- _resolve_workflow_title -------------------------------------------------
+
+    def test__resolve_workflow_title_uses_supplied(self):
+        serializer = mock.Mock()
+        serializer.validated_data = {'title': 'CustomTitle'}
+        self.assertEqual(
+            WorkflowList._resolve_workflow_title(serializer, self.pipeline),
+            'CustomTitle')
+
+    def test__resolve_workflow_title_falls_back_to_pipeline_name(self):
+        serializer = mock.Mock()
+        serializer.validated_data = {'title': None}
+        self.assertEqual(
+            WorkflowList._resolve_workflow_title(serializer, self.pipeline),
+            self.pipeline.name)
+
+    def test__resolve_workflow_title_missing_key_falls_back(self):
+        serializer = mock.Mock()
+        serializer.validated_data = {}
+        self.assertEqual(
+            WorkflowList._resolve_workflow_title(serializer, self.pipeline),
+            self.pipeline.name)
+
+    # ---- _build_inst_templates ---------------------------------------------------
+
+    def _make_canonical_nodes(self):
+        """Mimic the canonical output of WorkflowSerializer.validate_nodes_info."""
+        return [{"piping_id": pip.id,
+                 "compute_resource_name": "host",
+                 "title": pip.title,
+                 "plugin_parameter_defaults": [],
+                 "cpu_limit": None,
+                 "memory_limit": None,
+                 "number_of_workers": None,
+                 "gpu_limit": None}
+                for pip in self.pips]
+
+    def test__build_inst_templates_returns_one_template_per_piping(self):
+        nodes = self._make_canonical_nodes()
+        tree, root_id, inst_data = WorkflowList._build_inst_templates(
+            self.pipeline, nodes)
+        self.assertEqual(set(inst_data.keys()),
+                         {pip.id for pip in self.pips})
+        self.assertIn(root_id, tree)
+        # root_id corresponds to the only piping with no previous (pip1).
+        self.assertEqual(root_id, self.pips[0].id)
+
+    # ---- _create_plugin_instance_tree --------------------------------------------
+
+    def test__create_plugin_instance_tree_creates_one_per_piping(self):
+        nodes = self._make_canonical_nodes()
+        tree, root_id, inst_data = WorkflowList._build_inst_templates(
+            self.pipeline, nodes)
+        before = PluginInstance.objects.count()
+        result = self.view._create_plugin_instance_tree(
+            tree, root_id, inst_data, self.previous_plugin_inst, self.workflow)
+        self.assertEqual(PluginInstance.objects.count(), before + len(self.pips))
+        self.assertEqual(set(result.keys()), {pip.id for pip in self.pips})
+        # The root's previous is the supplied previous instance.
+        self.assertEqual(result[root_id].previous, self.previous_plugin_inst)
+        # Every non-root child's previous is its parent piping's plugin instance.
+        for parent_id, node in tree.items():
+            for child_id in node['child_ids']:
+                self.assertEqual(result[child_id].previous, result[parent_id])
+
+    # ---- _rewrite_ts_parent_ids --------------------------------------------------
+
+    def test__rewrite_ts_parent_ids_translates_piping_ids(self):
+        nodes = self._make_canonical_nodes()
+        tree, root_id, inst_data = WorkflowList._build_inst_templates(
+            self.pipeline, nodes)
+        plugin_instances_dict = self.view._create_plugin_instance_tree(
+            tree, root_id, inst_data, self.previous_plugin_inst, self.workflow)
+
+        ts_pip = self.pips[2]  # the 'ts' piping built in ViewTests.setUp
+        ts_inst = plugin_instances_dict[ts_pip.id]
+        # Before: param value is the comma-separated piping ids set in setUp.
+        param_before = ts_inst.string_param.filter(
+            plugin_param__name='plugininstances').first()
+        self.assertEqual(param_before.value,
+                         f"{self.pips[0].id},{self.pips[1].id}")
+
+        WorkflowList._rewrite_ts_parent_ids(ts_inst, plugin_instances_dict)
+
+        param_after = ts_inst.string_param.filter(
+            plugin_param__name='plugininstances').first()
+        expected_ids = (f"{plugin_instances_dict[self.pips[0].id].id},"
+                        f"{plugin_instances_dict[self.pips[1].id].id}")
+        self.assertEqual(param_after.value, expected_ids)
+
+    def test__rewrite_ts_parent_ids_no_op_when_param_missing(self):
+        """If no 'plugininstances' string param exists, the helper is a no-op."""
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        ds_inst = PluginInstance.objects.create(
+            plugin=plugin_ds, owner=self.view.request.user,
+            compute_resource=plugin_ds.compute_resources.all()[0],
+            previous=self.previous_plugin_inst,
+            workflow=self.workflow)
+        # Should not raise even though plugin_instances_dict is empty.
+        WorkflowList._rewrite_ts_parent_ids(ds_inst, {})
+
+    # ---- _dispatch_runs ----------------------------------------------------------
+
+    def test__dispatch_runs_calls_run_if_ready_for_every_instance(self):
+        nodes = self._make_canonical_nodes()
+        tree, root_id, inst_data = WorkflowList._build_inst_templates(
+            self.pipeline, nodes)
+        plugin_instances_dict = self.view._create_plugin_instance_tree(
+            tree, root_id, inst_data, self.previous_plugin_inst, self.workflow)
+
+        with mock.patch('workflows.views.run_if_ready') as run_mock:
+            self.view._dispatch_runs(plugin_instances_dict)
+        self.assertEqual(run_mock.call_count, len(plugin_instances_dict))

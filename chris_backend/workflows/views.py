@@ -32,64 +32,110 @@ class WorkflowList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         """
-        Overriden to associate a pipeline with the newly created workflow before
-        first saving to the DB. All the workflow's parameters in the request are
+        Overriden to associate a pipeline and owner with the newly created workflow
+        before first saving to the DB. All the workflow's parameters in the request are
         parsed and properly saved to the DB with the corresponding plugin instances.
         """
         previous_plugin_inst = serializer.validated_data['previous_plugin_inst_id']
         nodes_info: List[GivenNodeInfo] = serializer.validated_data['nodes_info']
         pipeline = self.get_object()
-        title = serializer.validated_data.get('title')
-        if title is None:
-            title = pipeline.name  # set default value
+        
+        title = self._resolve_workflow_title(serializer, pipeline)
+
         workflow = serializer.save(owner=self.request.user, pipeline=pipeline,
                                    title=title)
 
+        tree, root_id, inst_data = self._build_inst_templates(pipeline, nodes_info)
+
+        plugin_instances_dict = self._create_plugin_instance_tree(
+            tree, root_id, inst_data, previous_plugin_inst, workflow)
+        
+        self._dispatch_runs(plugin_instances_dict)
+
+    @staticmethod
+    def _resolve_workflow_title(serializer, pipeline) -> str:
+        """Return the workflow title, falling back to ``pipeline.name`` when omitted."""
+        title = serializer.validated_data.get('title')
+        return pipeline.name if title is None else title
+
+    @staticmethod
+    def _build_inst_templates(pipeline, nodes_info: List[GivenNodeInfo]):
+        """
+        Build the per-piping :class:`WorkflowPluginInstanceTemplate` map from
+        ``nodes_info``. Returns ``(tree, root_id, inst_data)`` where ``tree`` and
+        ``root_id`` come from :meth:`Pipeline.get_pipings_tree` and ``inst_data``
+        is keyed by piping id.
+        """
         pipings_tree = pipeline.get_pipings_tree()
         tree = pipings_tree['tree']
+
         factory = WorkflowPluginInstanceTemplateFactory(tree=tree)
 
         inst_data: Dict[PipingId, WorkflowPluginInstanceTemplate] = {
             info['piping_id']: factory.inflate(info)
             for info in nodes_info
         }
+        return tree, pipings_tree['root_id'], inst_data
 
-        root_id = pipings_tree['root_id']
-        plugin_inst = self.create_plugin_inst(inst_data[root_id], previous_plugin_inst,
-                                              workflow)
+    def _create_plugin_instance_tree(self, tree, root_id, inst_data, previous,
+                                     workflow) -> Dict[PipingId, PluginInstance]:
+        """
+        Create plugin instances for every node in ``tree`` via breadth-first
+        traversal so each child's ``previous`` is its parent's freshly-created
+        plugin instance. Returns a piping-id -> plugin-instance map.
+        """
+        root_inst = self.create_plugin_inst(inst_data[root_id], previous, workflow)
+        plugin_instances_dict: Dict[PipingId, PluginInstance] = {root_id: root_inst}
 
-        plugin_instances_dict = {root_id: plugin_inst}  # map from pip id to plg inst id
+        pip_id_queue = deque([root_id])
+        plugin_inst_queue = deque([root_inst])
 
-        # breath-first traversal
-        plugin_inst_queue = deque()
-        plugin_inst_queue.append(plugin_inst)
-        pip_id_queue = deque()
-        pip_id_queue.append(root_id)
-        while len(pip_id_queue):
+        while pip_id_queue:
             curr_id = pip_id_queue.popleft()
             curr_plugin_inst = plugin_inst_queue.popleft()
-            child_ids = tree[curr_id]['child_ids']
-            for id in child_ids:
-                plugin_inst = self.create_plugin_inst(inst_data[id], curr_plugin_inst,
-                                                      workflow)
-                plugin_instances_dict[id] = plugin_inst
-                pip_id_queue.append(id)
-                plugin_inst_queue.append(plugin_inst)
 
-        # update 'plugininstances' param with parent plg inst ids for any 'ts' plg inst
+            for child_id in tree[curr_id]['child_ids']:
+                child_inst = self.create_plugin_inst(
+                    inst_data[child_id], curr_plugin_inst, workflow)
+                
+                plugin_instances_dict[child_id] = child_inst
+
+                pip_id_queue.append(child_id)
+                plugin_inst_queue.append(child_inst)
+        return plugin_instances_dict
+
+    def _dispatch_runs(self,
+                       plugin_instances_dict: Dict[PipingId, PluginInstance]) -> None:
+        """
+        For each created plugin instance: rewrite the ``plugininstances`` param of
+        any ``ts`` plugin instance from piping-id refs to plugin-instance-id refs,
+        then submit the instance via :func:`run_if_ready`.
+        """
         for plg_inst in plugin_instances_dict.values():
             if plg_inst.plugin.meta.type == 'ts':
-                param = plg_inst.string_param.filter(
-                    plugin_param__name='plugininstances').first()
-                if param and param.value:
-                    parent_pip_ids = [int(pip_id) for pip_id in param.value.split(',')]
-                    parent_plg_inst_ids = [str(plugin_instances_dict[pip_id].id) for
-                                           pip_id in parent_pip_ids]
-                    param.value = ','.join(parent_plg_inst_ids)
-                    param.save()
-
-            # run plugin instance
+                self._rewrite_ts_parent_ids(plg_inst, plugin_instances_dict)
             run_if_ready(plg_inst, plg_inst.previous)
+
+    @staticmethod
+    def _rewrite_ts_parent_ids(
+            plg_inst: PluginInstance,
+            plugin_instances_dict: Dict[PipingId, PluginInstance]) -> None:
+        """
+        Translate the comma-separated ``plugininstances`` string param of a ``ts``
+        plugin instance from piping ids (as stored on the pipeline) to the actual
+        plugin-instance ids created for this workflow.
+        """
+        param = plg_inst.string_param.filter(plugin_param__name='plugininstances').first()
+        if not (param and param.value):
+            return
+        
+        parent_pip_ids = [int(pip_id) for pip_id in param.value.split(',')]
+
+        parent_plg_inst_ids = [str(plugin_instances_dict[pip_id].id)
+                               for pip_id in parent_pip_ids]
+        
+        param.value = ','.join(parent_plg_inst_ids)
+        param.save()
 
     def list(self, request, *args, **kwargs):
         """
@@ -100,10 +146,12 @@ class WorkflowList(generics.ListCreateAPIView):
         queryset = self.get_workflows_queryset()
         response = services.get_list_response(self, queryset)
         pipeline = self.get_object()
+
         # append document-level link relations
         links = {'pipeline': reverse('pipeline-detail', request=request,
                                      kwargs={"pk": pipeline.id})}
         response = services.append_collection_links(response, links)
+
         # append write template
         template_data = {'previous_plugin_inst_id': '', 'title': '', 'nodes_info': ''}
         return services.append_collection_template(response, template_data)
@@ -158,9 +206,11 @@ class AllWorkflowList(generics.ListAPIView):
         Overriden to add a query list and document-level link relation to the response.
         """
         response = super(AllWorkflowList, self).list(request, *args, **kwargs)
+
         # append query list
         query_list = [reverse('allworkflow-list-query-search', request=request)]
         response = services.append_collection_querylist(response, query_list)
+
         # append document-level link relations
         links = {'pipelines': reverse('pipeline-list', request=request)}
         return services.append_collection_links(response, links)
@@ -200,9 +250,11 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
         delete the workflow.
         """
         workflow = self.get_object()
+
         for plg_inst in workflow.plugin_instances.all():
             if plg_inst.status == 'started':
                 cancel_plugin_instance_job.delay(plg_inst.id, 'PluginInstanceAppJob')  # call async task
+            
             plg_inst.status = 'cancelled'
             plg_inst.save()
         return super(WorkflowDetail, self).destroy(request, *args, **kwargs)

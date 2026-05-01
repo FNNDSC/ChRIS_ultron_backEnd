@@ -50,9 +50,11 @@ class Pipeline(models.Model):
         """
         pipings = self.plugin_pipings.all()
         param_names = []
+
         for pip in pipings:
             plg = pip.plugin
             prev_pip_id = pip.previous.id if pip.previous else 'null'
+
             # param name becomes <plugin.id>_<piping.id>_<previous_piping.id>_<param.name>
             param_names.extend(['%s_%s_%s_%s' % (plg.id, pip.id, prev_pip_id, param.name)
                                 for param in plg.parameters.all()])
@@ -64,13 +66,17 @@ class Pipeline(models.Model):
         values regardless of their type.
         """
         pipeline_default_parameters = []
+
         pipeline_default_parameters.extend(list(DefaultPipingStrParameter.objects.filter(
             plugin_piping__pipeline=self)))
+        
         pipeline_default_parameters.extend(list(DefaultPipingIntParameter.objects.filter(
             plugin_piping__pipeline=self)))
+        
         pipeline_default_parameters.extend(
             list(DefaultPipingFloatParameter.objects.filter(
                 plugin_piping__pipeline=self)))
+        
         pipeline_default_parameters.extend(list(DefaultPipingBoolParameter.objects.filter(
             plugin_piping__pipeline=self)))
         return pipeline_default_parameters
@@ -85,12 +91,15 @@ class Pipeline(models.Model):
         pipings = list(self.plugin_pipings.all())
         root_pip = [pip for pip in pipings if not pip.previous][0]
         root_id = root_pip.id
+
         tree = {}
         tree[root_id] = {'piping': root_pip, 'child_ids':[]}
+        
         for pip in pipings:
             if pip.id not in tree:
                 tree[pip.id] = {'piping': pip, 'child_ids': []}
                 prev_id = pip.previous.id
+
                 if prev_id in tree:
                     tree[prev_id]['child_ids'].append(pip.id)
                 else:
@@ -109,16 +118,33 @@ class Pipeline(models.Model):
         """
         Custom method to return a list representation of the pipeline's plugin_tree.
         """
-        pipeline_default_parameters = self.get_default_parameters()
+        default_params = self.get_default_parameters()
 
+        tree_nodes_dict, id_to_title, is_ts_dict = (
+            Pipeline._build_tree_nodes_from_defaults(default_params))
+        
+        root_title, adjacency = Pipeline._build_title_adjacency(
+            tree_nodes_dict, is_ts_dict, id_to_title)
+
+        return Pipeline._bfs_order_plugin_tree(root_title, adjacency, tree_nodes_dict)
+
+    @staticmethod
+    def _build_tree_nodes_from_defaults(default_params):
+        """
+        Custom internal method to build the title-keyed map of tree nodes from the 
+        iterable of default parameter rows. 
+        Returns (tree_nodes_dict, id_to_title, is_ts_dict).
+        """
         tree_nodes_dict = {}
-        id_to_title = {}  # mapping from piping id to piping title
+        id_to_title = {}
         is_ts_dict = {}
-        for default_param in pipeline_default_parameters:
+
+        for default_param in default_params:
             piping = default_param.plugin_piping
-            previous = piping.previous
 
             if piping.title not in tree_nodes_dict:
+                previous = piping.previous
+
                 tree_nodes_dict[piping.title] = {
                     'plugin_id': piping.plugin.id,
                     'previous': previous.title if previous is not None else None,
@@ -129,41 +155,66 @@ class Pipeline(models.Model):
                 is_ts_dict[piping.title] = piping.plugin.meta.type == 'ts'
 
             tree_nodes_dict[piping.title]['plugin_parameter_defaults'].append(
-                {
-                    'name': default_param.plugin_param.name,
-                    'default': default_param.value
-                }
-            )
+                {'name': default_param.plugin_param.name,
+                 'default': default_param.value})
+        return tree_nodes_dict, id_to_title, is_ts_dict
 
-        root_title = [pip_title for pip_title in tree_nodes_dict.keys()
-                      if tree_nodes_dict[pip_title]['previous'] is None][0]
-        tree = {root_title: []}  # dict with list of child titles for each piping title
-        for title in tree_nodes_dict.keys():
-            if is_ts_dict[title]:  # process 'ts' plugins
-                for default_d in tree_nodes_dict[title]['plugin_parameter_defaults']:
-                    if default_d['name'] == 'plugininstances':
-                        default = default_d['default']
-                        if default:
-                            parent_titles = [id_to_title[int(pip_id)] for pip_id in
-                                             default.split(',')]
-                            default_d['default'] = ','.join(parent_titles)
-                        break
-            if title not in tree:
-                tree[title] = []
-                prev_title = tree_nodes_dict[title]['previous']
-                if prev_title in tree:
-                    tree[prev_title].append(title)
+    @staticmethod
+    def _resolve_ts_parent_titles(node, id_to_title):
+        """
+        Custom internal method to replace the comma-separated piping ids in the 
+        'plugininstances' default with the corresponding piping titles for a 'ts' 
+        tree node.
+        """
+        for default_d in node['plugin_parameter_defaults']:
+            if default_d['name'] == 'plugininstances':
+                default = default_d['default']
+
+                if default:
+                    parent_titles = [id_to_title[int(pip_id)]
+                                     for pip_id in default.split(',')]
+                    default_d['default'] = ','.join(parent_titles)
+                break
+
+    @classmethod
+    def _build_title_adjacency(cls, tree_nodes_dict, is_ts_dict, id_to_title):
+        """
+        Custom internal method to find the root title and build a dict mapping each piping 
+        title to the list of its child titles. Also resolves the 'plugininstances' default
+        for 'ts' plugins (rewriting piping ids as piping titles).
+        """
+        root_title = next(t for t, n in tree_nodes_dict.items()
+                          if n['previous'] is None)
+        
+        adjacency = {root_title: []}
+
+        for title, node in tree_nodes_dict.items():
+            if is_ts_dict[title]:
+                cls._resolve_ts_parent_titles(node, id_to_title)
+
+            if title not in adjacency:
+                adjacency[title] = []
+                prev_title = node['previous']
+
+                if prev_title in adjacency:
+                    adjacency[prev_title].append(title)
                 else:
-                    tree[prev_title] = [title]
+                    adjacency[prev_title] = [title]
+        return root_title, adjacency
 
+    @staticmethod
+    def _bfs_order_plugin_tree(root_title, adjacency, tree_nodes_dict):
+        """
+        Custom internal method for breadth-first traversal of the title adjacency map. 
+        Returns the ordered list of plugin tree nodes.
+        """
         plugin_tree = [tree_nodes_dict[root_title]]
-        # breath-first traversal of tree to order nodes in the returned plugin_tree
-        queue = deque(tree[root_title])
-        while len(queue):
+        queue = deque(adjacency[root_title])
+
+        while queue:
             curr_title = queue.popleft()
             plugin_tree.append(tree_nodes_dict[curr_title])
-            queue.extend(tree[curr_title])
-
+            queue.extend(adjacency[curr_title])
         return plugin_tree
 
     @staticmethod
@@ -173,10 +224,12 @@ class Pipeline(models.Model):
         accessible to a given user (not locked or otherwise own by the user).
         """
         queryset = Pipeline.objects.all()
+
         if user.is_authenticated:
             # if the user is chris then return all the pipelines in the queryset
             if user.username == 'chris':
                 return queryset
+            
             # construct the full lookup expression.
             lookup = models.Q(locked=False) | models.Q(owner=user)
         else:
@@ -222,6 +275,7 @@ class PipelineSourceFile(ChrisFile):
 def auto_delete_file_from_storage(sender, instance, **kwargs):
     storage_path = instance.fname.name
     storage_manager = connect_storage(settings)
+
     try:
         if storage_manager.obj_exists(storage_path):
             storage_manager.delete_obj(storage_path)
@@ -309,6 +363,7 @@ class PluginPiping(models.Model):
         for parameter in parameters:
             param = [d for d in param_defaults if d['name'] == parameter.name]
             default_model_class = DEFAULT_PIPING_PARAMETER_MODELS[parameter.type]
+
             try:
                 default_piping_param = default_model_class.objects.get(
                     plugin_piping=self, plugin_param=parameter)
@@ -316,6 +371,7 @@ class PluginPiping(models.Model):
                 default_piping_param = default_model_class()
                 default_piping_param.plugin_piping = self
                 default_piping_param.plugin_param = parameter
+
                 if param:
                     default_piping_param.value = param[0]['default']
                 else:
@@ -334,10 +390,13 @@ class PluginPiping(models.Model):
         """
         if not self.cpu_limit:
             self.cpu_limit = CPUInt(self.plugin.min_cpu_limit)
+
         if not self.memory_limit:
             self.memory_limit = MemoryInt(self.plugin.min_memory_limit)
+
         if not self.number_of_workers:
             self.number_of_workers = self.plugin.min_number_of_workers
+
         if not self.gpu_limit:
             self.gpu_limit = self.plugin.min_gpu_limit
 
@@ -348,6 +407,7 @@ class PluginPiping(models.Model):
         """
         for type in DEFAULT_PIPING_PARAMETER_MODELS:
             typed_parameters = getattr(self, type + '_param')
+
             for parameter in typed_parameters.all():
                 if parameter.value is None:
                     raise ValueError('A default is required for parameter %s'

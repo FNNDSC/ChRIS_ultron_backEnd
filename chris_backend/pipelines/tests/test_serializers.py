@@ -640,6 +640,399 @@ class PipelineSerializerTests(SerializerTests):
         for ix in parent_ixs:
             self.assertIn(ix, plg_pip_ids)
 
+    def test__parse_plugin_tree_invalid_json(self):
+        """
+        Test that _parse_plugin_tree raises ValidationError for non-JSON input.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._parse_plugin_tree('not-a-json')
+
+    def test__parse_plugin_tree_empty_list(self):
+        """
+        Test that _parse_plugin_tree raises ValidationError for an empty list.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._parse_plugin_tree('[]')
+
+    def test__parse_plugin_tree_returns_list(self):
+        """
+        Test that _parse_plugin_tree returns the parsed list for valid input.
+        """
+        result = PipelineSerializer._parse_plugin_tree(
+            '[{"title": "a", "previous": null}]')
+        self.assertEqual(result, [{'title': 'a', 'previous': None}])
+
+    def test__build_title_to_ix_happy_path(self):
+        """
+        Test that _build_title_to_ix returns the title-to-index mapping.
+        """
+        plugin_list = [{'title': 'a'}, {'title': 'b'}, {'title': 'c'}]
+        self.assertEqual(PipelineSerializer._build_title_to_ix(plugin_list),
+                         {'a': 0, 'b': 1, 'c': 2})
+
+    def test__build_title_to_ix_missing_title_raises(self):
+        """
+        Test that _build_title_to_ix raises ValidationError when a node is
+        missing its title.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._build_title_to_ix([{'title': 'a'}, {}])
+
+    def test__build_title_to_ix_duplicate_title_raises(self):
+        """
+        Test that _build_title_to_ix raises ValidationError on duplicated titles.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._build_title_to_ix(
+                [{'title': 'a'}, {'title': 'a'}])
+
+    def test__validate_node_plugin_resolves_plugin_id(self):
+        """
+        Test that _validate_node_plugin resolves plugin_id, sets found_root_node
+        on the root, and returns (plugin, prev_title, found_root_node).
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'a', 'plugin_id': plugin_ds.id, 'previous': None}
+        plg, prev, found = PipelineSerializer._validate_node_plugin(d, {'a': 0}, False)
+        self.assertEqual(plg.id, plugin_ds.id)
+        self.assertIsNone(prev)
+        self.assertTrue(found)
+
+    def test__validate_node_plugin_resolves_plugin_name_and_version(self):
+        """
+        Test that _validate_node_plugin resolves a node by plugin_name +
+        plugin_version when plugin_id is absent and assigns plugin_id back to d.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'a', 'plugin_name': self.plugin_ds_name,
+             'plugin_version': '0.1', 'previous': None}
+        plg, _, _ = PipelineSerializer._validate_node_plugin(d, {'a': 0}, False)
+        self.assertEqual(plg.id, plugin_ds.id)
+        self.assertEqual(d['plugin_id'], plugin_ds.id)
+
+    def test__validate_node_plugin_rejects_fs_plugin(self):
+        """
+        Test that _validate_node_plugin raises ValidationError when the resolved
+        plugin is of type 'fs'.
+        """
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        d = {'title': 'a', 'plugin_id': plugin_fs.id, 'previous': None}
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_node_plugin(d, {'a': 0}, False)
+
+    def test__validate_node_plugin_rejects_unknown_plugin_id(self):
+        """
+        Test that _validate_node_plugin raises ValidationError when no plugin
+        with the supplied plugin_id exists.
+        """
+        d = {'title': 'a', 'plugin_id': 999999, 'previous': None}
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_node_plugin(d, {'a': 0}, False)
+
+    def test__validate_node_plugin_rejects_unknown_previous(self):
+        """
+        Test that _validate_node_plugin raises ValidationError when the previous
+        title is not in title_to_ix.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'b', 'plugin_id': plugin_ds.id, 'previous': 'unknown'}
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_node_plugin(d, {'b': 0}, False)
+
+    def test__validate_node_plugin_rejects_disconnected_tree(self):
+        """
+        Test that _validate_node_plugin raises ValidationError when a second
+        root (previous=None) is encountered.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'b', 'plugin_id': plugin_ds.id, 'previous': None}
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_node_plugin(d, {'b': 0}, True)
+
+    def test__validate_previous_pointer_root_marks_found(self):
+        """
+        Test that _validate_previous_pointer returns True when prev_title is
+        None and no root has been seen yet.
+        """
+        self.assertTrue(
+            PipelineSerializer._validate_previous_pointer(None, {}, False))
+
+    def test__validate_previous_pointer_second_root_raises(self):
+        """
+        Test that _validate_previous_pointer raises ValidationError when a
+        second root (None previous) is encountered.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_previous_pointer(None, {}, True)
+
+    def test__validate_previous_pointer_unknown_title_raises(self):
+        """
+        Test that _validate_previous_pointer raises ValidationError when
+        prev_title is not in title_to_ix.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_previous_pointer('unknown', {'a': 0},
+                                                          False)
+
+    def test__validate_previous_pointer_known_title_passthrough(self):
+        """
+        Test that _validate_previous_pointer returns found_root_node unchanged
+        when prev_title is known.
+        """
+        self.assertTrue(
+            PipelineSerializer._validate_previous_pointer('a', {'a': 0}, True))
+
+    def test__resolve_node_plugin_by_id(self):
+        """
+        Test that _resolve_node_plugin resolves the Plugin by plugin_id.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'plugin_id': plugin_ds.id}
+        plg = PipelineSerializer._resolve_node_plugin(d)
+        self.assertEqual(plg.id, plugin_ds.id)
+
+    def test__resolve_node_plugin_by_name_and_version(self):
+        """
+        Test that _resolve_node_plugin resolves the Plugin by plugin_name and
+        plugin_version, and back-fills d['plugin_id'].
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'plugin_name': self.plugin_ds_name, 'plugin_version': '0.1'}
+        plg = PipelineSerializer._resolve_node_plugin(d)
+        self.assertEqual(plg.id, plugin_ds.id)
+        self.assertEqual(d['plugin_id'], plugin_ds.id)
+
+    def test__resolve_node_plugin_malformed_raises(self):
+        """
+        Test that _resolve_node_plugin raises ValidationError when neither
+        plugin_id nor plugin_name+plugin_version are present.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._resolve_node_plugin({})
+
+    def test__resolve_node_plugin_unknown_id_raises(self):
+        """
+        Test that _resolve_node_plugin raises ValidationError when plugin_id
+        does not match any plugin in the DB.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._resolve_node_plugin({'plugin_id': 99999})
+
+    def test__validate_node_resources_happy_path(self):
+        """
+        Test that _validate_node_resources accepts in-range per-piping resources.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'a', 'cpu_limit': plugin_ds.min_cpu_limit}
+        # should not raise
+        PipelineSerializer._validate_node_resources(plugin_ds, d)
+
+    def test__validate_node_resources_includes_node_title_in_error(self):
+        """
+        Test that _validate_node_resources raises ValidationError mentioning
+        the offending node's title when a resource value is out of range.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'failing-node', 'cpu_limit': plugin_ds.min_cpu_limit - 1}
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            PipelineSerializer._validate_node_resources(plugin_ds, d)
+        self.assertIn('failing-node', str(ctx.exception.detail))
+
+    def test__normalize_node_parameter_defaults_installs_empty_list(self):
+        """
+        Test that _normalize_node_parameter_defaults installs an empty
+        plugin_parameter_defaults list when the key is missing.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'a'}
+        PipelineSerializer._normalize_node_parameter_defaults(d, plugin_ds, None,
+                                                              {'a': 0})
+        self.assertEqual(d['plugin_parameter_defaults'], [])
+
+    def test__normalize_node_parameter_defaults_maps_ts_titles_to_indices(self):
+        """
+        Test that _normalize_node_parameter_defaults rewrites the
+        'plugininstances' default for 'ts' plugins from comma-separated titles
+        to comma-separated indices.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        d = {'title': 'b',
+             'plugin_parameter_defaults':
+                 [{'name': 'plugininstances', 'default': 'a,b'}]}
+        title_to_ix = {'a': 0, 'b': 1}
+        PipelineSerializer._normalize_node_parameter_defaults(
+            d, plugin_ts, 'a', title_to_ix)
+        self.assertEqual(d['plugin_parameter_defaults'][0]['default'], '0,1')
+
+    def test__validate_user_default_invalid_value_type_raises(self):
+        """
+        Test that _validate_user_default raises ValidationError when a default
+        value cannot be parsed by the typed DEFAULT_PARAMETER_SERIALIZERS.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        param = plugin_ds.parameters.get(name='dummyInt')
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_user_default(
+                plugin_ds, None, {}, param,
+                {'name': 'dummyInt', 'default': 'not-an-int'})
+
+    def test__validate_user_default_missing_default_key_raises(self):
+        """
+        Test that _validate_user_default raises ValidationError when the entry
+        is missing the 'default' key.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        param = plugin_ds.parameters.get(name='dummyInt')
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_user_default(
+                plugin_ds, None, {}, param, {'name': 'dummyInt'})
+
+    def test__validate_user_default_happy_path(self):
+        """
+        Test that _validate_user_default accepts a well-formed entry.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        param = plugin_ds.parameters.get(name='dummyInt')
+        # should not raise
+        PipelineSerializer._validate_user_default(
+            plugin_ds, None, {}, param, {'name': 'dummyInt', 'default': 7})
+
+    def test__validate_ts_plugininstances_default_null_previous_with_default_raises(self):
+        """
+        Test that _validate_ts_plugininstances_default raises ValidationError
+        when previous_title is None but a default is provided.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_ts_plugininstances_default(
+                plugin_ts, None, {'a': 0}, 'a')
+
+    def test__validate_ts_plugininstances_default_set_previous_with_empty_default_raises(self):
+        """
+        Test that _validate_ts_plugininstances_default raises ValidationError
+        when previous_title is set but default is empty.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_ts_plugininstances_default(
+                plugin_ts, 'a', {'a': 0}, '')
+
+    def test__validate_ts_plugininstances_default_happy_path(self):
+        """
+        Test that _validate_ts_plugininstances_default accepts a list that
+        contains the previous title and only known titles.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        # should not raise
+        PipelineSerializer._validate_ts_plugininstances_default(
+            plugin_ts, 'a', {'a': 0, 'b': 1}, 'a,b')
+
+    def test__resolve_instance_tree_ts_indices_rewrites_ids(self):
+        """
+        Test that _resolve_instance_tree_ts_indices rewrites
+        'plugininstances' from instance ids to tree indices and flattens
+        plugin_id from the Plugin object to its primary key.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        tree_dict = {'root_index': 0, 'tree': [
+            {'plugin_id': plugin_ds, 'plugin_parameter_defaults': [],
+             'child_indices': [1]},
+            {'plugin_id': plugin_ts,
+             'plugin_parameter_defaults':
+                 [{'name': 'plugininstances', 'default': '100,200'}],
+             'child_indices': []},
+        ]}
+        inst_id_to_ix = {100: 0, 200: 1}
+        PipelineSerializer._resolve_instance_tree_ts_indices(tree_dict,
+                                                             inst_id_to_ix)
+        self.assertEqual(tree_dict['tree'][0]['plugin_id'], plugin_ds.id)
+        self.assertEqual(tree_dict['tree'][1]['plugin_id'], plugin_ts.id)
+        self.assertEqual(
+            tree_dict['tree'][1]['plugin_parameter_defaults'][0]['default'],
+            '0,1')
+
+    def test__collect_tree_from_instance_duplicate_titles_raises(self):
+        """
+        Test that _collect_tree_from_instance raises ValidationError when two
+        visited plugin instances share the same title.
+        """
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        owner = User.objects.get(username=self.username)
+        root, _ = PluginInstance.objects.get_or_create(
+            plugin=plugin_fs, owner=owner, title='dup',
+            compute_resource=self.compute_resource)
+        PluginInstance.objects.get_or_create(
+            plugin=plugin_ds, owner=owner, title='dup', previous=root,
+            compute_resource=self.compute_resource)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._collect_tree_from_instance(root)
+
+    def test__create_piping_persists_plugin_piping(self):
+        """
+        Test that _create_piping creates a PluginPiping row with the requested
+        title, plugin and previous, and returns it.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        node = {'plugin_id': plugin_ds.id, 'title': 'fresh-piping',
+                'plugin_parameter_defaults': []}
+        piping = PipelineSerializer._create_piping(pipeline, node, None)
+        self.assertEqual(piping.title, 'fresh-piping')
+        self.assertEqual(piping.plugin.id, plugin_ds.id)
+        self.assertIsNone(piping.previous)
+        self.assertEqual(
+            PluginPiping.objects.filter(pipeline=pipeline,
+                                        title='fresh-piping').count(),
+            1)
+
+    def test__create_pipings_bfs_creates_all_pipings(self):
+        """
+        Test that _create_pipings_bfs creates one PluginPiping per tree node and
+        returns the index-to-piping dict in BFS order.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        tree_dict = {'root_index': 0, 'tree': [
+            {'plugin_id': plugin_ds.id, 'title': 'r',
+             'plugin_parameter_defaults': [], 'child_indices': [1, 2]},
+            {'plugin_id': plugin_ds.id, 'title': 'c1',
+             'plugin_parameter_defaults': [], 'child_indices': []},
+            {'plugin_id': plugin_ds.id, 'title': 'c2',
+             'plugin_parameter_defaults': [], 'child_indices': []},
+        ]}
+        plg_pipings_dict = PipelineSerializer._create_pipings_bfs(pipeline,
+                                                                  tree_dict)
+        self.assertEqual(set(plg_pipings_dict.keys()), {0, 1, 2})
+        self.assertEqual(plg_pipings_dict[0].title, 'r')
+        self.assertEqual(plg_pipings_dict[1].previous, plg_pipings_dict[0])
+        self.assertEqual(plg_pipings_dict[2].previous, plg_pipings_dict[0])
+
+    def test__finalize_ts_pipings_rewrites_indices_to_piping_ids(self):
+        """
+        Test that _finalize_ts_pipings rewrites the 'plugininstances' default
+        from comma-separated tree indices to comma-separated piping ids for ts
+        pipings.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        tree_dict = {'root_index': 0, 'tree': [
+            {'plugin_id': plugin_ds.id, 'title': 'r',
+             'plugin_parameter_defaults': [], 'child_indices': [1]},
+            {'plugin_id': plugin_ts.id, 'title': 't',
+             'plugin_parameter_defaults':
+                 [{'name': 'plugininstances', 'default': '0'}],
+             'child_indices': []},
+        ]}
+        plg_pipings_dict = PipelineSerializer._create_pipings_bfs(pipeline,
+                                                                  tree_dict)
+        PipelineSerializer._finalize_ts_pipings(plg_pipings_dict)
+        ts_param = plg_pipings_dict[1].string_param.filter(
+            plugin_param__name='plugininstances').first()
+        self.assertEqual(ts_param.value, str(plg_pipings_dict[0].id))
+
     def test__add_plugin_tree_to_pipeline_normalizes_string_resource_limits(self):
         """
         Regression test: when a tree node carries cpu_limit/memory_limit as
@@ -825,7 +1218,90 @@ class PipelineSourceFileSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             PipelineSourceFileSerializer.get_yaml_pipeline_canonical_representation(pipeline_repr)
 
-    def test_get_json_pipeline_canonical_representation(self):
+    def test__parse_plugin_name_and_version(self):
+        """
+        Test that _parse_plugin_name_and_version returns the (name, version)
+        tuple for the YAML 'plugin' string '<name> v<version>'.
+        """
+        name, version = PipelineSourceFileSerializer._parse_plugin_name_and_version(
+            'simpledsapp v0.1')
+        self.assertEqual(name, 'simpledsapp')
+        self.assertEqual(version, '0.1')
+
+    def test__parse_plugin_name_and_version_missing_version_raises(self):
+        """
+        Test that _parse_plugin_name_and_version raises ValidationError when
+        the plugin string has no version (only one whitespace-separated token).
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer._parse_plugin_name_and_version(
+                'simpledsapp')
+
+    def test__convert_plugin_parameter_defaults(self):
+        """
+        Test that _convert_plugin_parameter_defaults converts a {name: default}
+        mapping to the canonical list of {'name', 'default'} entries.
+        """
+        result = PipelineSourceFileSerializer._convert_plugin_parameter_defaults(
+            {'a': 1, 'b': 'two'})
+        self.assertIn({'name': 'a', 'default': 1}, result)
+        self.assertIn({'name': 'b', 'default': 'two'}, result)
+        self.assertEqual(len(result), 2)
+
+    def test__convert_plugin_parameter_defaults_empty(self):
+        """
+        Test that _convert_plugin_parameter_defaults returns an empty list for
+        an empty defaults dict.
+        """
+        self.assertEqual(
+            PipelineSourceFileSerializer._convert_plugin_parameter_defaults({}),
+            [])
+
+    def test__build_canonical_yaml_node_full(self):
+        """
+        Test that _build_canonical_yaml_node produces the expected canonical
+        node dict, including resource overrides and plugin_parameter_defaults.
+        """
+        node = {'title': 'simpledsapp1', 'plugin': 'simpledsapp v0.1',
+                'previous': None, 'cpu_limit': '2500m',
+                'memory_limit': '512Mi', 'number_of_workers': 2,
+                'gpu_limit': 1,
+                'plugin_parameter_defaults': {'dummyInt': 7}}
+        canonical = PipelineSourceFileSerializer._build_canonical_yaml_node(node)
+        self.assertEqual(canonical['title'], 'simpledsapp1')
+        self.assertEqual(canonical['plugin_name'], 'simpledsapp')
+        self.assertEqual(canonical['plugin_version'], '0.1')
+        self.assertIsNone(canonical['previous'])
+        self.assertEqual(canonical['cpu_limit'], '2500m')
+        self.assertEqual(canonical['memory_limit'], '512Mi')
+        self.assertEqual(canonical['number_of_workers'], 2)
+        self.assertEqual(canonical['gpu_limit'], 1)
+        self.assertEqual(canonical['plugin_parameter_defaults'],
+                         [{'name': 'dummyInt', 'default': 7}])
+
+    def test__build_canonical_yaml_node_omits_absent_resource_fields(self):
+        """
+        Test that _build_canonical_yaml_node omits resource keys that are not
+        present on the source node, and omits plugin_parameter_defaults when
+        empty.
+        """
+        node = {'title': 'simpledsapp1', 'plugin': 'simpledsapp v0.1',
+                'previous': None}
+        canonical = PipelineSourceFileSerializer._build_canonical_yaml_node(node)
+        for f in ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit',
+                  'plugin_parameter_defaults'):
+            self.assertNotIn(f, canonical)
+
+    def test__build_canonical_yaml_node_missing_plugin_raises(self):
+        """
+        Test that _build_canonical_yaml_node raises ValidationError when 'plugin'
+        is missing.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSourceFileSerializer._build_canonical_yaml_node(
+                {'title': 'simpledsapp1', 'previous': None})
+
+    def test__get_json_pipeline_canonical_representation(self):
         """
         Test whether custom get_json_pipeline_canonical_representation method returns an
         appropriate canonical JSON pipeline representation from the json representation.

@@ -5,6 +5,45 @@ import django_filters
 from django_filters.rest_framework import FilterSet
 
 from pipelines.models import Pipeline
+from plugininstances.enums import STATUS_CHOICES
+
+
+# Mapping of (annotation field name) -> (plugin-instance status string).
+# Source of truth for valid status strings is plugininstances.enums.STATUS_CHOICES;
+# the field-name side of the pair is workflow-specific (e.g. 'registeringFiles' is
+# surfaced as 'registering_jobs', 'finishedSuccessfully' as 'finished_jobs').
+JOBS_STATUS_FIELDS = (
+    ('created_jobs',     'created'),
+    ('waiting_jobs',     'waiting'),
+    ('copying_jobs',     'copying'),
+    ('scheduled_jobs',   'scheduled'),
+    ('started_jobs',     'started'),
+    ('uploading_jobs',   'uploading'),
+    ('registering_jobs', 'registeringFiles'),
+    ('finished_jobs',    'finishedSuccessfully'),
+    ('errored_jobs',     'finishedWithError'),
+    ('cancelled_jobs',   'cancelled'),
+)
+assert {s for _, s in JOBS_STATUS_FIELDS} <= {c[0] for c in STATUS_CHOICES}, (
+    'workflows.JOBS_STATUS_FIELDS references a status missing from '
+    'plugininstances.enums.STATUS_CHOICES'
+)
+
+
+def _status_count_kwargs(status_path: str) -> dict:
+    """
+    Build the dict of count expressions keyed by annotation/aggregate field name.
+    The same dict shape works for both QuerySet.annotate (status_path traverses
+    the related manager, e.g. 'plugin_instances__status') and Manager.aggregate
+    (status_path is the local field, e.g. 'status').
+    """
+    return {
+        field: Count(
+            Case(When(**{status_path: status}, then=1),
+                 output_field=IntegerField())
+        )
+        for field, status in JOBS_STATUS_FIELDS
+    }
 
 
 class Workflow(models.Model):
@@ -27,26 +66,7 @@ class Workflow(models.Model):
         execution status to each element of a Workflow queryset.
         """
         return workflow_qs.annotate(
-            created_jobs=Count(Case(When(plugin_instances__status='created', then=1),
-                               output_field=IntegerField())),
-            waiting_jobs=Count(Case(When(plugin_instances__status='waiting', then=1),
-                               output_field=IntegerField())),
-            copying_jobs=Count(Case(When(plugin_instances__status='copying', then=1),
-                               output_field=IntegerField())),
-            scheduled_jobs=Count(Case(When(plugin_instances__status='scheduled', then=1),
-                                    output_field=IntegerField())),
-            started_jobs=Count(Case(When(plugin_instances__status='started', then=1),
-                                    output_field=IntegerField())),
-            uploading_jobs=Count(Case(When(plugin_instances__status='uploading', then=1),
-                               output_field=IntegerField())),
-            registering_jobs=Count(Case(When(plugin_instances__status='registeringFiles',
-                                             then=1), output_field=IntegerField())),
-            finished_jobs=Count(Case(When(plugin_instances__status='finishedSuccessfully',
-                                          then=1), output_field=IntegerField())),
-            errored_jobs=Count(Case(When(plugin_instances__status='finishedWithError',
-                                         then=1), output_field=IntegerField())),
-            cancelled_jobs=Count(Case(When(plugin_instances__status='cancelled', then=1),
-                                    output_field=IntegerField()))
+            **_status_count_kwargs('plugin_instances__status')
         ).order_by('-creation_date')
 
     def get_jobs_status_count(self):
@@ -54,28 +74,7 @@ class Workflow(models.Model):
         Custom method to get the number of associated plugin instances per
         execution status.
         """
-        return self.plugin_instances.aggregate(
-            created_jobs=Count(Case(When(status='created', then=1),
-                               output_field=IntegerField())),
-            waiting_jobs=Count(Case(When(status='waiting', then=1),
-                               output_field=IntegerField())),
-            copying_jobs=Count(Case(When(status='copying', then=1),
-                               output_field=IntegerField())),
-            scheduled_jobs=Count(Case(When(status='scheduled', then=1),
-                               output_field=IntegerField())),
-            started_jobs=Count(Case(When(status='started', then=1),
-                               output_field=IntegerField())),
-            uploading_jobs=Count(Case(When(status='uploading', then=1),
-                               output_field=IntegerField())),
-            registering_jobs=Count(Case(When(status='registeringFiles', then=1),
-                               output_field=IntegerField())),
-            finished_jobs=Count(Case(When(status='finishedSuccessfully', then=1),
-                               output_field=IntegerField())),
-            errored_jobs=Count(Case(When(status='finishedWithError', then=1),
-                               output_field=IntegerField())),
-            cancelled_jobs=Count(Case(When(status='cancelled', then=1),
-                               output_field=IntegerField()))
-        )
+        return self.plugin_instances.aggregate(**_status_count_kwargs('status'))
 
 
 class WorkflowFilter(FilterSet):
