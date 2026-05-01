@@ -9,9 +9,22 @@ from pipelines.serializers import (DEFAULT_PIPING_PARAMETER_SERIALIZERS,
                                     PluginPipingSerializer)
 from plugininstances.models import PluginInstance
 from ._types import GivenNodeInfo, PipingId, GivenWorkflowPluginParameterDefault
-from .models import Workflow
+from .models import Workflow, JOBS_STATUS_FIELDS
 
 RESOURCE_FIELDS = ('cpu_limit', 'memory_limit', 'number_of_workers', 'gpu_limit')
+
+
+def _make_jobs_count_getter(field_name: str):
+    """
+    Build a SerializerMethodField-style getter that returns the value of
+    ``obj.<field_name>`` (the count annotated by ``Workflow.add_jobs_status_count``)
+    or 0 when the workflow was fetched without that annotation.
+    """
+    def getter(self, obj) -> int:
+        return getattr(obj, field_name, 0)
+    getter.__doc__ = (f"Return the number of plugin instances counted under "
+                      f"'{field_name}', or 0 if the queryset wasn't annotated.")
+    return getter
 
 
 class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
@@ -21,16 +34,16 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                                                        required=False)
     nodes_info = serializers.JSONField(write_only=True, default='[]')
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    created_jobs = serializers.IntegerField(default=0, read_only=True)
-    waiting_jobs = serializers.IntegerField(default=0, read_only=True)
-    copying_jobs = serializers.IntegerField(default=0, read_only=True)
-    scheduled_jobs = serializers.IntegerField(default=0, read_only=True)
-    started_jobs = serializers.IntegerField(default=0, read_only=True)
-    uploading_jobs = serializers.IntegerField(default=0, read_only=True)
-    registering_jobs = serializers.IntegerField(default=0, read_only=True)
-    finished_jobs = serializers.IntegerField(default=0, read_only=True)
-    errored_jobs = serializers.IntegerField(default=0, read_only=True)
-    cancelled_jobs = serializers.IntegerField(default=0, read_only=True)
+    created_jobs = serializers.SerializerMethodField()
+    waiting_jobs = serializers.SerializerMethodField()
+    copying_jobs = serializers.SerializerMethodField()
+    scheduled_jobs = serializers.SerializerMethodField()
+    started_jobs = serializers.SerializerMethodField()
+    uploading_jobs = serializers.SerializerMethodField()
+    registering_jobs = serializers.SerializerMethodField()
+    finished_jobs = serializers.SerializerMethodField()
+    errored_jobs = serializers.SerializerMethodField()
+    cancelled_jobs = serializers.SerializerMethodField()
     pipeline = serializers.HyperlinkedRelatedField(view_name='pipeline-detail',
                                                    read_only=True)
     plugin_instances = serializers.HyperlinkedIdentityField(
@@ -292,3 +305,13 @@ class WorkflowSerializer(serializers.HyperlinkedModelSerializer):
                 raise serializers.ValidationError(
                     {'previous_plugin_inst_id': ["This field is required."]})
         return data
+
+
+# Attach the factory-built ``get_<field_name>`` getter for each tracked status to
+# WorkflowSerializer. Done after class definition (rather than via a metaclass)
+# so the canonical mapping in JOBS_STATUS_FIELDS stays the single source of truth.
+for _field_name, _ in JOBS_STATUS_FIELDS:
+    setattr(WorkflowSerializer,
+            f'get_{_field_name}',
+            _make_jobs_count_getter(_field_name))
+del _field_name
