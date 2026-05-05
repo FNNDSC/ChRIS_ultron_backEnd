@@ -1023,6 +1023,9 @@ class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer
     plugin_piping_cpu_limit = serializers.ReadOnlyField(source='plugin_piping.cpu_limit')
     plugin_piping_memory_limit = serializers.ReadOnlyField(
         source='plugin_piping.memory_limit')
+    plugin_piping_gpu_limit = serializers.ReadOnlyField(source='plugin_piping.gpu_limit')
+    plugin_piping_number_of_workers = serializers.ReadOnlyField(
+        source='plugin_piping.number_of_workers')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -1038,6 +1041,7 @@ class DefaultPipingStrParameterSerializer(serializers.HyperlinkedModelSerializer
         model = DefaultPipingStrParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'plugin_piping_cpu_limit', 'plugin_piping_memory_limit',
+                  'plugin_piping_gpu_limit', 'plugin_piping_number_of_workers',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -1050,6 +1054,9 @@ class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer
     plugin_piping_cpu_limit = serializers.ReadOnlyField(source='plugin_piping.cpu_limit')
     plugin_piping_memory_limit = serializers.ReadOnlyField(
         source='plugin_piping.memory_limit')
+    plugin_piping_gpu_limit = serializers.ReadOnlyField(source='plugin_piping.gpu_limit')
+    plugin_piping_number_of_workers = serializers.ReadOnlyField(
+        source='plugin_piping.number_of_workers')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -1065,6 +1072,7 @@ class DefaultPipingIntParameterSerializer(serializers.HyperlinkedModelSerializer
         model = DefaultPipingIntParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'plugin_piping_cpu_limit', 'plugin_piping_memory_limit',
+                  'plugin_piping_gpu_limit', 'plugin_piping_number_of_workers',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -1077,6 +1085,9 @@ class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializ
     plugin_piping_cpu_limit = serializers.ReadOnlyField(source='plugin_piping.cpu_limit')
     plugin_piping_memory_limit = serializers.ReadOnlyField(
         source='plugin_piping.memory_limit')
+    plugin_piping_gpu_limit = serializers.ReadOnlyField(source='plugin_piping.gpu_limit')
+    plugin_piping_number_of_workers = serializers.ReadOnlyField(
+        source='plugin_piping.number_of_workers')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -1092,6 +1103,7 @@ class DefaultPipingFloatParameterSerializer(serializers.HyperlinkedModelSerializ
         model = DefaultPipingFloatParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'plugin_piping_cpu_limit', 'plugin_piping_memory_limit',
+                  'plugin_piping_gpu_limit', 'plugin_piping_number_of_workers',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -1104,6 +1116,9 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
     plugin_piping_cpu_limit = serializers.ReadOnlyField(source='plugin_piping.cpu_limit')
     plugin_piping_memory_limit = serializers.ReadOnlyField(
         source='plugin_piping.memory_limit')
+    plugin_piping_gpu_limit = serializers.ReadOnlyField(source='plugin_piping.gpu_limit')
+    plugin_piping_number_of_workers = serializers.ReadOnlyField(
+        source='plugin_piping.number_of_workers')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -1119,6 +1134,7 @@ class DefaultPipingBoolParameterSerializer(serializers.HyperlinkedModelSerialize
         model = DefaultPipingBoolParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'plugin_piping_cpu_limit', 'plugin_piping_memory_limit',
+                  'plugin_piping_gpu_limit', 'plugin_piping_number_of_workers',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
@@ -1131,6 +1147,9 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
     plugin_piping_cpu_limit = serializers.ReadOnlyField(source='plugin_piping.cpu_limit')
     plugin_piping_memory_limit = serializers.ReadOnlyField(
         source='plugin_piping.memory_limit')
+    plugin_piping_gpu_limit = serializers.ReadOnlyField(source='plugin_piping.gpu_limit')
+    plugin_piping_number_of_workers = serializers.ReadOnlyField(
+        source='plugin_piping.number_of_workers')
     plugin_id = serializers.ReadOnlyField(source='plugin_piping.plugin_id')
     plugin_name = serializers.ReadOnlyField(source='plugin_param.plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin_param.plugin.version')
@@ -1148,6 +1167,7 @@ class GenericDefaultPipingParameterSerializer(serializers.HyperlinkedModelSerial
         model = DefaultPipingStrParameter
         fields = ('url', 'id', 'value', 'type', 'plugin_piping_id', 'plugin_piping_title',
                   'plugin_piping_cpu_limit', 'plugin_piping_memory_limit',
+                  'plugin_piping_gpu_limit', 'plugin_piping_number_of_workers',
                   'previous_plugin_piping_id', 'param_name', 'param_id', 'plugin_piping',
                   'plugin_name', 'plugin_version', 'plugin_id', 'plugin_param')
 
