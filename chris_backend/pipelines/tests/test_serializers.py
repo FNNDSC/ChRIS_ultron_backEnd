@@ -9,14 +9,16 @@ import yaml
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.core.files.base import ContentFile
 from rest_framework import serializers
 
-from plugininstances.models import PluginInstance
+from plugininstances.models import PluginInstance, StrParameter, IntParameter
 from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultStrParameter, DefaultIntParameter
-from pipelines.models import Pipeline, PluginPiping
-from pipelines.serializers import (PipelineSerializer, PipelineSourceFileSerializer, 
+from pipelines.models import (Pipeline, PluginPiping, PipelineSourceFile,
+                              PipelineSourceFileMeta)
+from pipelines.serializers import (PipelineSerializer, PipelineSourceFileSerializer,
                                    PluginPipingSerializer)
 
 
@@ -818,6 +820,16 @@ class PipelineSerializerTests(SerializerTests):
         with self.assertRaises(serializers.ValidationError):
             PipelineSerializer._resolve_node_plugin({'plugin_id': 99999})
 
+    def test__resolve_node_plugin_unknown_name_and_version_raises(self):
+        """
+        Test that _resolve_node_plugin raises ValidationError with the name+version
+        error message when a plugin lookup by name+version misses.
+        """
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            PipelineSerializer._resolve_node_plugin({
+                'plugin_name': 'no-such-plugin', 'plugin_version': '99.99'})
+        self.assertIn('no-such-plugin', str(ctx.exception.detail))
+
     def test__validate_node_resources_happy_path(self):
         """
         Test that _validate_node_resources accepts in-range per-piping resources.
@@ -1032,6 +1044,177 @@ class PipelineSerializerTests(SerializerTests):
         ts_param = plg_pipings_dict[1].string_param.filter(
             plugin_param__name='plugininstances').first()
         self.assertEqual(ts_param.value, str(plg_pipings_dict[0].id))
+
+    def test_create_from_plugin_inst_id(self):
+        """
+        Test that PipelineSerializer.create can build a pipeline from an existing
+        PluginInstance tree (the plugin_inst_id flow, covering
+        _build_tree_dict_from_instance and _collect_tree_from_instance). The
+        resulting pipeline must contain one PluginPiping per visited instance and
+        the 'plugininstances' default of the 'ts' instance must be rewritten from
+        an instance id to a piping id.
+        """
+        # use a linear chain: fs_root --> ds_node --> ts_node
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        owner = User.objects.get(username=self.username)
+
+        fs_root = PluginInstance.objects.create(
+            plugin=plugin_fs, owner=owner, title='fs_root',
+            compute_resource=self.compute_resource)
+        ds_node = PluginInstance.objects.create(
+            plugin=plugin_ds, owner=owner, title='ds_node', previous=fs_root,
+            compute_resource=self.compute_resource)
+        ts_node = PluginInstance.objects.create(
+            plugin=plugin_ts, owner=owner, title='ts_node', previous=ds_node,
+            compute_resource=self.compute_resource)
+
+        # ts_node's 'plugininstances' parameter references ds_node by instance id
+        ts_param = plugin_ts.parameters.get(name='plugininstances')
+        StrParameter.objects.create(
+            plugin_inst=ts_node, plugin_param=ts_param, value=str(ds_node.id))
+
+        # PipelineSerializer.create expects 'plugin_inst_id' to already be the
+        # resolved instance object (validate_plugin_inst_id returns the object,
+        # not the id), so we drive create() directly with the resolved object.
+        ser = PipelineSerializer(data={'name': 'PipelineFromInst'})
+        # bypass validate (which requires plugin_tree or plugin_inst_id in data)
+        validated_data = {'name': 'PipelineFromInst', 'owner': owner,
+                          'plugin_inst_id': fs_root}
+        pipeline = ser.create(validated_data)
+
+        self.assertEqual(pipeline.plugin_pipings.count(), 3)
+        titles = set(pipeline.plugin_pipings.values_list('title', flat=True))
+        self.assertEqual(titles, {'fs_root', 'ds_node', 'ts_node'})
+
+        # the ts piping's 'plugininstances' default must be rewritten from the
+        # original instance id to the corresponding piping id
+        ts_pip = pipeline.plugin_pipings.get(title='ts_node')
+        ds_pip = pipeline.plugin_pipings.get(title='ds_node')
+        ts_default = ts_pip.string_param.get(plugin_param__name='plugininstances')
+        self.assertEqual(ts_default.value, str(ds_pip.id))
+
+    def test_validate_drops_locked_when_pipeline_already_unlocked(self):
+        """
+        Test the update branch of PipelineSerializer.validate that strips a
+        'locked' field from data when the pipeline being updated is already
+        unlocked (an unlocked pipeline cannot be re-locked).
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline.locked = False
+        pipeline.save()
+        ser = PipelineSerializer(pipeline)
+        validated = ser.validate({'name': 'NewName', 'locked': True})
+        self.assertNotIn('locked', validated)
+
+    def test_validate_requires_name_on_create(self):
+        """
+        Test that validate raises ValidationError when 'name' is missing on
+        create (no instance bound).
+        """
+        ser = PipelineSerializer(data={})
+        with self.assertRaises(serializers.ValidationError):
+            ser.validate({'plugin_tree': '[]'})
+
+    def test_validate_plugin_inst_id_returns_ds_instance(self):
+        """
+        Test the success path of validate_plugin_inst_id: a 'ds' plugin instance
+        is returned as-is.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        owner = User.objects.get(username=self.username)
+        # need an fs root for the feed/output_folder chain
+        fs_inst = PluginInstance.objects.create(
+            plugin=plugin_fs, owner=owner, title='fs_for_inst_id',
+            compute_resource=self.compute_resource)
+        ds_inst = PluginInstance.objects.create(
+            plugin=plugin_ds, owner=owner, title='ds_for_inst_id',
+            previous=fs_inst, compute_resource=self.compute_resource)
+        ser = PipelineSerializer(data={})
+        result = ser.validate_plugin_inst_id(ds_inst.id)
+        self.assertEqual(result, ds_inst)
+
+    def test_validate_does_not_require_name_on_update(self):
+        """
+        Test the update branch of PipelineSerializer.validate that does not
+        require 'name' in data when an instance is bound.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        ser = PipelineSerializer(pipeline)
+        # should not raise
+        validated = ser.validate({'authors': 'someone'})
+        self.assertEqual(validated, {'authors': 'someone'})
+
+    def test_validate_plugin_tree_raises_when_no_root(self):
+        """
+        Test that validate_plugin_tree raises ValidationError when every node has
+        a non-null previous title (no root), even if every previous reference is
+        otherwise valid.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        # both nodes reference each other as previous, leaving the tree rootless
+        tree = json.dumps([
+            {'plugin_id': plugin_ds.id, 'title': 'a', 'previous': 'b'},
+            {'plugin_id': plugin_ds.id, 'title': 'b', 'previous': 'a'},
+        ])
+        ser = PipelineSerializer(data={})
+        with self.assertRaises(serializers.ValidationError):
+            ser.validate_plugin_tree(tree)
+
+    def test__validate_node_plugin_missing_previous_key_raises(self):
+        """
+        Test the malformed-node path in _validate_node_plugin: a node missing the
+        'previous' key raises ValidationError.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        d = {'title': 'a', 'plugin_id': plugin_ds.id}  # no 'previous'
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_node_plugin(d, {'a': 0}, False)
+
+    def test__resolve_node_plugin_non_int_plugin_id_raises(self):
+        """
+        Test the generic-Exception path in _resolve_node_plugin: a non-coercible
+        plugin_id (e.g. a list) raises ValidationError.
+        """
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._resolve_node_plugin({'plugin_id': ['nope']})
+
+    def test__validate_ts_parent_titles_list_duplicate_raises(self):
+        """
+        Test that _validate_ts_parent_titles_list raises ValidationError when the
+        comma-separated parent-titles list contains duplicates.
+        """
+        plugin_ts = Plugin.objects.get(meta__name=self.plugin_ts_name)
+        with self.assertRaises(serializers.ValidationError):
+            PipelineSerializer._validate_ts_parent_titles_list(
+                plugin_ts, 'a', {'a': 0, 'b': 1}, 'a,a')
+
+    def test_get_tree_creates_prev_node_lazily(self):
+        """
+        Regression test: get_tree must materialize a parent (prev_ix) node when
+        a child is iterated before the parent (forward reference where
+        prev_ix > ix). Covers the 'else: tree[prev_ix] = _make_node' path.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        # tree_list ordering creates a forward reference: the node at ix=1
+        # has previous=2, so when iter reaches ix=1, tree[2] is still None
+        tree_list = [
+            {'plugin_id': plugin_ds.id, 'title': 'root',
+             'plugin_parameter_defaults': [], 'previous': None},
+            {'plugin_id': plugin_ds.id, 'title': 'leaf',
+             'plugin_parameter_defaults': [], 'previous': 2},
+            {'plugin_id': plugin_ds.id, 'title': 'middle',
+             'plugin_parameter_defaults': [], 'previous': 0},
+        ]
+        result = PipelineSerializer.get_tree(tree_list)
+        self.assertEqual(result['root_index'], 0)
+        self.assertEqual(result['tree'][0]['child_indices'], [2])
+        # 'middle' (ix=2) was materialized via the lazy-create path while
+        # processing 'leaf' (ix=1), then its child_indices was populated
+        self.assertEqual(result['tree'][2]['child_indices'], [1])
+        self.assertEqual(result['tree'][1]['child_indices'], [])
 
     def test__add_plugin_tree_to_pipeline_normalizes_string_resource_limits(self):
         """
@@ -1315,6 +1498,127 @@ class PipelineSourceFileSerializerTests(SerializerTests):
                                          '"plugin_parameter_defaults": [{"name": "plugininstances", "default": "simpledsapp1,simpledsapp2"}]}]'}
         self.assertEqual(PipelineSourceFileSerializer.get_json_pipeline_canonical_representation(pipeline_repr),
                          canonical_repr)
+
+    def test_validate_type_accepts_supported_values(self):
+        """
+        Test that validate_type accepts 'yaml', 'YAML', 'json' and 'JSON' and
+        normalizes them to lowercase.
+        """
+        ser = PipelineSourceFileSerializer()
+        for v in ('yaml', 'YAML', 'json', 'JSON'):
+            self.assertIn(ser.validate_type(v), ('yaml', 'json'))
+        self.assertEqual(ser.validate_type('YAML'), 'yaml')
+        self.assertEqual(ser.validate_type('JSON'), 'json')
+
+    def test_validate_type_rejects_unsupported_value(self):
+        """
+        Test that validate_type raises ValidationError for any value that isn't a
+        case-insensitive 'yaml' or 'json'.
+        """
+        ser = PipelineSourceFileSerializer()
+        with self.assertRaises(serializers.ValidationError):
+            ser.validate_type('xml')
+
+    def test_validate_dispatches_to_yaml(self):
+        """
+        Test that the top-level validate parses a YAML pipeline file and stores
+        the canonical pipeline representation under 'pipeline'.
+        """
+        ser = PipelineSourceFileSerializer()
+        with io.BytesIO(self.yaml_pipeline_str.encode()) as f:
+            f.name = 'test_validate.yaml'
+            data = ser.validate({'fname': f, 'type': 'yaml'})
+        self.assertIn('pipeline', data)
+        self.assertEqual(data['pipeline']['name'], 'TestPipeline')
+        # plugin_tree must be a JSON-serialized list of canonical nodes
+        plugin_tree = json.loads(data['pipeline']['plugin_tree'])
+        self.assertEqual(plugin_tree[0]['plugin_name'], 'simpledsapp')
+
+    def test_validate_dispatches_to_json(self):
+        """
+        Test that the top-level validate parses a JSON pipeline file and stores
+        the canonical pipeline representation under 'pipeline'.
+        """
+        ser = PipelineSourceFileSerializer()
+        with io.BytesIO(self.json_pipeline_str.encode()) as f:
+            f.name = 'test_validate.json'
+            data = ser.validate({'fname': f, 'type': 'json'})
+        self.assertIn('pipeline', data)
+        self.assertEqual(data['pipeline']['name'], 'TestPipeline')
+
+    def _make_validated_data(self, filename, source_basename=None):
+        """
+        Build the validated_data dict that PipelineSourceFileSerializer.create
+        expects, including a fresh ContentFile so storage upload can succeed.
+        """
+        chris_user, _ = User.objects.get_or_create(username='chris')
+        uploader = User.objects.get(username=self.username)
+        ser = PipelineSourceFileSerializer()
+        with io.BytesIO(self.yaml_pipeline_str.encode()) as f:
+            f.name = source_basename or filename
+            validated = ser.validate({'fname': f, 'type': 'yaml'})
+        f = ContentFile(self.yaml_pipeline_str.encode())
+        f.name = source_basename or filename
+        return ser, {
+            'fname': f, 'owner': chris_user, 'uploader': uploader,
+            'type': 'yaml', 'pipeline': validated['pipeline'],
+        }
+
+    def _purge_storage_path(self, storage_path):
+        """
+        Best-effort cleanup of a storage object so transactional rollback of the
+        DB row doesn't leave file behind for the next run.
+        """
+        from core.storage import connect_storage
+        try:
+            mgr = connect_storage(settings)
+            if mgr.obj_exists(storage_path):
+                mgr.delete_obj(storage_path)
+        except Exception:
+            pass
+
+    def test_create_persists_pipeline_and_source_file(self):
+        """
+        Test that PipelineSourceFileSerializer.create creates the Pipeline, the
+        PipelineSourceFile (in the PIPELINES space) and the
+        PipelineSourceFileMeta linking them. The Pipeline is owned by the
+        uploader; the source file's parent folder is the PIPELINES/<username> sub-folder 
+        owned by chris superuser and is granted public access.
+        """
+        # use a per-test storage path; clean up beforehand so Django's storage
+        # backend doesn't append a uniqueness suffix on top of leftovers from
+        # prior runs (file ops are outside the test DB transaction)
+        target_path = f'PIPELINES/{self.username}/create_persists_test.yaml'
+        self._purge_storage_path(target_path)
+        ser, validated_data = self._make_validated_data('create_persists_test.yaml')
+        try:
+            source_file = ser.create(validated_data)
+            self.assertEqual(source_file.fname.name, target_path)
+            self.assertTrue(source_file.public)
+            uploader = User.objects.get(username=self.username)
+            pipeline = Pipeline.objects.get(name='TestPipeline')
+            self.assertEqual(pipeline.owner, uploader)
+            self.assertEqual(source_file.meta.pipeline, pipeline)
+            self.assertEqual(source_file.meta.uploader, uploader)
+            self.assertEqual(source_file.meta.type, 'yaml')
+        finally:
+            self._purge_storage_path(target_path)
+
+    def test_create_strips_commas_from_filename(self):
+        """
+        Test that PipelineSourceFileSerializer.create strips commas from the
+        uploaded file's basename before composing the storage path. Commas are
+        reserved in ChRIS path syntax.
+        """
+        target_path = f'PIPELINES/{self.username}/withcommastest.yaml'
+        self._purge_storage_path(target_path)
+        ser, validated_data = self._make_validated_data(
+            'withcommastest.yaml', source_basename='with,commas,test.yaml')
+        try:
+            source_file = ser.create(validated_data)
+            self.assertEqual(source_file.fname.name, target_path)
+        finally:
+            self._purge_storage_path(target_path)
 
 
 class PluginPipingSerializerTests(SerializerTests):

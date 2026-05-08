@@ -1,6 +1,5 @@
 
 import jwt
-from unittest import mock
 
 from channels.db import database_sync_to_async
 from django.conf import settings
@@ -83,11 +82,14 @@ class PACSFileProgressTests(TransactionTestCase):
 
         await oxidicom.send_error(error='stuck in chimney', **series2)
         expected = 'oxidicom reported an error, check logs for details.'
-        with mock.patch("logging.Logger._log"):  # disable the error logging
+        # the oxidicom error is decoded in pacsfiles.lonk and logs at ERROR;
+        # capture/suppress with assertLogs and verify the expected message fired
+        with self.assertLogs('pacsfiles.lonk', level='ERROR') as cm:
             self.assertEqual(
                 await communicator.receive_json_from(),
                 Lonk(message=LonkError(error=expected), **series2),
             )
+        self.assertTrue(any('stuck in chimney' in msg for msg in cm.output))
 
         await oxidicom.send_progress(ndicom=192, **series1)
         self.assertEqual(

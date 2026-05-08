@@ -104,3 +104,52 @@ class PipelineManagerTests(TestCase):
         """
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         self.assertEqual(pipeline, self.pipeline_manager.get_pipeline(pipeline.id))
+
+    def test_manager_get_pipeline_raises_for_missing_id(self):
+        """
+        Test that get_pipeline raises NameError when no pipeline with the given
+        id exists in the system.
+        """
+        with self.assertRaises(NameError):
+            self.pipeline_manager.get_pipeline(999999)
+
+    def test_manager_add_pipeline_with_optional_metadata(self):
+        """
+        Test that the 'add' command persists the optional --authors, --category
+        and --description flags on the new pipeline.
+        """
+        plugin_tree = ('[{"title": "pip3", "plugin_name": "simpledsapp", '
+                       '"plugin_version": "0.1", "previous": null}]')
+        self.pipeline_manager.run([
+            'add', 'PipelineMetadata', self.username, plugin_tree,
+            '--authors', 'Author One',
+            '--category', 'TestCategory',
+            '--description', 'pipeline description',
+        ])
+        pipeline = Pipeline.objects.get(name='PipelineMetadata')
+        self.assertEqual(pipeline.authors, 'Author One')
+        self.assertEqual(pipeline.category, 'TestCategory')
+        self.assertEqual(pipeline.description, 'pipeline description')
+        # without --unlock the pipeline stays locked (the model default)
+        self.assertTrue(pipeline.locked)
+
+    def test_manager_modify_pipeline_optional_fields_and_unlock(self):
+        """
+        Test that the 'modify' command updates the optional --authors,
+        --category, --description fields and that --unlock flips the locked
+        flag to False.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        self.assertTrue(pipeline.locked)
+        self.pipeline_manager.run([
+            'modify', str(pipeline.id),
+            '--authors', 'New Author',
+            '--category', 'NewCategory',
+            '--description', 'new desc',
+            '--unlock',
+        ])
+        pipeline.refresh_from_db()
+        self.assertEqual(pipeline.authors, 'New Author')
+        self.assertEqual(pipeline.category, 'NewCategory')
+        self.assertEqual(pipeline.description, 'new desc')
+        self.assertFalse(pipeline.locked)

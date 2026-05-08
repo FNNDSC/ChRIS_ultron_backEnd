@@ -1,15 +1,17 @@
 
 import logging
+from unittest import mock
 
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.conf import settings
 
+from core.models import ChrisFolder
 from plugins.models import PluginMeta, Plugin
 from plugins.models import ComputeResource
 from plugins.models import PluginParameter, DefaultIntParameter
-from pipelines.models import Pipeline
-from pipelines.models import PluginPiping
+from pipelines.models import (Pipeline, PluginPiping, PipelineSourceFile,
+                              PipelineSourceFileMeta)
 from pipelines.models import DEFAULT_PIPING_PARAMETER_MODELS
 
 
@@ -140,6 +142,91 @@ class PipelineModelTests(ModelTests):
         self.assertEqual(accessible_pipelines_user1[0], Pipeline.objects.all()[0])
         self.assertEqual(len(Pipeline.get_accesible_pipelines(user2)), 0)
 
+    def test_get_accesible_pipelines_chris_user_returns_all(self):
+        """
+        Test whether custom get_accesible_pipelines method returns all pipelines
+        (including locked ones owned by other users) for the 'chris' superuser.
+        """
+        chris_user, _ = User.objects.get_or_create(username='chris')
+        # the fixture pipeline is locked and owned by self.username, not chris
+        accessible = Pipeline.get_accesible_pipelines(chris_user)
+        self.assertEqual(len(accessible), Pipeline.objects.count())
+
+    def test_get_accesible_pipelines_unauthenticated_user(self):
+        """
+        Test that get_accesible_pipelines for an unauthenticated user only returns
+        non-locked pipelines.
+        """
+        from django.contrib.auth.models import AnonymousUser
+        # the only fixture pipeline is locked, so anonymous sees nothing
+        self.assertEqual(len(Pipeline.get_accesible_pipelines(AnonymousUser())), 0)
+
+        owner = User.objects.get(username=self.username)
+        Pipeline.objects.create(name='OpenPipeline', owner=owner, locked=False)
+        accessible = Pipeline.get_accesible_pipelines(AnonymousUser())
+        self.assertEqual(len(accessible), 1)
+        self.assertEqual(accessible[0].name, 'OpenPipeline')
+
+    def test_get_default_parameters_returns_mixed_types(self):
+        """
+        Test that get_default_parameters returns the union of typed default-piping
+        parameter rows associated with the pipeline.
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        # add an int-typed parameter so the pipeline ends up with both string and int
+        # default-piping rows
+        (int_param, _) = PluginParameter.objects.get_or_create(
+            plugin=plugin_ds, name='dummyInt', type='integer', optional=True)
+        DefaultIntParameter.objects.get_or_create(plugin_param=int_param, value=7)
+        # re-saving any piping populates the int default for that piping
+        self.pips[0].save()
+
+        defaults = pipeline.get_default_parameters()
+        self.assertTrue(any(d.__class__.__name__ == 'DefaultPipingStrParameter'
+                            for d in defaults))
+        self.assertTrue(any(d.__class__.__name__ == 'DefaultPipingIntParameter'
+                            for d in defaults))
+
+    def test__build_title_adjacency_prev_title_inserted_first(self):
+        """
+        Test the branch in _build_title_adjacency where a node is processed before
+        its previous title has been added to the adjacency dict, so the previous
+        is created with the current title as its only child.
+        """
+        # iteration order matters: 'b' must be visited before 'a' to exercise the
+        # 'prev_title not in adjacency' branch. dict preserves insertion order.
+        nodes = {
+            'b': {'plugin_parameter_defaults': [], 'previous': 'a'},
+            'a': {'plugin_parameter_defaults': [], 'previous': None},
+        }
+        is_ts = {'a': False, 'b': False}
+        root, adjacency = Pipeline._build_title_adjacency(nodes, is_ts, {})
+        self.assertEqual(root, 'a')
+        self.assertEqual(adjacency['a'], ['b'])
+        self.assertEqual(adjacency['b'], [])
+
+    def test__build_title_adjacency_creates_prev_lazily(self):
+        """
+        Test the branch where a node is processed whose previous title has not
+        yet been added to the adjacency dict. The previous entry is created on
+        the fly with the current title as its only child.
+        """
+        # iteration order: 'c' first; its previous is 'b', which is not yet in
+        # adjacency (only the root 'a' is pre-seeded). When 'b' itself is then
+        # iterated it is already in adjacency, so it isn't re-linked into 'a'.
+        nodes = {
+            'c': {'plugin_parameter_defaults': [], 'previous': 'b'},
+            'b': {'plugin_parameter_defaults': [], 'previous': 'a'},
+            'a': {'plugin_parameter_defaults': [], 'previous': None},
+        }
+        is_ts = {'a': False, 'b': False, 'c': False}
+        root, adjacency = Pipeline._build_title_adjacency(nodes, is_ts, {})
+        self.assertEqual(root, 'a')
+        # 'b' was created lazily with 'c' as its only child
+        self.assertEqual(adjacency['b'], ['c'])
+        self.assertIn('c', adjacency)
+
     def test_get_plugin_tree(self):
         """
         Test whether get_plugin_tree returns the BFS-ordered list of canonical
@@ -269,3 +356,197 @@ class PluginPipingModelTests(ModelTests):
                                            previous=self.pips[1])
         with self.assertRaises(ValueError):
             pip.check_parameter_defaults()
+
+    def test_save_sets_compute_defaults_from_plugin(self):
+        """
+        Test that PluginPiping.save populates cpu_limit, memory_limit,
+        number_of_workers and gpu_limit from the plugin's min_* values when those
+        fields are not explicitly set on the piping.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pip = PluginPiping(plugin=plugin_ds, pipeline=pipeline,
+                           previous=self.pips[1], title='compute-defaults')
+        pip.save()
+        self.assertEqual(int(pip.cpu_limit), int(plugin_ds.min_cpu_limit))
+        self.assertEqual(int(pip.memory_limit), int(plugin_ds.min_memory_limit))
+        self.assertEqual(pip.number_of_workers, plugin_ds.min_number_of_workers)
+        self.assertEqual(pip.gpu_limit, plugin_ds.min_gpu_limit)
+
+    def test_save_keeps_explicitly_set_compute_overrides(self):
+        """
+        Test that PluginPiping.save does not overwrite explicitly-set per-piping
+        cpu_limit / memory_limit / number_of_workers / gpu_limit values.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        cpu = plugin_ds.min_cpu_limit + 10
+        mem = plugin_ds.min_memory_limit + 32
+        n_workers = plugin_ds.min_number_of_workers
+        gpu = plugin_ds.min_gpu_limit
+        pip = PluginPiping(plugin=plugin_ds, pipeline=pipeline,
+                           previous=self.pips[1], title='compute-overrides',
+                           cpu_limit=cpu, memory_limit=mem,
+                           number_of_workers=n_workers, gpu_limit=gpu)
+        pip.save()
+        self.assertEqual(int(pip.cpu_limit), int(cpu))
+        self.assertEqual(int(pip.memory_limit), int(mem))
+        self.assertEqual(pip.number_of_workers, n_workers)
+        self.assertEqual(pip.gpu_limit, gpu)
+
+    def test_save_updates_existing_default_when_param_supplied(self):
+        """
+        Test the update branch in PluginPiping.save: when an existing default-piping
+        parameter row is present and a parameter_defaults entry is supplied, the
+        existing row's value is updated rather than a new row being created.
+        """
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pip = self.pips[0]
+        existing = pip.string_param.get(plugin_param__name='prefix')
+        existing.value = 'original'
+        existing.save()
+        # supply a new default for the same parameter via save(parameter_defaults=...)
+        pip.save(parameter_defaults=[{'name': 'prefix', 'default': 'updated'}])
+        existing.refresh_from_db()
+        self.assertEqual(existing.value, 'updated')
+
+
+class PipelineSourceFileSignalTests(ModelTests):
+    """
+    Tests for the post_delete signals on PipelineSourceFile and
+    PipelineSourceFileMeta.
+    """
+
+    def _make_source_file(self):
+        """
+        Build a PipelineSourceFile + PipelineSourceFileMeta for the fixture
+        pipeline, with its fname pointing inside the PIPELINES space and a
+        ChrisFolder parent. No bytes are uploaded to storage; tests that need
+        to assert delete behaviour mock the storage manager.
+        """
+        owner = User.objects.get(username=self.username)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        folder_path = f'PIPELINES/{self.username}'
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(path=folder_path,
+                                                               owner=owner)
+        source_file = PipelineSourceFile(parent_folder=parent_folder, owner=owner)
+        source_file.fname.name = f'{folder_path}/test_signal.yaml'
+        source_file.save()
+        meta = PipelineSourceFileMeta.objects.create(
+            type='yaml', pipeline=pipeline, source_file=source_file, uploader=owner)
+        return source_file, meta
+
+    def test_auto_delete_file_from_storage_when_object_exists(self):
+        """
+        Test the post_delete signal on PipelineSourceFile: when the storage
+        backend reports the object exists, delete_obj is called on it.
+        """
+        source_file, _ = self._make_source_file()
+        storage_path = source_file.fname.name
+        storage_manager_mock = mock.Mock()
+        storage_manager_mock.obj_exists = mock.Mock(return_value=True)
+        storage_manager_mock.delete_obj = mock.Mock()
+        with mock.patch('pipelines.models.connect_storage') as connect_storage_mock:
+            connect_storage_mock.return_value = storage_manager_mock
+            source_file.delete()
+        storage_manager_mock.obj_exists.assert_called_with(storage_path)
+        storage_manager_mock.delete_obj.assert_called_with(storage_path)
+
+    def test_auto_delete_file_from_storage_when_object_missing(self):
+        """
+        Test the post_delete signal on PipelineSourceFile: when the storage
+        backend reports the object does not exist, delete_obj is not called.
+        """
+        source_file, _ = self._make_source_file()
+        storage_manager_mock = mock.Mock()
+        storage_manager_mock.obj_exists = mock.Mock(return_value=False)
+        storage_manager_mock.delete_obj = mock.Mock()
+        with mock.patch('pipelines.models.connect_storage') as connect_storage_mock:
+            connect_storage_mock.return_value = storage_manager_mock
+            source_file.delete()
+        storage_manager_mock.delete_obj.assert_not_called()
+
+    def test_auto_delete_file_from_storage_swallows_storage_errors(self):
+        """
+        Test that storage errors during the post_delete signal on
+        PipelineSourceFile are caught and logged rather than re-raised. Without
+        this, deleting a PipelineSourceFile would fail whenever the storage
+        backend is unreachable.
+        """
+        source_file, _ = self._make_source_file()
+        storage_manager_mock = mock.Mock()
+        storage_manager_mock.obj_exists = mock.Mock(side_effect=RuntimeError('boom'))
+        with mock.patch('pipelines.models.connect_storage') as connect_storage_mock:
+            connect_storage_mock.return_value = storage_manager_mock
+            # should not raise; the error must be logged instead
+            with self.assertLogs('pipelines.models', level='ERROR') as cm:
+                source_file.delete()
+        self.assertTrue(any('boom' in msg for msg in cm.output))
+
+    def test_auto_delete_source_file_with_meta_cascade(self):
+        """
+        Test that deleting a PipelineSourceFileMeta triggers a delete of the
+        associated PipelineSourceFile through the post_delete signal.
+        """
+        source_file, meta = self._make_source_file()
+        source_file_pk = source_file.pk
+        storage_manager_mock = mock.Mock()
+        storage_manager_mock.obj_exists = mock.Mock(return_value=False)
+        with mock.patch('pipelines.models.connect_storage') as connect_storage_mock:
+            connect_storage_mock.return_value = storage_manager_mock
+            meta.delete()
+        self.assertFalse(
+            PipelineSourceFile.objects.filter(pk=source_file_pk).exists())
+
+
+class PipelineSourceFileQuerysetTests(ModelTests):
+    """
+    Tests for PipelineSourceFile.get_base_queryset.
+    """
+
+    def test_get_base_queryset_filters_to_pipelines_space(self):
+        """
+        Test that get_base_queryset only returns rows whose fname starts with
+        'PIPELINES/'.
+        """
+        owner = User.objects.get(username=self.username)
+        (pipelines_folder, _) = ChrisFolder.objects.get_or_create(
+            path=f'PIPELINES/{self.username}', owner=owner)
+        in_space = PipelineSourceFile(parent_folder=pipelines_folder, owner=owner)
+        in_space.fname.name = f'PIPELINES/{self.username}/in.yaml'
+        in_space.save()
+
+        (other_folder, _) = ChrisFolder.objects.get_or_create(
+            path=f'home/{self.username}', owner=owner)
+        out_of_space = PipelineSourceFile(parent_folder=other_folder, owner=owner)
+        out_of_space.fname.name = f'home/{self.username}/out.yaml'
+        out_of_space.save()
+
+        names = list(PipelineSourceFile.get_base_queryset()
+                     .values_list('fname', flat=True))
+        self.assertIn(f'PIPELINES/{self.username}/in.yaml', names)
+        self.assertNotIn(f'home/{self.username}/out.yaml', names)
+
+
+class PipelineSourceFileMetaModelTests(ModelTests):
+    """
+    Tests for PipelineSourceFileMeta.
+    """
+
+    def test_str_returns_string_id(self):
+        """
+        Regression test: __str__ must return a string (not an int) so Django can
+        render the instance in admin / shell contexts.
+        """
+        owner = User.objects.get(username=self.username)
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(
+            path=f'PIPELINES/{self.username}', owner=owner)
+        source_file = PipelineSourceFile(parent_folder=parent_folder, owner=owner)
+        source_file.fname.name = f'PIPELINES/{self.username}/meta_str.yaml'
+        source_file.save()
+        meta = PipelineSourceFileMeta.objects.create(
+            type='yaml', pipeline=pipeline, source_file=source_file,
+            uploader=owner)
+        self.assertEqual(str(meta), str(meta.id))
