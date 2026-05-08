@@ -1,0 +1,27 @@
+# Coverage configuration for the dev environment.
+# Excluded from production images via the repo-root .dockerignore.
+
+[run]
+source =
+    collectionjson
+    core
+    feeds
+    filebrowser
+    pacsfiles
+    pipelines
+    plugininstances
+    plugins
+    userfiles
+    users
+    workflows
+omit =
+    */migrations/*
+    */tests/*
+
+[report]
+show_missing = True
+skip_empty = True
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError

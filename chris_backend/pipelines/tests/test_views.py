@@ -14,8 +14,10 @@ from plugins.models import ComputeResource
 from plugins.models import PluginParameter
 from plugins.models import DefaultStrParameter, DefaultBoolParameter
 from plugins.models import DefaultFloatParameter, DefaultIntParameter
-from pipelines.models import Pipeline, PluginPiping, DefaultPipingStrParameter
+from pipelines.models import (Pipeline, PluginPiping, DefaultPipingStrParameter,
+                              PipelineSourceFile)
 
+from core.models import ChrisFolder
 from core.storage import connect_storage
 
 
@@ -330,8 +332,18 @@ class PipelineSourceFileViewTests(PipelineViewTests):
           plugin_parameter_defaults:
             plugininstances: simpledsapp1,simpledsapp2
         """
+        # tracked storage paths get removed in tearDown so a failing test
+        # doesn't leave behind orphaned objects in the storage backend
+        self._storage_paths_to_cleanup = []
 
     def tearDown(self):
+        storage_manager = connect_storage(settings)
+        for path in self._storage_paths_to_cleanup:
+            try:
+                if storage_manager.obj_exists(path):
+                    storage_manager.delete_obj(path)
+            except Exception:
+                pass
         super(PipelineSourceFileViewTests, self).tearDown()
 
     @tag('integration')
@@ -340,19 +352,190 @@ class PipelineSourceFileViewTests(PipelineViewTests):
         # POST request using multipart/form-data to be able to upload file
         self.client.login(username=self.username, password=self.password)
 
+        fpath = f'PIPELINES/{self.username}/test_pipeline0000001.yaml'
+        self._storage_paths_to_cleanup.append(fpath)
         with io.BytesIO(self.pipeline_str.encode()) as f:
             f.name = 'test_pipeline0000001.yaml'
             post = {"fname": f}
             response = self.client.post(self.create_read_url, data=post)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        fpath = f'PIPELINES/{self.username}/test_pipeline0000001.yaml'
-        # delete file from storage
-        storage_manager = connect_storage(settings)
-        storage_manager.delete_obj(fpath)
 
     def test_pipelinesourcefile_create_failure_unauthenticated(self):
         response = self.client.post(self.create_read_url, data={"fname": {}})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_pipelinesourcefile_list_success(self):
+        """
+        Test that GET on the pipelinesourcefile-list returns a Collection+JSON
+        response with the write template containing the 'type' and 'fname' keys.
+        """
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.create_read_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'fname')
+        self.assertContains(response, 'type')
+
+
+class _SourceFileFixture:
+    """
+    Helper mixin that uploads a small in-memory pipeline source file to storage
+    so list/detail serialization (which calls fname.size) works, and tracks the
+    storage path for cleanup.
+    """
+
+    def _make_source_file(self, filename):
+        """
+        Upload a tiny yaml blob to storage at PIPELINES/<username>/<filename>,
+        create the corresponding PipelineSourceFile + PipelineSourceFileMeta
+        rows, and register the storage path for tearDown cleanup. Returns the
+        PipelineSourceFile instance.
+        """
+        from pipelines.models import PipelineSourceFileMeta
+        owner = User.objects.get(username=self.username)
+        chris_user, _ = User.objects.get_or_create(username='chris')
+        storage_path = f'PIPELINES/{self.username}/{filename}'
+        # upload a few bytes so fname.size succeeds during serialization
+        with io.StringIO('name: dummy\n') as src:
+            self._storage_manager.upload_obj(
+                storage_path, src.read(), content_type='text/yaml')
+        self._storage_paths_to_cleanup.append(storage_path)
+        (parent_folder, _) = ChrisFolder.objects.get_or_create(
+            path=f'PIPELINES/{self.username}', owner=chris_user)
+        source_file = PipelineSourceFile(parent_folder=parent_folder,
+                                          owner=chris_user)
+        source_file.fname.name = storage_path
+        source_file.save()
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        PipelineSourceFileMeta.objects.create(
+            type='yaml', pipeline=pipeline, source_file=source_file,
+            uploader=owner)
+        return source_file
+
+
+class PipelineSourceFileListQuerySearchViewTests(_SourceFileFixture,
+                                                  PipelineViewTests):
+    """
+    Test the pipelinesourcefile-list-query-search view.
+    """
+
+    def setUp(self):
+        super(PipelineSourceFileListQuerySearchViewTests, self).setUp()
+        self._storage_manager = connect_storage(settings)
+        self._storage_paths_to_cleanup = []
+        self.source_file = self._make_source_file('qs_test.yaml')
+        self.search_url = reverse("pipelinesourcefile-list-query-search")
+
+    def tearDown(self):
+        for path in self._storage_paths_to_cleanup:
+            try:
+                if self._storage_manager.obj_exists(path):
+                    self._storage_manager.delete_obj(path)
+            except Exception:
+                pass
+        super(PipelineSourceFileListQuerySearchViewTests, self).tearDown()
+
+    def test_pipelinesourcefile_search_by_pipeline_name(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(
+            self.search_url + f'?pipeline_name={self.pipeline_name}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'qs_test.yaml')
+
+    def test_pipelinesourcefile_search_by_uploader_username(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(
+            self.search_url + f'?uploader_username={self.username}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'qs_test.yaml')
+
+
+class PipelineSourceFileDetailViewTests(_SourceFileFixture, PipelineViewTests):
+    """
+    Test the pipelinesourcefile-detail view.
+    """
+
+    def setUp(self):
+        super(PipelineSourceFileDetailViewTests, self).setUp()
+        self._storage_manager = connect_storage(settings)
+        self._storage_paths_to_cleanup = []
+        self.source_file = self._make_source_file('detail_test.yaml')
+        self.read_url = reverse("pipelinesourcefile-detail",
+                                kwargs={"pk": self.source_file.id})
+
+    def tearDown(self):
+        for path in self._storage_paths_to_cleanup:
+            try:
+                if self._storage_manager.obj_exists(path):
+                    self._storage_manager.delete_obj(path)
+            except Exception:
+                pass
+        super(PipelineSourceFileDetailViewTests, self).tearDown()
+
+    def test_pipelinesourcefile_detail_success(self):
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.get(self.read_url)
+        self.assertContains(response, 'detail_test.yaml')
+
+
+class PipelineSourceFileResourceViewTests(PipelineViewTests):
+    """
+    Test the pipelinesourcefile-resource view (binary file download).
+    """
+
+    def setUp(self):
+        super(PipelineSourceFileResourceViewTests, self).setUp()
+        self.pipeline_str = b"name: TestPipeline\n"
+        self.create_read_url = reverse("pipelinesourcefile-list")
+        self._storage_paths_to_cleanup = []
+
+    def tearDown(self):
+        storage_manager = connect_storage(settings)
+        for path in self._storage_paths_to_cleanup:
+            try:
+                if storage_manager.obj_exists(path):
+                    storage_manager.delete_obj(path)
+            except Exception:
+                pass
+        super(PipelineSourceFileResourceViewTests, self).tearDown()
+
+    @tag('integration')
+    def test_integration_pipelinesourcefile_resource_download_success(self):
+        """
+        Test the full upload + download round-trip for a pipeline source file:
+        upload via POST with multipart, then GET the resource URL and assert the
+        response has Content-Disposition with the filename and the original
+        bytes.
+        """
+        # full pipeline yaml needed for the upload to validate
+        pipeline_yaml = (
+            "name: ResourcePipeline\n"
+            "locked: false\n"
+            "plugin_tree:\n"
+            "- title: simpledsapp1\n"
+            "  plugin: simpledsapp v0.1\n"
+            "  previous: ~\n"
+        )
+        filename = 'resource_test.yaml'
+        fpath = f'PIPELINES/{self.username}/{filename}'
+        self._storage_paths_to_cleanup.append(fpath)
+
+        self.client.login(username=self.username, password=self.password)
+        with io.BytesIO(pipeline_yaml.encode()) as f:
+            f.name = filename
+            response = self.client.post(self.create_read_url, data={'fname': f})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        source_file = PipelineSourceFile.objects.get(fname=fpath)
+
+        # download the file
+        download_url = reverse(
+            "pipelinesourcefile-resource",
+            kwargs={"pk": source_file.id}) + filename
+        response = self.client.get(download_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Disposition'],
+                         f'attachment; filename="{filename}"')
+        content = b''.join(c for c in response.streaming_content)
+        self.assertEqual(content, pipeline_yaml.encode())
 
 
 class PipelinePluginListViewTests(PipelineViewTests):
@@ -455,17 +638,149 @@ class PluginPipingDetailViewTests(PipelineViewTests):
     def setUp(self):
         super(PluginPipingDetailViewTests, self).setUp()
 
-        self.read_url = reverse("pluginpiping-detail", kwargs={"pk": self.pips[0].id})
+        self.read_update_url = reverse("pluginpiping-detail",
+                                       kwargs={"pk": self.pips[0].id})
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        self.plugin_ds = plugin_ds
+        # build a PUT body that updates all four compute-resource fields to
+        # values within the plugin's allowed range
+        self.put = json.dumps({
+            "template": {"data": [
+                {"name": "cpu_limit", "value": int(plugin_ds.min_cpu_limit) + 1},
+                {"name": "memory_limit",
+                 "value": int(plugin_ds.min_memory_limit) + 1},
+                {"name": "number_of_workers",
+                 "value": plugin_ds.min_number_of_workers},
+                {"name": "gpu_limit", "value": plugin_ds.min_gpu_limit},
+            ]}})
 
     def test_plugin_piping_detail_success(self):
         self.client.login(username=self.username, password=self.password)
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_url)
         self.assertContains(response, "plugin_id")
         self.assertContains(response, "pipeline_id")
 
     def test_plugin_piping_detail_failure_unauthenticated(self):
-        response = self.client.get(self.read_url)
+        response = self.client.get(self.read_update_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_piping_update_success(self):
+        """
+        Test that a PUT to the pluginpiping-detail view as the pipeline owner
+        updates the per-piping cpu_limit, memory_limit, number_of_workers and
+        gpu_limit values.
+        """
+        self.client.login(username=self.username, password=self.password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pip = PluginPiping.objects.get(pk=self.pips[0].id)
+        self.assertEqual(int(pip.cpu_limit), int(self.plugin_ds.min_cpu_limit) + 1)
+        self.assertEqual(int(pip.memory_limit),
+                         int(self.plugin_ds.min_memory_limit) + 1)
+
+    def test_plugin_piping_update_failure_unauthenticated(self):
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_plugin_piping_update_failure_access_denied_locked_pipeline(self):
+        """
+        Test that a PUT by a non-owner is rejected when the pipeline is locked
+        (the IsChrisOrOwnerAndLockedOrNotLockedReadOnly permission only grants
+        write to chris or the owner).
+        """
+        self.client.login(username=self.other_username,
+                          password=self.other_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_plugin_piping_update_success_chris_user(self):
+        """
+        Test that the 'chris' superuser is always granted write access to a
+        plugin piping, even when the pipeline is locked and chris is not the
+        owner (covers the chris branch in
+        IsChrisOrOwnerAndLockedOrNotLockedReadOnly).
+        """
+        chris_user, _ = User.objects.get_or_create(username=self.chris_username)
+        chris_user.set_password(self.chris_password)
+        chris_user.save()
+        self.client.login(username=self.chris_username,
+                          password=self.chris_password)
+        response = self.client.put(self.read_update_url, data=self.put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_plugin_piping_update_failure_out_of_range(self):
+        """
+        Test that a PUT with an out-of-range cpu_limit is rejected with 400.
+        """
+        self.client.login(username=self.username, password=self.password)
+        bad_put = json.dumps({
+            "template": {"data": [
+                {"name": "cpu_limit",
+                 "value": int(self.plugin_ds.min_cpu_limit) - 1},
+            ]}})
+        response = self.client.put(self.read_update_url, data=bad_put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class PipelineDetailChrisSuperuserViewTests(PipelineViewTests):
+    """
+    Test the IsChrisOrOwnerOrNotLockedReadOnly permission's chris branch on the
+    pipeline-detail view.
+    """
+
+    def setUp(self):
+        super(PipelineDetailChrisSuperuserViewTests, self).setUp()
+        # ensure chris exists with the configured password
+        chris_user, _ = User.objects.get_or_create(username=self.chris_username)
+        chris_user.set_password(self.chris_password)
+        chris_user.save()
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        self.read_update_url = reverse("pipeline-detail",
+                                       kwargs={"pk": pipeline.id})
+
+    def test_pipeline_detail_chris_can_read_locked_pipeline_owned_by_other(self):
+        """
+        Test that the 'chris' superuser can read a locked pipeline owned by a
+        different user (covers the chris branch in
+        IsChrisOrOwnerOrNotLockedReadOnly).
+        """
+        self.client.login(username=self.chris_username,
+                          password=self.chris_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, self.pipeline_name)
+
+    def test_pipeline_detail_chris_can_update_locked_pipeline_owned_by_other(self):
+        """
+        Test that the 'chris' superuser can PUT a locked pipeline owned by a
+        different user.
+        """
+        self.client.login(username=self.chris_username,
+                          password=self.chris_password)
+        put = json.dumps({
+            "template": {"data": [{"name": "name", "value": "ChrisRenamed"}]}})
+        response = self.client.put(self.read_update_url, data=put,
+                                   content_type=self.content_type)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "ChrisRenamed")
+
+    def test_pipeline_detail_other_user_can_read_unlocked_pipeline(self):
+        """
+        Test that a non-owner user can GET an unlocked pipeline (covers the
+        unlocked-read branch of IsChrisOrOwnerOrNotLockedReadOnly).
+        """
+        pipeline = Pipeline.objects.get(name=self.pipeline_name)
+        pipeline.locked = False
+        pipeline.save()
+        self.client.login(username=self.other_username,
+                          password=self.other_password)
+        response = self.client.get(self.read_update_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
 class DefaultPipingStrParameterDetailViewTests(ViewTests):

@@ -206,7 +206,10 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
                                return_value=None):
             with mock.patch.object(tasks.PluginInstanceAppJob, 'run',
                                    side_effect=Exception):
-                with mock.patch("logging.Logger._log"):  # disable the error logging
+                # the deliberately-raised exception drives expected ERROR logging
+                # (task failure + cancel handler); capture/suppress with assertLogs
+                # rather than mocking out logging globally
+                with self.assertLogs(level='ERROR'):
                     tasks.run_plugin_instance_job.delay(self.plg_inst.id, 'PluginInstanceAppJob')  # call async task
 
                     for _ in range(10):
@@ -244,14 +247,18 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
 
         with mock.patch.object(tasks.PluginInstanceAppJob, 'schedule_remote_cleanup',
                                return_value=None):
-            tasks.cancel_plugin_instances_stuck_in_lock.delay()  # call async task
+            # plugininstances.tasks logger has propagate=False (see LOGGING in
+            # config/settings/local.py), so target it directly
+            with self.assertLogs('plugininstances.tasks', level='ERROR') as cm:
+                tasks.cancel_plugin_instances_stuck_in_lock.delay()  # call async task
 
-            for _ in range(10):
-                time.sleep(3)
-                self.plg_inst.refresh_from_db()
-                if self.plg_inst.status == 'cancelled': break
+                for _ in range(10):
+                    time.sleep(3)
+                    self.plg_inst.refresh_from_db()
+                    if self.plg_inst.status == 'cancelled': break
 
-            self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
+                self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
+            self.assertTrue(any('stuck in lock' in msg for msg in cm.output))
 
     @tag('integration')
     def test_task_cancel_plugin_instances_stuck_in_scheduled_status_during_async_run(self):
@@ -261,11 +268,13 @@ class PluginInstanceAsyncTasksTests(TasksAsyncTests):
 
         with mock.patch.object(tasks.PluginInstanceAppJob, 'schedule_remote_cleanup',
                                return_value=None):
-            tasks.cancel_plugin_instances_stuck_in_scheduled_status.delay()  # call async task
+            with self.assertLogs('plugininstances.tasks', level='ERROR') as cm:
+                tasks.cancel_plugin_instances_stuck_in_scheduled_status.delay()  # call async task
 
-            for _ in range(10):
-                time.sleep(3)
-                self.plg_inst.refresh_from_db()
-                if self.plg_inst.status == 'cancelled': break
+                for _ in range(10):
+                    time.sleep(3)
+                    self.plg_inst.refresh_from_db()
+                    if self.plg_inst.status == 'cancelled': break
 
-            self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
+                self.assertEqual(self.plg_inst.status, 'cancelled')  # instance must be cancelled
+            self.assertTrue(any('stuck in scheduled status' in msg for msg in cm.output))

@@ -72,6 +72,13 @@ test-unit: start-ancillary (run 'python manage.py test --force-color --exclude-t
 [group('(3) development')]
 test-integration: start-ancillary (run 'python manage.py test --force-color --tag integration')
 
+# Run the full test suite under coverage and print a report.
+[group('(3) development')]
+test-coverage: start-ancillary
+    @just storage={{ storage }} run coverage erase
+    @just storage={{ storage }} run coverage run manage.py test --force-color
+    @just storage={{ storage }} run coverage report
+
 # Start dependency services.
 [group('(1) start-up')]
 start-ancillary: (docker-compose 'up -d')

@@ -889,6 +889,16 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
             raise serializers.ValidationError([f"Invalid object name '{name}'."])
         return fname
 
+    def validate_type(self, type):
+        """
+        Overriden to validate the pipeline source file type.
+        """
+        if type not in ('yaml', 'YAML', 'json', 'JSON'):
+            raise serializers.ValidationError(
+                [f"Unsupported pipeline source file type '{type}'. Must be either "
+                 "'yaml' or 'json'."])
+        return type.lower()
+
     def validate(self, data):
         """
         Overriden to validate and transform the pipeline data in the source file to the
@@ -900,8 +910,7 @@ class PipelineSourceFileSerializer(ChrisFileSerializer):
         if type == 'yaml':
             pipeline_repr = self.read_yaml_pipeline_representation(data['fname'])
             pipeline_repr = self.get_yaml_pipeline_canonical_representation(pipeline_repr)
-
-        elif type == 'json':
+        else:
             pipeline_repr = self.read_json_pipeline_representation(data['fname'])
             pipeline_repr = self.get_json_pipeline_canonical_representation(pipeline_repr)
 
