@@ -23,7 +23,8 @@ from django.db.utils import IntegrityError
 from rest_framework.authtoken.models import Token
 
 from core.utils import json_zip2str
-from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
+from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, PathAccessError,
+                          validate_path_access)
 from plugininstances.models import PluginInstance, PluginInstanceLock
 from userfiles.models import UserFile
 from .abstractjobs import PluginInstanceJob
@@ -417,6 +418,25 @@ class PluginInstanceAppJob(PluginInstanceJob):
             raise
         return str_inputdir
 
+    def _check_path_access(self, linked_path):
+        """
+        Raise a ``ValueError`` (and set the CODE17 error code) if the plugin
+        instance owner is not allowed to access the given path. Authorization is
+        delegated to ``core.models.validate_path_access`` so the exact
+        same rule enforced at job submission time is re-enforced at runtime when
+        ChRIS link files are followed or created (link files can point anywhere,
+        so they must be re-checked).
+        """
+        try:
+            validate_path_access(self.c_plugin_inst.owner, linked_path)
+        except PathAccessError:
+            job_id = self.str_job_id
+            logger.error(
+                f'[CODE17,{job_id}]: Found unauthorized input path {linked_path} '
+                f'that the plugin instance owner is not allowed to access')
+            self.c_plugin_inst.error_code = 'CODE17'
+            raise ValueError(f'Invalid input path: {linked_path}')
+
     def find_all_storage_object_paths(self, storage_path, obj_paths, visited_paths):
         """
         Find all object storage paths from the passed storage path (prefix) by
@@ -456,6 +476,10 @@ class PluginInstanceAppJob(PluginInstanceJob):
                             f'{output_dir}')
                         self.c_plugin_inst.error_code = 'CODE17'
                         raise ValueError(f'Invalid input path: {linked_path}')
+
+                    # link files can point anywhere, so re-enforce the access rule
+                    # to prevent following links into unauthorized data
+                    self._check_path_access(linked_path)
 
                     self.find_all_storage_object_paths(linked_path, obj_paths,
                                                        visited_paths)  # recursive call
@@ -606,6 +630,10 @@ class PluginInstanceAppJob(PluginInstanceJob):
                          f'{output_dir}')
             self.c_plugin_inst.error_code = 'CODE17'
             raise ValueError(f'Invalid input path: {linked_path}')
+
+        # re-enforce the access rule: only paths the plugin instance owner is
+        # authorized to access may be turned into output link files
+        self._check_path_access(path)
 
         str_source_trace_dir = path.replace('/', '_')
         try:
@@ -987,6 +1015,28 @@ class PluginInstanceAppJob(PluginInstanceJob):
                 obj_path = changed_file_paths[obj_path]
 
             if obj_path:
+                if obj_path.endswith('.chrislink'):
+                    # Plugins are not authorized to produce ChRIS link files.
+                    # Any link file coming from the remote compute (zip/json
+                    # output) is refused and deleted from storage so subsequent
+                    # jobs cannot follow it. Legit link files created by CUBE for
+                    # 'unextpath' parameters or 'ts' plugins are registered
+                    # directly as ChrisLinkFile objects and never reach this set.
+                    logger.warning(f'Refusing to register link file '
+                                   f'-->{obj_path}<-- produced by job {job_id}; '
+                                   f'deleting it from storage')
+                    try:
+                        self.storage_manager.delete_obj(obj_path)
+                    except Exception as e:
+                        # a non-deletable attacker-controlled link left in an
+                        # output dir is a security-relevant state: fail the job
+                        logger.error(f'[CODE07,{job_id}]: Error while deleting '
+                                     f'unauthorized link file {obj_path} from '
+                                     f'storage, detail: {str(e)}')
+                        self.c_plugin_inst.error_code = 'CODE07'
+                        raise
+                    continue
+
                 logger.info(f'Registering file -->{obj_path}<-- for job {job_id}')
 
                 folder_path = os.path.dirname(obj_path)

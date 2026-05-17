@@ -3,6 +3,7 @@ import logging
 import uuid
 import io
 import os
+import pathlib
 
 from django.db import models
 from django.db.models.functions import Length
@@ -34,6 +35,83 @@ def validate_permission(permission):
         raise ValueError(f"Invalid permission '{permission}'. Allowed values "
                          f"are: {perm_list}.")
     return permission
+
+
+def user_can_access_obj(obj, user):
+    """
+    Return whether the given user is allowed to read-access the given storage
+    object (a ``ChrisFolder``, ``ChrisFile`` or ``ChrisLinkFile``).
+
+    This is the canonical owner/superuser/public/permission read-access rule.
+    The object is accessible if the user owns it, is the superuser 'chris', the
+    object is public, or the user has been granted any permission to it
+    (possibly through one of their groups).
+    """
+    return (obj.owner == user or user.username == 'chris' or obj.public
+            or obj.has_user_permission(user))
+
+
+class PathAccessError(Exception):
+    """
+    Raised by ``validate_path_access`` when a user is not allowed to access a
+    storage path. The exception message is a human-readable reason suitable for
+    surfacing to API clients.
+    """
+    pass
+
+
+def validate_path_access(user, path):
+    """
+    Check whether the given user is allowed to access the given storage path.
+
+    Enforces the structural path rules, the PUBLIC/SHARED link-target restriction
+    and the owner/public/permission access rule. This is the single source of
+    truth for path-access authorization.
+
+    Returns the normalized path on success.
+    Raises ``PathAccessError`` with a human-readable reason on failure.
+    """
+    path = path.strip().strip('/')
+    path_parts = pathlib.Path(path).parts
+
+    if len(path_parts) < 2:
+        # trying to access a top-level folder or an unknown folder
+        raise PathAccessError(
+            f"This field may not reference a top-level folder path '{path}'.")
+
+    if path_parts[0] not in ('home', 'SERVICES', 'PIPELINES'):
+        raise PathAccessError(
+            f"This field may not reference an invalid path '{path}'.")
+
+    if len(path_parts) == 2 and path_parts[0] == 'home':
+        raise PathAccessError(
+            f"This field may not reference a home folder path '{path}'.")
+
+    if len(path_parts) == 3 and path_parts[0] == 'home' and path_parts[2] == 'feeds':
+        raise PathAccessError(
+            f"This field may not reference a home's feeds folder path '{path}'.")
+
+    try:
+        obj = ChrisFolder.objects.get(path=path)
+    except ChrisFolder.DoesNotExist:  # path is not a folder
+        try:
+            obj = ChrisFile.objects.get(fname=path)
+        except ChrisFile.DoesNotExist:  # path is not a file
+            try:
+                obj = ChrisLinkFile.objects.get(fname=path)
+
+                if obj.path in ('PUBLIC', 'SHARED'):
+                    raise PathAccessError(
+                        f"This field may not reference an invalid path '{path}'.")
+
+            except ChrisLinkFile.DoesNotExist:  # path is not a link file
+                raise PathAccessError(
+                    f"This field may not reference an invalid path '{path}'.")
+
+    if not user_can_access_obj(obj, user):
+        raise PathAccessError(
+            f"User does not have permission to access path '{path}'.")
+    return path
 
 
 class AsyncDeletableModel(models.Model):

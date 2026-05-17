@@ -12,7 +12,7 @@ from django.conf import settings
 
 from pfconclient import client as pfcon
 
-from core.models import ChrisInstance
+from core.models import ChrisInstance, ChrisFolder, ChrisLinkFile
 from core.storage import connect_storage
 from plugins.models import PluginMeta, Plugin
 from plugins.models import PluginParameter
@@ -293,3 +293,223 @@ class PluginInstanceAppJobTests(TestCase):
 
         # delete files from storage
         self.storage_manager.delete_path(outputdir)
+
+    def _create_started_plugin_inst(self):
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        (pl_inst, tf) = PluginInstance.objects.get_or_create(
+            plugin=plugin, owner=user, status='started',
+            compute_resource=plugin.compute_resources.all()[0])
+        return pl_inst
+
+    def test_create_chris_link_file_refuses_unauthorized_path(self):
+        """
+        Test whether _create_chris_link_file refuses to create a link file to a
+        path the plugin instance owner is not allowed to access.
+        """
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+
+        other = User.objects.create_user(username='other', password='other-pass')
+        other_folder, _ = ChrisFolder.objects.get_or_create(
+            path='home/other/uploads', owner=other)
+
+        parent_folder, _ = ChrisFolder.objects.get_or_create(
+            path=pl_inst.get_output_path(), owner=pl_inst.owner)
+
+        # refusing the unauthorized path logs at ERROR (CODE17) before raising;
+        # capture/suppress with assertLogs and verify the expected message fired
+        with self.assertLogs('plugininstances.services.pluginjobs',
+                              level='ERROR') as cm:
+            with self.assertRaises(ValueError):
+                job._create_chris_link_file(other_folder.path, parent_folder)
+        self.assertEqual(pl_inst.error_code, 'CODE17')
+        self.assertTrue(any('CODE17' in msg and 'home/other/uploads' in msg
+                            for msg in cm.output))
+
+    def test_find_all_storage_object_paths_refuses_unauthorized_link(self):
+        """
+        Test whether find_all_storage_object_paths refuses to follow a ChRIS link
+        file pointing to a path the plugin instance owner is not allowed to access.
+        """
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+
+        other = User.objects.create_user(username='other', password='other-pass')
+        ChrisFolder.objects.get_or_create(path='home/other/uploads', owner=other)
+
+        storage_path = 'home/%s/uploads' % self.username
+        link_obj = storage_path + '/secret.chrislink'
+
+        job.storage_manager = mock.Mock()
+        job.storage_manager.ls = mock.Mock(return_value=[link_obj])
+        job.storage_manager.download_obj = mock.Mock(
+            return_value=b'home/other/uploads')
+
+        obj_paths = set()
+        visited_paths = set()
+        # refusing the unauthorized link logs at ERROR (CODE17) before raising;
+        # capture/suppress with assertLogs and verify the expected message fired
+        with self.assertLogs('plugininstances.services.pluginjobs',
+                              level='ERROR') as cm:
+            with self.assertRaises(ValueError):
+                job.find_all_storage_object_paths(storage_path, obj_paths,
+                                                  visited_paths)
+        self.assertEqual(pl_inst.error_code, 'CODE17')
+        self.assertTrue(any('CODE17' in msg and 'home/other/uploads' in msg
+                            for msg in cm.output))
+
+    def test_find_all_storage_object_paths_follows_authorized_link(self):
+        """
+        Test whether find_all_storage_object_paths still follows a ChRIS link file
+        pointing to a path the plugin instance owner is allowed to access.
+        """
+        user = User.objects.get(username=self.username)
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+
+        linked_path = 'home/%s/uploads' % self.username
+        ChrisFolder.objects.get_or_create(path=linked_path, owner=user)
+
+        storage_path = 'home/%s/uploads_input' % self.username
+        link_obj = storage_path + '/data.chrislink'
+        linked_file = linked_path + '/file.txt'
+
+        def fake_ls(path):
+            if path == storage_path:
+                return [link_obj]
+            if path == linked_path:
+                return [linked_file]
+            return []
+
+        job.storage_manager = mock.Mock()
+        job.storage_manager.ls = mock.Mock(side_effect=fake_ls)
+        job.storage_manager.download_obj = mock.Mock(
+            return_value=linked_path.encode())
+
+        obj_paths = set()
+        visited_paths = set()
+        job.find_all_storage_object_paths(storage_path, obj_paths, visited_paths)
+
+        self.assertIn(link_obj, obj_paths)
+        self.assertIn(linked_file, obj_paths)
+        self.assertEqual(pl_inst.error_code, '')
+
+    @tag('integration')
+    def test_integration_register_output_files_refuses_remote_link_file(self):
+        """
+        Test whether _register_output_files refuses to register a .chrislink file
+        coming from the remote compute and deletes it from storage, while still
+        registering regular output files.
+        """
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, status='finishedSuccessfully',
+            compute_resource=plugin.compute_resources.all()[0])
+
+        outputdir = pl_inst.get_output_path()
+
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(outputdir + '/data.txt', f.read(),
+                                            content_type='text/plain')
+        with io.StringIO('home/other/uploads') as f:
+            self.storage_manager.upload_obj(outputdir + '/evil.chrislink',
+                                            f.read(), content_type='text/plain')
+
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+        job.plugin_inst_output_files = {outputdir + '/data.txt',
+                                        outputdir + '/evil.chrislink'}
+        job._register_output_files()
+
+        fnames = [f.fname.name for f in pl_inst.output_folder.chris_files.all()]
+        self.assertIn(outputdir + '/data.txt', fnames)
+        self.assertNotIn(outputdir + '/evil.chrislink', fnames)
+
+        self.assertFalse(
+            self.storage_manager.obj_exists(outputdir + '/evil.chrislink'))
+        self.assertTrue(
+            self.storage_manager.obj_exists(outputdir + '/data.txt'))
+
+        self.assertIn(outputdir + '/data.txt', job.plugin_inst_output_files)
+        self.assertNotIn(outputdir + '/evil.chrislink',
+                         job.plugin_inst_output_files)
+
+        # delete files from storage
+        self.storage_manager.delete_path(outputdir)
+
+    def test_register_output_files_fails_when_link_delete_fails(self):
+        """
+        Test whether _register_output_files fails the job (sets CODE07 and
+        propagates the exception) when a refused remote link file cannot be
+        deleted from storage.
+        """
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+        outputdir = pl_inst.get_output_path()
+
+        job.storage_manager = mock.Mock()
+        job.storage_manager.sanitize_obj_names = mock.Mock(return_value={})
+        job.storage_manager.delete_obj = mock.Mock(
+            side_effect=Exception('boom'))
+        job.plugin_inst_output_files = {outputdir + '/evil.chrislink'}
+
+        # the failed deletion logs at ERROR (CODE07) before re-raising; capture/
+        # suppress with assertLogs and verify the expected message fired
+        with self.assertLogs('plugininstances.services.pluginjobs',
+                              level='ERROR') as cm:
+            with self.assertRaises(Exception):
+                job._register_output_files()
+        self.assertEqual(pl_inst.error_code, 'CODE07')
+        self.assertTrue(any('CODE07' in msg and 'boom' in msg
+                            for msg in cm.output))
+
+    @tag('integration')
+    def test_integration_register_output_files_keeps_cube_generated_link_file(self):
+        """
+        Test whether _register_output_files preserves legit ChRIS link files
+        created by CUBE (via _create_chris_link_file) for 'unextpath'/'ts' flows,
+        i.e. they are not in plugin_inst_output_files and are not scrubbed.
+        """
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        pl_inst = PluginInstance.objects.create(
+            plugin=plugin, owner=user, status='finishedSuccessfully',
+            compute_resource=plugin.compute_resources.all()[0])
+        outputdir = pl_inst.get_output_path()
+
+        # an authorized folder owned by the instance owner, used as link target
+        target_folder, _ = ChrisFolder.objects.get_or_create(
+            path=f'home/{self.username}/uploads', owner=user)
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(
+                f'home/{self.username}/uploads/in.txt', f.read(),
+                content_type='text/plain')
+
+        # a regular remote output file
+        with io.StringIO('Test file') as f:
+            self.storage_manager.upload_obj(outputdir + '/data.txt', f.read(),
+                                            content_type='text/plain')
+
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+        parent_folder, _ = ChrisFolder.objects.get_or_create(
+            path=outputdir, owner=user)
+        job._create_chris_link_file(target_folder.path, parent_folder)
+
+        link_path = (outputdir + '/' +
+                     target_folder.path.replace('/', '_') + '.chrislink')
+
+        # CUBE-generated link is a ChrisLinkFile and NOT in the remote-output set
+        self.assertTrue(ChrisLinkFile.objects.filter(fname=link_path).exists())
+        self.assertNotIn(link_path, job.plugin_inst_output_files)
+
+        job.plugin_inst_output_files = {outputdir + '/data.txt'}
+        job._register_output_files()
+
+        # the link file survived the scrub (storage + DB)
+        self.assertTrue(self.storage_manager.obj_exists(link_path))
+        self.assertTrue(ChrisLinkFile.objects.filter(fname=link_path).exists())
+
+        # delete files from storage
+        self.storage_manager.delete_path(outputdir)
+        self.storage_manager.delete_obj(f'home/{self.username}/uploads/in.txt')
