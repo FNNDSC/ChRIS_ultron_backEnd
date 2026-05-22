@@ -3,7 +3,7 @@ import logging
 import os
 from unittest import mock
 
-from django.test import TestCase, tag
+from django.test import TestCase
 from django.contrib.auth.models import User
 from django.conf import settings
 

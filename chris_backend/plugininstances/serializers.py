@@ -1,13 +1,11 @@
 
-import pathlib
-
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 from drf_spectacular.utils import OpenApiTypes, extend_schema_field
 
 from collectionjson.fields import ItemLinkField
-from core.models import ChrisFolder, ChrisFile, ChrisLinkFile
+from core.models import PathAccessError, validate_path_access
 from plugins.enums import TYPES
 from plugins.models import Plugin
 
@@ -344,51 +342,16 @@ class BoolParameterSerializer(serializers.HyperlinkedModelSerializer):
 
 def validate_paths(user, string):
     """
-    Custom function to check whether a user is allowed to access the provided paths.
+    Custom function to check whether a user is allowed to access the provided
+    paths (a string of one or more paths separated by commas).
     """
     path_list = [s.strip().strip('/') for s in string.split(',')]
 
     for path in path_list:
-        path_parts = pathlib.Path(path).parts
-
-        if len(path_parts) < 2:
-            # trying to access a top-level folder or an unknown folder
-            raise serializers.ValidationError(
-                [f"This field may not reference a top-level folder path '{path}'."])
-
-        if path_parts[0] not in ('home', 'SERVICES', 'PIPELINES'):
-            raise serializers.ValidationError(
-                [f"This field may not reference an invalid path '{path}'."])
-
-        if len(path_parts) == 2 and path_parts[0] == 'home':
-            raise serializers.ValidationError(
-                [f"This field may not reference a home folder path '{path}'."])
-
-        if len(path_parts) == 3 and path_parts[0] == 'home' and path_parts[2] == 'feeds':
-            raise serializers.ValidationError(
-                [f"This field may not reference a home's feeds folder path '{path}'."])
-
         try:
-            obj = ChrisFolder.objects.get(path=path)
-        except ChrisFolder.DoesNotExist:  # path is not a folder
-            try:
-                obj = ChrisFile.objects.get(fname=path)
-            except ChrisFile.DoesNotExist:  # path is not a file
-                try:
-                    obj = ChrisLinkFile.objects.get(fname=path)
-
-                    if obj.path in ('PUBLIC', 'SHARED'):
-                        raise serializers.ValidationError(
-                            [f"This field may not reference an invalid path '{path}'."])
-
-                except ChrisLinkFile.DoesNotExist:  # path is not a link file
-                    raise serializers.ValidationError(
-                        [f"This field may not reference an invalid path '{path}'."])
-
-        if not (obj.owner == user or user.username == 'chris' or obj.public
-                or obj.has_user_permission(user)):
-            raise serializers.ValidationError(
-                [f"User does not have permission to access path '{path}'."])
+            validate_path_access(user, path)
+        except PathAccessError as e:
+            raise serializers.ValidationError([str(e)])
 
     return ','.join(path_list)
 

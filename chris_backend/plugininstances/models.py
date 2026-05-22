@@ -15,7 +15,8 @@ from plugins.models import ComputeResource, Plugin, PluginParameter
 from plugins.fields import CPUField, MemoryField
 from plugins.fields import MemoryInt, CPUInt
 from workflows.models import Workflow
-from plugininstances.enums import ACTIVE_STATUSES, INACTIVE_STATUSES, STATUS_CHOICES, REMOTE_CLEANUP_STATUS_CHOICES
+from plugininstances.enums import (ACTIVE_STATUSES, INACTIVE_STATUSES, STATUS_CHOICES,
+                                   REMOTE_CLEANUP_STATUS_CHOICES)
 
 
 logger = logging.getLogger(__name__)

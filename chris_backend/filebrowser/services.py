@@ -2,7 +2,7 @@
 
 from django.db import models
 
-from core.models import ChrisFolder
+from core.models import ChrisFolder, user_can_access_obj
 
 
 def get_folder_queryset(pk_dict, user=None):
@@ -18,8 +18,7 @@ def get_folder_queryset(pk_dict, user=None):
             if not folder.public:
                 return ChrisFolder.objects.none()
         else:
-            if not (folder.owner == user or user.username == 'chris' or folder.public
-                    or folder.has_user_permission(user)):
+            if not user_can_access_obj(folder, user):
                 return ChrisFolder.objects.none()
     return qs
 
