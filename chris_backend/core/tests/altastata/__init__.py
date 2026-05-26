@@ -1,0 +1,3 @@
+"""
+Altastata storage manager tests
+"""
