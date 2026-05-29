@@ -214,6 +214,7 @@ SPECTACULAR_SETTINGS = {
         'collectionjson.spectacular_hooks.postprocess_remove_collectionjson',
         'plugininstances.spectacular_hooks.additionalproperties_for_plugins_instances_create',
         'filebrowser.spectacular_hooks.nonrequired_fields',
+        'users.spectacular_hooks.users_get_username'
     ],
 
     'SCHEMA_PATH_PREFIX': '/api/v1/',
