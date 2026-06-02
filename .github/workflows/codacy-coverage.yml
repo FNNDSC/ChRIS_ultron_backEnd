@@ -13,6 +13,9 @@ jobs:
     env:
       CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
     steps:
+      - uses: taiki-e/install-action@6887963ccf37a9ddcd8c5fa4baeb3e1e5fd61fa1  # v2.81.2
+        with:
+          tool: just
       - uses: actions/checkout@v6
       - name: Run unit tests under coverage
         uses: ./
