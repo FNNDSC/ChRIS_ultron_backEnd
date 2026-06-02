@@ -1,0 +1,31 @@
+name: Code coverage
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  coverage:
+    name: Unit-test coverage
+    runs-on: ubuntu-24.04
+    env:
+      CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+    steps:
+      - uses: taiki-e/install-action@just
+      - uses: actions/checkout@v6
+      - name: Run unit tests under coverage
+        uses: ./
+        with:
+          engine: docker
+          command: test-unit-coverage
+      - name: Make coverage paths relative to the repository root
+        run: sed -i 's| filename="| filename="chris_backend/|g' chris_backend/coverage.xml
+      - name: Upload coverage to Codacy
+        if: ${{ env.CODACY_PROJECT_TOKEN != '' }}
+        uses: codacy/codacy-coverage-reporter-action@v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: chris_backend/coverage.xml
+          force-coverage-parser: cobertura
