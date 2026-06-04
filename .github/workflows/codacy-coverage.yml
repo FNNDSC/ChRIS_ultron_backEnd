@@ -10,8 +10,6 @@ jobs:
   coverage:
     name: Unit-test coverage
     runs-on: ubuntu-24.04
-    env:
-      CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
     steps:
       - uses: taiki-e/install-action@6887963ccf37a9ddcd8c5fa4baeb3e1e5fd61fa1  # v2.81.2
         with:
@@ -22,12 +20,23 @@ jobs:
         with:
           engine: docker
           command: test-unit-coverage
-      - name: Make coverage paths relative to the repository root
-        run: sed -i 's| filename="| filename="chris_backend/|g' chris_backend/coverage.xml
-      - name: Upload coverage to Codacy
-        if: ${{ env.CODACY_PROJECT_TOKEN != '' }}
-        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699  # v1.3.0
+      - name: Stage coverage report and commit SHA
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p coverage-artifact
+          cp chris_backend/coverage.xml coverage-artifact/coverage.xml
+          if [ "$EVENT_NAME" = pull_request ]; then
+            echo "$PR_HEAD_SHA" > coverage-artifact/commit-sha.txt
+          else
+            echo "$PUSH_SHA" > coverage-artifact/commit-sha.txt
+          fi
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
         with:
-          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-          coverage-reports: chris_backend/coverage.xml
-          force-coverage-parser: cobertura
+          name: coverage-report
+          path: coverage-artifact/
+          if-no-files-found: error
+          retention-days: 1
