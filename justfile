@@ -79,6 +79,13 @@ test-coverage: start-ancillary
     @just storage={{ storage }} run coverage run manage.py test --force-color
     @just storage={{ storage }} run coverage report
 
+# Run unit tests under coverage and write a Cobertura XML report to chris_backend/coverage.xml.
+[group('(3) development')]
+test-unit-coverage: start-ancillary
+    @just storage={{ storage }} run coverage erase
+    @just storage={{ storage }} run coverage run manage.py test --force-color --exclude-tag integration
+    @just storage={{ storage }} run coverage xml
+
 # Start dependency services.
 [group('(1) start-up')]
 start-ancillary: (docker-compose 'up -d')
