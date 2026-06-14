@@ -168,13 +168,19 @@ class PACSSeries(AsyncDeletableModel):
     PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'),
                                                          ('O', 'Other')], blank=True)
     StudyDate = models.DateField(db_index=True)
+    StudyTime = models.TimeField(blank=True, null=True)
     AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
-    Modality = models.CharField(max_length=15, blank=True)
+    Modality = models.CharField(max_length=15, blank=True, db_index=True)
+    Manufacturer = models.CharField(max_length=64, blank=True)
+    BodyPartExamined = models.CharField(max_length=16, blank=True)
     ProtocolName = models.CharField(max_length=64, blank=True)
-    StudyInstanceUID = models.CharField(max_length=100)
+    StudyInstanceUID = models.CharField(max_length=100, db_index=True)
     StudyDescription = models.CharField(max_length=400, blank=True)
     SeriesInstanceUID = models.CharField(max_length=100, db_index=True)
+    SeriesNumber = models.IntegerField(blank=True, null=True)
     SeriesDescription = models.CharField(max_length=400, blank=True)
+    PerformedProcedureStepStartDate = models.DateField(blank=True, null=True)
+    PerformedProcedureStepStartTime = models.TimeField(blank=True, null=True)
     folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
                                   related_name='pacs_series')
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE, related_name='series_list')
@@ -182,6 +188,10 @@ class PACSSeries(AsyncDeletableModel):
     class Meta:
         ordering = ('pacs', 'PatientID',)
         unique_together = ('pacs', 'SeriesInstanceUID',)
+        indexes = [
+            models.Index(fields=['pacs', 'StudyInstanceUID'],
+                         name='pacsseries_pacs_study_idx'),
+        ]
 
     def __str__(self):
         return self.SeriesInstanceUID

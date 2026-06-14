@@ -3,6 +3,7 @@ import logging
 import os
 import time
 
+from django.db import transaction
 from django.db.utils import IntegrityError
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -208,7 +209,18 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
                     pacs_file.fname.name = obj_path
                     files.append(pacs_file)
 
-            PACSFile.objects.bulk_create(files)
+            created = PACSFile.objects.bulk_create(files)
+
+            # Fan out DICOM-header indexing for QIDO-RS. Imported here to avoid
+            # a circular import at module load (dicomweb.tasks imports
+            # pacsfiles.models). bulk_create populates pks on PostgreSQL.
+            from dicomweb.tasks import index_pacs_instance
+            created_ids = [pf.pk for pf in created if pf.pk is not None]
+            transaction.on_commit(
+                lambda ids=created_ids: [
+                    index_pacs_instance.delay(pk) for pk in ids
+                ]
+            )
 
             # grant the group permission from the highest folder ancestor without it
             current = series_folder
