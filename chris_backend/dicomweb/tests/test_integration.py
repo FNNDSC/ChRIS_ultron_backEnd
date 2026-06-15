@@ -40,7 +40,6 @@ from django.contrib.auth.models import Group, User
 from django.conf import settings
 from django.test import TransactionTestCase, tag
 
-from core.celery import app as celery_app
 from core.storage import connect_storage
 
 from dicomweb.models import PACSInstance
@@ -116,8 +115,8 @@ class SerializerBulkCreateIndexIntegrationTest(TransactionTestCase):
     def tearDown(self):
         try:
             self.storage.delete_obj(self.dcm_path)
-        except Exception:
-            pass
+        except Exception as exc:
+            logging.warning('tearDown: could not remove test file %s: %s', self.dcm_path, exc)
         logging.disable(logging.NOTSET)
 
     def _register(self):
