@@ -11,7 +11,7 @@ Two groups:
 import io
 import logging
 from datetime import date, time
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pydicom
 from django.contrib.auth.models import Group, User
