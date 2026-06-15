@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('pacsfiles', '0008_pacsseries_deletion_error_and_more'),
+        ('pacsfiles', '0009_pacsseries_qido_fields'),
     ]
 
     operations = [
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name='PACSInstance',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('SOPClassUID', models.CharField(db_index=True, max_length=100)),
+                ('SOPClassUID', models.CharField(blank=True, db_index=True, max_length=100)),
                 ('SOPInstanceUID', models.CharField(db_index=True, max_length=100)),
                 ('InstanceNumber', models.IntegerField(blank=True, null=True)),
                 ('Rows', models.IntegerField(blank=True, null=True)),

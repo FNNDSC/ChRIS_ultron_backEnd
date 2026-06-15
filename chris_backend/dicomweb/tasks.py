@@ -25,8 +25,11 @@ def _find_series_for_file(pacs_file: PACSFile):
     folder. Walk up the chain until we hit a folder whose reverse
     ``pacs_series`` accessor resolves.
     """
+    # oxidicom nests files at most a few levels deep under the series folder;
+    # 16 is a conservative upper bound that also guards against corrupt state.
+    _MAX_FOLDER_WALK = 16
     folder = pacs_file.parent_folder
-    for _ in range(16):  # bound the walk in case of cycles / bad state
+    for _ in range(_MAX_FOLDER_WALK):
         if folder is None:
             return None
         try:
@@ -139,6 +142,7 @@ def index_pacs_instance(self, pacs_file_id):
                 Rows=_as_int(getattr(ds, 'Rows', None)),
                 Columns=_as_int(getattr(ds, 'Columns', None)),
                 BitsAllocated=_as_int(getattr(ds, 'BitsAllocated', None)),
+                # DICOM mandates NumberOfFrames for multi-frame; absent means 1.
                 NumberOfFrames=_as_int(getattr(ds, 'NumberOfFrames', None)) or 1,
                 TransferSyntaxUID=transfer_syntax,
             ),

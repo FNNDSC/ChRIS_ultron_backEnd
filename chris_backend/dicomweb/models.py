@@ -20,7 +20,7 @@ class PACSInstance(models.Model):
         related_name='dicom_instance',
     )
 
-    SOPClassUID = models.CharField(max_length=100, db_index=True)
+    SOPClassUID = models.CharField(max_length=100, blank=True, db_index=True)
     SOPInstanceUID = models.CharField(max_length=100, db_index=True)
     InstanceNumber = models.IntegerField(blank=True, null=True)
     Rows = models.IntegerField(blank=True, null=True)
