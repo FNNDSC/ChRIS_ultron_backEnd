@@ -33,7 +33,7 @@ def _find_series_for_file(pacs_file: PACSFile):
             return folder.pacs_series
         except PACSSeries.DoesNotExist:
             folder = folder.parent
-    return None
+    return None  # pragma: no cover — safety guard for cycles/pathological state
 
 
 def _parse_dicom_date(value):

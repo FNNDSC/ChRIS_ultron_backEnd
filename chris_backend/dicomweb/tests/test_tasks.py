@@ -11,7 +11,7 @@ Two groups:
 import io
 import logging
 from datetime import date, time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pydicom
 from django.contrib.auth.models import Group, User
@@ -105,6 +105,11 @@ class HelperParseTests(TestCase):
         self.assertIsNone(_parse_dicom_time(''))
         self.assertIsNone(_parse_dicom_time(None))
         self.assertIsNone(_parse_dicom_time('not-a-time'))
+
+    def test_parse_dicom_time_valid_length_invalid_value(self):
+        # Length 4 matches '%H%M' format but '9999' is not a valid time —
+        # exercises the except ValueError branch in _parse_dicom_time.
+        self.assertIsNone(_parse_dicom_time('9999'))
 
     def test_as_int(self):
         self.assertEqual(_as_int(42), 42)
@@ -388,9 +393,53 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
         # Task raises Retry internally; apply() captures it as a failure
         self.assertTrue(result.failed())
 
-    def test_corrupt_dicom_bytes_returns_gracefully(self):
-        mock_mgr = self._mock_storage(b'this is not dicom at all')
-        with patch('dicomweb.tasks.connect_storage', return_value=mock_mgr):
-            # Should not raise; pydicom error path logs and returns
+    def test_pydicom_exception_returns_gracefully(self):
+        # pydicom.dcmread raises (e.g. memory error, bad decompression) —
+        # exercises the except Exception branch at lines 115-117.
+        mock_mgr = self._mock_storage(b'irrelevant')
+        with patch('dicomweb.tasks.connect_storage', return_value=mock_mgr), \
+             patch('dicomweb.tasks.pydicom.dcmread', side_effect=RuntimeError('boom')):
             index_pacs_instance.apply(args=[self.pacs_file.pk])
         self.assertEqual(PACSInstance.objects.filter(series=self.series).count(), 0)
+
+    def test_missing_sop_instance_uid_returns_gracefully(self):
+        # DICOM with no SOPInstanceUID — exercises the `if not sop_instance_uid` branch.
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.sop.nosop')
+        mock_mgr = self._mock_storage(dicom_bytes)
+        mock_ds = MagicMock()
+        mock_ds.SOPInstanceUID = None
+        mock_ds.file_meta = None
+        with patch('dicomweb.tasks.connect_storage', return_value=mock_mgr), \
+             patch('dicomweb.tasks.pydicom.dcmread', return_value=mock_ds):
+            index_pacs_instance.apply(args=[self.pacs_file.pk])
+        self.assertEqual(PACSInstance.objects.filter(series=self.series).count(), 0)
+
+    def test_file_meta_attribute_error_handled(self):
+        # ds.file_meta raises AttributeError — exercises the except AttributeError
+        # branch. MagicMock.__getattr__ intercepts PropertyMock descriptors, so we
+        # use a plain class whose file_meta property raises the error reliably.
+        class _NoFileMeta:
+            # All attributes the task accesses via getattr(ds, ..., default) are
+            # set here; file_meta is omitted entirely so Python raises AttributeError
+            # naturally without __getattr__ intercepting it.
+            SOPInstanceUID = '1.2.3.4.sop.meta'
+            SOPClassUID = '1.2.840.10008.5.1.4.1.1.2'
+            InstanceNumber = 1
+            Rows = 4
+            Columns = 4
+            BitsAllocated = 16
+            NumberOfFrames = 1
+            Manufacturer = None
+            BodyPartExamined = None
+            StudyTime = None
+            SeriesNumber = None
+            PerformedProcedureStepStartDate = None
+            PerformedProcedureStepStartTime = None
+
+        mock_mgr = self._mock_storage(b'irrelevant')
+        with patch('dicomweb.tasks.connect_storage', return_value=mock_mgr), \
+             patch('dicomweb.tasks.pydicom.dcmread', return_value=_NoFileMeta()):
+            index_pacs_instance.apply(args=[self.pacs_file.pk])
+        self.assertEqual(
+            PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.sop.meta').count(), 1
+        )

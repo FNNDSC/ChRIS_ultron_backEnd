@@ -4,7 +4,7 @@
 # This file is kept only as a fallback for tools that read .coveragerc directly.
 
 [run]
-source =
+source_pkgs =
     collectionjson
     core
     dicomweb
