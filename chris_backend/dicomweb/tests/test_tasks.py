@@ -27,6 +27,7 @@ from dicomweb.tasks import (
     _find_series_for_file,
     _parse_dicom_date,
     _parse_dicom_time,
+    _transfer_syntax_uid,
     index_pacs_instance,
 )
 
@@ -83,40 +84,63 @@ def _make_dicom_bytes(**kwargs) -> bytes:
 # ---------------------------------------------------------------------------
 
 class HelperParseTests(TestCase):
-    def test_parse_dicom_date_valid(self):
-        self.assertEqual(_parse_dicom_date('20231201'), date(2023, 12, 1))
 
-    def test_parse_dicom_date_invalid_returns_none(self):
-        self.assertIsNone(_parse_dicom_date(''))
-        self.assertIsNone(_parse_dicom_date(None))
-        self.assertIsNone(_parse_dicom_date('not-a-date'))
+    def test_parse_dicom_date(self):
+        cases = [
+            ('20231201', date(2023, 12, 1)),
+            ('', None),
+            (None, None),
+            ('not-a-date', None),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(_parse_dicom_date(value), expected)
 
-    def test_parse_dicom_time_full(self):
-        self.assertEqual(_parse_dicom_time('143005'), time(14, 30, 5))
-
-    def test_parse_dicom_time_with_fractional_seconds(self):
-        self.assertEqual(_parse_dicom_time('143005.123'), time(14, 30, 5))
-
-    def test_parse_dicom_time_partial(self):
-        self.assertEqual(_parse_dicom_time('1430'), time(14, 30, 0))
-        self.assertEqual(_parse_dicom_time('14'), time(14, 0, 0))
-
-    def test_parse_dicom_time_invalid(self):
-        self.assertIsNone(_parse_dicom_time(''))
-        self.assertIsNone(_parse_dicom_time(None))
-        self.assertIsNone(_parse_dicom_time('not-a-time'))
-
-    def test_parse_dicom_time_valid_length_invalid_value(self):
-        # Length 4 matches '%H%M' format but '9999' is not a valid time —
-        # exercises the except ValueError branch in _parse_dicom_time.
-        self.assertIsNone(_parse_dicom_time('9999'))
+    def test_parse_dicom_time(self):
+        cases = [
+            ('143005',     time(14, 30, 5)),   # full HHMMSS
+            ('143005.123', time(14, 30, 5)),   # fractional seconds stripped
+            ('1430',       time(14, 30, 0)),   # truncated HHMM
+            ('14',         time(14,  0, 0)),   # truncated HH
+            ('9999',       None),              # valid length, invalid value
+            ('',           None),
+            (None,         None),
+            ('not-a-time', None),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(_parse_dicom_time(value), expected)
 
     def test_as_int(self):
-        self.assertEqual(_as_int(42), 42)
-        self.assertEqual(_as_int('17'), 17)
-        self.assertIsNone(_as_int(''))
-        self.assertIsNone(_as_int(None))
-        self.assertIsNone(_as_int('xyz'))
+        cases = [
+            (42,    42),
+            ('17',  17),
+            ('',    None),
+            (None,  None),
+            ('xyz', None),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(_as_int(value), expected)
+
+
+class TransferSyntaxUIDTests(TestCase):
+
+    def test_returns_uid_when_file_meta_present(self):
+        from pydicom.uid import ExplicitVRLittleEndian
+        ds = pydicom.dcmread(io.BytesIO(_make_dicom_bytes()), stop_before_pixels=True, force=True)
+        self.assertEqual(_transfer_syntax_uid(ds), str(ExplicitVRLittleEndian))
+
+    def test_returns_empty_string_on_attribute_error(self):
+        class _NoFileMeta:
+            @property
+            def file_meta(self):
+                raise AttributeError
+        self.assertEqual(_transfer_syntax_uid(_NoFileMeta()), '')
+
+    def test_returns_empty_string_when_file_meta_is_none(self):
+        ds = pydicom.dataset.Dataset()
+        self.assertEqual(_transfer_syntax_uid(ds), '')
 
 
 # ---------------------------------------------------------------------------
