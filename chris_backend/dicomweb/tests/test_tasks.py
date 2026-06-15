@@ -10,6 +10,7 @@ Two groups:
 
 import io
 import logging
+import types
 from datetime import date, time
 from unittest.mock import MagicMock, patch
 
@@ -37,7 +38,7 @@ from dicomweb.tasks import (
 # ---------------------------------------------------------------------------
 
 def _make_dicom_bytes(**kwargs) -> bytes:
-    """Return bytes of a minimal valid DICOM P10 file."""
+    """Return bytes of a minimal valid DICOM P10 file with compliant UIDs."""
     from pydicom.dataset import Dataset, FileMetaDataset
     from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
@@ -49,13 +50,11 @@ def _make_dicom_bytes(**kwargs) -> bytes:
 
     ds = Dataset()
     ds.file_meta = file_meta
-    ds.is_implicit_VR = False
-    ds.is_little_endian = True
 
     ds.SOPClassUID = '1.2.840.10008.5.1.4.1.1.2'
     ds.SOPInstanceUID = sop_uid
-    ds.StudyInstanceUID = kwargs.get('StudyInstanceUID', '1.2.3.4.study')
-    ds.SeriesInstanceUID = kwargs.get('SeriesInstanceUID', '1.2.3.4.series')
+    ds.StudyInstanceUID = kwargs.get('StudyInstanceUID', '1.2.3.4.1')
+    ds.SeriesInstanceUID = kwargs.get('SeriesInstanceUID', '1.2.3.4.2')
     ds.PatientID = 'TESTPAT'
     ds.PatientName = 'Test^Patient'
     ds.StudyDate = '20230101'
@@ -175,7 +174,7 @@ class DicomwebTaskTestBase(TestCase):
     SERIES_PATH = 'SERVICES/PACS/TASKPACS/P001/1.2.3.study/1.2.3.series'
 
     def setUp(self):
-        logging.disable(logging.WARNING)
+        logging.disable(logging.CRITICAL)  # suppress expected task error/warning logs
         owner = User.objects.get(username='chris')
         pacs_grp, _ = Group.objects.get_or_create(name='pacs_users')
 
@@ -254,10 +253,9 @@ class FindSeriesForFileTests(DicomwebTaskTestBase):
 class BackfillSeriesTagsTests(DicomwebTaskTestBase):
 
     def _make_ds(self, **attrs):
-        ds = pydicom.dataset.Dataset()
-        for k, v in attrs.items():
-            setattr(ds, k, v)
-        return ds
+        # Use SimpleNamespace to avoid pydicom VR validation warnings when
+        # setting test values that intentionally exceed field length limits.
+        return types.SimpleNamespace(**attrs)
 
     def test_fills_all_empty_fields(self):
         ds = self._make_ds(
@@ -329,7 +327,7 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
 
     def test_creates_pacs_instance_from_valid_dicom(self):
         dicom_bytes = _make_dicom_bytes(
-            SOPInstanceUID='1.2.3.4.sop.new',
+            SOPInstanceUID='1.2.3.4.5001',
             InstanceNumber=1,
         )
         with patch('dicomweb.tasks.connect_storage',
@@ -339,21 +337,21 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
         self.assertEqual(
             PACSInstance.objects.filter(
                 series=self.series,
-                SOPInstanceUID='1.2.3.4.sop.new',
+                SOPInstanceUID='1.2.3.4.5001',
             ).count(),
             1,
         )
 
     def test_created_instance_has_correct_geometry(self):
         dicom_bytes = _make_dicom_bytes(
-            SOPInstanceUID='1.2.3.4.sop.geom',
+            SOPInstanceUID='1.2.3.4.5002',
             InstanceNumber=7,
         )
         with patch('dicomweb.tasks.connect_storage',
                    return_value=self._mock_storage(dicom_bytes)):
             index_pacs_instance.apply(args=[self.pacs_file.pk])
 
-        inst = PACSInstance.objects.get(SOPInstanceUID='1.2.3.4.sop.geom')
+        inst = PACSInstance.objects.get(SOPInstanceUID='1.2.3.4.5002')
         self.assertEqual(inst.Rows, 4)
         self.assertEqual(inst.Columns, 4)
         self.assertEqual(inst.BitsAllocated, 16)
@@ -361,19 +359,19 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
         self.assertEqual(inst.SOPClassUID, '1.2.840.10008.5.1.4.1.1.2')
 
     def test_task_is_idempotent(self):
-        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.sop.idem')
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.5003')
         mock_mgr = self._mock_storage(dicom_bytes)
         with patch('dicomweb.tasks.connect_storage', return_value=mock_mgr):
             index_pacs_instance.apply(args=[self.pacs_file.pk])
             index_pacs_instance.apply(args=[self.pacs_file.pk])
 
         self.assertEqual(
-            PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.sop.idem').count(),
+            PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.5003').count(),
             1,
         )
 
     def test_backfill_runs_during_task(self):
-        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.sop.backfill')
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.5004')
         with patch('dicomweb.tasks.connect_storage',
                    return_value=self._mock_storage(dicom_bytes)):
             index_pacs_instance.apply(args=[self.pacs_file.pk])
@@ -402,7 +400,7 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
         orphan_file.fname.name = 'SERVICES/PACS/TASKPACS/orphan2/x.dcm'
         orphan_file.save()
 
-        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.sop.orphan')
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.5005')
         with patch('dicomweb.tasks.connect_storage',
                    return_value=self._mock_storage(dicom_bytes)):
             index_pacs_instance.apply(args=[orphan_file.pk])
@@ -428,7 +426,7 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
 
     def test_missing_sop_instance_uid_returns_gracefully(self):
         # DICOM with no SOPInstanceUID — exercises the `if not sop_instance_uid` branch.
-        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.sop.nosop')
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.5006')
         mock_mgr = self._mock_storage(dicom_bytes)
         mock_ds = MagicMock()
         mock_ds.SOPInstanceUID = None
@@ -446,7 +444,7 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
             # All attributes the task accesses via getattr(ds, ..., default) are
             # set here; file_meta is omitted entirely so Python raises AttributeError
             # naturally without __getattr__ intercepting it.
-            SOPInstanceUID = '1.2.3.4.sop.meta'
+            SOPInstanceUID = '1.2.3.4.5007'
             SOPClassUID = '1.2.840.10008.5.1.4.1.1.2'
             InstanceNumber = 1
             Rows = 4
@@ -465,5 +463,5 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
              patch('dicomweb.tasks.pydicom.dcmread', return_value=_NoFileMeta()):
             index_pacs_instance.apply(args=[self.pacs_file.pk])
         self.assertEqual(
-            PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.sop.meta').count(), 1
+            PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.5007').count(), 1
         )
