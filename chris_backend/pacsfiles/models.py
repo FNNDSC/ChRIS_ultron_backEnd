@@ -184,6 +184,12 @@ class PACSSeries(AsyncDeletableModel):
     folder = models.OneToOneField(ChrisFolder, on_delete=models.CASCADE,
                                   related_name='pacs_series')
     pacs = models.ForeignKey(PACS, on_delete=models.CASCADE, related_name='series_list')
+    study = models.ForeignKey(
+        'dicomweb.PACSStudy',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='series',
+    )
 
     class Meta:
         ordering = ('pacs', 'PatientID',)
