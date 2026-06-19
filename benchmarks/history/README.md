@@ -57,7 +57,7 @@ pins at the 10 s pool timeout) and the clean write-path run. Raw CSVs alongside 
 All runs used the pinned envelope (`envelope.md`), `fslink` storage, on the dedicated Linux
 box. The harness binds each workload plugin by name to the first match, so keep exactly one
 version of each installed — runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and
-`pl-topologicalcopy` 1.0.12. Two conventions matter for reproducing them faithfully:
+`pl-topologicalcopy` 1.0.13. Two conventions matter for reproducing them faithfully:
 
 - **Clean-stack discipline.** Isolation runs are preceded by a recovery so a prior failure
   can't contaminate them (we saw spurious failures otherwise). A light reset is a service

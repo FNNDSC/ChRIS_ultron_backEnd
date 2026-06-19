@@ -223,7 +223,7 @@ a stack you can `just nuke` afterwards.
 - **Run authoritative sweeps on a dedicated Linux box.** On Docker Desktop the VM's own
   limits dominate the per-container envelope, so laptop numbers are directional only.
 - **Pin the workload plugin versions.** Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp`
-  2.1.5, `pl-topologicalcopy` 1.0.12. The harness resolves each plugin by name and uses the
+  2.1.5, `pl-topologicalcopy` 1.0.13. The harness resolves each plugin by name and uses the
   first match (CUBE's `-version` order), so install **exactly one version of each** — with
   several present it silently binds to the lexicographically-highest version string, not the
   pinned one (see STRATEGY.md § Workload Plugins).

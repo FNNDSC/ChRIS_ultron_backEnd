@@ -61,7 +61,7 @@ the Compose envelope; note the plugin-job defaults separately if you change them
 
 ## Pinned workload plugin versions
 
-Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.12
+Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13
 (provisioned by `chrisomatic.yml`). The harness resolves each plugin **by name** and uses the
 first match (CUBE orders by `-version`), so **install exactly one version of each** — otherwise
 it silently binds to the lexicographically-highest version string, not necessarily the pinned
