@@ -1,5 +1,11 @@
+"""
+Tests for benchmarks.report — Markdown/CSV rendering of a run.
+"""
+
 from benchmarks.report import csv_cell, markdown_table, render, render_levels_csv
 
+
+# -- fixtures --------------------------------------------------------------------------
 
 def _level(**kw):
     base = dict(topology="linear", axis="depth", level=1, verdict="PASS", criteria=[],
@@ -8,6 +14,8 @@ def _level(**kw):
     base.update(kw)
     return base
 
+
+# -- render ----------------------------------------------------------------------------
 
 def test_render_has_sections_and_breaking_point():
     summary = {"run_id": "R", "tier": "smoke", "environment": {}, "levels_run": 2,
@@ -34,9 +42,11 @@ def test_render_shows_aggregate_job_cpu_and_disk_write():
 def test_peak_io_note_skips_zero_write_services():
     summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 1,
                "breaking_points": []}
+    
     # every service wrote nothing -> no disk-write line at all (the fslink common case)
     md = render(summary, [_level(peak_write_bytes={"db": 0, "chris": 0})])
     assert "Peak disk write" not in md
+    
     # mixed -> only the non-zero writer is rendered (zeros filtered out)
     md2 = render(summary, [_level(peak_write_bytes={"db": 1048576, "chris": 0})])
     assert "Peak disk write" in md2 and "db 1.0 MiB" in md2
@@ -61,12 +71,33 @@ def test_render_flags_degraded_basic_auth():
     assert "degraded run" not in render(summary, [])
 
 
+# -- markdown_table & csv --------------------------------------------------------------
+
 def test_markdown_table_shape_dashes_and_escaping():
     lines = markdown_table(["A", "B"], [[1, None], ["x|y", "p\nq"]])
     assert lines[0] == "| A | B |"
     assert lines[1] == "|---|---|"
     assert lines[2] == "| 1 | — |"                       # None renders as em dash
     assert lines[3] == "| x\\|y | p q |"                 # pipes escaped, newlines spaced
+
+
+def test_render_workload_plugins_table():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {"workload_plugins": {
+                   "fs": {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
+                          "dock_image": "localhost/dbg-bigfiles", "matches": 1},
+                   "ts": {"name": "pl-topologicalcopy", "version": "1.0.13", "id": 6,
+                          "dock_image": "fnndsc/pl-topologicalcopy", "matches": 1}}}}
+    md = render(summary, [])
+    assert "### Workload plugins" in md
+    assert "pl-topologicalcopy" in md and "1.0.13" in md   # resolved version in the report
+    assert "Installed versions" in md                       # ambiguity (matches) column
+
+
+def test_render_omits_workload_plugins_when_absent():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {}}
+    assert "Workload plugins" not in render(summary, [])     # back-compat for old runs
 
 
 def test_csv_cell_rfc4180_quoting():

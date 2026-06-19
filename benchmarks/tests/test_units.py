@@ -1,7 +1,13 @@
+"""
+Tests for benchmarks.units — file-size parsing and dbg-bigfiles param sizing.
+"""
+
 import pytest
 
 from benchmarks.units import parse_size, to_dbg_params
 
+
+# -- parse_size ------------------------------------------------------------------------
 
 @pytest.mark.parametrize("text,expected", [
     ("1024B", 1024),
@@ -26,6 +32,8 @@ def test_parse_size_rejects_garbage():
     with pytest.raises(ValueError):
         parse_size("abc")
 
+
+# -- to_dbg_params ---------------------------------------------------------------------
 
 def test_to_dbg_params_exact_count():
     # total = count * size guarantees exactly `count` files in dbg-bigfiles

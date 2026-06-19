@@ -1,8 +1,14 @@
+"""
+Tests for benchmarks.metrics — RED/USE/makespan rollups and percentiles.
+"""
+
 from benchmarks.metrics import (instance_makespan, max_concurrent_active, percentile,
                                 phase_durations, red_rollup, resource_rollup,
                                 timelines_rollup)
 from benchmarks.models import (PluginRole, RequestRecord, ResourceSample, StatusTimeline)
 
+
+# -- percentile ------------------------------------------------------------------------
 
 def test_percentile_basic():
     assert percentile([], 95) == 0.0
@@ -10,6 +16,8 @@ def test_percentile_basic():
     assert percentile([1, 2, 3, 4], 50) == 2.5
     assert percentile([1, 2, 3, 4], 100) == 4
 
+
+# -- RED rollup ------------------------------------------------------------------------
 
 def _req(cls, ms, ok=True, code=200, t=0.0):
     return RequestRecord(endpoint_class=cls, method="POST", status_code=code,
@@ -35,6 +43,8 @@ def test_red_rollup_counts_timeouts_as_zero_status():
     red = red_rollup([_req("list", 30000, ok=False, code=0, t=0.0)])
     assert red["timeouts"] == 1
 
+
+# -- timelines & makespan --------------------------------------------------------------
 
 def _timeline(inst, **first_seen):
     tl = StatusTimeline(instance_id=inst, node_key=f"n{inst}", role=PluginRole.DS)
@@ -81,6 +91,8 @@ def test_max_concurrent_active():
     ]
     assert max_concurrent_active(tls) == 2
 
+
+# -- resources -------------------------------------------------------------------------
 
 def test_resource_rollup_peaks():
     samples = [

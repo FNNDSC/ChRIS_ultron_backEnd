@@ -8,7 +8,9 @@ STATS_HEADER = "Type,Name,Request Count,Failure Count,Requests/s,50%,95%,99%\n"
 
 
 def _write_stats(path, rows):
-    """rows: list of (name, count, fails, rps, p50, p95, p99)."""
+    """
+    rows: list of (name, count, fails, rps, p50, p95, p99).
+    """
     with open(path, "w") as fh:
         fh.write(STATS_HEADER)
         for r in rows:
@@ -16,7 +18,9 @@ def _write_stats(path, rows):
 
 
 def _write_failures(path, rows):
-    """rows: list of (name, error, occurrences)."""
+    """
+    rows: list of (name, error, occurrences).
+    """
     with open(path, "w") as fh:
         fh.write("Method,Name,Error,Occurrences\n")
         for name, err, occ in rows:

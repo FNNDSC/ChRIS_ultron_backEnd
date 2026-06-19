@@ -160,6 +160,15 @@ def _environment_section(env: dict) -> list[str]:
     out += ["### Envelope (recorded knobs)", ""]
     out += markdown_table(["Knob", "Value"], [[k, v] for k, v in envelope.items()])
     
+    plugins = env.get("workload_plugins", {})
+    if plugins:
+        out.append("")
+        out += ["### Workload plugins", ""]
+        out += markdown_table(
+            ["Role", "Plugin", "Version", "Installed versions"],
+            [[role, p.get("name"), p.get("version"), p.get("matches")]
+             for role, p in plugins.items()])
+
     out.append("")
     out += ["### Manual fields (fill in)", ""]
     

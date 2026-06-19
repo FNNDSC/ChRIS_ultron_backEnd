@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.executor — per-node params and feed construction.
+"""
+
 import threading
 
 from benchmarks.chris_api import ChrisApiError, HttpResult
@@ -23,11 +27,15 @@ class FakeCreateApi:
         with self._lock:
             self._n += 1
             n = self._n
+
         if self.fail_at is not None and n >= self.fail_at:
             raise ChrisApiError(HttpResult(False, 400, 1.0, None, [], "bad request"))
+        
         self.calls.append((plugin_id, dict(params)))
         return {"id": n, "feed_id": 99}
 
+
+# -- _params_for -----------------------------------------------------------------------
 
 def test_params_for_fs_passthrough():
     node = NodeSpec("root", PluginRole.FS, {"total": "10B", "size": "1B"})
@@ -49,13 +57,17 @@ def test_params_for_ts_sets_previous_and_plugininstances():
     assert params["filter"] == ".*"
 
 
+# -- build_feed / build_feeds ----------------------------------------------------------
+
 def test_build_feed_links_chain_and_captures_feed():
     api = FakeCreateApi()
     topo = build_linear(depth=2, file_count=1, file_size="1KiB")
     fb = build_feed(api, topo, PLUGIN_IDS)
+    
     assert fb.error is None
     assert fb.feed.feed_id == 99 and fb.feed.root_instance_id == 1
     assert fb.feed.instance_ids == (1, 2, 3)
+
     # ds nodes chain previous_id to the instance created just before them
     assert api.calls[1][1]["previous_id"] == 1
     assert api.calls[2][1]["previous_id"] == 2

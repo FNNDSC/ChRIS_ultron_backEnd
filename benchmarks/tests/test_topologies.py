@@ -1,18 +1,28 @@
+"""
+Tests for benchmarks.topologies — DAG builders for the three topologies.
+"""
+
 from benchmarks.models import PluginRole
 from benchmarks.topologies import (build, build_fanout_fanin, build_layered_diamond,
                                    build_linear)
 
 
+# -- helpers ---------------------------------------------------------------------------
+
 def _by_key(topo):
     return {n.key: n for n in topo.nodes}
 
 
+# -- linear ----------------------------------------------------------------------------
+
 def test_linear_shape_and_chain():
     topo = build_linear(depth=3, file_count=5, file_size="1KiB")
+    
     assert topo.kind == "linear"
     assert len(topo.nodes) == 4              # root + 3 ds
     assert topo.nodes[0].role is PluginRole.FS
     assert topo.nodes[0].parents == ()
+
     # each ds chains to the previous node
     assert topo.nodes[1].parents == ("root",)
     assert topo.nodes[2].parents == ("ds0",)
@@ -24,6 +34,8 @@ def test_linear_root_encodes_file_count():
     topo = build_linear(depth=1, file_count=10, file_size="1KiB")
     assert topo.nodes[0].params == {"total": "10240B", "size": "1024B"}
 
+
+# -- fan-out / fan-in ------------------------------------------------------------------
 
 def test_fanout_fanin_shape():
     topo = build_fanout_fanin(branches=4, file_count=1, file_size="1KiB")
@@ -58,11 +70,15 @@ def test_fanout_multiple_merges():
     assert all(set(m.parents) == {"b0", "b1"} for m in merges)
 
 
+# -- layered diamond -------------------------------------------------------------------
+
 def test_diamond_layers_linkage():
     topo = build_layered_diamond(branches=2, layers=2, file_count=1, file_size="1KiB")
     nodes = _by_key(topo)
+
     # root + layers * (branches + 1 merge)
     assert len(topo.nodes) == 1 + 2 * (2 + 1)
+
     # layer 0 branches hang off root; layer 1 branches hang off merge0
     assert nodes["l0b0"].parents == ("root",)
     assert nodes["l1b0"].parents == ("merge0",)
@@ -72,10 +88,13 @@ def test_diamond_layers_linkage():
 def test_topological_order_parents_precede_children():
     topo = build_layered_diamond(branches=3, layers=2, file_count=2, file_size="1KiB")
     seen: set[str] = set()
+
     for node in topo.nodes:
         assert all(p in seen for p in node.parents), f"{node.key} before its parents"
         seen.add(node.key)
 
+
+# -- dispatch --------------------------------------------------------------------------
 
 def test_build_dispatch():
     class P:
@@ -83,6 +102,7 @@ def test_build_dispatch():
         file_count = 1
         file_size = "1KiB"
         sleep_length = 0
+
     assert build("linear", P()).kind == "linear"
     assert build("fanout_fanin", P()).kind == "fanout_fanin"
     assert build("diamond", P()).kind == "diamond"

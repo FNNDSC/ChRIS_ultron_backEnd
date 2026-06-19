@@ -1,6 +1,12 @@
+"""
+Tests for benchmarks.escalation — the OFAT escalation engine.
+"""
+
 from benchmarks import escalation
 from benchmarks.models import (Classification, ScenarioParams, ScenarioResult, Verdict)
 
+
+# -- fixtures --------------------------------------------------------------------------
 
 def _params(topology, axis, level, i):
     return ScenarioParams(topology=topology, axis=axis, level=level, file_count=1,
@@ -27,6 +33,8 @@ def _runner(fail_at_level=None, verdict_at=None):
     return run_scenario
 
 
+# -- aggregate_verdict -----------------------------------------------------------------
+
 def test_aggregate_verdict_is_worst_of():
     p = _params("linear", "depth", 1, 0)
     reps = [_result(p, Verdict.PASS), _result(p, Verdict.DEGRADED, ("p95",)),
@@ -35,6 +43,8 @@ def test_aggregate_verdict_is_worst_of():
     assert verdict is Verdict.DEGRADED
     assert criteria == ("p95",)
 
+
+# -- escalate_axis ---------------------------------------------------------------------
 
 def test_escalate_axis_stops_at_first_fail():
     seen_levels = []
@@ -79,6 +89,7 @@ def test_fail_short_circuits_remaining_repeats():
     levels, bp = escalation.escalate_axis(
         "linear", "depth", cap=8, repeat=3,
         run_scenario=run_scenario, make_params=_params)
+    
     # passing levels run all 3 repeats; the failing level stops after its first repeat
     assert ran == [(1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2), (4, 0)]
     assert bp.level == 4
@@ -95,14 +106,18 @@ def test_escalate_axis_decade_step():
     assert bp is None
 
 
+# -- run (full sweep) ------------------------------------------------------------------
+
 def test_run_uses_step_for_per_axis():
     levels, _ = escalation.run(
         {"linear": {"file_count": 100, "depth": 8}}, repeat=1,
         run_scenario=_runner(fail_at_level=None), make_params=_params,
         step_for=lambda axis: 10 if axis == "file_count" else 2)
+    
     by_axis = {}
     for lv in levels:
         by_axis.setdefault(lv.axis, []).append(lv.level)
+        
     assert by_axis["file_count"] == [1, 10, 100]       # decade
     assert by_axis["depth"] == [1, 2, 4, 8]            # binary
 

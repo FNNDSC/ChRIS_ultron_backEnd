@@ -214,14 +214,30 @@ class ChrisApi:
         return _total(self._call("list", "GET", self.base + "userfiles/",
                                  params={"limit": 1}).payload)
 
-    def get_plugin_id(self, name: str) -> int:
+    def get_plugin(self, name: str) -> dict:
+        """
+        Resolve a plugin by name and return the selected version's provenance.
+
+        Searches ``plugins/search/?name_exact=`` and selects the first match — CUBE
+        orders plugins by ``('meta', '-version')``, so this is the highest-sorting
+        version *string* for the name. ``matches`` is how many versions the name
+        resolved to; ``> 1`` means the selection is ambiguous (the recorded
+        provenance and the run's warning both key off it).
+        """
         r = self._call("list", "GET", self.base + "plugins/search/",
                        params={"name_exact": name})
-        
+
         if not r.ok or not r.items:
             raise ChrisApiError(r if not r.ok else HttpResult(
                 False, 404, r.latency_ms, None, [], f"plugin not found: {name}"))
-        return int(r.items[0]["id"])
+
+        sel = r.items[0]
+        return {"id": int(sel["id"]), "name": sel.get("name", name),
+                "version": sel.get("version"), "dock_image": sel.get("dock_image"),
+                "matches": len(r.items)}
+
+    def get_plugin_id(self, name: str) -> int:
+        return self.get_plugin(name)["id"]
 
     def create_plugin_instance(self, plugin_id: int, params: dict) -> dict:
         url = self.base + f"plugins/{plugin_id}/instances/"

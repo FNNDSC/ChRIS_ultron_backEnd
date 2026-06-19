@@ -71,8 +71,13 @@ class BenchmarkRunner:
         self.broker = BrokerClient(broker_host, int(broker_port or 6379))
         self.pg_stats = PgStatStatements(self.docker)
         
-        self.plugin_ids = {role: self.api.get_plugin_id(name)
-                           for role, name in PLUGIN_NAMES.items()}
+        self.plugins = {role: self.api.get_plugin(name)
+                        for role, name in PLUGIN_NAMES.items()}
+        self.plugin_ids = {role: p["id"] for role, p in self.plugins.items()}
+
+        warning = plugin_ambiguity_warning(self.plugins)
+        if warning:
+            print(warning, flush=True)
 
     def _record_request(self, record) -> None:
         self._sink.record_request(record)
@@ -265,7 +270,12 @@ class BenchmarkRunner:
             "pg_stat_statements": True if self.pg_stats.available
             else self.pg_stats.unavailable_reason,
         }
-        
+
+        # exact workload-plugin versions the run resolved to (the harness picks by
+        # name, so without this there is no record of which version actually ran)
+        env["workload_plugins"] = build_workload_manifest(self.plugins)
+        env["workload_plugins_ambiguous"] = ambiguous_plugins(self.plugins)
+
         self.store.write_json("environment.json", env)
 
         levels, breaking = escalation.run(
@@ -383,6 +393,41 @@ def _worst_p95(red: dict) -> float:
 def _bp_row(bp: BreakingPoint) -> dict:
     return {"topology": bp.topology, "axis": bp.axis, "level": bp.level,
             "criteria": list(bp.criteria)}
+
+
+def build_workload_manifest(plugins: dict) -> dict:
+    """
+    Per-role workload-plugin provenance for the environment manifest:
+    ``{role.value: {name, version, id, dock_image, matches}}``. ``matches`` is how
+    many installed versions the name resolved to (>1 = the selection was ambiguous).
+    """
+    return {role.value: {"name": p["name"], "version": p["version"],
+                         "id": p["id"], "dock_image": p["dock_image"],
+                         "matches": p["matches"]}
+            for role, p in plugins.items()}
+
+
+def ambiguous_plugins(plugins: dict) -> list[str]:
+    """
+    Names that resolved to more than one installed version — the harness then runs
+    CUBE's first match, which may not be the intended version.
+    """
+    return [p["name"] for p in plugins.values() if p.get("matches", 1) > 1]
+
+
+def plugin_ambiguity_warning(plugins: dict) -> str | None:
+    """
+    Operator warning when any workload plugin resolved to more than one installed
+    version (the harness then runs CUBE's first match, which may not be the intended
+    one), else ``None``.
+    """
+    names = ambiguous_plugins(plugins)
+
+    if not names:
+        return None
+    return (f"[bench] WARNING: multiple installed versions for {', '.join(names)}; "
+            f"running CUBE's first match (highest -version). Runs may not be "
+            f"reproducible — keep one version per workload plugin (see chrisomatic.yml).")
 
 
 # -- CLI -------------------------------------------------------------------------------

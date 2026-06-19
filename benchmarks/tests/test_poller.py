@@ -1,3 +1,7 @@
+"""T
+ests for benchmarks.poller — status polling to completion and ProgressProbe.
+"""
+
 from benchmarks.models import InstanceRef, PluginRole
 from benchmarks.poller import ProgressProbe, poll_to_completion
 
@@ -28,6 +32,8 @@ class FakeDocker:
 
 POLL = dict(poll_every=0.001, scenario_timeout=5, no_progress_timeout=5)
 
+
+# -- poll_to_completion ----------------------------------------------------------------
 
 def test_early_return_when_no_feeds():
     res = poll_to_completion(FakeApi([]), [], [], **POLL)

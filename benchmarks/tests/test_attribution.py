@@ -23,12 +23,14 @@ def test_parse_reply_integer_and_simple_string():
 
 def test_parse_reply_rejects_errors():
     import pytest
+
     with pytest.raises(ValueError):
         parse_reply(b"-ERR unknown command\r\n")
 
 
 def test_broker_unreachable_degrades_to_empty():
     client = BrokerClient("127.0.0.1", 1, timeout=0.1)   # nothing listens on port 1
+
     assert not client.available
     assert client.depths() == {}
 
@@ -55,6 +57,7 @@ def test_sampler_records_queue_depths():
     sampler = StatsSampler(NoDocker(), sink, broker=FakeBroker({"main2": 7}))
     sampler._sample_once()
     samples = sink.queues()
+
     assert len(samples) == 1
     assert samples[0].queue == "main2" and samples[0].depth == 7
 
@@ -63,6 +66,7 @@ def test_queue_rollup_peak_and_mean():
     samples = [QueueSample(0, "main2", 0), QueueSample(1, "main2", 10),
                QueueSample(2, "main2", 4), QueueSample(0, "periodic", 1)]
     roll = queue_rollup(samples)
+
     assert roll["main2"] == {"depth_peak": 10, "depth_mean": 4.7, "samples": 3}
     assert roll["periodic"]["depth_peak"] == 1
 
@@ -74,6 +78,7 @@ def test_parse_psql_rows_types_and_shape():
           "3\t12\t4.0\t3\tUPDATE feeds_feed SET name = $1\n" \
           "malformed line without tabs\n"
     rows = parse_psql_rows(out, ("calls", "total_ms", "mean_ms", "rows", "query"))
+    
     assert len(rows) == 2
     assert rows[0]["calls"] == 120 and rows[0]["mean_ms"] == 37.67
     assert rows[0]["query"].startswith("SELECT * FROM")

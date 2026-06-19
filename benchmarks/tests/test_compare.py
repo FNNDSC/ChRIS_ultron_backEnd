@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.compare — run comparability, deltas, trends, and the CI gate.
+"""
+
 import json
 from pathlib import Path
 

@@ -1,12 +1,19 @@
+"""
+Tests for benchmarks.run_bench — scenario params, tier filtering, level rollup, plugin resolution.
+"""
+
 import pytest
 
 from benchmarks.config import load_tier
 from benchmarks.models import (Classification, LevelResult, PluginRole, ScenarioParams,
                                ScenarioResult, StatusTimeline, Verdict)
 from benchmarks.run_bench import (_filter_tier, _level_row, _override_baseline,
-                                  apply_build_errors, effective_poll_cadence,
-                                  make_scenario_params)
+                                  ambiguous_plugins, apply_build_errors,
+                                  build_workload_manifest, effective_poll_cadence,
+                                  make_scenario_params, plugin_ambiguity_warning)
 
+
+# -- scenario params -------------------------------------------------------------------
 
 def test_make_scenario_params_overrides_only_one_axis():
     tier = load_tier("smoke")
@@ -22,6 +29,8 @@ def test_make_scenario_params_file_count_axis():
     p = make_scenario_params(tier.baseline, 1.0, "linear", "file_count", 100, 0)
     assert p.file_count == 100 and p.depth == tier.baseline.depth
 
+
+# -- tier filtering --------------------------------------------------------------------
 
 def test_filter_tier_topology_and_cap_override():
     f = _filter_tier(load_tier("full"), topology="linear", axis=None, cap=4, repeat=1)
@@ -51,6 +60,7 @@ def test_override_baseline_replaces_only_given_fields():
     assert t2.baseline.file_size == "1MiB"
     assert t2.baseline.sleep_length == tier.baseline.sleep_length
     assert _override_baseline(tier, None, None) is tier
+
     t3 = _override_baseline(tier, None, None, file_count=100)
     assert t3.baseline.file_count == 100               # the marquee preset override
     assert t3.baseline.file_size == tier.baseline.file_size
@@ -66,11 +76,14 @@ def test_file_count_override_yields_to_the_escalated_axis():
     assert held.file_count == 50                        # override held while escalating depth
 
 
+# -- build errors & cadence ------------------------------------------------------------
+
 def test_apply_build_errors_escalates_to_fail():
     clean = Classification(Verdict.PASS)
     failed = apply_build_errors(clean, ["HTTP 400: bad"])
     assert failed.verdict is Verdict.FAIL
     assert "build_error:1" in failed.criteria
+    
     # already-FAIL classifications keep their original criteria
     hard = Classification(Verdict.FAIL, ("no_progress",))
     assert apply_build_errors(hard, ["x"]) is hard
@@ -84,13 +97,17 @@ def test_effective_poll_cadence_scales_with_feeds():
     assert effective_poll_cadence(2.0, 1) == 2.0          # never faster than base
 
 
+# -- level rollup ----------------------------------------------------------------------
+
 def _scenario(verdict, makespan, p95, cpu, n_completed, out_bytes):
     p = ScenarioParams("linear", "depth", 1, 1, "1KiB", 1, 1, 1, 1, 1, 0, 1.0, 0)
     tls = []
+
     for i in range(n_completed):
         tl = StatusTimeline(i, "k", PluginRole.DS)
         tl.final_status = "finishedSuccessfully"
         tls.append(tl)
+
     return ScenarioResult(
         p, Classification(verdict), makespan, [], tls,
         {"by_class": {"create": {"p95_ms": p95}}, "errors": 0, "status_5xx": 0},
@@ -123,3 +140,39 @@ def test_level_row_excludes_job_containers_and_keeps_service_io():
     assert row["peak_cpu_pct"] == {"db": 70.0}         # ephemeral job container excluded
     assert row["peak_job_cpu_pct"] == 250.0            # surfaced as one aggregate
     assert row["peak_write_bytes"] == {"db": 2048}     # service disk write only
+
+
+# -- workload plugins ------------------------------------------------------------------
+
+def test_build_workload_manifest_carries_versions_keyed_by_role():
+    plugins = {
+        PluginRole.FS: {"id": 1, "name": "dbg-bigfiles", "version": "1.0.0",
+                        "dock_image": "localhost/dbg-bigfiles", "matches": 1},
+        PluginRole.TS: {"id": 9, "name": "pl-topologicalcopy", "version": "1.0.13",
+                        "dock_image": "fnndsc/pl-topologicalcopy", "matches": 1},
+    }
+    m = build_workload_manifest(plugins)
+    assert m["fs"] == {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
+                       "dock_image": "localhost/dbg-bigfiles", "matches": 1}
+    assert m["ts"]["version"] == "1.0.13"
+
+
+def test_ambiguous_plugins_flags_multiversion_only():
+    plugins = {
+        PluginRole.DS: {"id": 2, "name": "pl-simpledsapp", "version": "2.1.5",
+                        "dock_image": "fnndsc/pl-simpledsapp", "matches": 2},
+        PluginRole.FS: {"id": 1, "name": "dbg-bigfiles", "version": "1.0.0",
+                        "dock_image": "localhost/dbg-bigfiles", "matches": 1},
+    }
+    assert ambiguous_plugins(plugins) == ["pl-simpledsapp"]
+    plugins[PluginRole.DS]["matches"] = 1
+    assert ambiguous_plugins(plugins) == []
+
+
+def test_plugin_ambiguity_warning_message():
+    assert plugin_ambiguity_warning(
+        {PluginRole.FS: {"name": "dbg-bigfiles", "matches": 1}}) is None
+    msg = plugin_ambiguity_warning(
+        {PluginRole.TS: {"name": "pl-topologicalcopy", "matches": 2},
+         PluginRole.FS: {"name": "dbg-bigfiles", "matches": 1}})
+    assert msg and "pl-topologicalcopy" in msg and "first match" in msg

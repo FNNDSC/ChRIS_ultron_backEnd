@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.classifier — the PASS/DEGRADED/FAIL verdict policy.
+"""
+
 from benchmarks.classifier import classify
 from benchmarks.config import Thresholds
 from benchmarks.models import PollResult, Verdict
@@ -7,6 +11,8 @@ THRESHOLDS = Thresholds(
     no_progress_timeout_s=300, scenario_timeout_s=1200,
 )
 
+
+# -- fixtures --------------------------------------------------------------------------
 
 def _poll(**kw):
     base = dict(timelines=[], makespan_s=1.0, terminal=True, hard_failures=(),
@@ -21,6 +27,8 @@ def _red(**kw):
     base.update(kw)
     return base
 
+
+# -- classification --------------------------------------------------------------------
 
 def test_clean_run_passes():
     assert classify(_poll(), _red(), THRESHOLDS).verdict is Verdict.PASS

@@ -64,8 +64,8 @@ the Compose envelope; note the plugin-job defaults separately if you change them
 Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13
 (provisioned by `chrisomatic.yml`). The harness resolves each plugin **by name** and uses the
 first match (CUBE orders by `-version`), so **install exactly one version of each** — otherwise
-it silently binds to the lexicographically-highest version string, not necessarily the pinned
-one. These versions are not recorded in `environment.json`, so this pin is the source of truth.
+it warns and binds to the lexicographically-highest version string, not necessarily the pinned
+one. Each run now records the resolved versions (and how many matched) under `workload_plugins` in `environment.json`/`summary.json`; the pin is still what keeps a run reproducible, since the harness resolves by name.
 
 ## Manual hardware fields
 

@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.results — JSON encoding and the run store/loader.
+"""
+
 import json
 from pathlib import Path
 
@@ -7,6 +11,8 @@ from benchmarks.models import Classification, Verdict
 from benchmarks.results import (ResultsStore, find_runs, load_run, resolve_run,
                                 to_json)
 
+
+# -- to_json ---------------------------------------------------------------------------
 
 def test_to_json_enum():
     assert json.loads(to_json(Verdict.PASS)) == "PASS"
@@ -26,6 +32,8 @@ def test_to_json_rejects_unknown_type():
     with pytest.raises(TypeError):
         to_json(object())
 
+
+# -- load_run / find_runs --------------------------------------------------------------
 
 def test_load_run_round_trips_the_store(tmp_path):
     # the writer builds the fixture the reader consumes -> layout tested end to end
@@ -76,6 +84,8 @@ def test_load_run_falls_back_to_environment_embedded_in_summary(tmp_path):
     run = load_run(store.run_dir)
     assert run.environment == {"storage_mode": "fslink"}
 
+
+# -- resolve_run -----------------------------------------------------------------------
 
 def test_resolve_run_prefers_explicit_path_then_results_then_history(tmp_path):
     live, history = tmp_path / "results", tmp_path / "history"

@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.chris_api — the measured Collection+JSON adapter.
+"""
+
 import requests
 
 from benchmarks.chris_api import (ChrisApi, ChrisApiError, _items, _next_link,
@@ -168,3 +172,42 @@ def test_get_feed_instances_follows_pagination():
     # the next-page request reuses the href (params only on the first request)
     assert session.request_calls[1][1] == "http://cube/api/v1/p2/"
     assert session.request_calls[1][2]["params"] is None
+
+
+# -- plugin resolution -------------------------------------------------------------------
+
+def test_get_plugin_selects_first_match_and_counts_versions():
+    # two installed versions; CUBE returns them -version-ordered, harness takes the first
+    payload = cj([
+        {"id": 7, "name": "pl-x", "version": "1.0.13", "dock_image": "fnndsc/pl-x"},
+        {"id": 6, "name": "pl-x", "version": "1.0.12", "dock_image": "fnndsc/pl-x"},
+    ])
+    api = make_api(FakeSession(responses=[FakeResponse(200, payload)]))
+    assert api.get_plugin("pl-x") == {
+        "id": 7, "name": "pl-x", "version": "1.0.13",
+        "dock_image": "fnndsc/pl-x", "matches": 2}
+
+
+def test_get_plugin_single_match_and_id_delegates():
+    payload = cj([{"id": 5, "name": "pl-y", "version": "2.1.5",
+                   "dock_image": "fnndsc/pl-y"}])
+    api = make_api(FakeSession(responses=[FakeResponse(200, payload),
+                                          FakeResponse(200, payload)]))
+    assert api.get_plugin("pl-y")["matches"] == 1
+    assert api.get_plugin_id("pl-y") == 5          # delegates to get_plugin
+
+
+def test_get_plugin_not_found_raises():
+    api = make_api(FakeSession(responses=[FakeResponse(200, cj([]))]))
+    try:
+        api.get_plugin("nope")
+        raise AssertionError("expected ChrisApiError")
+    except ChrisApiError as exc:
+        assert "not found" in (exc.result.error or "")
+
+
+def test_get_plugin_missing_optional_fields_are_none():
+    api = make_api(FakeSession(
+        responses=[FakeResponse(200, cj([{"id": 1, "name": "pl-z"}]))]))
+    p = api.get_plugin("pl-z")
+    assert p["version"] is None and p["dock_image"] is None and p["matches"] == 1

@@ -88,7 +88,7 @@ All three are installed by `chrisomatic` in the default dev environment (`chriso
 | **`pl-simpledsapp`** | `ds` | Downstream: streams input→output (8 MiB chunks) | `--sleepLength`, `--prefix` |
 | **`pl-topologicalcopy`** | `ts` | Fan-in/merge: copies filtered parent output | `--plugininstances`, `--filter`, `--groupByInstance` |
 
-**Versions (pinned).** Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. The harness resolves each plugin **by name** (`get_plugin_id` → `plugins/search/?name_exact=`, taking the first match in CUBE's `('meta', '-version')` order) and never pins a version, so **reproducible runs require exactly one version of each installed.** With more than one present it silently binds to the lexicographically-highest version *string* (`version` is a `CharField`, so `1.0.9` sorts above `1.0.13`), not necessarily the intended one — and `chrisomatic.yml` provisions these images untagged, so verify the installed versions there.
+**Versions (pinned).** Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. The harness resolves each plugin **by name** (`get_plugin` → `plugins/search/?name_exact=`, taking the first match in CUBE's `('meta', '-version')` order) and never pins a version, so **reproducible runs require exactly one version of each installed.** With more than one present it warns at startup and binds to the lexicographically-highest version *string* (`version` is a `CharField`, so `1.0.9` sorts above `1.0.13`), not necessarily the intended one — and `chrisomatic.yml` provisions these images untagged, so verify the installed versions there. Each run records what it resolved (name, version, id, match count) under `workload_plugins` in `environment.json`.
 
 **Note:** `--sleepLength` produces two workload classes — storage/registration pressure at `0`, scheduling/long-active-job pressure at `>0`.
 
@@ -310,7 +310,7 @@ Authoritative `full`-tier runs are performed on a **dedicated bare-metal Linux b
 
 The runner auto-collects what it can and leaves explicit manual placeholders.
 
-- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon image ids, git commit + dirty status, storage mode, the full envelope knob set, API auth mode, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`), and a measured idle noise floor.
+- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon image ids, git commit + dirty status, storage mode, the full envelope knob set, API auth mode, the resolved workload-plugin versions, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`), and a measured idle noise floor.
 - **Manual (in the report):** storage device type/throughput, power/thermal mode, and other significant workloads running during the benchmark.
 
 ## 14. Implementation Phases

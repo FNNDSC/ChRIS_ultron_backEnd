@@ -1,3 +1,7 @@
+"""
+Tests for benchmarks.recovery — health and quiescence waits.
+"""
+
 from benchmarks.recovery import wait_for_health, wait_for_quiescence
 
 
@@ -15,6 +19,8 @@ class FlippingApi:
         return self.calls > self.healthy_after
 
 
+# -- wait_for_health -------------------------------------------------------------------
+
 def test_wait_for_health_returns_when_healthy():
     assert wait_for_health(FlippingApi(2), timeout=1.0, interval=0.001)
 
@@ -22,6 +28,8 @@ def test_wait_for_health_returns_when_healthy():
 def test_wait_for_health_times_out():
     assert not wait_for_health(FlippingApi(10_000), timeout=0.02, interval=0.001)
 
+
+# -- wait_for_quiescence ---------------------------------------------------------------
 
 def test_quiescence_waits_until_counts_drop():
     seq = iter([{"feeds": 5, "instances": 9},

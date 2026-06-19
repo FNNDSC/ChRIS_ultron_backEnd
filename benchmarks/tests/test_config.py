@@ -1,9 +1,15 @@
+"""
+Tests for benchmarks.config — matrix/tier loading and the workload fingerprint.
+"""
+
 from dataclasses import replace
 
 import pytest
 
 from benchmarks.config import load_tier, step_for, tier_fingerprint
 
+
+# -- tier loading ----------------------------------------------------------------------
 
 def test_load_tier_smoke():
     t = load_tier("smoke")
@@ -66,6 +72,8 @@ def test_full_linear_feeds_is_the_marquee_and_merges_escalated():
     assert t.topology_axes["fanout_fanin"]["merges"] == 8
 
 
+# -- workload fingerprint --------------------------------------------------------------
+
 def test_tier_fingerprint_is_stable_and_workload_sensitive():
     t = load_tier("smoke")
     fp = tier_fingerprint(t)
@@ -89,8 +97,10 @@ def test_tier_fingerprint_canonicalizes_numeric_types():
     t = load_tier("smoke")
     as_int = replace(t, baseline=replace(t.baseline, sleep_length=0))
     as_float = replace(t, baseline=replace(t.baseline, sleep_length=0.0))
+
     assert (tier_fingerprint(as_int)["workload_sha256"]
             == tier_fingerprint(as_float)["workload_sha256"])
+    
     # non-integral floats remain distinct workloads
     half = replace(t, baseline=replace(t.baseline, sleep_length=0.5))
     assert (tier_fingerprint(half)["workload_sha256"]
