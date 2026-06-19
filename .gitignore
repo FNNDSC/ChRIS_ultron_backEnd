@@ -30,3 +30,7 @@ chris_backend/.lesshist
 
 # created by `just set-storage`
 .storage
+
+# benchmark run outputs (keep the directory, ignore generated runs)
+benchmarks/results/*
+!benchmarks/results/.gitkeep

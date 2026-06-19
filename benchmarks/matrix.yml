@@ -1,0 +1,146 @@
+# Benchmark matrix: smoke / default / full + aging-grow / aging-probe tiers.
+#
+# Each tier holds a `baseline` (all dimensions held here unless escalated), the
+# `topologies` it exercises with their escalation `axes` (axis -> binary cap), the
+# `repeat` count, failure `thresholds`, and the harness `poll_every_s` cadence.
+#
+# The escalation engine runs each axis up to its cap, holding every other dimension at
+# the baseline. Most axes double (1, 2, 4, 8 ...); file_count escalates by decade
+# (1, 10, 100, 1000, ...) per the issue ("Varying file count- 1, 10, 100, etc.") — see
+# config.AXIS_STEP. file_size is a 2-point sanity check: run once as-is, once with
+# `--file-size 1MiB` (fslink hides byte-copy cost either way).
+#
+# poll_every_s is the HARNESS observation cadence (how often it polls instance
+# statuses) — not CUBE's beat interval, which is the CUBE_CELERY_POLL_INTERVAL
+# envelope knob.
+
+tiers:
+
+  # ~2 minutes; proves the harness works end to end. CI-friendly.
+  smoke:
+    repeat: 1
+    poll_every_s: 1.0
+    baseline:
+      file_count: 1
+      file_size: 1KiB
+      depth: 1
+      branches: 1
+      layers: 1
+      merges: 1
+      feeds: 1
+      sleep_length: 0
+    thresholds:
+      healthcheck_timeout_s: 30
+      api_request_timeout_s: 30
+      api_p95_latency_ms: 5000
+      no_progress_timeout_s: 180
+      scenario_timeout_s: 600
+      quiesce_timeout_s: 120
+    topologies:
+      linear:        {axes: {depth: 2, file_count: 10}}
+      fanout_fanin:  {axes: {branches: 2}}
+      diamond:       {axes: {branches: 2, layers: 2}}
+
+  # ~15-30 minutes on a laptop; directional regression check.
+  default:
+    repeat: 3
+    poll_every_s: 1.0
+    baseline:
+      file_count: 10
+      file_size: 1KiB
+      depth: 4
+      branches: 4
+      layers: 1
+      merges: 1
+      feeds: 1
+      sleep_length: 0
+    thresholds:
+      healthcheck_timeout_s: 30
+      api_request_timeout_s: 30
+      api_p95_latency_ms: 2000
+      no_progress_timeout_s: 300
+      scenario_timeout_s: 1200
+      quiesce_timeout_s: 300
+    topologies:
+      linear:        {axes: {depth: 16, file_count: 1000, feeds: 8}}
+      fanout_fanin:  {axes: {branches: 16, feeds: 8}}
+      diamond:       {axes: {branches: 8, layers: 4}}
+
+  # Overnight on the dedicated Linux box; pushes each axis toward the breaking point.
+  # The linear `feeds` axis is the combined-stress "marquee number" (how many concurrent
+  # feeds before CUBE breaks). For the heavier per-feed variant, run it with a bigger
+  # baseline and a single repeat:
+  #   just bench-run --tier full --topology linear --axis feeds --cap 128 --repeat 1 --file-count 100
+  full:
+    repeat: 3
+    poll_every_s: 1.0
+    baseline:
+      file_count: 10
+      file_size: 1KiB
+      depth: 4
+      branches: 4
+      layers: 1
+      merges: 1
+      feeds: 1
+      sleep_length: 0
+    thresholds:
+      healthcheck_timeout_s: 30
+      api_request_timeout_s: 30
+      api_p95_latency_ms: 2000
+      no_progress_timeout_s: 300
+      scenario_timeout_s: 3600
+      quiesce_timeout_s: 900
+    topologies:
+      linear:        {axes: {depth: 64, file_count: 10000, feeds: 128}}
+      fanout_fanin:  {axes: {branches: 64, feeds: 64, file_count: 10000, merges: 8}}
+      diamond:       {axes: {branches: 32, layers: 16, feeds: 32}}
+
+  # State-aging measurement — run as alternating pairs in a loop:
+  #   aging-grow:  ALWAYS with --no-cleanup; accumulates DB rows (~56k file rows
+  #                per invocation: feeds 1+2+4, 4 instances each, 1000 files).
+  #   aging-probe: small fixed workload (2 instances, 100 files) WITH cleanup,
+  #                measured between growth batches. Probe makespan/p95 plotted
+  #                against the absolute row counts recorded in db_deltas.
+  aging-grow:
+    repeat: 2
+    poll_every_s: 1.0
+    baseline:
+      file_count: 1000
+      file_size: 1KiB
+      depth: 3
+      branches: 1
+      layers: 1
+      merges: 1
+      feeds: 1
+      sleep_length: 0
+    thresholds:
+      healthcheck_timeout_s: 30
+      api_request_timeout_s: 30
+      api_p95_latency_ms: 2000
+      no_progress_timeout_s: 300
+      scenario_timeout_s: 1200
+      quiesce_timeout_s: 60
+    topologies:
+      linear:        {axes: {feeds: 4}}
+
+  aging-probe:
+    repeat: 3
+    poll_every_s: 1.0
+    baseline:
+      file_count: 100
+      file_size: 1KiB
+      depth: 1
+      branches: 1
+      layers: 1
+      merges: 1
+      feeds: 1
+      sleep_length: 0
+    thresholds:
+      healthcheck_timeout_s: 30
+      api_request_timeout_s: 30
+      api_p95_latency_ms: 2000
+      no_progress_timeout_s: 300
+      scenario_timeout_s: 600
+      quiesce_timeout_s: 300
+    topologies:
+      linear:        {axes: {depth: 1}}

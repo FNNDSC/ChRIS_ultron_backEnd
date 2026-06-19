@@ -260,6 +260,18 @@ jobs:
           PFCON_IMAGE: localhost/fnndsc/pfcon:dev
 ```
 
+## Load & Scalability Benchmarks
+
+A repo-native load & scalability benchmark harness lives under [`benchmarks/`](./benchmarks). It drives real plugin-instance DAGs end-to-end against the dev stack and **auto-escalates one factor at a time** (file count, concurrent feeds, chain depth, branching/merging) until _CUBE_ breaks, then writes a ticket-ready report with the breaking points and approach-to-failure curves.
+
+```shell
+just bench-start              # bring up the fslink stack with the uvicorn envelope + plugins
+just bench-run --tier smoke   # ~2 min sanity sweep (also: default, full, aging-grow, aging-probe)
+just bench-down               # stop the stack
+```
+
+See [`benchmarks/README.md`](./benchmarks/README.md) for usage and [`benchmarks/STRATEGY.md`](./benchmarks/STRATEGY.md) for the design.
+
 ## Documentation
 
 > [!CAUTION]

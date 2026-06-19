@@ -1,0 +1,101 @@
+# Benchmark override for docker-compose.yml. Layered on top of the base dev stack by the
+# `just bench-*` recipes (never used by normal `just`). It does two things:
+#   1. swaps CUBE from the dev `runserver` to a production-like uvicorn with N workers,
+#      a larger DB pool, and a higher Postgres max_connections — a pinned, *recorded*
+#      resource envelope so breaking points are reproducible;
+#   2. adds a `benchmark` service (profile `bench`) that runs the harness as an external
+#      API client, with the Docker socket mounted for stats/logs/reaping.
+#
+# Tunable via the env vars below (all recorded in the report's environment manifest).
+
+services:
+
+  chris:
+    command: python3 -m uvicorn --host 0.0.0.0 --port 8000 --workers ${CUBE_UVICORN_WORKERS:-4} config.asgi:application
+    cpus: ${CUBE_CPUS:-4}
+    mem_limit: ${CUBE_MEM_LIMIT:-4g}
+    environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
+      CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
+      CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
+      CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
+      CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+
+  worker-mains:
+    command: celery -A core worker -c ${CUBE_WORKER_MAINS_CONCURRENCY:-4} -l info -Q main1,main2
+    cpus: ${CUBE_WORKER_CPUS:-4}
+    mem_limit: ${CUBE_WORKER_MEM_LIMIT:-4g}
+    environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
+      CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
+      CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
+      CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
+      CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+
+  worker-periodic:
+    environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
+      CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
+      CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
+      CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
+      CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+
+  celery-scheduler:
+    environment:
+      DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
+      CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
+      CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
+      CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
+      CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+
+  db:
+    # pg_stat_statements gives the harness per-scenario query attribution
+    command: postgres -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300} -c shared_preload_libraries=pg_stat_statements
+    cpus: ${CUBE_DB_CPUS:-2}
+    mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
+
+  pfcon:
+    command: gunicorn -b 0.0.0.0:30005 -w ${PFCON_WORKERS:-8} -t 120 pfcon.wsgi:application
+    cpus: ${PFCON_CPUS:-2}
+    mem_limit: ${PFCON_MEM_LIMIT:-2g}
+
+  benchmark:
+    image: ${BENCH_IMAGE:-localhost/fnndsc/cube-benchmark:dev}
+    build:
+      context: ./benchmarks
+    profiles:
+      - bench
+    environment:
+      CUBE_URL: "http://chris:8000/api/v1/"
+      CUBE_USERNAME: "${CUBE_USERNAME:-chris}"
+      CUBE_PASSWORD: "${CUBE_PASSWORD:-chris1234}"
+      BENCH_BROKER: "dragonflydb:6379"
+      COMPOSE_PROJECT_NAME: "${COMPOSE_PROJECT_NAME:-}"
+      BENCH_RESULTS_DIR: "/app/benchmarks/results"
+      GIT_COMMIT: "${GIT_COMMIT:-}"
+      GIT_DIRTY: "${GIT_DIRTY:-}"
+      STORAGE_ENV: "fslink"
+      # recorded envelope knobs (kept in sync with the service overrides above)
+      CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
+      CUBE_UVICORN_WORKERS: "${CUBE_UVICORN_WORKERS:-4}"
+      CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
+      CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
+      CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DB_MAX_CONNECTIONS: "${CUBE_DB_MAX_CONNECTIONS:-300}"
+      CUBE_WORKER_MAINS_CONCURRENCY: "${CUBE_WORKER_MAINS_CONCURRENCY:-4}"
+      PFCON_WORKERS: "${PFCON_WORKERS:-8}"
+    volumes:
+      - ./benchmarks:/app/benchmarks
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
+    working_dir: /app
+    userns_mode: host
+    user: ${UID}:${GID}
+    # add the host docker socket's group so the non-root container can sample stats /
+    # reap job containers (DOCKER_GID is computed by the `bench-compose` recipe)
+    group_add:
+      - "${DOCKER_GID:-0}"
+    networks:
+      - local
+    depends_on:
+      chris:
+        condition: service_healthy

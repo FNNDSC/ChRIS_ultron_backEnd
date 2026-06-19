@@ -871,7 +871,9 @@ class PluginInstanceAppJob(PluginInstanceJob):
             else:
                 self.c_plugin_inst.status = 'finishedSuccessfully'
 
-        self.c_plugin_inst.save(update_fields=['status', 'error_code'])
+        # 'size' is accumulated while registering output files or creating link files
+        # in a few method calls above
+        self.c_plugin_inst.save(update_fields=['status', 'error_code', 'size'])
         self.schedule_remote_cleanup()
 
     def _get_job_json_data(self, job_id, job_output_path, timeout=500):
@@ -977,9 +979,10 @@ class PluginInstanceAppJob(PluginInstanceJob):
                 self._register_output_files()  # register output files in the DB
             except Exception:
                 pass  # giving up
-            
+
         self.c_plugin_inst.status = 'finishedWithError'
-        self.c_plugin_inst.save(update_fields=['status', 'error_code'])
+        # 'size' is accumulated while registering output files above
+        self.c_plugin_inst.save(update_fields=['status', 'error_code', 'size'])
         self.schedule_remote_cleanup()
 
     def handle_undefined_status(self):

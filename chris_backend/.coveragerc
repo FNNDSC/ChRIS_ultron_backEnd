@@ -1,22 +1,17 @@
 # Coverage configuration for the dev environment.
 # Excluded from production images via the repo-root .dockerignore.
 
+# A single source root is used. Previously there was one root per django app which had
+# the following problem: the XML report wrote each file's path relative to its app dir,
+# so same-named files from different apps (models.py, views.py, ...) collided and 
+# overwrote each other, breaking per-file coverage consumed by Codacy.
 [run]
-source =
-    collectionjson
-    core
-    feeds
-    filebrowser
-    pacsfiles
-    pipelines
-    plugininstances
-    plugins
-    userfiles
-    users
-    workflows
+source = .
 omit =
     */migrations/*
     */tests/*
+    config/*
+    manage.py
 
 [report]
 show_missing = True

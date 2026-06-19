@@ -1,0 +1,188 @@
+{
+  "run_id": "2026-06-16T022252Z",
+  "tier": "full",
+  "environment": {
+    "collected_at": "2026-06-16T02:22:53.893203+00:00",
+    "host": {
+      "operating_system": "Ubuntu 26.04 LTS",
+      "kernel_version": "7.0.0-22-generic",
+      "architecture": "x86_64",
+      "ncpu": 16,
+      "mem_total_bytes": 132319051776,
+      "docker_root_dir": "/var/lib/docker",
+      "server_version": "27.3.0"
+    },
+    "docker": {
+      "engine_version": "27.3.0",
+      "api_version": "1.47",
+      "platform": "Docker Engine - Community"
+    },
+    "images": {
+      "chris": {
+        "image_id": "sha256:b9cc6d3b386d3059c307e959fcd5540875a1941590971e29929029ef6f5fad5d",
+        "tags": [
+          "localhost/fnndsc/cube:dev"
+        ]
+      },
+      "pfcon": {
+        "image_id": "sha256:351577ac85653697e863203bbcc501f2478bf4d36a719344f26fde3e0d999535",
+        "tags": [
+          "ghcr.io/fnndsc/pfcon:latest"
+        ]
+      }
+    },
+    "git": {
+      "commit": "f4e27c6",
+      "dirty": "true"
+    },
+    "storage_mode": "fslink",
+    "envelope": {
+      "CUBE_CELERY_POLL_INTERVAL": "2.0",
+      "CUBE_UVICORN_WORKERS": "4",
+      "CUBE_DB_POOL_MIN_SIZE": "2",
+      "CUBE_DB_POOL_MAX_SIZE": "10",
+      "CUBE_DB_POOL_TIMEOUT": "10",
+      "CUBE_DB_MAX_CONNECTIONS": "300",
+      "CUBE_WORKER_MAINS_CONCURRENCY": "4",
+      "PFCON_WORKERS": "8",
+      "STORAGE_ENV": "fslink"
+    },
+    "noise_floor": {
+      "health_p50_ms": 9.6,
+      "health_p95_ms": 12.9,
+      "samples": 20
+    },
+    "manual_fields": {
+      "storage_device_type_throughput": "TODO",
+      "power_thermal_mode": "TODO",
+      "other_significant_workloads": "TODO"
+    },
+    "api_auth_mode": "token",
+    "matrix": {
+      "tier": "full",
+      "workload": {
+        "baseline": {
+          "file_count": 10,
+          "file_size": "1KiB",
+          "depth": 4,
+          "branches": 4,
+          "layers": 1,
+          "merges": 1,
+          "feeds": 1,
+          "sleep_length": 0
+        },
+        "topology_axes": {
+          "linear": {
+            "depth": 64,
+            "file_count": 10000,
+            "feeds": 128
+          },
+          "fanout_fanin": {
+            "branches": 64,
+            "feeds": 64,
+            "file_count": 10000,
+            "merges": 8
+          },
+          "diamond": {
+            "branches": 32,
+            "layers": 16,
+            "feeds": 32
+          }
+        },
+        "axis_steps": {
+          "depth": 2,
+          "file_count": 10,
+          "feeds": 2,
+          "branches": 2,
+          "merges": 2,
+          "layers": 2
+        },
+        "poll_every_s": 1
+      },
+      "workload_sha256": "5276f308d12214f3795373cc9f72eea12f6dc139a8515796e5e50450c7d74734",
+      "thresholds": {
+        "healthcheck_timeout_s": 30,
+        "api_request_timeout_s": 30,
+        "api_p95_latency_ms": 2000,
+        "no_progress_timeout_s": 300,
+        "scenario_timeout_s": 3600,
+        "quiesce_timeout_s": 900
+      },
+      "repeat": 3
+    },
+    "attribution": {
+      "queue_sampling": true,
+      "pg_stat_statements": true
+    }
+  },
+  "levels_run": 52,
+  "breaking_points": [
+    {
+      "topology": "linear",
+      "axis": "depth",
+      "level": 64,
+      "criteria": [
+        "cancelled:inst-249",
+        "cancelled:inst-250",
+        "cancelled:inst-251",
+        "cancelled:inst-252",
+        "cancelled:inst-253",
+        "cancelled:inst-254",
+        "cancelled:inst-255",
+        "cancelled:inst-256",
+        "cancelled:inst-257",
+        "cancelled:inst-258",
+        "cancelled:inst-259",
+        "api_5xx:1",
+        "no_progress"
+      ]
+    },
+    {
+      "topology": "linear",
+      "axis": "feeds",
+      "level": 64,
+      "criteria": [
+        "cancelled:inst-1804",
+        "cancelled:inst-1856",
+        "cancelled:inst-1895",
+        "cancelled:inst-1810",
+        "cancelled:inst-1877",
+        "cancelled:inst-1916"
+      ]
+    },
+    {
+      "topology": "fanout_fanin",
+      "axis": "feeds",
+      "level": 16,
+      "criteria": [
+        "cancelled:inst-2799"
+      ]
+    },
+    {
+      "topology": "diamond",
+      "axis": "layers",
+      "level": 16,
+      "criteria": [
+        "scenario_timeout"
+      ]
+    },
+    {
+      "topology": "diamond",
+      "axis": "feeds",
+      "level": 1,
+      "criteria": [
+        "cancelled:inst-3544",
+        "cancelled:inst-3545",
+        "cancelled:inst-3546",
+        "cancelled:inst-3547",
+        "cancelled:inst-3548",
+        "cancelled:inst-3549"
+      ]
+    }
+  ],
+  "verdict_counts": {
+    "PASS": 46,
+    "FAIL": 5,
+    "DEGRADED": 1
+  }
+}
