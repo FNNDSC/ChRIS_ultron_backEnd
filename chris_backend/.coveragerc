@@ -1,10 +1,8 @@
-# Coverage config for local dev (volume-mounted, not in Docker image).
-# The canonical config lives in setup.cfg so it is available inside the
-# container during CI runs (.coveragerc is excluded by .dockerignore).
-# This file is kept only as a fallback for tools that read .coveragerc directly.
+# Coverage configuration for the dev environment.
+# Excluded from production images via the repo-root .dockerignore.
 
 [run]
-source_pkgs =
+source =
     collectionjson
     core
     dicomweb

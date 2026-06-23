@@ -115,7 +115,7 @@ def index_pacs_instance(self, pacs_file_id):
     """
     Read the DICOM header for pacs_file_id, upsert PACSInstance, and backfill
     any QIDO-relevant tags on PACSSeries that weren't set at ingest time.
-    Idempotent: safe to retry and safe to run via reindex_pacs_instances.
+    Idempotent: safe to retry and safe to re-run against already-indexed files.
     """
     try:
         pacs_file = (PACSFile.objects
@@ -152,6 +152,10 @@ def index_pacs_instance(self, pacs_file_id):
         logger.warning('index_pacs_instance: missing SOPInstanceUID in %s', fname)
         return
 
+    # update_or_create is idempotent but two concurrent retries for the same file
+    # can both miss the SELECT and race to INSERT, raising IntegrityError on the
+    # (series, SOPInstanceUID) unique constraint. The loser is caught by
+    # max_retries=3 and succeeds on the next attempt via the UPDATE path.
     with transaction.atomic():
         PACSInstance.objects.update_or_create(
             series=series,

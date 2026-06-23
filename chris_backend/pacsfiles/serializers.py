@@ -176,62 +176,67 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
             pacs.save()  # create a PACS object
 
         SeriesInstanceUID = validated_data['SeriesInstanceUID']
-        try:
-            PACSSeries.objects.get(pacs=pacs, SeriesInstanceUID=SeriesInstanceUID)
-        except PACSSeries.DoesNotExist:
-            path = validated_data.pop('path')
+        with transaction.atomic():
+            try:
+                PACSSeries.objects.get(pacs=pacs, SeriesInstanceUID=SeriesInstanceUID)
+            except PACSSeries.DoesNotExist:
+                path = validated_data.pop('path')
 
-            (series_folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=owner)
+                (series_folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=owner)
 
-            validated_data['pacs'] = pacs
-            validated_data['folder'] = series_folder
+                validated_data['pacs'] = pacs
+                validated_data['folder'] = series_folder
 
-            # remove commas from the existing files/folders names and handle the
-            # special cases
-            storage_manager = connect_storage(settings)
-            changed_file_paths = storage_manager.sanitize_obj_names(path)
+                # remove commas from the existing files/folders names and handle the
+                # special cases
+                storage_manager = connect_storage(settings)
+                changed_file_paths = storage_manager.sanitize_obj_names(path)
 
-            files_in_storage = validated_data.pop('files_in_storage')
-            files = []
-            for obj_path in files_in_storage:
-                if obj_path in changed_file_paths:
-                    obj_path = changed_file_paths[obj_path]
+                files_in_storage = validated_data.pop('files_in_storage')
+                files = []
+                for obj_path in files_in_storage:
+                    if obj_path in changed_file_paths:
+                        obj_path = changed_file_paths[obj_path]
 
-                if obj_path:
-                    folder_path = os.path.dirname(obj_path)
-                    parent_folder = series_folder
+                    if obj_path:
+                        folder_path = os.path.dirname(obj_path)
+                        parent_folder = series_folder
 
-                    if folder_path != path:
-                        (parent_folder, _) = ChrisFolder.objects.get_or_create(
-                            path=folder_path, owner=owner)
+                        if folder_path != path:
+                            (parent_folder, _) = ChrisFolder.objects.get_or_create(
+                                path=folder_path, owner=owner)
 
-                    pacs_file = PACSFile(owner=owner, parent_folder=parent_folder)
-                    pacs_file.fname.name = obj_path
-                    files.append(pacs_file)
+                        pacs_file = PACSFile(owner=owner, parent_folder=parent_folder)
+                        pacs_file.fname.name = obj_path
+                        files.append(pacs_file)
 
-            created = PACSFile.objects.bulk_create(files)
+                created = PACSFile.objects.bulk_create(files)
 
-            # Fan out DICOM-header indexing for QIDO-RS. Imported here to avoid
-            # a circular import at module load (dicomweb.tasks imports
-            # pacsfiles.models). bulk_create populates pks on PostgreSQL.
-            from dicomweb.tasks import index_pacs_instance
-            created_ids = [pf.pk for pf in created if pf.pk is not None]
-            transaction.on_commit(
-                lambda ids=created_ids: [
-                    index_pacs_instance.delay(pk) for pk in ids
-                ]
-            )
+                # grant the group permission from the highest folder ancestor without it
+                current = series_folder
+                while not current.parent.has_group_permission(pacs_grp):
+                    current = current.parent
+                current.grant_group_permission(pacs_grp, 'r')
 
-            # grant the group permission from the highest folder ancestor without it
-            current = series_folder
-            while not current.parent.has_group_permission(pacs_grp):
-                current = current.parent
-            current.grant_group_permission(pacs_grp, 'r')
-        else:
-            error_msg = (f'A DICOM series with SeriesInstanceUID={SeriesInstanceUID} '
-                         f'already registered for pacs {pacs_name}')
-            raise serializers.ValidationError([error_msg])
-        return super(PACSSeriesSerializer, self).create(validated_data)
+                # PACSSeries must exist in the DB before the indexing tasks run so
+                # that _find_series_for_file() can locate it. Create it inside the
+                # atomic block and register the on_commit fan-out afterwards — the
+                # callback is deferred until the block commits, which guarantees the
+                # series row is visible to any worker that picks up the task.
+                # Import here to avoid circular import at module load (dicomweb.tasks
+                # imports pacsfiles.models).
+                from dicomweb.tasks import index_pacs_instance
+                result = super(PACSSeriesSerializer, self).create(validated_data)
+                created_ids = [pf.pk for pf in created
+                               if pf.pk is not None and pf.fname.name.endswith('.dcm')]
+                transaction.on_commit(
+                    lambda ids=created_ids: [index_pacs_instance.delay(pk) for pk in ids]
+                )
+                return result
+            else:
+                error_msg = (f'A DICOM series with SeriesInstanceUID={SeriesInstanceUID} '
+                             f'already registered for pacs {pacs_name}')
+                raise serializers.ValidationError([error_msg])
 
     def validate_path(self, path):
         """
