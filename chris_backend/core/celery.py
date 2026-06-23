@@ -47,7 +47,8 @@ task_routes = {
     'filebrowser.tasks.delete_folder': {'queue': 'main2'},
     'pacsfiles.tasks.delete_pacs_series': {'queue': 'main2'},
     'pacsfiles.tasks.send_pacs_query': {'queue': 'main2'},
-    'pacsfiles.tasks.register_pacs_series': {'queue': 'main2'}
+    'pacsfiles.tasks.register_pacs_series': {'queue': 'main2'},
+    'dicomweb.tasks.index_pacs_instance': {'queue': 'main2'},
 }
 app.conf.update(task_routes=task_routes)
 

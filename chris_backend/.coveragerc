@@ -5,6 +5,7 @@
 source =
     collectionjson
     core
+    dicomweb
     feeds
     filebrowser
     pacsfiles
