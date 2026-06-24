@@ -9,6 +9,7 @@ generated report.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 from datetime import datetime, timezone
@@ -78,10 +79,8 @@ def measure_noise_floor(api: ChrisApi, samples: int = 20) -> dict:
     for _ in range(samples):
         t0 = time.perf_counter()
 
-        try:
+        with contextlib.suppress(Exception):
             api.health()
-        except Exception:  # noqa: BLE001
-            pass
 
         latencies.append((time.perf_counter() - t0) * 1000.0)
 

@@ -8,6 +8,7 @@ the Docker API works too.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Optional
 
 from .models import ResourceSample
@@ -103,11 +104,9 @@ class DockerClient:
     def reap_jobs(self) -> int:
         removed = 0
         for c in self.job_containers(all_states=True):
-            try:
+            with contextlib.suppress(Exception):       # best effort
                 c.remove(force=True)
                 removed += 1
-            except Exception:                          # noqa: BLE001 - best effort
-                pass
         return removed
 
     def exec_in_service(self, service: str, cmd: list) -> "tuple[int, str]":

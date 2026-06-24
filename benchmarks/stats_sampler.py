@@ -11,6 +11,7 @@ when a ``BrokerClient`` is given, the Celery queue depths — emitting samples i
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 
@@ -66,7 +67,5 @@ class StatsSampler:
             return
         
         for container in containers:
-            try:
+            with contextlib.suppress(Exception):       # skip flaky reads
                 self._sink.record_resource(self._docker.sample(container))
-            except Exception:                          # noqa: BLE001 - skip flaky reads
-                continue

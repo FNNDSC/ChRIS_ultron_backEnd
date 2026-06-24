@@ -13,6 +13,7 @@ DB-delta measurements.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from pathlib import Path
 from typing import Callable
@@ -24,11 +25,9 @@ from .docker_client import DockerClient
 def wait_for_health(api: ChrisApi, timeout: float, interval: float = 2.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        try:
+        with contextlib.suppress(Exception):           # keep polling through transient errors
             if api.health():
                 return True
-        except Exception:                              # noqa: BLE001 - keep polling
-            pass
         time.sleep(interval)
     return False
 

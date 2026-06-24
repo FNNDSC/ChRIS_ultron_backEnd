@@ -50,7 +50,7 @@ class PluginRole(str, enum.Enum):
 
 
 class Verdict(str, enum.Enum):
-    PASS = "PASS"
+    PASS = "PASS"  # nosec B105 - classification label, not a credential
     DEGRADED = "DEGRADED"
     FAIL = "FAIL"
 

@@ -6,5 +6,10 @@ WORKDIR /app
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
+# Drop root in the image; the compose override sets `user:`/`group_add` at runtime so the
+# socket-mounted benchmark service can still sample stats and reap job containers
+# (see docker-compose.benchmark.yml).
+USER nobody
+
 # Default command is informational; `just bench-run` overrides it with the real CLI.
 CMD ["python", "-m", "benchmarks.run_bench", "--help"]

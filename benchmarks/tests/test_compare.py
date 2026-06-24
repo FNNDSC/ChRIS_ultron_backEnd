@@ -2,7 +2,6 @@
 Tests for benchmarks.compare — run comparability, deltas, trends, and the CI gate.
 """
 
-import json
 from pathlib import Path
 
 from benchmarks.compare import (DeltaPolicy, breaking_point_shifts, check_comparability,
