@@ -53,7 +53,8 @@ INSTALLED_APPS = [
     'pacsfiles',
     'filebrowser',
     'users',
-    'workflows'
+    'workflows',
+    'dicomweb',
 ]
 
 # Pagination
