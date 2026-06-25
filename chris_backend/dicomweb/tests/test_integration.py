@@ -236,3 +236,42 @@ class SerializerBulkCreateIndexIntegrationTest(TransactionTestCase):
         )
         self.assertEqual(series.SeriesNumber, 1)
         self.assertEqual(series.Modality, 'CT')
+
+    def test_study_tags_agree_with_series(self):
+        """
+        Every Patient/Study tag denormalized onto PACSStudy must equal the value
+        on the linked PACSSeries after ingest + indexing. PACSStudy is a
+        study-level cache of these tags, so any disagreement is a data-integrity
+        bug (e.g. the indexing task backfills StudyTime onto the series but not
+        the study).
+        """
+        from pacsfiles.models import PACSFile, PACSSeries
+        from dicomweb.tasks import index_pacs_instance
+
+        self._register()
+        pf = PACSFile.objects.get(fname__endswith='0001.dcm')
+        index_pacs_instance.apply(args=[pf.pk]).get()
+
+        series = PACSSeries.objects.get(
+            pacs__identifier=self.PACS_NAME,
+            SeriesInstanceUID=self.SERIES_UID,
+        )
+        study = series.study
+        self.assertIsNotNone(study, 'ingest did not create/link a PACSStudy')
+
+        # Patient/Study tags present on both models — must be identical.
+        shared_tags = [
+            'PatientID', 'PatientName', 'PatientBirthDate', 'PatientSex',
+            'StudyInstanceUID', 'StudyDate', 'StudyTime', 'AccessionNumber',
+            'StudyDescription',
+        ]
+        mismatches = {
+            tag: (getattr(study, tag), getattr(series, tag))
+            for tag in shared_tags
+            if getattr(study, tag) != getattr(series, tag)
+        }
+        self.assertEqual(
+            mismatches, {},
+            'PACSStudy tags must equal the related PACSSeries; '
+            'mismatched (study, series): %s' % mismatches,
+        )

@@ -13,6 +13,7 @@ from core.storage import connect_storage
 from pacsfiles.models import PACS, PACSQuery
 from pacsfiles.serializers import (PACSQuerySerializer, PACSRetrieveSerializer,
                                    PACSSeriesSerializer)
+from dicomweb.models import PACSStudy
 
 
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
@@ -143,6 +144,78 @@ class PACSQuerySerializerTests(SerializerTests):
 
 
 class PACSSeriesSerializerTests(SerializerTests):
+
+    def test_ensure_study_creates_and_reuses_one_row_per_study(self):
+        """
+        _ensure_study creates exactly one PACSStudy per (pacs, StudyInstanceUID),
+        denormalizes the study tags from the first series, and reuses the row for
+        subsequent series of the same study.
+        """
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        data = {'StudyInstanceUID': '1.study.A', 'PatientID': 'P9',
+                'PatientName': 'Doe^Jane', 'StudyDate': '2026-02-02',
+                'AccessionNumber': 'ACC1', 'StudyDescription': 'head'}
+
+        study = PACSSeriesSerializer._ensure_study(pacs, data)
+        self.assertEqual(PACSStudy.objects.filter(pacs=pacs).count(), 1)
+        self.assertEqual(study.PatientName, 'Doe^Jane')
+        self.assertEqual(study.AccessionNumber, 'ACC1')
+        self.assertEqual(study.StudyDescription, 'head')
+
+        # a second series of the same study reuses the row (no new PACSStudy)
+        again = PACSSeriesSerializer._ensure_study(
+            pacs, dict(data, SeriesInstanceUID='whatever'))
+        self.assertEqual(again.pk, study.pk)
+        self.assertEqual(PACSStudy.objects.filter(pacs=pacs).count(), 1)
+
+    def test_ensure_study_warns_and_keeps_name_on_patient_name_drift(self):
+        """
+        A later series reporting a different, non-empty PatientName logs a
+        WARNING and the stored value is kept (never overwritten).
+        """
+        pacs = PACS.objects.get(identifier=self.pacs_name)
+        base = {'StudyInstanceUID': '1.study.B', 'PatientID': 'P9',
+                'PatientName': 'Smith^John', 'StudyDate': '2026-02-02'}
+        PACSSeriesSerializer._ensure_study(pacs, base)
+
+        drift = dict(base, PatientName='Smith')
+        logging.disable(logging.NOTSET)  # base setUp disables WARNING logs
+        with self.assertLogs('pacsfiles.serializers', level='WARNING') as cm:
+            study = PACSSeriesSerializer._ensure_study(pacs, drift)
+
+        self.assertEqual(study.PatientName, 'Smith^John')  # not overwritten
+        self.assertTrue(any('PatientName mismatch' in line for line in cm.output))
+
+    @tag('integration')
+    def test_create_links_study_and_increments_counter(self):
+        """
+        End-to-end: ingest finds-or-creates the study, links the series to it, and
+        the series counter reflects the new row.
+        """
+        chris_user = User.objects.get(username=self.chris_username)
+        path = f'SERVICES/PACS/{self.pacs_name}/777-jane/brain_study'
+        data = {'PatientID': '777', 'PatientName': 'jane',
+                'StudyDate': '2021-08-16',
+                'StudyInstanceUID': '1.1.study.counter',
+                'StudyDescription': 'brain_study',
+                'SeriesDescription': 'AX T2',
+                'SeriesInstanceUID': '2.2.series.counter',
+                'owner': chris_user,
+                'pacs_name': self.pacs_name, 'path': path}
+
+        storage_manager = connect_storage(settings)
+        with io.StringIO('Test file') as f:
+            storage_manager.upload_obj(path + '/AXT2/a.dcm', f.read(),
+                                       content_type='text/plain')
+        data['files_in_storage'] = [path + '/AXT2/a.dcm']
+
+        series = PACSSeriesSerializer(data=data).create(data)
+        self.assertIsNotNone(series.study)
+        self.assertEqual(series.study.StudyInstanceUID, '1.1.study.counter')
+        series.study.refresh_from_db()
+        self.assertEqual(series.study.NumberOfStudyRelatedSeries, 1)
+
+        storage_manager.delete_path(path)
 
     @tag('integration')
     def test_create_success(self):

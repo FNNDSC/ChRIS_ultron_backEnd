@@ -10,7 +10,7 @@ from django.db import transaction
 from core.storage import connect_storage
 from pacsfiles.models import PACSFile, PACSSeries
 
-from .models import PACSInstance
+from .models import PACSInstance, PACSStudy
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,32 @@ def _backfill_series_tags(series: PACSSeries, ds) -> None:
         PACSSeries.objects.filter(pk=series.pk).update(**updates)
 
 
+# Descriptor table for _backfill_study_tags — study-level tags PACSStudy caches
+# that the ingest path can miss. Same shape as _BACKFILL_FIELDS. StudyTime is the
+# notable case: it rides only on the DICOM header, so neither register_pacs_series
+# nor PACSSeriesSerializer._ensure_study sets it at ingest, and it must be mirrored
+# onto the study to keep it in agreement with its series.
+_STUDY_BACKFILL_FIELDS = [
+    ('StudyTime', lambda v: not v, 'StudyTime', _parse_dicom_time),
+]
+
+
+def _backfill_study_tags(study: PACSStudy, ds) -> None:
+    """
+    Populate study-level tags on the linked PACSStudy that the ingest path didn't
+    capture, mirroring _backfill_series_tags. Only empty/null columns are written,
+    so a value chosen at ingest (e.g. the DEC-3 PatientName) is never overwritten.
+    """
+    updates = {}
+    for attr, is_empty, ds_attr, transform in _STUDY_BACKFILL_FIELDS:
+        if is_empty(getattr(study, attr)):
+            val = transform(getattr(ds, ds_attr, None))
+            if val is not None:
+                updates[attr] = val
+    if updates:
+        PACSStudy.objects.filter(pk=study.pk).update(**updates)
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
 def index_pacs_instance(self, pacs_file_id):
     """
@@ -173,3 +199,5 @@ def index_pacs_instance(self, pacs_file_id):
             ),
         )
         _backfill_series_tags(series, ds)
+        if series.study is not None:
+            _backfill_study_tags(series.study, ds)

@@ -13,6 +13,7 @@ from core.models import ChrisFolder
 from core.storage import connect_storage
 from core.serializers import ChrisFileSerializer
 from .models import PACS, PACSQuery, PACSRetrieve, PACSSeries, PACSFile
+from dicomweb.models import PACSStudy
 
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
 
                 (series_folder, _) = ChrisFolder.objects.get_or_create(path=path, owner=owner)
 
+                validated_data['study'] = self._ensure_study(pacs, validated_data)
                 validated_data['pacs'] = pacs
                 validated_data['folder'] = series_folder
 
@@ -237,6 +239,35 @@ class PACSSeriesSerializer(serializers.HyperlinkedModelSerializer):
                 error_msg = (f'A DICOM series with SeriesInstanceUID={SeriesInstanceUID} '
                              f'already registered for pacs {pacs_name}')
                 raise serializers.ValidationError([error_msg])
+
+    @staticmethod
+    def _ensure_study(pacs, validated_data):
+        """
+        Find or create the PACSStudy for this series' (pacs, StudyInstanceUID).
+
+        Study-level Patient/Study tags are denormalized from the first series
+        ingested for the study and are never overwritten. A WARNING is logged
+        if a later series reports a different, non-empty PatientName.
+        """
+        study, created = PACSStudy.objects.get_or_create(
+            pacs=pacs,
+            StudyInstanceUID=validated_data['StudyInstanceUID'],
+            defaults={
+                field: validated_data[field]
+                for field in ('AccessionNumber', 'PatientBirthDate', 'PatientID',
+                              'PatientName', 'PatientSex', 'StudyDate',
+                              'StudyDescription', 'StudyTime')
+                if field in validated_data
+            },
+        )
+        incoming_name = validated_data.get('PatientName', '')
+        if not created and incoming_name and study.PatientName != incoming_name:
+            logger.warning(
+                'PACSStudy %s: PatientName mismatch (stored=%r, incoming=%r) — '
+                'keeping stored value',
+                study.StudyInstanceUID, study.PatientName, incoming_name,
+            )
+        return study
 
     def validate_path(self, path):
         """
