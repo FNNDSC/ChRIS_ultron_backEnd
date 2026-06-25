@@ -1,0 +1,8 @@
+# Runtime dependencies for the benchmark harness (data plane, v1).
+requests>=2.33.0
+PyYAML>=6.0
+docker>=7.0
+# control plane (Locust RED load test — see locustfile.py)
+locust>=2.20
+# dev / self-test
+pytest>=9.0.3

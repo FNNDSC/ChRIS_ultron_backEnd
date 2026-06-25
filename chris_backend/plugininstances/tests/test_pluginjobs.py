@@ -230,6 +230,10 @@ class PluginInstanceAppJobTests(TestCase):
 
         self.assertEqual(pl_inst.status, 'finishedSuccessfully')
 
+        # the registered output size must be persisted to the DB, not just
+        # accumulated on the in-memory instance
+        self.assertGreater(PluginInstance.objects.get(pk=pl_inst.id).size, 0)
+
         str_fileCreatedByPlugin = os.path.join(pl_inst.get_output_path(), 'out.txt')
         # make sure str_fileCreatedByPlugin file was created in storage
         self.assertTrue(self.storage_manager.obj_exists(str_fileCreatedByPlugin))
@@ -301,6 +305,53 @@ class PluginInstanceAppJobTests(TestCase):
             plugin=plugin, owner=user, status='started',
             compute_resource=plugin.compute_resources.all()[0])
         return pl_inst
+
+    def test_register_output_files_on_success_persists_size(self):
+        """
+        Test whether the size accumulated while registering output files is saved
+        to the DB. Regression test: 'size' was missing from the closing save's
+        update_fields, so every instance reported size=0 through the API.
+        """
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+
+        # bypass the remote fetch and cleanup; exercise registration -> final save
+        job._get_job_zip_data = mock.Mock(return_value=b'')
+        job._get_job_json_data = mock.Mock(return_value={})
+        job.unpack_zip_file = mock.Mock()
+        job.check_files_from_json_exist = mock.Mock()
+        job.schedule_remote_cleanup = mock.Mock()
+        job._register_output_files = mock.Mock(
+            side_effect=lambda: setattr(pl_inst, 'size', pl_inst.size + 1024))
+
+        job.register_output_files_on_success()
+
+        self.assertEqual(pl_inst.status, 'finishedSuccessfully')
+        db_inst = PluginInstance.objects.get(pk=pl_inst.id)   # fresh DB fetch
+        self.assertEqual(db_inst.status, 'finishedSuccessfully')
+        self.assertEqual(db_inst.size, 1024)
+
+    def test_register_output_files_on_error_persists_size(self):
+        """
+        Same regression as above for the error path: files registered before the
+        job is marked finishedWithError must still have their size persisted.
+        """
+        pl_inst = self._create_started_plugin_inst()
+        job = pluginjobs.PluginInstanceAppJob(pl_inst)
+
+        job._get_job_zip_data = mock.Mock(return_value=b'')
+        job._get_job_json_data = mock.Mock(return_value={})
+        job.unpack_zip_file = mock.Mock()
+        job.check_files_from_json_exist = mock.Mock()
+        job.schedule_remote_cleanup = mock.Mock()
+        job._register_output_files = mock.Mock(
+            side_effect=lambda: setattr(pl_inst, 'size', pl_inst.size + 512))
+
+        job.register_output_files_on_error()
+
+        db_inst = PluginInstance.objects.get(pk=pl_inst.id)
+        self.assertEqual(db_inst.status, 'finishedWithError')
+        self.assertEqual(db_inst.size, 512)
 
     def test_create_chris_link_file_refuses_unauthorized_path(self):
         """

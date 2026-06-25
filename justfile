@@ -200,6 +200,78 @@ set-storage mode:
 unset-storage:
     rm -f .storage
 
+# Compose helper for the benchmark stack (fslink + uvicorn-envelope override).
+[group('(6) benchmarks')]
+bench-compose +command:
+    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" \
+        DOCKER_GID="$(stat -c '%g' "$(just get-socket)" 2>/dev/null || stat -f '%g' "$(just get-socket)" 2>/dev/null || echo 0)" \
+        COMPOSE_PROJECT_NAME="$(basename "$(pwd)" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')" \
+        GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+        GIT_DIRTY="$(git diff --quiet HEAD 2>/dev/null && echo false || echo true)" \
+        $(just get-engine) compose -f docker-compose.yml -f docker-compose.benchmark.yml {{ command }}
+
+# Start the benchmark stack (fslink + uvicorn envelope), migrate, and register plugins.
+[group('(6) benchmarks')]
+bench-start:
+    just bench-compose 'up -d --build db dragonflydb nats pfcon cube-nonroot-user-volume-fix'
+    just bench-compose 'run --rm chris python manage.py migrate --noinput'
+    just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
+    just bench-compose '--profile cube run --rm chrisomatic chrisomatic'
+
+# Run the benchmark harness, e.g. `just bench-run --tier smoke` or `just bench-run --tier full`.
+[group('(6) benchmarks')]
+bench-run *args:
+    just bench-compose '--profile cube --profile bench build benchmark'
+    just bench-compose '--profile cube --profile bench run --rm benchmark python -m benchmarks.run_bench {{ args }}'
+
+# Run the harness unit tests inside the benchmark image.
+[group('(6) benchmarks')]
+bench-test *args:
+    just bench-compose '--profile cube --profile bench build benchmark'
+    just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m pytest -p no:cacheprovider benchmarks/tests {{ args }}'
+
+# Control-plane RED load test (Locust). Args pass through, e.g.
+# `just bench-locust '-u 100 -r 20 -t 3m'`. CSVs land in benchmarks/results/locust/.
+[group('(6) benchmarks')]
+bench-locust *args:
+    just bench-compose '--profile cube --profile bench build benchmark'
+    mkdir -p benchmarks/results/locust
+    just bench-compose '--profile cube --profile bench run --rm benchmark locust -f benchmarks/locustfile.py --headless --csv /app/benchmarks/results/locust/run {{ args }}'
+
+# Re-render a report from a results run id, e.g. `just bench-report 2026-06-09T153000Z`.
+[group('(6) benchmarks')]
+bench-report run_id:
+    just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m benchmarks.report /app/benchmarks/results/{{ run_id }}'
+
+# Compare runs over time: first = baseline, last = candidate, 3+ adds a trend table.
+# Run ids resolve against results/ and the committed history/ archive, e.g.
+# `just bench-compare 2026-06-09T153000Z 2026-06-10T214526Z --fail-on-regression`.
+[group('(6) benchmarks')]
+bench-compare *args:
+    just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m benchmarks.compare {{ args }}'
+
+# Keep a run's small artifacts (summary, levels, environment, rendered report) in
+# version control so there is a human-readable history to compare against, e.g.
+# `just bench-archive 2026-06-10T214526Z`.
+[group('(6) benchmarks')]
+bench-archive run_id:
+    mkdir -p benchmarks/history/{{ run_id }}
+    cp benchmarks/results/{{ run_id }}/summary.json benchmarks/history/{{ run_id }}/
+    cp benchmarks/results/{{ run_id }}/environment.json benchmarks/history/{{ run_id }}/ 2>/dev/null || true
+    cp benchmarks/results/{{ run_id }}/levels.jsonl benchmarks/history/{{ run_id }}/ 2>/dev/null || true
+    cp benchmarks/results/{{ run_id }}/report.md benchmarks/history/{{ run_id }}/ 2>/dev/null || true
+    @echo "archived to benchmarks/history/{{ run_id }} — commit it with the change it validates"
+
+# Open a shell in the benchmark container (debugging).
+[group('(6) benchmarks')]
+bench-bash:
+    just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark bash'
+
+# Stop the benchmark stack.
+[group('(6) benchmarks')]
+bench-down:
+    just bench-compose '--profile cube --profile bench down'
+
 # Print the OpenAPI schema via drf-spectacular.
 [group('(3) development')]
 openapi:
