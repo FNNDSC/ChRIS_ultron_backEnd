@@ -65,6 +65,13 @@ if DATABASE_CONN_POOL:
                                                 'max_size': DATABASE_CONN_POOL_MAX_SIZE,
                                                 'timeout': DATABASE_CONN_POOL_TIMEOUT}}
 
+# Apply the QIDO-RS fuzzy-matching similarity threshold as a per-connection GUC
+# (see DICOMWEB_FUZZY_THRESHOLD in common.py). Merge into OPTIONS unconditionally
+# so it is set whether or not the connection pool branch above ran.
+DATABASES['default'].setdefault('OPTIONS', {})['options'] = (  # noqa: F405
+    f'-c pg_trgm.similarity_threshold={DICOMWEB_FUZZY_THRESHOLD}'  # noqa: F405
+)
+
 
 # STORAGE CONFIGURATION
 # ------------------------------------------------------------------------------

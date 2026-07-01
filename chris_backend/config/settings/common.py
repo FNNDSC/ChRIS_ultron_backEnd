@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'django_filters',
     'django_celery_beat',
     'rest_framework',
@@ -125,6 +126,13 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
     }
 }
+
+# QIDO-RS fuzzy Person-Name matching (PS3.18 §8.3.4.2 / PS3.4 §C.2.2.2.1.1).
+# Backed by pg_trgm's '%' similarity operator; this value is applied as the
+# session GUC pg_trgm.similarity_threshold per DB connection (see the DATABASES
+# OPTIONS in the environment-specific settings). Valid range 0.0–1.0 (higher =
+# stricter); Postgres' pg_trgm default is 0.3.
+DICOMWEB_FUZZY_THRESHOLD = env.float('DICOMWEB_FUZZY_THRESHOLD', 0.3)
 
 
 # Password validation

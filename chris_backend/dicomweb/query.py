@@ -1,8 +1,10 @@
 """
-DICOM-tag query parser for QIDO-RS (PS3.18 §F.7).
+DICOM-tag query parser for QIDO-RS (PS3.18 §10.6.1.2 "Query Parameters"; matching
+semantics per §8.3.4 and PS3.4 §C.2.2.2).
 
 Translates URL query parameters (hex tags or DICOM keywords) into Django ORM
-filter expressions. Handles: multi-value OR, date ranges, wildcards, limit/offset.
+filter expressions. Handles: multi-value OR, date ranges, wildcards, fuzzy
+Person-Name matching (§8.3.4.2), and limit/offset pagination (§8.3.4.4).
 
 Usage::
 
@@ -31,6 +33,7 @@ class ModelField:
     vr: str             # DICOM VR ('PN', 'DA', 'UI', 'CS', ...)
     range_: bool = False   # DA/TM range syntax supported
     wildcard: bool = False  # wildcard ('*' / '?') supported
+    fuzzy: bool = False  # eligible for fuzzy PN matching (PS3.18 §8.3.4.2)
 
 
 @dataclass
@@ -44,7 +47,7 @@ class Aggregation:
 # ---------------------------------------------------------------------------
 
 TAG_MAP_STUDY = {
-    '00100010': ModelField('PatientName', vr='PN', wildcard=True),
+    '00100010': ModelField('PatientName', vr='PN', wildcard=True, fuzzy=True),
     '00100020': ModelField('PatientID', vr='LO', wildcard=True),
     '00100030': ModelField('PatientBirthDate', vr='DA', range_=True),
     '00100040': ModelField('PatientSex', vr='CS'),
@@ -69,7 +72,7 @@ TAG_MAP_SERIES = {
     '00181030': ModelField('ProtocolName', vr='LO', wildcard=True),
     # Study-level pass-through
     '0020000D': ModelField('StudyInstanceUID', vr='UI'),
-    '00100010': ModelField('PatientName', vr='PN', wildcard=True),
+    '00100010': ModelField('PatientName', vr='PN', wildcard=True, fuzzy=True),
     '00100020': ModelField('PatientID', vr='LO'),
 }
 
@@ -119,6 +122,11 @@ class QueryFilter:
 
     def apply(self, qs: QuerySet, params) -> QuerySet:
         """Apply DICOM match parameters from ``params`` to ``qs``."""
+        # Fuzzy Person-Name matching is a request-wide modifier, not a match key
+        # (PS3.18 §8.3.4.2). Resolve it once up front so it can influence PN terms.
+        fuzzy = (str(params.get('fuzzymatching', '')).lower() in ('true', '1', 'yes')
+                 if hasattr(params, 'get') else False)
+
         if isinstance(params, QueryDict):
             items = params.items()
         else:
@@ -128,7 +136,7 @@ class QueryFilter:
             if key in _RESERVED_PARAMS:
                 continue
             if not value:
-                # PS3.18 §F.7: empty value → no restriction on that attribute
+                # §8.3.4.1 / PS3.4 §C.2.2.2: empty value → no restriction on that attribute
                 continue
             hex_tag = self._resolve_tag(key)
             if hex_tag is None:
@@ -136,7 +144,7 @@ class QueryFilter:
             descriptor = self.tag_map.get(hex_tag)
             if descriptor is None or isinstance(descriptor, Aggregation):
                 continue
-            qs = self._apply_field(qs, descriptor, value)
+            qs = self._apply_field(qs, descriptor, value, fuzzy)
         return qs
 
     def paginate(self, qs: QuerySet, params):
@@ -163,7 +171,8 @@ class QueryFilter:
             return upper
         return self._kw_to_hex.get(key)  # case-sensitive keyword lookup
 
-    def _apply_field(self, qs: QuerySet, descriptor: ModelField, raw_value: str) -> QuerySet:
+    def _apply_field(self, qs: QuerySet, descriptor: ModelField, raw_value: str,
+                     fuzzy: bool = False) -> QuerySet:
         field = descriptor.orm_path
         vr = descriptor.vr
         values = raw_value.split(',')  # multi-value → OR semantics
@@ -171,6 +180,12 @@ class QueryFilter:
         # Date/time range: only activate for DA/TM VRs with a single value containing '-'
         if vr in ('DA', 'TM', 'DT') and descriptor.range_ and '-' in raw_value and len(values) == 1:
             return self._apply_range(qs, field, vr, raw_value)
+
+        # Fuzzy Person-Name matching (PS3.18 §8.3.4.2). Applies only to fuzzy-eligible
+        # PN attributes when fuzzymatching=true and no wildcard is present — an explicit
+        # wildcard takes precedence and falls through to the wildcard path below.
+        if fuzzy and descriptor.fuzzy and '*' not in raw_value and '?' not in raw_value:
+            return self._apply_fuzzy(qs, field, values)
 
         q = Q()
         for v in values:
@@ -182,6 +197,19 @@ class QueryFilter:
                 q |= Q(**{f'{field}__iexact': v}) | Q(**{f'{field}__istartswith': v})
             else:
                 q |= Q(**{f'{field}': v})
+        return qs.filter(q)
+
+    def _apply_fuzzy(self, qs: QuerySet, field: str, values) -> QuerySet:
+        """Fuzzy PN match via pg_trgm's ``%`` operator (Django ``__trigram_similar``).
+
+        GIN-index-backed. The match threshold is Postgres' session GUC
+        ``pg_trgm.similarity_threshold``, set per connection from
+        ``settings.DICOMWEB_FUZZY_THRESHOLD`` (see the DATABASES OPTIONS in the
+        environment settings). Multi-value → OR (PS3.18 §8.3.4.2, PS3.4 §C.2.2.2.1.1).
+        """
+        q = Q()
+        for v in values:
+            q |= Q(**{f'{field}__trigram_similar': v})
         return qs.filter(q)
 
     def _apply_range(self, qs: QuerySet, field: str, vr: str, raw_value: str) -> QuerySet:
