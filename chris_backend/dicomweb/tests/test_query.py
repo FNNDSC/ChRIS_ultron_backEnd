@@ -104,6 +104,13 @@ class PaginateTest(TestCase):
         _, _, limit = self.qf.paginate(qs, QueryDict('limit=notanumber'))
         self.assertEqual(limit, self.qf.DEFAULT_LIMIT)
 
+    def test_negative_limit_does_not_crash(self):
+        from pacsfiles.models import PACSSeries
+        qs = PACSSeries.objects.none()
+        page, _, limit = self.qf.paginate(qs, QueryDict('limit=-5'))
+        self.assertEqual(limit, self.qf.DEFAULT_LIMIT)
+        self.assertEqual(list(page), [])  # slicing must not raise on a negative limit
+
 
 class FuzzyMatchingSqlShapeTest(TestCase):
     """
@@ -236,3 +243,79 @@ class GinTrigramIndexTest(TestCase):
             names = {row[0] for row in cur.fetchall()}
         self.assertTrue(expected.issubset(names),
                         f'missing GIN trigram indexes: {expected - names}')
+
+
+class TemporalAndWildcardBehaviorTest(TestCase):
+    """
+    Behavioral regression guards (against real rows) for parser bugs owned during
+    this PR: wildcard prefix/suffix anchoring, single-value exact DA matching, and
+    TM range matching. See PS3.4 §C.2.2.2 (Attribute Matching).
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from core.models import ChrisFolder
+        from pacsfiles.models import PACS
+
+        self.user = User.objects.get(username='chris')
+        pacs_folder, _ = ChrisFolder.objects.get_or_create(
+            path='SERVICES/PACS/TWPACS', owner=self.user)
+        self.pacs, _ = PACS.objects.get_or_create(
+            folder=pacs_folder, identifier='TWPACS')
+        self._n = 0
+
+    def _series(self, patient_name='X^Y', study_date=None, study_time=None):
+        from datetime import date
+        from core.models import ChrisFolder
+        from pacsfiles.models import PACSSeries
+
+        self._n += 1
+        uid = f'1.2.{self._n}'
+        folder, _ = ChrisFolder.objects.get_or_create(
+            path=f'SERVICES/PACS/TWPACS/{uid}', owner=self.user)
+        return PACSSeries.objects.create(
+            PatientID='P', PatientName=patient_name,
+            StudyDate=study_date or date(2023, 1, 1), StudyTime=study_time,
+            StudyInstanceUID='1.2', SeriesInstanceUID=uid,
+            folder=folder, pacs=self.pacs)
+
+    def test_wildcard_is_prefix_anchored(self):
+        from pacsfiles.models import PACSSeries
+        self._series(patient_name='DOE^JANE')
+        self._series(patient_name='MCDOE^JOHN')  # contains DOE but not a prefix
+        qf = QueryFilter(TAG_MAP_SERIES)
+        names = set(qf.apply(PACSSeries.objects.all(),
+                             QueryDict('PatientName=DOE*')).values_list('PatientName', flat=True))
+        self.assertIn('DOE^JANE', names)
+        self.assertNotIn('MCDOE^JOHN', names)  # prefix '*' must not match a substring
+
+    def test_wildcard_is_suffix_anchored(self):
+        from pacsfiles.models import PACSSeries
+        self._series(patient_name='SMITH^ANNE')
+        self._series(patient_name='SMITH^ANNEX')  # ends with X, not ANNE
+        qf = QueryFilter(TAG_MAP_SERIES)
+        names = set(qf.apply(PACSSeries.objects.all(),
+                             QueryDict('PatientName=*ANNE')).values_list('PatientName', flat=True))
+        self.assertIn('SMITH^ANNE', names)
+        self.assertNotIn('SMITH^ANNEX', names)
+
+    def test_single_value_exact_date_matches(self):
+        from datetime import date
+        from pacsfiles.models import PACSSeries
+        self._series(study_date=date(2023, 1, 1))
+        self._series(study_date=date(2024, 6, 15))
+        qf = QueryFilter(TAG_MAP_STUDY)
+        got = list(qf.apply(PACSSeries.objects.all(),
+                            QueryDict('StudyDate=20230101')).values_list('StudyDate', flat=True))
+        self.assertEqual(got, [date(2023, 1, 1)])
+
+    def test_time_range_filters(self):
+        from datetime import time
+        from pacsfiles.models import PACSSeries
+        self._series(study_time=time(11, 0, 0))
+        self._series(study_time=time(12, 30, 0))
+        self._series(study_time=time(14, 0, 0))
+        qf = QueryFilter(TAG_MAP_STUDY)
+        got = set(qf.apply(PACSSeries.objects.all(),
+                           QueryDict('StudyTime=120000-130000')).values_list('StudyTime', flat=True))
+        self.assertEqual(got, {time(12, 30, 0)})

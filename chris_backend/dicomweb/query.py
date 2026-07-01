@@ -155,6 +155,10 @@ class QueryFilter:
             limit = min(int(raw_limit), self.HARD_LIMIT)
         except (TypeError, ValueError):
             limit = self.DEFAULT_LIMIT
+        if limit < 0:
+            # A negative limit would produce a negative slice stop
+            # (qs[offset:offset+limit]), which Django rejects — treat as invalid.
+            limit = self.DEFAULT_LIMIT
         try:
             offset = max(int(raw_offset), 0)
         except (TypeError, ValueError):
@@ -165,10 +169,16 @@ class QueryFilter:
     # ── Private helpers ──────────────────────────────────────────────────────
 
     def _resolve_tag(self, key: str) -> Optional[str]:
-        """Return 8-hex-char tag from either hex form or DICOM keyword."""
+        """Return the 8-hex-char tag for a *supported* attribute (hex or keyword
+        form), or None if the key is not a query attribute for this level.
+
+        Both forms are validated against ``tag_map`` so an unknown-but-well-formed
+        hex tag resolves to None (consistent with keyword lookup) — the caller then
+        drops it (PS3.18 §8.3.4.1: servers may ignore unsupported match keys).
+        """
         upper = key.upper()
         if len(upper) == 8 and all(c in '0123456789ABCDEF' for c in upper):
-            return upper
+            return upper if upper in self.tag_map else None
         return self._kw_to_hex.get(key)  # case-sensitive keyword lookup
 
     def _apply_field(self, qs: QuerySet, descriptor: ModelField, raw_value: str,
@@ -192,6 +202,13 @@ class QueryFilter:
             if descriptor.wildcard and ('*' in v or '?' in v):
                 like_val = v.replace('*', '%').replace('?', '_')
                 q |= Q(**{f'{field}__icontains': like_val.strip('%_')}) if like_val in ('%', '_') else Q(**{f'{field}__iregex': _like_to_regex(like_val)})
+            elif vr in ('DA', 'TM', 'DT'):
+                # Single-value DA/TM/DT: coerce the DICOM compact form
+                # (YYYYMMDD / HHMMSS) to a native date/time so the Date/TimeField
+                # comparison is unambiguous. Unparseable values add no restriction.
+                parsed = _parse_temporal(vr, v)
+                if parsed is not None:
+                    q |= Q(**{field: parsed})
             elif vr == 'PN':
                 # PN: stored as 'FAMILY^GIVEN'; support exact or alphabetic-component prefix
                 q |= Q(**{f'{field}__iexact': v}) | Q(**{f'{field}__istartswith': v})
@@ -216,11 +233,14 @@ class QueryFilter:
         parts = raw_value.split('-', 1)
         start_str = parts[0].strip()
         end_str = parts[1].strip() if len(parts) > 1 else ''
-        start = _parse_da(start_str) if start_str else None
-        end = _parse_da(end_str) if end_str else None
-        if start:
+        # Parse per the attribute's VR — a DA range yields dates, a TM range times,
+        # a DT range datetimes. (Previously this always used the DA parser, so TM/DT
+        # ranges silently parsed to None and applied no filter.)
+        start = _parse_temporal(vr, start_str) if start_str else None
+        end = _parse_temporal(vr, end_str) if end_str else None
+        if start is not None:
             qs = qs.filter(**{f'{field}__gte': start})
-        if end:
+        if end is not None:
             qs = qs.filter(**{f'{field}__lte': end})
         return qs
 
@@ -237,11 +257,53 @@ def _parse_da(s: str):
         return None
 
 
+def _parse_tm(s: str):
+    """Parse a DICOM TM string (HHMMSS[.ffffff], truncated forms allowed) to a
+    Python time, or None on failure."""
+    raw = s.split('.', 1)[0]
+    fmt = {6: '%H%M%S', 4: '%H%M', 2: '%H'}.get(len(raw))
+    if fmt is None:
+        return None
+    try:
+        return datetime.strptime(raw, fmt).time()
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_dt(s: str):
+    """Parse a DICOM DT string (YYYYMMDD[HHMMSS], truncated forms allowed) to a
+    Python datetime, or None on failure."""
+    raw = s.split('.', 1)[0]
+    for fmt in ('%Y%m%d%H%M%S', '%Y%m%d%H%M', '%Y%m%d%H', '%Y%m%d'):
+        try:
+            return datetime.strptime(raw, fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _parse_temporal(vr: str, s: str):
+    """Parse a DICOM DA/TM/DT string into its native type (date/time/datetime),
+    or None. Dispatches on VR so range and exact matching coerce correctly."""
+    if vr == 'DA':
+        return _parse_da(s)
+    if vr == 'TM':
+        return _parse_tm(s)
+    if vr == 'DT':
+        return _parse_dt(s)
+    return None
+
+
 def _like_to_regex(like_val: str) -> str:
-    """Convert SQL LIKE pattern (with % and _) to a Python regex string."""
+    """Convert a SQL LIKE pattern (``%`` / ``_``) to an *anchored* POSIX regex.
+
+    Anchored at both ends (``^...$``) so wildcard matching keeps prefix/suffix
+    semantics — ``DOE*`` matches values *starting* with DOE, not merely containing
+    it — when used with Postgres' unanchored ``~*`` operator via ``__iregex``.
+    """
     import re
     parts = re.split(r'([%_])', like_val)
-    result = []
+    result = ['^']
     for part in parts:
         if part == '%':
             result.append('.*')
@@ -249,4 +311,5 @@ def _like_to_regex(like_val: str) -> str:
             result.append('.')
         else:
             result.append(re.escape(part))
+    result.append('$')
     return ''.join(result)
