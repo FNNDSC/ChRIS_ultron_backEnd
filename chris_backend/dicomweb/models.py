@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 
 
@@ -21,8 +22,8 @@ class PACSStudy(models.Model):
     StudyTime = models.TimeField(null=True, blank=True)
     AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
     StudyDescription = models.CharField(max_length=400, blank=True)
-    # Patient tags — denormalized from first series
-    # PatientName matches PACSSeries and is served by a pg_trgm GIN index
+    # Patient tags — denormalized from first series. PatientName and PatientID
+    # carry pg_trgm GIN indexes (see Meta.indexes) for QIDO wildcard matching.
     PatientName = models.CharField(max_length=150, blank=True)
     PatientID = models.CharField(max_length=100, blank=True, db_index=True)
     PatientBirthDate = models.DateField(null=True, blank=True)
@@ -37,6 +38,16 @@ class PACSStudy(models.Model):
         unique_together = ('pacs', 'StudyInstanceUID',)
         indexes = [
             models.Index(fields=['pacs', 'StudyDate'], name='pacsstudy_pacs_date_idx'),
+            # pg_trgm GIN indexes backing QIDO-RS Wild Card Matching (`*`/`?` -> ILIKE
+            # substring) on string-VR tags. Wild Card Matching is defined for these
+            # VRs (PN, LO) in DICOM PS3.4 §C.2.2.2.4; PatientName and PatientID are
+            # required study-level match keys (PS3.18 §10.6.1.2.3, Table 10.6.1-5).
+            GinIndex(fields=['PatientName'], name='pacsstudy_patientname_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['PatientID'], name='pacsstudy_patientid_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['StudyDescription'], name='pacsstudy_studydesc_trgm',
+                     opclasses=['gin_trgm_ops']),
         ]
 
     def __str__(self):

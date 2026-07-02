@@ -49,6 +49,21 @@ from .models import PACSInstance, PACSStudy
 logger = logging.getLogger(__name__)
 
 
+def _study_id_for_series(series_id):
+    """Return a series' ``study_id`` via a narrow query, or ``None``.
+
+    Resolving through ``values_list`` (rather than ``instance.series``) keeps
+    the lookup to the single indexed column and, on the delete path, yields
+    ``None`` for a concurrently-gone series instead of raising ``DoesNotExist``
+    from inside a receiver. Both instance-counter receivers use it so the
+    increment and decrement paths resolve the study identically.
+    """
+    return (PACSSeries.objects
+            .filter(pk=series_id)
+            .values_list('study_id', flat=True)
+            .first())
+
+
 @receiver(post_save, sender=PACSSeries)
 def increment_study_series_count(sender, instance, created, **kwargs):
     """Bump ``NumberOfStudyRelatedSeries`` when a new series joins a study."""
@@ -68,23 +83,17 @@ def decrement_study_series_count(sender, instance, **kwargs):
 @receiver(post_save, sender=PACSInstance)
 def increment_study_instance_count(sender, instance, created, **kwargs):
     """Bump ``NumberOfStudyRelatedInstances`` when a new instance is indexed."""
-    if created and instance.series.study_id:
-        PACSStudy.objects.filter(pk=instance.series.study_id).update(
-            NumberOfStudyRelatedInstances=F('NumberOfStudyRelatedInstances') + 1)
+    if created:
+        study_id = _study_id_for_series(instance.series_id)
+        if study_id:
+            PACSStudy.objects.filter(pk=study_id).update(
+                NumberOfStudyRelatedInstances=F('NumberOfStudyRelatedInstances') + 1)
 
 
 @receiver(post_delete, sender=PACSInstance)
 def decrement_study_instance_count(sender, instance, **kwargs):
-    """Drop ``NumberOfStudyRelatedInstances`` when an indexed instance is removed.
-
-    The instance's study is resolved with a narrow query (rather than
-    ``instance.series``) so that a concurrently-gone series yields ``None``
-    instead of raising ``DoesNotExist`` from inside the receiver.
-    """
-    study_id = (PACSSeries.objects
-                .filter(pk=instance.series_id)
-                .values_list('study_id', flat=True)
-                .first())
+    """Drop ``NumberOfStudyRelatedInstances`` when an indexed instance is removed."""
+    study_id = _study_id_for_series(instance.series_id)
     if study_id:
         PACSStudy.objects.filter(pk=study_id).update(
             NumberOfStudyRelatedInstances=F('NumberOfStudyRelatedInstances') - 1)
