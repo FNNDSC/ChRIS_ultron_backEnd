@@ -21,10 +21,11 @@ from django.test import TestCase
 from core.models import ChrisFolder
 from pacsfiles.models import PACS, PACSFile, PACSSeries
 
-from dicomweb.models import PACSInstance
+from dicomweb.models import PACSInstance, PACSStudy
 from dicomweb.tasks import (
     _as_int,
     _backfill_series_tags,
+    _backfill_study_tags,
     _find_series_for_file,
     _parse_dicom_date,
     _parse_dicom_time,
@@ -315,6 +316,38 @@ class BackfillSeriesTagsTests(DicomwebTaskTestBase):
 
 
 # ---------------------------------------------------------------------------
+# _backfill_study_tags tests
+# ---------------------------------------------------------------------------
+
+class BackfillStudyTagsTests(DicomwebTaskTestBase):
+
+    def _make_ds(self, **attrs):
+        return types.SimpleNamespace(**attrs)
+
+    def _make_study(self, **kwargs):
+        kwargs.setdefault('StudyInstanceUID', '1.2.3.study')
+        return PACSStudy.objects.create(pacs=self.pacs, **kwargs)
+
+    def test_fills_empty_studytime_from_header(self):
+        study = self._make_study()  # StudyTime is NULL
+        _backfill_study_tags(study, self._make_ds(StudyTime='143000'))
+        study.refresh_from_db()
+        self.assertEqual(study.StudyTime, time(14, 30, 0))
+
+    def test_does_not_overwrite_existing_studytime(self):
+        study = self._make_study(StudyTime=time(9, 0, 0))
+        _backfill_study_tags(study, self._make_ds(StudyTime='143000'))
+        study.refresh_from_db()
+        self.assertEqual(study.StudyTime, time(9, 0, 0))
+
+    def test_no_update_when_ds_has_no_studytime(self):
+        study = self._make_study()
+        _backfill_study_tags(study, self._make_ds())
+        study.refresh_from_db()
+        self.assertIsNone(study.StudyTime)
+
+
+# ---------------------------------------------------------------------------
 # index_pacs_instance task body tests (mocked storage)
 # ---------------------------------------------------------------------------
 
@@ -465,3 +498,24 @@ class IndexPacsInstanceTaskTests(DicomwebTaskTestBase):
         self.assertEqual(
             PACSInstance.objects.filter(SOPInstanceUID='1.2.3.4.5007').count(), 1
         )
+
+    def test_backfill_study_runs_when_series_linked_to_study(self):
+        # When the series is linked to a PACSStudy, the task also backfills the
+        # study's study-level tags (StudyTime) from the header — the call site
+        # that is skipped when series.study is None. The task backfills the same
+        # tag onto both series and study, so assert they agree afterwards rather
+        # than hard-coding the fixture's StudyTime.
+        study = PACSStudy.objects.create(
+            pacs=self.pacs, StudyInstanceUID='1.2.3.study')
+        PACSSeries.objects.filter(pk=self.series.pk).update(study=study)
+
+        dicom_bytes = _make_dicom_bytes(SOPInstanceUID='1.2.3.4.5008')
+        with patch('dicomweb.tasks.connect_storage',
+                   return_value=self._mock_storage(dicom_bytes)):
+            index_pacs_instance.apply(args=[self.pacs_file.pk])
+
+        self.series.refresh_from_db()
+        study.refresh_from_db()
+        # guard: the fixture must carry a StudyTime for this test to exercise the path
+        self.assertIsNotNone(self.series.StudyTime)
+        self.assertEqual(study.StudyTime, self.series.StudyTime)

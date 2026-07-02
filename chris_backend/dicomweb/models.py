@@ -1,4 +1,57 @@
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
+
+
+class PACSStudy(models.Model):
+    """
+    Study-level entity for the DICOM hierarchy (Patient → Study → Series → Instance).
+
+    Created or reused by ``PACSSeriesSerializer.create`` on every series ingest.
+    Patient tags are denormalized from the first series. Counter fields are
+    maintained by the signal receivers in ``dicomweb.signals`` (wired up in
+    ``dicomweb.apps``) using F() expressions.
+    """
+    creation_date = models.DateTimeField(auto_now_add=True)
+    pacs = models.ForeignKey(
+        'pacsfiles.PACS',
+        on_delete=models.CASCADE,
+        related_name='studies',
+    )
+    StudyInstanceUID = models.CharField(max_length=100, db_index=True)
+    StudyDate = models.DateField(null=True, blank=True, db_index=True)
+    StudyTime = models.TimeField(null=True, blank=True)
+    AccessionNumber = models.CharField(max_length=100, blank=True, db_index=True)
+    StudyDescription = models.CharField(max_length=400, blank=True)
+    # Patient tags — denormalized from first series. PatientName and PatientID
+    # carry pg_trgm GIN indexes (see Meta.indexes) for QIDO wildcard matching.
+    PatientName = models.CharField(max_length=150, blank=True)
+    PatientID = models.CharField(max_length=100, blank=True, db_index=True)
+    PatientBirthDate = models.DateField(null=True, blank=True)
+    PatientSex = models.CharField(max_length=1, choices=[('M', 'Male'), ('F', 'Female'),
+                                                         ('O', 'Other')], blank=True)
+    # Maintained counters (updated via F() to avoid race conditions)
+    NumberOfStudyRelatedSeries = models.PositiveIntegerField(default=0)
+    NumberOfStudyRelatedInstances = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ('pacs', 'PatientID',)
+        unique_together = ('pacs', 'StudyInstanceUID',)
+        indexes = [
+            models.Index(fields=['pacs', 'StudyDate'], name='pacsstudy_pacs_date_idx'),
+            # pg_trgm GIN indexes backing QIDO-RS Wild Card Matching (`*`/`?` -> ILIKE
+            # substring) on string-VR tags. Wild Card Matching is defined for these
+            # VRs (PN, LO) in DICOM PS3.4 §C.2.2.2.4; PatientName and PatientID are
+            # required study-level match keys (PS3.18 §10.6.1.2.3, Table 10.6.1-5).
+            GinIndex(fields=['PatientName'], name='pacsstudy_patientname_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['PatientID'], name='pacsstudy_patientid_trgm',
+                     opclasses=['gin_trgm_ops']),
+            GinIndex(fields=['StudyDescription'], name='pacsstudy_studydesc_trgm',
+                     opclasses=['gin_trgm_ops']),
+        ]
+
+    def __str__(self):
+        return self.StudyInstanceUID
 
 
 class PACSInstance(models.Model):
