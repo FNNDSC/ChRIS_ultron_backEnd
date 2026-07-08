@@ -14,88 +14,216 @@ Usage::
     qs = qf.apply(PACSSeries.objects.all(), request.query_params)
     page, total, limit = qf.paginate(qs, request.query_params)
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Self, Optional, Literal, Any, Union
 
 import pydicom.datadict
 from django.db.models import Q, QuerySet
 from django.http import QueryDict
 
 
+# Alias
+Tag = pydicom.tag.Tag
+
+# reserved words for search query parameters
+_SEARCH_PARAMS = frozenset({
+    'limit', 'offset', 'includefield', 'fuzzymatching',
+    'orderby', 'emptyvaluematching', 'multiplevaluematching'
+})
+
+
+@dataclass
+class SearchQuery:
+    match: dict[Tag, list[str]]
+    fuzzymatching: bool = False
+    includefield: Optional[Union[list[Tag], Literal['all']]] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    emptyvaluematching: bool = False
+    multiplevaluematching: bool = False
+
+    @staticmethod
+    def _parse_bool(value: str) -> bool:
+        return value.lower() in ('true', '1', 'yes')
+
+    @classmethod
+    def from_query_dict(cls, params: QueryDict) -> Self:
+        # Split the query parameters into matches and search parameters
+        match_pairs = {}
+        for param in params:
+            if param not in _SEARCH_PARAMS:
+                try:
+                    tag = Tag(param)
+                except (ValueError, OverflowError):
+                    continue
+                match_pairs[tag] = params.getlist(param)
+
+        search_options = {}
+        if 'includefield' in params:
+            # includefield can be passed multiple times and/or be a
+            # comma-separated list. It may also include the special
+            # 'all' value.
+            includefield = []
+            for item in params.getlist('includefield'):
+                includefield.extend(item.split(","))
+            if 'all' in includefield:
+                search_options['includefield'] = 'all'
+            else:
+                _includefield = []
+                for val in includefield:
+                    try:
+                        tag = Tag(val)
+                    except (ValueError, OverflowError):
+                        continue
+                    _includefield.append(tag)
+                search_options['includefield'] = _includefield
+        if (limit := params.get('limit')) is not None:
+            search_options['limit'] = int(limit)
+        if (offset := params.get('offset')) is not None:
+            search_options['offset'] = int(offset)
+        for field in ['fuzzymatching', 'emptyvaluematching', 'multiplevaluematching']:
+            if (field_value := params.get(field)) is not None:
+                search_options[field] = cls._parse_bool(field_value)
+
+        return cls(
+            match = match_pairs,
+            **search_options,
+        )
+
+
+
+# Matching types for VRs
+WILDCARD_VRS = frozenset({'AE', 'CS', 'LO', 'LT', 'PN', 'SH', 'ST', 'UC',
+                          'UR', 'UT'})
+MULTI_VALUE_VRS = frozenset({'AE', 'AS', 'AT', 'CS', 'LO', 'PN', 'SH', 'UC'})
+RANGE_VRS = frozenset({'DA', 'TM', 'DT'})
+UID_LIST_VRS = frozenset({'UI'})
+
 # ---------------------------------------------------------------------------
 # Tag descriptor types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
-class ModelField:
-    orm_path: str       # e.g. 'PatientName' or 'series__StudyInstanceUID'
-    vr: str             # DICOM VR ('PN', 'DA', 'UI', 'CS', ...)
-    range_: bool = False   # DA/TM range syntax supported
-    wildcard: bool = False  # wildcard ('*' / '?') supported
-    fuzzy: bool = False  # eligible for fuzzy PN matching (PS3.18 §8.3.4.2)
+class RangeValue[T]:
+    start: T
+    end: T
+
+@dataclass
+class MultipleValue[T]:
+    values: list[T]
 
 
 @dataclass
-class Aggregation:
-    """Tags handled by view-level .annotate()/.filter(); skipped here."""
-    name: str
+class Attribute:
+    keyword: str
+    orm_field: str = ""         # Will default to keyword if unset
+    fuzzy: bool = False # eligible for fuzzy PN matching (PS3.18 §8.3.4.2)
+    fuzzy_lookup: str = "trigram_similar"
+    tag: Optional[Tag] = None
+    vr: Optional[str] = None
+    vm: Optional[str] = None
+
+    def __post_init__(self):
+        if self.orm_field == "":
+            self.orm_field = self.keyword
+        if self.tag is None:
+            self.tag = pydicom.tag.Tag(self.keyword)
+        if self.vr is None:
+            self.vr = pydicom.datadict.dictionary_VR(self.tag)
+        if self.vm is None:
+            self.vm = pydicom.datadict.dictionary_VM(self.tag)
+
+    def cap_wildcard(self) -> bool:
+        return self.vr in WILDCARD_VRS
+
+    def cap_range(self) -> bool:
+        return self.vr in RANGE_VRS
+
+    def cap_multi_value(self) -> bool:
+        # PS3.4 §C.2.2.2.8
+        if self.vr not in MULTI_VALUE_VRS:
+            return False
+        return self.vm != '1'
+
+    def parse(self, value: str, multi_value: bool=False) -> Any:
+        if self.cap_range() and "-" in value:
+            return self.parse_range(value)
+        if self.cap_multi_value() and multi_value:
+            parsed_value = self.parse_multiple(value)
+            if len(parsed_value.values) == 1:
+                return parsed_value.values[0]
+            return parsed_value
+        return self.parse_single(value)
+
+    def parse_single(self, value: str) -> Any:
+        """Parse a single value from a query string. For range values, use parse_range."""
+        if self.vr in ['DA', 'DT', 'TM']:
+            return _parse_temporal(self.vr, value)
+        return value
+
+    def parse_range(self, value: str) -> RangeValue:
+        if '-' not in value:
+            raise ValueError(f'Invalid range value: {value}')
+        start, end = value.split('-', maxsplit=1)
+        return RangeValue(self.parse_single(start), self.parse_single(end))
+
+    def parse_multiple(self, value: str) -> MultipleValue:
+        import re
+        return MultipleValue([self.parse_single(v) for v in re.split(r'[\\,]', value)])
 
 
 # ---------------------------------------------------------------------------
-# Static tag maps
+# Supported Query fields
 # ---------------------------------------------------------------------------
 
-TAG_MAP_STUDY = {
-    '00100010': ModelField('PatientName', vr='PN', wildcard=True, fuzzy=True),
-    '00100020': ModelField('PatientID', vr='LO', wildcard=True),
-    '00100030': ModelField('PatientBirthDate', vr='DA', range_=True),
-    '00100040': ModelField('PatientSex', vr='CS'),
-    '0020000D': ModelField('StudyInstanceUID', vr='UI'),
-    '00080020': ModelField('StudyDate', vr='DA', range_=True),
-    '00080030': ModelField('StudyTime', vr='TM', range_=True),
-    '00080050': ModelField('AccessionNumber', vr='SH', wildcard=True),
-    '00081030': ModelField('StudyDescription', vr='LO', wildcard=True),
-    # Aggregation tags — handled in view, not here
-    '00080061': Aggregation('ModalitiesInStudy'),
-    '00201206': Aggregation('NumberOfStudyRelatedSeries'),
-    '00201208': Aggregation('NumberOfStudyRelatedInstances'),
-}
+QUERY_FIELDS_STUDY = [
+        Attribute('PatientName', fuzzy=True),
+        Attribute('PatientID'),
+        Attribute('PatientBirthDate'),
+        Attribute('PatientSex'),
+        Attribute('StudyInstanceUID'),
+        Attribute('StudyDate'),
+        Attribute('StudyTime'),
+        Attribute('AccessionNumber'),
+        Attribute('StudyDescription'),
+        # Attribute('ModalitiesInStudy', aggregation=True),
+        Attribute('NumberOfStudyRelatedSeries'),
+        Attribute('NumberOfStudyRelatedInstances'),
+    ]
 
-TAG_MAP_SERIES = {
-    '0020000E': ModelField('SeriesInstanceUID', vr='UI'),
-    '00200011': ModelField('SeriesNumber', vr='IS'),
-    '00080060': ModelField('Modality', vr='CS'),
-    '0008103E': ModelField('SeriesDescription', vr='LO', wildcard=True),
-    '00180015': ModelField('BodyPartExamined', vr='CS'),
-    '00080070': ModelField('Manufacturer', vr='LO', wildcard=True),
-    '00181030': ModelField('ProtocolName', vr='LO', wildcard=True),
+QUERY_FIELDS_SERIES = [
+    Attribute('SeriesInstanceUID'),
+    Attribute('SeriesNumber'),
+    Attribute('Modality'),
+    Attribute('SeriesDescription'),
+    Attribute('BodyPartExamined'),
+    Attribute('Manufacturer'),
+    Attribute('ProtocolName'),
     # Study-level pass-through
-    '0020000D': ModelField('StudyInstanceUID', vr='UI'),
-    '00100010': ModelField('PatientName', vr='PN', wildcard=True, fuzzy=True),
-    '00100020': ModelField('PatientID', vr='LO'),
-}
+    Attribute('StudyInstanceUID'),
+    Attribute('PatientName', fuzzy=True),
+    Attribute('PatientID'),
+]
 
-TAG_MAP_INSTANCE = {
-    '00080018': ModelField('SOPInstanceUID', vr='UI'),
-    '00080016': ModelField('SOPClassUID', vr='UI'),
-    '00200013': ModelField('InstanceNumber', vr='IS'),
-    '00280010': ModelField('Rows', vr='US'),
-    '00280011': ModelField('Columns', vr='US'),
-    '00280100': ModelField('BitsAllocated', vr='US'),
-    '00280008': ModelField('NumberOfFrames', vr='IS'),
+QUERY_FIELDS_INSTANCE = [
+    Attribute('SOPInstanceUID'),
+    Attribute('SOPClassUID'),
+    Attribute('InstanceNumber'),
+    Attribute('Rows'),
+    Attribute('Columns'),
+    Attribute('BitsAllocated'),
+    Attribute('NumberOfFrames'),
     # Series pass-through
-    '0020000E': ModelField('series__SeriesInstanceUID', vr='UI'),
-    '0020000D': ModelField('series__StudyInstanceUID', vr='UI'),
-}
+    Attribute('SeriesInstanceUID', orm_field='series__SeriesInstanceUID'),
+    Attribute('StudyInstanceUID', orm_field='series__StudyInstanceUID'),
+]
 
 
 # ---------------------------------------------------------------------------
 # QueryFilter
 # ---------------------------------------------------------------------------
-
-_RESERVED_PARAMS = frozenset({'limit', 'offset', 'includefield', 'fuzzymatching', 'orderby'})
-
 
 class QueryFilter:
     """
@@ -106,144 +234,79 @@ class QueryFilter:
     """
     HARD_LIMIT = 5000
     DEFAULT_LIMIT = 50
+    TAG_MAPS_BY_RESOURCE_TYPE = {
+        'study': {field.tag: field for field in QUERY_FIELDS_STUDY},
+        'series': {field.tag: field for field in QUERY_FIELDS_SERIES},
+        'instance': {field.tag: field for field in QUERY_FIELDS_INSTANCE},
+    }
 
-    def __init__(self, tag_map: dict):
-        self.tag_map = tag_map
-        self._kw_to_hex = {}
-        for hex_tag in tag_map:
-            if len(hex_tag) != 8:
-                continue
+    def __init__(self, target_resource_type: Literal['study', 'series', 'instance']):
+        self.tag_map = self.TAG_MAPS_BY_RESOURCE_TYPE[target_resource_type]
+
+    def apply(self, qs: QuerySet, search_query: SearchQuery) -> QuerySet:
+        """Filter a QuerySet according to a SearchQuery."""
+
+        for tag, values in search_query.match.items():
             try:
-                kw = pydicom.datadict.keyword_for_tag(int(hex_tag, 16))
-                if kw:
-                    self._kw_to_hex[kw] = hex_tag
-            except Exception:
-                pass
+                attribute = self.tag_map[tag]
+            except KeyError:
+                # Ignore any extra attributes
+                continue
 
-    def apply(self, qs: QuerySet, params) -> QuerySet:
-        """Apply DICOM match parameters from ``params`` to ``qs``."""
-        # Fuzzy Person-Name matching is a request-wide modifier, not a match key
-        # (PS3.18 §8.3.4.2). Resolve it once up front so it can influence PN terms.
-        fuzzy = (str(params.get('fuzzymatching', '')).lower() in ('true', '1', 'yes')
-                 if hasattr(params, 'get') else False)
+            q = Q()
+            for raw_value in values:
+                # Handle multiple and range values first
+                match attribute.parse(raw_value, search_query.multiplevaluematching):
+                    case RangeValue(start, end):
+                        range_q = Q(**{f'{attribute.orm_field}__gte': start})
+                        range_q &= Q(**{f'{attribute.orm_field}__lte': end})
+                        q |= range_q
+                        continue
+                    case MultipleValue(multi_values):
+                        q |= Q(**{f'{attribute.orm_field}__in': multi_values})
+                        continue
+                    case '' | None:
+                        # PS3.4 §C.2.2.2.3 Universal Matching
+                        continue
+                    case '""':
+                        # PS3.4 §C.2.2.2.7 Empty value matching
+                        if not search_query.emptyvaluematching:
+                            # TODO: log warning
+                            continue
+                        q |= Q(**{f'{attribute.orm_field}__exact': ''})
+                        continue
+                    case single_value:
+                        value = single_value
 
-        if isinstance(params, QueryDict):
-            items = params.items()
-        else:
-            items = params.items() if hasattr(params, 'items') else params
+                # Single value handling
+                if search_query.fuzzymatching and attribute.fuzzy:
+                    # Fuzzy matching
+                    q |= Q(**{f'{attribute.orm_field}__{attribute.fuzzy_lookup}': value})
+                elif attribute.cap_wildcard() and ('*' in value or '?' in value):
+                    # Wildcard matching
+                    q |= Q(**{f'{attribute.orm_field}__iregex': _wildcard_to_regex(value)})
+                else:
+                    q |= Q(**{attribute.orm_field: value})
 
-        for key, value in items:
-            if key in _RESERVED_PARAMS:
-                continue
-            if not value:
-                # §8.3.4.1 / PS3.4 §C.2.2.2: empty value → no restriction on that attribute
-                continue
-            hex_tag = self._resolve_tag(key)
-            if hex_tag is None:
-                continue
-            descriptor = self.tag_map.get(hex_tag)
-            if descriptor is None or isinstance(descriptor, Aggregation):
-                continue
-            qs = self._apply_field(qs, descriptor, value, fuzzy)
+            qs = qs.filter(q)
         return qs
 
-    def paginate(self, qs: QuerySet, params):
-        """Return (page_qs, total_count, effective_limit)."""
-        raw_limit = params.get('limit', self.DEFAULT_LIMIT) if hasattr(params, 'get') else self.DEFAULT_LIMIT
-        raw_offset = params.get('offset', 0) if hasattr(params, 'get') else 0
-        try:
-            limit = min(int(raw_limit), self.HARD_LIMIT)
-        except (TypeError, ValueError):
-            limit = self.DEFAULT_LIMIT
-        if limit < 0:
-            # A negative limit would produce a negative slice stop
-            # (qs[offset:offset+limit]), which Django rejects — treat as invalid.
-            limit = self.DEFAULT_LIMIT
-        try:
-            offset = max(int(raw_offset), 0)
-        except (TypeError, ValueError):
-            offset = 0
+    def paginate(self, qs: QuerySet, search_query: SearchQuery):
+        """Return a single page of a QuerySet using limit and offset specified in a SearchQuery.
+
+        Return Value: (page_qs, total_count, effective_limit).
+        """
+        limit = self.DEFAULT_LIMIT if search_query.limit is None else search_query.limit
+        offset = 0 if search_query.offset is None else search_query.offset
+
+        # Clip limit to [0..HARD_LIMIT]
+        limit = max(0, min(limit, self.HARD_LIMIT))
+
+        # Ensure a non-negative offset
+        offset = max(0, search_query.offset or 0)
+
         total = qs.count()
         return qs[offset:offset + limit], total, limit
-
-    # ── Private helpers ──────────────────────────────────────────────────────
-
-    def _resolve_tag(self, key: str) -> Optional[str]:
-        """Return the 8-hex-char tag for a *supported* attribute (hex or keyword
-        form), or None if the key is not a query attribute for this level.
-
-        Both forms are validated against ``tag_map`` so an unknown-but-well-formed
-        hex tag resolves to None (consistent with keyword lookup) — the caller then
-        drops it (PS3.18 §8.3.4.1: servers may ignore unsupported match keys).
-        """
-        upper = key.upper()
-        if len(upper) == 8 and all(c in '0123456789ABCDEF' for c in upper):
-            return upper if upper in self.tag_map else None
-        return self._kw_to_hex.get(key)  # case-sensitive keyword lookup
-
-    def _apply_field(self, qs: QuerySet, descriptor: ModelField, raw_value: str,
-                     fuzzy: bool = False) -> QuerySet:
-        field = descriptor.orm_path
-        vr = descriptor.vr
-        values = raw_value.split(',')  # multi-value → OR semantics
-
-        # Date/time range: only activate for DA/TM VRs with a single value containing '-'
-        if vr in ('DA', 'TM', 'DT') and descriptor.range_ and '-' in raw_value and len(values) == 1:
-            return self._apply_range(qs, field, vr, raw_value)
-
-        # Fuzzy Person-Name matching (PS3.18 §8.3.4.2). Applies only to fuzzy-eligible
-        # PN attributes when fuzzymatching=true and no wildcard is present — an explicit
-        # wildcard takes precedence and falls through to the wildcard path below.
-        if fuzzy and descriptor.fuzzy and '*' not in raw_value and '?' not in raw_value:
-            return self._apply_fuzzy(qs, field, values)
-
-        q = Q()
-        for v in values:
-            if descriptor.wildcard and ('*' in v or '?' in v):
-                like_val = v.replace('*', '%').replace('?', '_')
-                q |= Q(**{f'{field}__icontains': like_val.strip('%_')}) if like_val in ('%', '_') else Q(**{f'{field}__iregex': _like_to_regex(like_val)})
-            elif vr in ('DA', 'TM', 'DT'):
-                # Single-value DA/TM/DT: coerce the DICOM compact form
-                # (YYYYMMDD / HHMMSS) to a native date/time so the Date/TimeField
-                # comparison is unambiguous. Unparseable values add no restriction.
-                parsed = _parse_temporal(vr, v)
-                if parsed is not None:
-                    q |= Q(**{field: parsed})
-            elif vr == 'PN':
-                # PN: stored as 'FAMILY^GIVEN'; support exact or alphabetic-component prefix
-                q |= Q(**{f'{field}__iexact': v}) | Q(**{f'{field}__istartswith': v})
-            else:
-                q |= Q(**{f'{field}': v})
-        return qs.filter(q)
-
-    def _apply_fuzzy(self, qs: QuerySet, field: str, values) -> QuerySet:
-        """Fuzzy PN match via pg_trgm's ``%`` operator (Django ``__trigram_similar``).
-
-        GIN-index-backed. The match threshold is Postgres' session GUC
-        ``pg_trgm.similarity_threshold``, set per connection from
-        ``settings.DICOMWEB_FUZZY_THRESHOLD`` (see the DATABASES OPTIONS in the
-        environment settings). Multi-value → OR (PS3.18 §8.3.4.2, PS3.4 §C.2.2.2.1.1).
-        """
-        q = Q()
-        for v in values:
-            q |= Q(**{f'{field}__trigram_similar': v})
-        return qs.filter(q)
-
-    def _apply_range(self, qs: QuerySet, field: str, vr: str, raw_value: str) -> QuerySet:
-        parts = raw_value.split('-', 1)
-        start_str = parts[0].strip()
-        end_str = parts[1].strip() if len(parts) > 1 else ''
-        # Parse per the attribute's VR — a DA range yields dates, a TM range times,
-        # a DT range datetimes. (Previously this always used the DA parser, so TM/DT
-        # ranges silently parsed to None and applied no filter.)
-        start = _parse_temporal(vr, start_str) if start_str else None
-        end = _parse_temporal(vr, end_str) if end_str else None
-        if start is not None:
-            qs = qs.filter(**{f'{field}__gte': start})
-        if end is not None:
-            qs = qs.filter(**{f'{field}__lte': end})
-        return qs
-
 
 # ---------------------------------------------------------------------------
 # Internal utilities
@@ -274,7 +337,7 @@ def _parse_dt(s: str):
     """Parse a DICOM DT string (YYYYMMDD[HHMMSS], truncated forms allowed) to a
     Python datetime, or None on failure."""
     raw = s.split('.', 1)[0]
-    for fmt in ('%Y%m%d%H%M%S', '%Y%m%d%H%M', '%Y%m%d%H', '%Y%m%d'):
+    for fmt in ('%Y%m%d', '%Y%m%d%H', '%Y%m%d%H%M', '%Y%m%d%H%M%S'):
         try:
             return datetime.strptime(raw, fmt)
         except (ValueError, TypeError):
@@ -294,22 +357,18 @@ def _parse_temporal(vr: str, s: str):
     return None
 
 
-def _like_to_regex(like_val: str) -> str:
-    """Convert a SQL LIKE pattern (``%`` / ``_``) to an *anchored* POSIX regex.
-
-    Anchored at both ends (``^...$``) so wildcard matching keeps prefix/suffix
-    semantics — ``DOE*`` matches values *starting* with DOE, not merely containing
-    it — when used with Postgres' unanchored ``~*`` operator via ``__iregex``.
-    """
+def _wildcard_to_regex(value: str) -> str:
+    """Convert a wildcard pattern to POSIX regex."""
     import re
-    parts = re.split(r'([%_])', like_val)
-    result = ['^']
+    parts = re.split(r'([*?])', value)
+    result = []
     for part in parts:
-        if part == '%':
+        if part == '*':
             result.append('.*')
-        elif part == '_':
+        elif part == '?':
             result.append('.')
         else:
             result.append(re.escape(part))
-    result.append('$')
+    # wrap in ^$ to ensure a full match
+    result = ['^', *result, '$']
     return ''.join(result)

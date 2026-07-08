@@ -4,7 +4,7 @@ Unit tests for dicomweb.query — QIDO-RS DICOM-tag query parser.
 from django.http import QueryDict
 from django.test import TestCase
 
-from dicomweb.query import QueryFilter, TAG_MAP_SERIES, TAG_MAP_STUDY, _parse_da
+from dicomweb.query import QueryFilter, SERIES_FIELDS_BY_TAG, TAG_MAP_STUDY, _parse_da
 
 
 class ParseDaTest(TestCase):
@@ -23,7 +23,7 @@ class ParseDaTest(TestCase):
 class QueryFilterTagResolutionTest(TestCase):
 
     def setUp(self):
-        self.qf = QueryFilter(TAG_MAP_SERIES)
+        self.qf = QueryFilter(SERIES_FIELDS_BY_TAG)
 
     def test_hex_tag_lookup(self):
         self.assertEqual(self.qf._resolve_tag('00100010'), '00100010')
@@ -50,7 +50,7 @@ class QueryFilterApplyTest(TestCase):
 
     def test_unsupported_tag_silently_ignored(self):
         from pacsfiles.models import PACSSeries
-        qf = QueryFilter(TAG_MAP_SERIES)
+        qf = QueryFilter(SERIES_FIELDS_BY_TAG)
         qs = PACSSeries.objects.none()
         result = qf.apply(qs, QueryDict('99990001=bogus'))
         # No exception; queryset unchanged
@@ -66,14 +66,14 @@ class QueryFilterApplyTest(TestCase):
 
     def test_empty_value_skipped(self):
         from pacsfiles.models import PACSSeries
-        qf = QueryFilter(TAG_MAP_SERIES)
+        qf = QueryFilter(SERIES_FIELDS_BY_TAG)
         qs = PACSSeries.objects.none()
         result = qf.apply(qs, QueryDict('PatientName='))
         self.assertEqual(list(result), [])
 
     def test_fuzzymatching_flag_alone_adds_no_filter(self):
         from pacsfiles.models import PACSSeries
-        qf = QueryFilter(TAG_MAP_SERIES)
+        qf = QueryFilter(SERIES_FIELDS_BY_TAG)
         qs = PACSSeries.objects.none()
         # fuzzymatching is a request-wide modifier, not a match key — on its own
         # (no PN attribute) it must not raise or apply any filter.
@@ -84,7 +84,7 @@ class QueryFilterApplyTest(TestCase):
 class PaginateTest(TestCase):
 
     def setUp(self):
-        self.qf = QueryFilter(TAG_MAP_SERIES)
+        self.qf = QueryFilter(SERIES_FIELDS_BY_TAG)
 
     def test_limit_enforced(self):
         from pacsfiles.models import PACSSeries
@@ -124,7 +124,7 @@ class FuzzyMatchingSqlShapeTest(TestCase):
     """
 
     def setUp(self):
-        self.qf = QueryFilter(TAG_MAP_SERIES)
+        self.qf = QueryFilter(SERIES_FIELDS_BY_TAG)
 
     def _sql(self, querystring):
         from pacsfiles.models import PACSSeries
@@ -190,7 +190,7 @@ class FuzzyMatchingBehaviorTest(TestCase):
 
         make_series('DOE^JANE', '1.1')
         make_series('SMITH^JOHN', '1.2')
-        self.qf = QueryFilter(TAG_MAP_SERIES)
+        self.qf = QueryFilter(SERIES_FIELDS_BY_TAG)
 
     # Query 'JOE^JANE' is a one-character transposition of the stored 'DOE^JANE':
     # literal iexact/istartswith matching misses it, but trigram similarity catches
@@ -283,7 +283,7 @@ class TemporalAndWildcardBehaviorTest(TestCase):
         from pacsfiles.models import PACSSeries
         self._series(patient_name='DOE^JANE')
         self._series(patient_name='MCDOE^JOHN')  # contains DOE but not a prefix
-        qf = QueryFilter(TAG_MAP_SERIES)
+        qf = QueryFilter(SERIES_FIELDS_BY_TAG)
         names = set(qf.apply(PACSSeries.objects.all(),
                              QueryDict('PatientName=DOE*')).values_list('PatientName', flat=True))
         self.assertIn('DOE^JANE', names)
@@ -293,7 +293,7 @@ class TemporalAndWildcardBehaviorTest(TestCase):
         from pacsfiles.models import PACSSeries
         self._series(patient_name='SMITH^ANNE')
         self._series(patient_name='SMITH^ANNEX')  # ends with X, not ANNE
-        qf = QueryFilter(TAG_MAP_SERIES)
+        qf = QueryFilter(SERIES_FIELDS_BY_TAG)
         names = set(qf.apply(PACSSeries.objects.all(),
                              QueryDict('PatientName=*ANNE')).values_list('PatientName', flat=True))
         self.assertIn('SMITH^ANNE', names)
@@ -319,3 +319,24 @@ class TemporalAndWildcardBehaviorTest(TestCase):
         got = set(qf.apply(PACSSeries.objects.all(),
                            QueryDict('StudyTime=120000-130000')).values_list('StudyTime', flat=True))
         self.assertEqual(got, {time(12, 30, 0)})
+
+# https://dicom.nema.org/medical/dicom/2026b/output/html/part18.html#sect_10.6.1.2.1
+# /studies?PatientID=11235813
+# /studies?PatientID=11235813&StudyDate=20130509
+# /studies?00100010=SMITH*&00101002.00100020=11235813&limit=25
+# /studies?00100010=SMITH*&OtherPatientIDsSequence.00100020=11235813
+# /studies?PatientID=11235813&includefield=00081048,00081049,00081060
+# /studies?PatientID=11235813&includefield=00081048&includefield=00081049&includefield=00081060
+# /studies?PatientID=11235813&StudyDate=20130509-20130510
+# /studies?StudyInstanceUID=1.2.392.200036.9116.2.2.2.2162893313.1029997326.94587,1.2.392.200036.9116.2.2.2.2162893313.1029997326.94583
+# /studies?00230010=AcmeCompany&includefield=00231002&includefield=00231003
+# /studies?00230010=AcmeCompany&00231001=001239&includefield=00231002&includefield=00231003
+
+# https://dicom.nema.org/dicom/2013/output/chtml/part18/sect_6.7.html
+# http://dicomrs/studies​?PatientID=11235813
+# http://dicomrs/studies​?PatientID=11235813​&StudyDate=20130509
+# http://dicomrs/studies​?00100010=SMITH*​&00101002.00100020=11235813​&limit=25
+# http://dicomrs/studies​?00100010=SMITH*​&OtherPatientIDsSequence.00100020=11235813
+# http://dicomrs/studies​?PatientID=11235813​&includefield=00081048​&includefield=00081049​&includefield=00081060
+# http://dicomrs/studies​?PatientID=11235813​&StudyDate=20130509-20130510
+# http://dicomrs/studies​?StudyInstanceUID=1.2.392.200036.9116.2.2.2.2162893313.1029997326.94587​%2c1.2.392.200036.9116.2.2.2.2162893313.1029997326.94583
