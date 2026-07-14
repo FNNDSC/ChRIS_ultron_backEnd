@@ -219,7 +219,7 @@ class QueryFilterInitTest(SimpleTestCase):
         self.assertIn(Tag('SeriesNumber'), QueryFilter('series').tag_map)
 
     def test_unknown_resource_type_raises(self):
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             QueryFilter('bogus')
 
 

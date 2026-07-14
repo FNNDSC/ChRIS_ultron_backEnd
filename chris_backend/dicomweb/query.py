@@ -276,7 +276,10 @@ class QueryFilter:
     }
 
     def __init__(self, target_resource_type: Literal['study', 'series', 'instance']):
-        self.tag_map = self.TAG_MAPS_BY_RESOURCE_TYPE[target_resource_type]
+        try:
+            self.tag_map = self.TAG_MAPS_BY_RESOURCE_TYPE[target_resource_type]
+        except KeyError:
+            raise ValueError(f'Unsupported resource type: "{target_resource_type}"')
 
     def apply(self, qs: QuerySet, search_query: SearchQuery) -> QuerySet:
         """Filter a QuerySet according to a SearchQuery."""
