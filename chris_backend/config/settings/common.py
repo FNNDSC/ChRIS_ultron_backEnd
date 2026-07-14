@@ -135,6 +135,15 @@ DATABASES = {
 DICOMWEB_FUZZY_THRESHOLD = env.float('DICOMWEB_FUZZY_THRESHOLD', 0.3)
 
 
+def apply_dicomweb_fuzzy_threshold(database, threshold=DICOMWEB_FUZZY_THRESHOLD):
+    """Merge the QIDO-RS fuzzy-matching similarity threshold into a database's
+    connection ``OPTIONS`` as a per-connection GUC, preserving any ``pool`` (or
+    other) config already present.
+    """
+    options = database.setdefault('OPTIONS', {})
+    options['options'] = f'-c pg_trgm.similarity_threshold={threshold}'
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 

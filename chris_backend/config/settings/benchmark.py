@@ -15,16 +15,9 @@ import os
 from .local import *  # noqa: F401,F403
 
 
-DATABASES['default']['OPTIONS'] = {  # noqa: F405
-    'pool': {
-        'min_size': int(os.getenv('CUBE_DB_POOL_MIN_SIZE', '2')),
-        'max_size': int(os.getenv('CUBE_DB_POOL_MAX_SIZE', '10')),
-        'timeout': int(os.getenv('CUBE_DB_POOL_TIMEOUT', '10')),
-    }
+options = DATABASES['default'].setdefault('OPTIONS', {})
+options['pool'] = {
+    'min_size': int(os.getenv('CUBE_DB_POOL_MIN_SIZE', '2')),
+    'max_size': int(os.getenv('CUBE_DB_POOL_MAX_SIZE', '10')),
+    'timeout': int(os.getenv('CUBE_DB_POOL_TIMEOUT', '10')),
 }
-# Re-apply the QIDO-RS fuzzy-matching similarity threshold GUC (the OPTIONS
-# reassignment above clobbers the merge done in local.py). See
-# DICOMWEB_FUZZY_THRESHOLD in common.py.
-DATABASES['default'].setdefault('OPTIONS', {})['options'] = (  # noqa: F405
-    f'-c pg_trgm.similarity_threshold={DICOMWEB_FUZZY_THRESHOLD}'  # noqa: F405
-)
