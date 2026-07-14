@@ -19,12 +19,12 @@ from dicomweb.query import (
 class ParseBoolTest(SimpleTestCase):
 
     def test_truthy_values(self):
-        for v in ('true', '1', 'yes', 'TRUE', 'Yes', 'YES'):
+        for v in ('true', '1', 'yes', 'TRUE', 'True', 'Yes', 'YES'):
             with self.subTest(v=v):
                 self.assertTrue(SearchQuery._parse_bool(v))
 
     def test_falsy_values(self):
-        for v in ('false', '0', 'no', '', 'nope'):
+        for v in ('false', '0', 'no', 'FALSE', 'False', 'No', 'NO', '', 'nope'):
             with self.subTest(v=v):
                 self.assertFalse(SearchQuery._parse_bool(v))
 
@@ -59,7 +59,8 @@ class FromQueryDictTest(SimpleTestCase):
                          [Tag('Modality'), Tag('00080061')])
 
     def test_includefield_absent_is_none(self):
-        self.assertIsNone(SearchQuery.from_query_dict(QueryDict('')).includefield)
+        search_query = SearchQuery.from_query_dict(QueryDict(''))
+        self.assertIsNone(search_query.includefield)
 
     def test_limit_and_offset_parsed_as_int(self):
         sq = SearchQuery.from_query_dict(QueryDict('limit=25&offset=10'))
@@ -71,7 +72,9 @@ class FromQueryDictTest(SimpleTestCase):
 
     def test_bool_flags_parsed(self):
         sq = SearchQuery.from_query_dict(QueryDict(
-            'fuzzymatching=true&emptyvaluematching=1&multiplevaluematching=yes'))
+            'fuzzymatching=true'
+            '&emptyvaluematching=1'
+            '&multiplevaluematching=yes'))
         self.assertTrue(sq.fuzzymatching)
         self.assertTrue(sq.emptyvaluematching)
         self.assertTrue(sq.multiplevaluematching)
@@ -171,6 +174,16 @@ class AttributeTest(SimpleTestCase):
         with self.assertRaises(ValueError):
             Attribute('StudyDate').parse_range('20230101')
 
+    def test_parse_range_open_ended(self):
+        open_start = Attribute('StudyDate').parse_range('-20260713')
+        open_end =  Attribute('StudyDate').parse_range('20260713-')
+        self.assertEqual(open_start, RangeValue(None, date(2026,7,13)))
+        self.assertEqual(open_end, RangeValue(date(2026,7,13), None))
+
+    def test_parse_range_no_values_raises(self):
+        with self.assertRaises(ValueError):
+            Attribute('StudyDate').parse_range('-')
+
     def test_parse_multiple_splits_on_comma_and_backslash(self):
         self.assertEqual(Attribute('Modality').parse_multiple('CT,MR').values,
                          ['CT', 'MR'])
@@ -230,8 +243,8 @@ class ApplySqlShapeTest(TestCase):
         return 'WHERE' in str(qs.query)
 
     def test_exact_match_uses_equality(self):
-        sql = self._sql('series', 'PatientName=DOE')
-        self.assertIn('"PatientName" = ', sql)
+        sql = self._sql('series', 'Modality=CT')
+        self.assertIn('"Modality" = ', sql)
 
     def test_unsupported_tag_produces_no_filter(self):
         # Valid-but-unsupported tag (9999,0001) is silently dropped.
@@ -248,10 +261,10 @@ class ApplySqlShapeTest(TestCase):
         # Modality (fuzzy=False) must not use the trigram operator even with the flag.
         self.assertNotIn('%%', self._sql('series', 'Modality=CT&fuzzymatching=true'))
 
-    def test_fuzzy_precedence_over_wildcard(self):
+    def test_wildcard_precedence_over_fuzzy(self):
         # Documented: with fuzzymatching on, a PN value is sent through the fuzzy
         # branch even when it contains a wildcard char (fuzzy is checked first).
-        self.assertIn('%%', self._sql('series', 'PatientName=DOE*&fuzzymatching=true'))
+        self.assertNotIn('%%', self._sql('series', 'PatientName=DOE*&fuzzymatching=true'))
 
     def test_range_emits_gte_and_lte(self):
         sql = self._sql('study', 'StudyDate=20230101-20231231')
@@ -276,7 +289,7 @@ class ApplySqlShapeTest(TestCase):
 
     def test_quoted_empty_matched_with_flag(self):
         sql = self._sql('series', 'PatientName=""&emptyvaluematching=true')
-        self.assertIn('"PatientName" = ', sql)
+        self.assertIn('"PatientName" IS NULL', sql)
 
     def test_distinct_attributes_are_anded(self):
         sql = self._sql('series', 'PatientName=DOE&Modality=CT')
@@ -336,9 +349,14 @@ class ApplyBehaviorTest(TestCase):
                    .values_list('PatientName', flat=True))
 
     def test_exact_match(self):
+        self._series(PatientName='DOE^JANE', Modality='CT')
+        self._series(PatientName='SMITH^JOHN', Modality='MR')
+        self.assertEqual(self._names('Modality=CT'), {'DOE^JANE'})
+
+    def test_pn_match_case(self):
         self._series(PatientName='DOE^JANE')
         self._series(PatientName='SMITH^JOHN')
-        self.assertEqual(self._names('PatientName=DOE^JANE'), {'DOE^JANE'})
+        self.assertEqual(self._names('PatientName=Doe^Jane'), {'DOE^JANE'})
 
     def test_multiple_value_matching(self):
         # No supported field has VM>1, so the multi-value path is exercised via a
@@ -405,13 +423,17 @@ class ApplyBehaviorTest(TestCase):
         self.assertEqual(returned_names, all_names)
 
     def test_empty_value_matching(self):
-        self._series(Modality='', PatientName='EMPTY')
-        self._series(Modality='CT', PatientName='NOT^EMPTY')
+        self._series(Modality='', StudyTime=None, PatientName='EMPTY')
+        self._series(Modality='CT', StudyTime=time(12,0,0), PatientName='NOT^EMPTY')
         self.assertEqual(self._names('Modality=""&emptyvaluematching=true&PatientName=NOT^EMPTY'), set())
         self.assertEqual(self._names('Modality=""&emptyvaluematching=false&PatientName=NOT^EMPTY'), {'NOT^EMPTY'})
         self.assertEqual(self._names('Modality=""&emptyvaluematching=true'), {'EMPTY'})
         self.assertEqual(self._names('Modality=""&emptyvaluematching=false'), {'NOT^EMPTY', 'EMPTY'})
         self.assertEqual(self._names('Modality=""'), {'NOT^EMPTY', 'EMPTY'})
+
+        # Check nullable column
+        self.assertEqual(self._names('StudyTime=""&emptyvaluematching=false', 'study'), {'NOT^EMPTY', 'EMPTY'})
+        self.assertEqual(self._names('StudyTime=""&emptyvaluematching=true', 'study'), {'EMPTY'})
 
 
 # ===========================================================================
@@ -498,12 +520,9 @@ class ParseDaTest(SimpleTestCase):
     def test_truncates_trailing(self):
         self.assertEqual(_parse_da('20230102120000'), date(2023, 1, 2))
 
-    def test_invalid_returns_none(self):
-        self.assertIsNone(_parse_da('not-a-date'))
-
-    def test_empty_returns_none(self):
-        self.assertIsNone(_parse_da(''))
-
+    def test_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            _parse_da('not-a-date')
 
 class ParseTmTest(SimpleTestCase):
 
@@ -519,12 +538,13 @@ class ParseTmTest(SimpleTestCase):
     def test_fractional_seconds_stripped(self):
         self.assertEqual(_parse_tm('120000.500000'), time(12, 0, 0))
 
-    def test_unsupported_length_returns_none(self):
-        self.assertIsNone(_parse_tm('123'))     # 3 digits -> no format
+    def test_unsupported_length_raises(self):
+        with self.assertRaises(ValueError):
+            _parse_tm('123')
 
-    def test_invalid_value_returns_none(self):
-        self.assertIsNone(_parse_tm('9999'))    # hour 99 -> ValueError
-
+    def test_invalid_value_raises(self):
+        with self.assertRaises(ValueError):
+            _parse_tm('9999')
 
 class ParseDtTest(SimpleTestCase):
 
@@ -545,8 +565,9 @@ class ParseDtTest(SimpleTestCase):
     def test_fractional_stripped(self):
         self.assertEqual(_parse_dt('20230101120000.5'), datetime(2023, 1, 1, 12, 0, 0))
 
-    def test_invalid_returns_none(self):
-        self.assertIsNone(_parse_dt('garbage'))
+    def test_invalid_raises(self):
+        with self.assertRaises(ValueError):
+            _parse_dt('garbage')
 
 
 class ParseTemporalTest(SimpleTestCase):
@@ -560,8 +581,9 @@ class ParseTemporalTest(SimpleTestCase):
     def test_dt(self):
         self.assertEqual(_parse_temporal('DT', '20230101'), datetime(2023, 1, 1))
 
-    def test_other_vr_returns_none(self):
-        self.assertIsNone(_parse_temporal('PN', 'DOE^JANE'))
+    def test_other_vr_raises(self):
+        with self.assertRaises(TypeError):
+            _parse_temporal('PN', 'DOE^JANE')
 
 
 # ===========================================================================
