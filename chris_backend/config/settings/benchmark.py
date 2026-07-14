@@ -15,7 +15,7 @@ import os
 from .local import *  # noqa: F401,F403
 
 
-options = DATABASES['default'].setdefault('OPTIONS', {})
+options = DATABASES['default'].setdefault('OPTIONS', {})  # noqa: F405
 options['pool'] = {
     'min_size': int(os.getenv('CUBE_DB_POOL_MIN_SIZE', '2')),
     'max_size': int(os.getenv('CUBE_DB_POOL_MAX_SIZE', '10')),
