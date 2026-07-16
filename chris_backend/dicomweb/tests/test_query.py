@@ -3,6 +3,7 @@ Unit tests for ``dicomweb.query`` — the QIDO-RS DICOM-tag query parser
 (PS3.18 §10.6 Search Transaction; matching semantics per PS3.4 §C.2.2.2).
 """
 from datetime import date, time, datetime
+import unittest
 
 from django.http import QueryDict
 from django.test import TestCase, SimpleTestCase
@@ -370,6 +371,13 @@ class ApplyBehaviorTest(TestCase):
         fields.update(overrides)
         return PACSSeries.objects.create(**fields)
 
+    def _study(self, **overrides):
+        from dicomweb.models import PACSStudy
+        fields = dict(PatientID='P', PatientName='X^Y', StudyDate=date(2023, 1, 1),
+                      StudyInstanceUID='1.2', pacs=self.pacs)
+        fields.update(overrides)
+        return PACSStudy.objects.create(**fields)
+
     def _names(self, querystring, resource='series'):
         from pacsfiles.models import PACSSeries
         qf = QueryFilter(resource)
@@ -387,11 +395,29 @@ class ApplyBehaviorTest(TestCase):
         self._series(PatientName='SMITH^JOHN')
         self.assertEqual(self._names('PatientName=Doe^Jane'), {'DOE^JANE'})
 
+    @unittest.expectedFailure   # ModalitiesInStudy missing
     def test_multiple_value_matching(self):
-        # The multiplevaluematching-gated multi path (VR in MULTI_VALUE_VRS with
-        # VM>1) has no such field in the resource maps, so it is exercised via a
-        # synthetic ModalitiesInStudy (CS VM 1-n) mapped onto the real Modality
-        # column. The ungated UID-list path is covered by test_uid_list_* above.
+        # multiple value matching asserts that all values of a
+        # comma-separated list appear in the matched object. We can
+        # test this by querying multiple values on ModalitiesInStudy.
+        # We should only get back studies that series with all modalities
+        from dicomweb.models import PACSStudy
+        self._study(PatientName='A', StudyInstanceUID='A.1', ModalitiesInStudy=r'CT\MR')
+        self._study(PatientName='A', StudyInstanceUID='A.2', ModalitiesInStudy=r'CT')
+        self._study(PatientName='A', StudyInstanceUID='A.3', ModalitiesInStudy=r'PT')
+        self._study(PatientName='B', StudyInstanceUID='B.3', ModalitiesInStudy=r'CT')
+        self._study(PatientName='B', StudyInstanceUID='B.3', ModalitiesInStudy=r'MR')
+        qf = QueryFilter('study')
+        sq = SearchQuery.from_query_dict(
+            QueryDict('ModalitiesInStudy=CT,MR&multiplevaluematching=true'))
+        study_instance_uids = set(qf.apply(PACSStudy.objects.all(), sq)
+                                  .values_list('StudyInstanceUID', flat=True))
+        self.assertEqual(study_instance_uids, {'A.1'})
+
+    def test_multiple_value_matching_monkeypatch(self):
+        # Workaround to exercise the currently-inaccessible
+        # multi-value matching path.
+        # TODO: remove this once the above expected failure is passing
         from pacsfiles.models import PACSSeries
         self._series(PatientName='A', Modality='CT')
         self._series(PatientName='B', Modality='MR')
