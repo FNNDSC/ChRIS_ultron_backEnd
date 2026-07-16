@@ -277,14 +277,20 @@ class ApplySqlShapeTest(TestCase):
         # VM>1) has no such field in the resource maps, so drive it with a
         # synthetic ModalitiesInStudy (CS VM 1-n) mapped onto a real column. The
         # ungated UID-list IN path is covered separately by the real-map tests.
-        from pacsfiles.models import PACSSeries
-        attr = Attribute('ModalitiesInStudy', orm_field='Modality')
-        qf = QueryFilter('series')
+        from dicomweb.models import PACSStudy
+        qf = QueryFilter('study')
+
+        # TODO: remove monkeypatch after ModalitiesInStudy implemented
+        attr = Attribute('ModalitiesInStudy', orm_field='PatientName')
         qf.tag_map = {attr.tag: attr}
+
         sq = SearchQuery.from_query_dict(
             QueryDict('ModalitiesInStudy=CT,MR&multiplevaluematching=true'))
-        sql = qf.apply(PACSSeries.objects.all(), sq).query.sql_with_params()[0]
-        self.assertIn('IN (', sql)
+        sql, params = qf.apply(PACSStudy.objects.all(), sq).query.sql_with_params()
+        self.assertIn(' AND ', sql)
+        self.assertIn(' LIKE ', sql)
+        self.assertIn('%CT%', params)
+        self.assertIn('%MR%', params)
 
     def test_quoted_empty_skipped_without_flag(self):
         self.assertFalse(self._has_where('series', 'PatientName=""'))
@@ -419,9 +425,8 @@ class ApplyBehaviorTest(TestCase):
         # multi-value matching path.
         # TODO: remove this once the above expected failure is passing
         from pacsfiles.models import PACSSeries
-        self._series(PatientName='A', Modality='CT')
-        self._series(PatientName='B', Modality='MR')
-        self._series(PatientName='C', Modality='US')
+        self._series(PatientName='A', StudyInstanceUID='A.1', Modality=r'CT\MR')
+        self._series(PatientName='B', StudyInstanceUID='B.1', Modality=r'US')
         attr = Attribute('ModalitiesInStudy', orm_field='Modality')
         qf = QueryFilter('series')
         qf.tag_map = {attr.tag: attr}
@@ -429,7 +434,7 @@ class ApplyBehaviorTest(TestCase):
             QueryDict('ModalitiesInStudy=CT,MR&multiplevaluematching=true'))
         names = set(qf.apply(PACSSeries.objects.all(), sq)
                     .values_list('PatientName', flat=True))
-        self.assertEqual(names, {'A', 'B'})
+        self.assertEqual(names, {'A'})
 
     def test_uid_list_matches_multiple_rows(self):
         # StudyInstanceUID=<uid>,<uid> (UI VR, ungated IN path via UID_LIST_VRS)

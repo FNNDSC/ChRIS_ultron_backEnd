@@ -138,6 +138,11 @@ class MultipleValue[T]:
 
 
 @dataclass
+class UIDListValue:
+    values: list[str]
+
+
+@dataclass
 class Attribute:
     keyword: str
     orm_field: str = ""         # Will default to keyword if unset
@@ -174,6 +179,9 @@ class Attribute:
             return False
         return self.vm != '1'
 
+    def cap_uid_list(self) -> bool:
+        return self.vr in UID_LIST_VRS
+
     def parse(self, value: str, multi_value: bool = False) -> Any:
         if value == '':
             return UniversalValue()
@@ -181,12 +189,18 @@ class Attribute:
             return EmptyValue()
         if self.cap_range() and "-" in value:
             return self.parse_range(value)
-        if self.vr in UID_LIST_VRS or (self.cap_multi_value() and multi_value):
+        if self.cap_multi_value() and multi_value:
             parsed_value = self.parse_multiple(value)
             length = len(parsed_value.values)
             if length == 1:
                 return parsed_value.values[0]
             return parsed_value
+        if self.cap_uid_list():
+            uid_list_value = self.parse_uid_list(value)
+            length = len(uid_list_value.values)
+            if length == 1:
+                return uid_list_value.values[0]
+            return uid_list_value
         return self.parse_single(value)
 
     def parse_single(self, value: str) -> Any:
@@ -207,6 +221,9 @@ class Attribute:
 
     def parse_multiple(self, value: str) -> MultipleValue:
         return MultipleValue([self.parse_single(v) for v in re.split(r'[\\,]', value) if len(v) > 0])
+
+    def parse_uid_list(self, value: str) -> UIDListValue:
+        return UIDListValue([self.parse_single(v) for v in re.split(',', value) if len(v) > 0])
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +321,13 @@ class QueryFilter:
                         q |= range_q
                         continue
                     case MultipleValue(multi_values):
-                        q |= Q(**{f'{attribute.orm_field}__in': multi_values})
+                        multi_value_q = Q()
+                        for value in multi_values:
+                            multi_value_q &= Q(**{f'{attribute.orm_field}__contains': value})
+                        q |= multi_value_q
+                        continue
+                    case UIDListValue(uid_list):
+                        q |= Q(**{f'{attribute.orm_field}__in': uid_list})
                         continue
                     case UniversalValue():
                         # PS3.4 §C.2.2.2.3 Universal Matching
