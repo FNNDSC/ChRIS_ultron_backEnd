@@ -272,9 +272,10 @@ class ApplySqlShapeTest(TestCase):
         self.assertIn('<=', sql)
 
     def test_multiple_value_emits_in(self):
-        # No supported field has VM>1, so the multi-value IN path is unreachable
-        # through the resource maps. Drive it with a genuinely multi-valued
-        # attribute (ModalitiesInStudy, CS VM 1-n) mapped onto a real column.
+        # The multiplevaluematching-gated multi path (VR in MULTI_VALUE_VRS with
+        # VM>1) has no such field in the resource maps, so drive it with a
+        # synthetic ModalitiesInStudy (CS VM 1-n) mapped onto a real column. The
+        # ungated UID-list IN path is covered separately by the real-map tests.
         from pacsfiles.models import PACSSeries
         attr = Attribute('ModalitiesInStudy', orm_field='Modality')
         qf = QueryFilter('series')
@@ -305,10 +306,38 @@ class ApplySqlShapeTest(TestCase):
         self.assertIn('pacsfiles_pacsseries', sql)          # joined series table
         self.assertIn('"SeriesInstanceUID" = ', sql)
 
+    def test_instance_empty_value_follows_fk_relation(self):
+        # Empty-value matching on the instance map's series__ pass-through field
+        # must follow the FK relation to resolve the target column type. This is
+        # the only path that reaches the relation-following branch of
+        # _is_text_column; SeriesInstanceUID is text, so the compiled filter is
+        # the NULL-or-empty pair (`IS NULL` OR `= ''`).
+        from dicomweb.models import PACSInstance
+        qf = QueryFilter('instance')
+        sq = SearchQuery.from_query_dict(
+            QueryDict('SeriesInstanceUID=""&emptyvaluematching=true'))
+        sql, params = qf.apply(PACSInstance.objects.all(), sq).query.sql_with_params()
+        self.assertIn('"SeriesInstanceUID" IS NULL', sql)
+        self.assertIn(' OR ', sql)          # text column → empty-string alternative
+        self.assertIn('"SeriesInstanceUID" = ', sql)
+        self.assertIn('', params)
+
+    def test_uid_list_emits_in(self):
+        self.assertIn('IN (', self._sql('study', 'StudyInstanceUID=1.2.3,4.5.6'))
+
+    def test_uid_list_emits_in_on_instance_passthrough(self):
+        # Same ungated UID-list path through the instance map's
+        # series__StudyInstanceUID FK pass-through field.
+        from dicomweb.models import PACSInstance
+        qf = QueryFilter('instance')
+        sq = SearchQuery.from_query_dict(QueryDict('StudyInstanceUID=1.2.3,4.5.6'))
+        sql = qf.apply(PACSInstance.objects.all(), sq).query.sql_with_params()[0]
+        self.assertIn('IN (', sql)
+
     def test_temporal_empty_is_universal_matching(self):
         # PS3.4 §C.2.2.2.3: a zero-length value is universal matching (no
-        # restriction) — including temporal VRs, whose empty value parses to
-        # None and must not emit `StudyDate IS NULL`.
+        # restriction) — including temporal VRs, whose empty value yields a
+        # UniversalValue sentinel and must not emit `StudyDate IS NULL`.
         self.assertFalse(self._has_where('study', 'StudyDate='))
 
 
@@ -359,9 +388,10 @@ class ApplyBehaviorTest(TestCase):
         self.assertEqual(self._names('PatientName=Doe^Jane'), {'DOE^JANE'})
 
     def test_multiple_value_matching(self):
-        # No supported field has VM>1, so the multi-value path is exercised via a
-        # genuinely multi-valued attribute (ModalitiesInStudy, CS VM 1-n) mapped
-        # onto the real Modality column.
+        # The multiplevaluematching-gated multi path (VR in MULTI_VALUE_VRS with
+        # VM>1) has no such field in the resource maps, so it is exercised via a
+        # synthetic ModalitiesInStudy (CS VM 1-n) mapped onto the real Modality
+        # column. The ungated UID-list path is covered by test_uid_list_* above.
         from pacsfiles.models import PACSSeries
         self._series(PatientName='A', Modality='CT')
         self._series(PatientName='B', Modality='MR')
@@ -374,6 +404,15 @@ class ApplyBehaviorTest(TestCase):
         names = set(qf.apply(PACSSeries.objects.all(), sq)
                     .values_list('PatientName', flat=True))
         self.assertEqual(names, {'A', 'B'})
+
+    def test_uid_list_matches_multiple_rows(self):
+        # StudyInstanceUID=<uid>,<uid> (UI VR, ungated IN path via UID_LIST_VRS)
+        # matches every listed study
+        self._series(PatientName='A', StudyInstanceUID='1')
+        self._series(PatientName='B', StudyInstanceUID='2')
+        self._series(PatientName='C', StudyInstanceUID='3')
+        self.assertEqual(self._names('StudyInstanceUID=1,2', 'study'),
+                         {'A', 'B'})
 
     def test_date_range_matching(self):
         self._series(PatientName='IN', StudyDate=date(2023, 6, 1))

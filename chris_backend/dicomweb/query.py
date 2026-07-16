@@ -370,7 +370,7 @@ def _is_text_column(model, orm_field: str) -> bool:
 
 
 def _parse_da(s: str):
-    """Parse DICOM DA string (YYYYMMDD) to Python date, or None on failure."""
+    """Parse DICOM DA string (YYYYMMDD) to Python date; raises ValueError on failure."""
     try:
         return datetime.strptime(s[:8], '%Y%m%d').date()
     except (ValueError, TypeError):
@@ -379,7 +379,7 @@ def _parse_da(s: str):
 
 def _parse_tm(s: str):
     """Parse a DICOM TM string (HHMMSS[.ffffff], truncated forms allowed) to a
-    Python time, or None on failure."""
+    Python time; raises ValueError on failure."""
     raw = s.split('.', 1)[0]
     fmt = {6: '%H%M%S', 4: '%H%M', 2: '%H'}.get(len(raw))
     if fmt is None:
@@ -392,7 +392,7 @@ def _parse_tm(s: str):
 
 def _parse_dt(s: str):
     """Parse a DICOM DT string (YYYYMMDD[HHMMSS], truncated forms allowed) to a
-    Python datetime, or None on failure."""
+    Python datetime; raises ValueError on failure."""
     raw = s.split('.', 1)[0]
     for fmt in ('%Y%m%d', '%Y%m%d%H', '%Y%m%d%H%M', '%Y%m%d%H%M%S'):
         try:
@@ -403,8 +403,9 @@ def _parse_dt(s: str):
 
 
 def _parse_temporal(vr: str, s: str):
-    """Parse a DICOM DA/TM/DT string into its native type (date/time/datetime),
-    or None. Dispatches on VR so range and exact matching coerce correctly."""
+    """Parse a DICOM DA/TM/DT string into its native type (date/time/datetime).
+    Dispatches on VR so range and exact matching coerce correctly. Raises
+    ValueError on malformed input, or TypeError on an unsupported VR."""
     if vr == 'DA':
         return _parse_da(s)
     if vr == 'TM':
