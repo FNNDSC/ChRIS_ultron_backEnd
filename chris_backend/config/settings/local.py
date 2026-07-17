@@ -150,6 +150,9 @@ DATABASES['default']['TEST'] = {'NAME': 'test_chris_dev'}
 DATABASES['default']['HOST'] = 'chris_dev_db'
 DATABASES['default']['PORT'] = '5432'
 DATABASES['default']['OPTIONS'] = {'pool': {'min_size': 1, 'max_size': 2, 'timeout': 10}}
+# Apply the QIDO-RS fuzzy-matching similarity threshold GUC (see common.py),
+# whether or not the connection pool branch above ran.
+apply_dicomweb_fuzzy_threshold(DATABASES['default'])  # noqa: F405
 
 # Mail settings
 # ------------------------------------------------------------------------------

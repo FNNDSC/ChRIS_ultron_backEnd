@@ -65,6 +65,10 @@ if DATABASE_CONN_POOL:
                                                 'max_size': DATABASE_CONN_POOL_MAX_SIZE,
                                                 'timeout': DATABASE_CONN_POOL_TIMEOUT}}
 
+# Apply the QIDO-RS fuzzy-matching similarity threshold GUC (see common.py),
+# whether or not the connection pool branch above ran.
+apply_dicomweb_fuzzy_threshold(DATABASES['default'])  # noqa: F405
+
 
 # STORAGE CONFIGURATION
 # ------------------------------------------------------------------------------
