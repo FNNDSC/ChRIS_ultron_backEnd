@@ -1,0 +1,296 @@
+"""
+Unit tests for dicomweb.dicomnative (native-model builder) and dicomweb.renderers
+(DICOM JSON Model encoding, PS3.18 §F).
+"""
+import json
+from datetime import date, datetime, time, timedelta, timezone
+
+from django.test import SimpleTestCase
+
+from dicomweb.dicomnative import (
+    DicomAttribute,
+    dataset,
+    dicom_attribute,
+    normalize_tag,
+)
+from dicomweb.renderers import DicomJsonEncoder, DicomJsonRenderer
+
+
+class NormalizeTagTest(SimpleTestCase):
+
+    def test_hex_string(self):
+        self.assertEqual(normalize_tag('00100010'), '00100010')
+
+    def test_int(self):
+        self.assertEqual(normalize_tag(0x00100010), '00100010')
+
+    def test_group_element_tuple(self):
+        self.assertEqual(normalize_tag((0x0010, 0x0010)), '00100010')
+
+    def test_keyword(self):
+        self.assertEqual(normalize_tag('PatientName'), '00100010')
+
+    def test_lowercase_is_uppercased(self):
+        self.assertEqual(normalize_tag('7fe00010'), '7FE00010')
+
+
+class DicomAttributeTest(SimpleTestCase):
+    """The native-model builder normalizes the tag, resolves the VR, and stores
+    the value unchanged (coercion is the renderer's job)."""
+
+    def test_vr_derived_from_data_dictionary(self):
+        attr = dicom_attribute('PatientName', 'DOE^JANE')
+        self.assertEqual(attr, DicomAttribute('00100010', 'PN', {'Alphabetic': 'DOE^JANE'}))
+
+    def test_pn_encoded_as_alphabetic_mapping(self):
+        # PN is part of the native model — stored as its component mapping.
+        self.assertEqual(
+            dicom_attribute('00100010', 'DOE^JANE').Value, {'Alphabetic': 'DOE^JANE'}
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', ['DOE^JANE', 'ROE^JOHN']).Value,
+            [{'Alphabetic': 'DOE^JANE'}, {'Alphabetic': 'ROE^JOHN'}],
+        )
+
+    def test_empty_pn_left_for_renderer(self):
+        # Empty PN is not turned into a mapping — the renderer omits it (§F.2.5).
+        self.assertIsNone(dicom_attribute('00100010', None).Value)
+        self.assertEqual(dicom_attribute('00100010', '').Value, '')
+
+    def test_non_pn_value_stored_unchanged(self):
+        # Raw value is preserved — no int coercion, no empty→None.
+        self.assertEqual(dicom_attribute('00200013', '42').Value, '42')
+        self.assertEqual(dicom_attribute('00080020', date(2023, 1, 2)).Value,
+                         date(2023, 1, 2))
+        self.assertEqual(dicom_attribute('00080060', ['CT', 'MR']).Value, ['CT', 'MR'])
+
+    def test_explicit_vr_overrides_dictionary(self):
+        self.assertEqual(dicom_attribute('00080016', 'x', vr='UI').VR, 'UI')
+
+    def test_non_two_char_vr_raises(self):
+        # Ambiguous data-dictionary VRs ('US or SS', 'OB or OW') must be rejected.
+        with self.assertRaises(ValueError):
+            dicom_attribute('7FE00010', b'\x00', vr='OB or OW')
+        with self.assertRaises(ValueError):
+            dicom_attribute('00280106', 0, vr='US or SS')
+
+
+class DatasetTest(SimpleTestCase):
+
+    def test_builds_attribute_list(self):
+        result = dataset([
+            ('00100010', 'PN', 'DOE^JANE'),   # (tag, vr, value)
+            ('00080020', date(2023, 6, 1)),   # (tag, value) — VR derived
+            ('00080060', 'CT'),
+        ])
+        self.assertEqual(
+            result,
+            [
+                DicomAttribute('00100010', 'PN', {'Alphabetic': 'DOE^JANE'}),
+                DicomAttribute('00080020', 'DA', date(2023, 6, 1)),
+                DicomAttribute('00080060', 'CS', 'CT'),
+            ],
+        )
+
+    def test_prebuilt_dicom_attribute_passed_through(self):
+        # A DicomAttribute is a length-3 tuple; it must not be re-encoded
+        # (which would double-wrap a PN mapping).
+        attr = dicom_attribute('00100010', 'DOE^JANE')
+        self.assertEqual(dataset([attr]), [attr])
+
+
+class DicomJsonEncoderTest(SimpleTestCase):
+    """Temporal wire-string encoding, including fractional seconds."""
+
+    def _encode(self, obj):
+        return json.loads(json.dumps(obj, cls=DicomJsonEncoder))
+
+    def test_datetime_with_microseconds(self):
+        self.assertEqual(
+            self._encode(datetime(2023, 1, 2, 14, 30, 5, 123456)),
+            '20230102143005.123456',
+        )
+
+    def test_time_with_microseconds(self):
+        self.assertEqual(self._encode(time(14, 30, 5, 123456)), '143005.123456')
+
+    def test_tz_aware_datetime_gets_offset_suffix(self):
+        # DICOM DT "&ZZXX" UTC-offset suffix (§F / PS3.5 DT VR).
+        east = datetime(2023, 1, 2, 14, 30, 5, tzinfo=timezone(timedelta(hours=5)))
+        self.assertEqual(self._encode(east), '20230102143005+0500')
+        west = datetime(2023, 1, 2, 14, 30, 5, 123456,
+                        tzinfo=timezone(timedelta(hours=-4, minutes=-30)))
+        self.assertEqual(self._encode(west), '20230102143005.123456-0430')
+
+    def test_naive_datetime_has_no_offset(self):
+        self.assertEqual(self._encode(datetime(2023, 1, 2, 14, 30, 5)),
+                         '20230102143005')
+
+    def test_unknown_type_defers_to_drf_encoder(self):
+        # A type this encoder does not handle falls through to DRF's encoder,
+        # which serializes a set as a JSON array.
+        self.assertEqual(self._encode({'X'}), ['X'])
+
+
+class DicomJsonRendererTest(SimpleTestCase):
+    """The renderer applies all DICOM JSON Model encoding (PS3.18 §F)."""
+
+    def _render(self, data):
+        raw = DicomJsonRenderer().render(data)
+        self.assertIsInstance(raw, bytes)
+        return json.loads(raw.decode('utf-8'))
+
+    def _element(self, tag, vr, value):
+        return self._render(dataset([(tag, vr, value)]))[0][tag]
+
+    def test_single_dataset_wrapped_in_array(self):
+        parsed = self._render(dataset([('00100010', 'PN', 'DOE^JANE')]))
+        self.assertEqual(
+            parsed,
+            [{'00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]}}],
+        )
+
+    def test_pn_encoded_as_alphabetic_object(self):
+        self.assertEqual(
+            self._element('00100010', 'PN', 'DOE^JANE'),
+            {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]},
+        )
+
+    def test_cs_single_and_multi(self):
+        self.assertEqual(self._element('00080060', 'CS', 'CT')['Value'], ['CT'])
+        self.assertEqual(
+            self._element('00080060', 'CS', ['CT', 'MR'])['Value'], ['CT', 'MR']
+        )
+
+    def test_integer_vrs_encoded_as_int(self):
+        # IS/US/SV/UV (and UL/SL/SS) → JSON integer (pydicom INT_VR minus AT).
+        for tag, vr in [('00200013', 'IS'), ('00280010', 'US'),
+                        ('00000000', 'SV'), ('00000000', 'UV')]:
+            value = self._element(tag, vr, '42')['Value']
+            self.assertEqual(value, [42])
+            self.assertIsInstance(value[0], int)
+
+    def test_float_vrs_encoded_as_float(self):
+        # DS/FL/FD → JSON float. §F.2.3 lists DS/IS/SV/UV as "Number or String";
+        # per the atlas QIDO reference we follow pydicom and emit numbers, so a
+        # DS decimal string is coerced to float (precision not preserved).
+        self.assertEqual(self._element('00189306', 'FD', '2.5')['Value'], [2.5])
+        value = self._element('00181164', 'DS', '3.140000')['Value']
+        self.assertEqual(value, [3.14])
+        self.assertIsInstance(value[0], float)
+
+    def test_at_encoded_as_hex_string(self):
+        # AT is in pydicom INT_VR but DICOM JSON encodes it as an 8-char hex
+        # string. Tag() makes it idempotent across int / hex-string / tuple input.
+        self.assertEqual(
+            self._element('00280009', 'AT', 0x00100010)['Value'], ['00100010']
+        )
+        self.assertEqual(
+            self._element('00280009', 'AT', '00100010')['Value'], ['00100010']
+        )
+
+    def test_binary_vr_rejected(self):
+        # Bulk data must not reach the QIDO surface; rejected here, not in the
+        # native builder. Fires even for an empty binary attribute.
+        for vr in ('OW', 'OV', 'OB', 'UN'):
+            with self.assertRaises(ValueError):
+                self._render(dataset([('7FE00010', vr, b'\x00')]))
+        with self.assertRaises(ValueError):
+            self._render(dataset([('7FE00010', 'OW', None)]))
+
+    def test_string_vrs_not_rejected_as_binary(self):
+        # UR/UC/UT are string VRs, not binary. RetrieveURL (0008,1190) is VR UR,
+        # a standard QIDO return attribute — must render as a string.
+        self.assertEqual(self._element('00081190', 'UR', 'http://x')['Value'],
+                         ['http://x'])
+        self.assertEqual(self._element('00081196', 'UT', 't')['Value'], ['t'])
+        self.assertEqual(self._element('00080104', 'UC', 'c')['Value'], ['c'])
+
+    def test_sq_empty_omits_value(self):
+        # SQ is a structured VR, not binary — an empty sequence just omits Value.
+        self.assertEqual(self._element('00081115', 'SQ', None), {'vr': 'SQ'})
+
+    def test_sq_renders_nested_datasets(self):
+        # §F.2.2: a sequence Value is an array of DICOM JSON objects, one per
+        # item; each item is a dataset (list[DicomAttribute]) rendered recursively.
+        item = dataset([('00080060', 'CS', 'CT'), ('0020000E', 'UI', '1.2.3')])
+        self.assertEqual(
+            self._element('00081115', 'SQ', [item]),
+            {'vr': 'SQ', 'Value': [{
+                '00080060': {'vr': 'CS', 'Value': ['CT']},
+                '0020000E': {'vr': 'UI', 'Value': ['1.2.3']},
+            }]},
+        )
+
+    def test_sq_multiple_items_and_empty_item(self):
+        # Multiple items preserved in order; an empty item → {} (§F.2.5).
+        item = dataset([('00080060', 'CS', 'CT')])
+        self.assertEqual(
+            self._element('00081115', 'SQ', [item, []])['Value'],
+            [{'00080060': {'vr': 'CS', 'Value': ['CT']}}, {}],
+        )
+
+    def test_sq_nested_sequence(self):
+        # Recursion: a sequence item that itself contains a sequence.
+        inner = dataset([('00080060', 'CS', 'CT')])
+        outer_item = dataset([('00081140', 'SQ', [inner])])   # ReferencedImageSequence
+        self.assertEqual(
+            self._element('00081115', 'SQ', [outer_item])['Value'],
+            [{'00081140': {'vr': 'SQ',
+                           'Value': [{'00080060': {'vr': 'CS', 'Value': ['CT']}}]}}],
+        )
+
+    def test_temporal_values_rendered_as_wire_strings(self):
+        parsed = self._render(dataset([
+            ('00080020', date(2023, 1, 2)),
+            ('00080030', time(14, 30, 5)),
+            ('0008002A', datetime(2023, 1, 2, 14, 30, 5)),   # DT
+        ]))
+        self.assertEqual(parsed[0]['00080020'], {'vr': 'DA', 'Value': ['20230102']})
+        self.assertEqual(parsed[0]['00080030'], {'vr': 'TM', 'Value': ['143005']})
+        self.assertEqual(
+            parsed[0]['0008002A'], {'vr': 'DT', 'Value': ['20230102143005']}
+        )
+
+    def test_preformatted_temporal_string_passes_through(self):
+        self.assertEqual(self._element('00080020', 'DA', '20230102')['Value'],
+                         ['20230102'])
+
+    def test_empty_attribute_omits_value_key(self):
+        for empty in (None, '', []):
+            element = self._element('00100010', 'PN', empty)
+            self.assertEqual(element, {'vr': 'PN'})
+            self.assertNotIn('Value', element)
+
+    def test_multivalued_empty_element_rendered_as_json_null(self):
+        # §F.2.5: empty elements are null, not dropped and never "".
+        self.assertEqual(
+            self._element('00080060', 'CS', ['CT', '', 'MR'])['Value'],
+            ['CT', None, 'MR'],
+        )
+
+    def test_all_empty_multivalue_omits_value_key(self):
+        element = self._element('00080060', 'CS', ['', None])
+        self.assertEqual(element, {'vr': 'CS'})
+
+    def test_non_numeric_value_raises_at_render(self):
+        # Bad data for a numeric VR fails during serialization, not silently.
+        with self.assertRaises(ValueError):
+            self._render(dataset([('00200013', 'IS', 'not-a-number')]))
+
+    def test_multiple_datasets(self):
+        parsed = self._render([
+            dataset([('00080060', 'CT')]),
+            dataset([('00080060', 'MR')]),
+        ])
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual(parsed[0]['00080060']['Value'], ['CT'])
+        self.assertEqual(parsed[1]['00080060']['Value'], ['MR'])
+
+    def test_empty_result_is_empty_array(self):
+        self.assertEqual(self._render([]), [])
+
+    def test_non_list_payload_passed_through(self):
+        # A non-list payload (e.g. a DRF error dict) is passed through untouched
+        # rather than treated as a dataset — avoids a KeyError on data[0].
+        self.assertEqual(self._render({'detail': 'not found'}), {'detail': 'not found'})
