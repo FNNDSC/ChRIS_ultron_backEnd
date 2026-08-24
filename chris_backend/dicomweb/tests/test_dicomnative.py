@@ -40,29 +40,53 @@ class DicomAttributeTest(SimpleTestCase):
 
     def test_vr_derived_from_data_dictionary(self):
         attr = dicom_attribute('PatientName', 'DOE^JANE')
-        self.assertEqual(attr, DicomAttribute('00100010', 'PN', {'Alphabetic': 'DOE^JANE'}))
+        self.assertEqual(attr, DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'DOE^JANE'}))
 
     def test_pn_encoded_as_alphabetic_mapping(self):
         # PN is part of the native model — stored as its component mapping.
         self.assertEqual(
-            dicom_attribute('00100010', 'DOE^JANE').Value, {'Alphabetic': 'DOE^JANE'}
+            dicom_attribute('00100010', 'DOE^JANE').person_name,
+            {'Alphabetic': 'DOE^JANE'}
         )
         self.assertEqual(
-            dicom_attribute('00100010', ['DOE^JANE', 'ROE^JOHN']).Value,
-            [{'Alphabetic': 'DOE^JANE'}, {'Alphabetic': 'ROE^JOHN'}],
+            dicom_attribute('00100010', 'Yamada^Tarou=山田^太郎=やまだ^たろう').person_name,
+            {
+                'Alphabetic': 'Yamada^Tarou',
+                'Phonetic': 'やまだ^たろう',
+                'Ideographic': '山田^太郎',
+            }
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', 'Yamada^Tarou==やまだ^たろう').person_name,
+            {
+                'Alphabetic': 'Yamada^Tarou',
+                'Phonetic': 'やまだ^たろう',
+            }
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', '==やまだ^たろう').person_name,
+            {'Phonetic': 'やまだ^たろう',}
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', '=山田^太郎=').person_name,
+            {'Ideographic': '山田^太郎',}
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', '=山田^太郎=').person_name,
+            dicom_attribute('00100010', '=山田^太郎').person_name,
         )
 
     def test_empty_pn_left_for_renderer(self):
         # Empty PN is not turned into a mapping — the renderer omits it (§F.2.5).
-        self.assertIsNone(dicom_attribute('00100010', None).Value)
-        self.assertEqual(dicom_attribute('00100010', '').Value, '')
+        self.assertIsNone(dicom_attribute('00100010', None).person_name)
+        self.assertEqual(dicom_attribute('00100010', '').person_name, '')
 
     def test_non_pn_value_stored_unchanged(self):
         # Raw value is preserved — no int coercion, no empty→None.
-        self.assertEqual(dicom_attribute('00200013', '42').Value, '42')
-        self.assertEqual(dicom_attribute('00080020', date(2023, 1, 2)).Value,
+        self.assertEqual(dicom_attribute('00200013', '42').value, '42')
+        self.assertEqual(dicom_attribute('00080020', date(2023, 1, 2)).value,
                          date(2023, 1, 2))
-        self.assertEqual(dicom_attribute('00080060', ['CT', 'MR']).Value, ['CT', 'MR'])
+        self.assertEqual(dicom_attribute('00080060', ['CT', 'MR']).value, ['CT', 'MR'])
 
     def test_explicit_vr_overrides_dictionary(self):
         self.assertEqual(dicom_attribute('00080016', 'x', vr='UI').VR, 'UI')
@@ -82,13 +106,15 @@ class DatasetTest(SimpleTestCase):
             ('00100010', 'PN', 'DOE^JANE'),   # (tag, vr, value)
             ('00080020', date(2023, 6, 1)),   # (tag, value) — VR derived
             ('00080060', 'CT'),
+            DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'PATIENT^TWO'}),
         ])
         self.assertEqual(
             result,
             [
-                DicomAttribute('00100010', 'PN', {'Alphabetic': 'DOE^JANE'}),
-                DicomAttribute('00080020', 'DA', date(2023, 6, 1)),
-                DicomAttribute('00080060', 'CS', 'CT'),
+                DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'DOE^JANE'}),
+                DicomAttribute('00080020', 'DA', value=date(2023, 6, 1)),
+                DicomAttribute('00080060', 'CS', value='CT'),
+                DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'PATIENT^TWO'}),
             ],
         )
 
@@ -241,15 +267,15 @@ class DicomJsonRendererTest(SimpleTestCase):
         )
 
     def test_temporal_values_rendered_as_wire_strings(self):
-        parsed = self._render(dataset([
+        parsed, = self._render(dataset([
             ('00080020', date(2023, 1, 2)),
             ('00080030', time(14, 30, 5)),
             ('0008002A', datetime(2023, 1, 2, 14, 30, 5)),   # DT
         ]))
-        self.assertEqual(parsed[0]['00080020'], {'vr': 'DA', 'Value': ['20230102']})
-        self.assertEqual(parsed[0]['00080030'], {'vr': 'TM', 'Value': ['143005']})
+        self.assertEqual(parsed['00080020'], {'vr': 'DA', 'Value': ['20230102']})
+        self.assertEqual(parsed['00080030'], {'vr': 'TM', 'Value': ['143005']})
         self.assertEqual(
-            parsed[0]['0008002A'], {'vr': 'DT', 'Value': ['20230102143005']}
+            parsed['0008002A'], {'vr': 'DT', 'Value': ['20230102143005']}
         )
 
     def test_preformatted_temporal_string_passes_through(self):
@@ -284,8 +310,8 @@ class DicomJsonRendererTest(SimpleTestCase):
             dataset([('00080060', 'MR')]),
         ])
         self.assertEqual(len(parsed), 2)
-        self.assertEqual(parsed[0]['00080060']['Value'], ['CT'])
-        self.assertEqual(parsed[1]['00080060']['Value'], ['MR'])
+        self.assertEqual(parsed[0][0]['00080060']['Value'], ['CT'])
+        self.assertEqual(parsed[1][0]['00080060']['Value'], ['MR'])
 
     def test_empty_result_is_empty_array(self):
         self.assertEqual(self._render([]), [])

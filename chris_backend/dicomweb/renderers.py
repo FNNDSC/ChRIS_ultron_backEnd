@@ -68,6 +68,19 @@ class DicomJsonEncoder(JSONEncoder):
             if obj.microsecond:
                 return obj.strftime('%H%M%S.%f')
             return obj.strftime('%H%M%S')
+        if isinstance(obj, DicomAttribute):
+            tag = f"{Tag(obj.tag):08X}"
+            encoded_attr = {
+                "vr": obj.vr,
+            }
+            if (value := obj.get_value()) is not None:
+                encoded_attr["Value"] = value
+            elif (bulk_data := obj.bulk_data) is not None:
+                # TODO: Fix this stub when implementing WADO-RS
+                encoded_attr["BulkDataURI"] = bulk_data
+            elif (inline_binary := obj.get_inline_binary()) is not None:
+                encoded_attr["InlineBinary"] = inline_binary.decode("utf-8")
+            return super().default({tag: encoded_attr})
         return super().default(obj)
 
 
@@ -85,6 +98,9 @@ class DicomJsonRenderer(JSONRenderer):
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
         payload = _to_json_model(data)
+        if renderer_context is None:
+            renderer_context = {}
+        renderer_context.get('encoder_kwargs', {})['sort_keys'] = True
         return super().render(payload, accepted_media_type, renderer_context)
 
 
@@ -100,12 +116,19 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
 
 def _to_json_model(data):
     """Convert DicomAttribute datasets into DICOM JSON Model objects."""
+    if isinstance(data, DicomAttribute):
+        return _render_dataset([data])
+    # Anything not a list is not a dataset, so pass through
     if not isinstance(data, list):
-        # Not a dataset payload (e.g. a DRF error dict) — pass through untouched
-        # rather than indexing data[0] and masking it with a KeyError/500.
         return data
     if not data:
         return []
+    # List of datasets
+    if all(isinstance(elem, DicomAttribute) for elem in data):
+        return [_render_dataset(data)]
+    # Anything else, map over the list
+    return [_to_json_model(elem) for elem in data]
+
     # A bare dataset (list of DicomAttribute) → wrap as a single-element array.
     datasets = [data] if isinstance(data[0], DicomAttribute) else data
     return [_render_dataset(ds) for ds in datasets]
@@ -115,13 +138,10 @@ def _render_dataset(attributes):
     result = {}
     for attr in attributes:
         if attr.VR in _BINARY_VRS:
-            # Bulk data must not appear at the QIDO metadata surface (§F.2.2).
-            # Checked per-VR here so it fires even for an empty binary attribute.
-            raise ValueError(
-                f'Binary VR {attr.VR!r} must not be emitted in QIDO responses'
-            )
+            # TODO: BulkDataURI, InlineBinary
+            raise ValueError(f'Binary VR {attr.VR!r} not supported in dicomweb')
         element = {'vr': attr.VR}
-        coerced = _coerce(attr.VR, attr.Value)
+        coerced = _coerce(attr.VR, attr.get_value())
         if coerced is not None:
             element['Value'] = coerced if isinstance(coerced, list) else [coerced]
         result[attr.tag] = element
@@ -155,7 +175,7 @@ def _coerce_scalar(vr, value):
     if value is None or value == '':
         return None
     if vr == 'PN':
-        return value  # already the native Alphabetic mapping (dicomweb.dicomnative)
+        return value  # already the native component mapping (dicomweb.dicomnative)
     if vr == 'AT':
         # AT is in pydicom's INT_VR (hence excluded from the local _INT_VRS);
         # DICOM JSON encodes it as an 8-char uppercase hex string, not a number.
