@@ -48,8 +48,10 @@ class DicomJsonEncoder(JSONEncoder):
     """
     JSON encoder that serializes temporal stdlib types to their DICOM wire
     forms (DA ``YYYYMMDD``, TM ``HHMMSS[.FFFFFF]``,
-    DT ``YYYYMMDDHHMMSS[.FFFFFF][&ZZXX]``) rather than ISO-8601. Everything else
-    defers to DRF's encoder.
+    DT ``YYYYMMDDHHMMSS[.FFFFFF][&ZZXX]``) rather than ISO-8601, and
+    :class:`DicomAttribute` objects to their JSON Model object form
+    (``{"TAG": {"vr": …}}``, including BulkDataURI / InlineBinary, §F.2.2).
+    Everything else defers to DRF's encoder.
     """
 
     def default(self, obj):
@@ -71,7 +73,7 @@ class DicomJsonEncoder(JSONEncoder):
         if isinstance(obj, DicomAttribute):
             tag = f"{Tag(obj.tag):08X}"
             encoded_attr = {
-                "vr": obj.vr,
+                "vr": obj.VR,
             }
             if (value := obj.get_value()) is not None:
                 encoded_attr["Value"] = value
@@ -88,8 +90,9 @@ class DicomJsonRenderer(JSONRenderer):
     """
     Render QIDO-RS / WADO-RS responses as the DICOM JSON Model (PS3.18 §F).
 
-    Accepts either a single dataset (``list[DicomAttribute]``) or a list of
-    datasets (``list[list[DicomAttribute]]``) and always emits a top-level JSON
+    Accepts a single dataset (``list[DicomAttribute]``), a bare
+    :class:`DicomAttribute`, or a list of datasets
+    (``list[list[DicomAttribute]]``) and always emits a top-level JSON
     array of DICOM JSON objects.
     """
     media_type = 'application/dicom+json'
@@ -117,7 +120,9 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
 def _to_json_model(data):
     """Convert DicomAttribute datasets into DICOM JSON Model objects."""
     if isinstance(data, DicomAttribute):
-        return _render_dataset([data])
+        # A bare attribute is a one-attribute dataset — wrap as a single-element
+        # array like any other single dataset.
+        return [_render_dataset([data])]
     # Anything not a list is not a dataset, so pass through
     if not isinstance(data, list):
         return data
@@ -128,10 +133,6 @@ def _to_json_model(data):
         return [_render_dataset(data)]
     # Anything else, map over the list
     return [_to_json_model(elem) for elem in data]
-
-    # A bare dataset (list of DicomAttribute) → wrap as a single-element array.
-    datasets = [data] if isinstance(data[0], DicomAttribute) else data
-    return [_render_dataset(ds) for ds in datasets]
 
 
 def _render_dataset(attributes):

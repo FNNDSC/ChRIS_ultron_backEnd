@@ -83,6 +83,25 @@ class DicomAttributeTest(SimpleTestCase):
             [{'Alphabetic': 'DOE^JANE'}, {'Alphabetic': 'SMITH^JOHN'}]
         )
 
+    def test_pn_mapping_value_passed_through(self):
+        # An already-encoded component mapping round-trips unchanged (just
+        # wrapped in its single-element list); unknown component groups are
+        # rejected (PS3.5 §6.2 allows only the three groups).
+        self.assertEqual(
+            dicom_attribute('00100010', {'Alphabetic': 'DOE^JANE'}).person_name,
+            [{'Alphabetic': 'DOE^JANE'}]
+        )
+        self.assertEqual(
+            dicom_attribute('00100010', [{'Alphabetic': 'A'}, {'Phonetic': 'B'}]).person_name,
+            [{'Alphabetic': 'A'}, {'Phonetic': 'B'}]
+        )
+        with self.assertRaises(ValueError):
+            dicom_attribute('00100010', {'GivenName': 'DOE^JANE'})
+
+    def test_pn_invalid_value_raises(self):
+        with self.assertRaises(ValueError):
+            dicom_attribute('00100010', 42)
+
     def test_empty_pn_left_for_renderer(self):
         # Empty PN is not turned into a mapping — the renderer omits it (§F.2.5).
         self.assertIsNone(dicom_attribute('00100010', None).person_name)
@@ -96,6 +115,36 @@ class DicomAttributeTest(SimpleTestCase):
                          [date(2023, 1, 2)])
         self.assertEqual(dicom_attribute('00080060', ['CT', 'MR']).value, ['CT', 'MR'])
         self.assertEqual(dicom_attribute('00080060', ('CT', 'MR')).value, ['CT', 'MR'])
+
+    def test_sq_value_stored_as_item(self):
+        # SQ values live in the item field: a list of item datasets is stored
+        # as supplied, an empty sequence stays None (renderer omits Value).
+        item = dataset([('00080060', 'CS', 'CT')])
+        self.assertEqual(dicom_attribute('00081115', [item]).item, [item])
+        self.assertIsNone(dicom_attribute('00081115', None).item)
+
+    def test_binary_value_stored_as_inline_binary(self):
+        # Binary VRs (pydicom BYTES_VR) are carried as raw bytes in
+        # inline_binary, never in value — the renderer rejects them at the
+        # QIDO surface.
+        attr = dicom_attribute('7FE00010', b'\x00\x01', vr='OW')
+        self.assertEqual(attr.inline_binary, b'\x00\x01')
+        self.assertIsNone(attr.value)
+        self.assertIsNone(attr.item)
+
+    def test_multiple_value_fields_rejected(self):
+        # At most one of [value, item, person_name, bulk_data, inline_binary].
+        with self.assertRaises(ValueError):
+            DicomAttribute('00100010', 'PN', value=['x'],
+                           person_name=[{'Alphabetic': 'x'}])
+
+    def test_get_inline_binary(self):
+        # None when unset; base64 of the raw bytes otherwise (§F.2.7).
+        self.assertIsNone(DicomAttribute('00100010', 'PN').get_inline_binary())
+        self.assertEqual(
+            DicomAttribute('7FE00010', 'OW', inline_binary=b'\x00\x01').get_inline_binary(),
+            b'AAE=',
+        )
 
     def test_explicit_vr_overrides_dictionary(self):
         self.assertEqual(dicom_attribute('00080016', 'x', vr='UI').VR, 'UI')
@@ -166,6 +215,36 @@ class DicomJsonEncoderTest(SimpleTestCase):
         # which serializes a set as a JSON array.
         self.assertEqual(self._encode({'X'}), ['X'])
 
+    def test_dicom_attribute_encoded_as_json_model_object(self):
+        # A DicomAttribute reaching the encoder is emitted as its JSON Model
+        # object {"TAG": {"vr": …, "Value": […]}} (§F.2.2). An empty attribute
+        # emits only "vr" — no Value/BulkDataURI/InlineBinary key (§F.2.5).
+        self.assertEqual(
+            self._encode(DicomAttribute('00100010', 'PN',
+                                        person_name=[{'Alphabetic': 'DOE^JANE'}])),
+            {'00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]}},
+        )
+        self.assertEqual(
+            self._encode(DicomAttribute('00080060', 'CS')),
+            {'00080060': {'vr': 'CS'}},
+        )
+
+    def test_dicom_attribute_bulk_data_uri(self):
+        # bulk_data → BulkDataURI string (§F.2.6). Not reachable from the
+        # QIDO dataset path (binary VRs are rejected in _render_dataset);
+        # exercised directly for the future WADO-RS surface.
+        self.assertEqual(
+            self._encode(DicomAttribute('7FE00010', 'OW', bulk_data='http://x/bulk')),
+            {'7FE00010': {'vr': 'OW', 'BulkDataURI': 'http://x/bulk'}},
+        )
+
+    def test_dicom_attribute_inline_binary(self):
+        # inline_binary → InlineBinary base64 string (§F.2.7).
+        self.assertEqual(
+            self._encode(DicomAttribute('7FE00010', 'OW', inline_binary=b'\x00\x01')),
+            {'7FE00010': {'vr': 'OW', 'InlineBinary': 'AAE='}},
+        )
+
 
 class DicomJsonRendererTest(SimpleTestCase):
     """The renderer applies all DICOM JSON Model encoding (PS3.18 §F)."""
@@ -184,6 +263,23 @@ class DicomJsonRendererTest(SimpleTestCase):
             parsed,
             [{'00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]}}],
         )
+
+    def test_bare_attribute_wrapped_in_array(self):
+        # A bare DicomAttribute is a one-attribute dataset — still an array.
+        parsed = self._render(DicomAttribute('00080060', 'CS', value=['CT']))
+        self.assertEqual(parsed, [{'00080060': {'vr': 'CS', 'Value': ['CT']}}])
+
+    def test_scalar_value_rendered_as_single_element_list(self):
+        # A hand-built DicomAttribute with an unwrapped scalar value still
+        # renders as a one-element Value array.
+        parsed = self._render([
+            DicomAttribute('00080060', 'CS', value='CT'),
+            DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'DOE^JANE'}),
+        ])
+        self.assertEqual(parsed, [{
+            '00080060': {'vr': 'CS', 'Value': ['CT']},
+            '00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]},
+        }])
 
     def test_pn_encoded_as_alphabetic_object(self):
         self.assertEqual(

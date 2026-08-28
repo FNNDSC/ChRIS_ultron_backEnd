@@ -17,8 +17,7 @@ VR classification is taken from pydicom (generated from PS3.5) so it never drift
 from the standard.
 """
 import base64
-from dataclasses import dataclass, field
-from collections import namedtuple
+from dataclasses import dataclass
 from typing import Optional, Any
 
 from pydicom.datadict import dictionary_VR
