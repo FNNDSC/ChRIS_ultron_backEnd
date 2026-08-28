@@ -63,7 +63,7 @@ class DicomAttribute:
 def normalize_tag(tag: TagType) -> str:
     """
     Canonical 8-char uppercase hex for any tag ``pydicom.tag.Tag`` accepts:
-    an int, a ``'0010,0010'`` / ``'00100010'`` hex string, a ``(group, elem)``
+    an int, a ``'00100010'`` hex string, a ``(group, elem)``
     tuple, or a DICOM keyword such as ``'PatientName'``.
     """
     return f'{Tag(tag):08X}'
