@@ -5,12 +5,13 @@ Builds a framework-free, natively-typed intermediate representation of a DICOM
 dataset — a ``list[DicomAttribute]`` — which ``dicomweb.renderers`` encodes into
 the DICOM JSON Model (PS3.18 §F, ``application/dicom+json``). Values are stored
 as the caller supplies them (raw strings, numbers, ``datetime`` objects, …),
-except Person Names, which the native model represents as a component mapping
-(``{"Alphabetic": "DOE^JANE"}``; Alphabetic group only here). The remaining
-JSON-Model encoding — IS/DS-as-number, empty/null handling and the temporal
-wire-string form — lives in the renderer, since those rules belong to the JSON
-Model, not the native model. Keeping this layer free of Django/DRF makes it
-unit-testable in isolation.
+always in their multi-value shape: a single value is wrapped as a
+single-element list. Person Names are represented as a component mapping
+(``{"Alphabetic": "DOE^JANE"}``; Alphabetic group only here), likewise wrapped.
+The remaining JSON-Model encoding — IS/DS-as-number, empty/null handling and
+the temporal wire-string form — lives in the renderer, since those rules belong
+to the JSON Model, not the native model. Keeping this layer free of Django/DRF
+makes it unit-testable in isolation.
 
 VR classification is taken from pydicom (generated from PS3.5) so it never drifts
 from the standard.
@@ -72,11 +73,12 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
     """
     Build a :class:`DicomAttribute` for ``tag``/``value``.
 
-    ``vr`` defaults to the DICOM data-dictionary VR of ``tag``. ``Value`` is
-    stored as supplied, except PN which is encoded to its native Alphabetic
-    component mapping; the renderer performs the remaining JSON-Model coercion
-    (including rejecting binary VRs). Raises :class:`ValueError` for any
-    non-2-character (ambiguous/invalid) VR.
+    ``vr`` defaults to the DICOM data-dictionary VR of ``tag``. The value is
+    stored in its multi-value shape: a single value is wrapped as a
+    single-element list, and PN is encoded to its native Alphabetic component
+    mapping (wrapped the same way). The renderer performs the remaining
+    JSON-Model coercion (including rejecting binary VRs). Raises
+    :class:`ValueError` for any non-2-character (ambiguous/invalid) VR.
     """
     tag_hex = normalize_tag(tag)
     if vr is None:
@@ -87,8 +89,8 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
         # caller must resolve — unreachable for the fixed QIDO attribute set.
         raise ValueError(f'Ambiguous or invalid VR {vr!r}; a concrete 2-char VR is required')
     if vr == 'PN':
-        return DicomAttribute(tag_hex, vr, person_name=_encode_pn(val))
-    return DicomAttribute(tag_hex, vr, value)
+        return DicomAttribute(tag_hex, vr, person_name=_as_value_list(_encode_pn(value)))
+    return DicomAttribute(tag_hex, vr, value=_as_value_list(value))
 
 
 _PN_COMPONENT_LABELS = ['Alphabetic', 'Ideographic', 'Phonetic']
@@ -121,6 +123,20 @@ def _encode_pn(value):
         if any(components):
             encoded_pn[label] = group
     return encoded_pn
+
+
+def _as_value_list(value):
+    """
+    The value fields of :class:`DicomAttribute` are always lists (the DICOM
+    JSON Model ``Value`` is an array): ``None`` (empty attribute) and lists
+    pass through unchanged, tuples are converted to lists, and any other
+    single value is wrapped as a single-element list.
+    """
+    if value is None or isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
 
 
 def dataset(

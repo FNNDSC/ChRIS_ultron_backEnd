@@ -36,57 +36,66 @@ class NormalizeTagTest(SimpleTestCase):
 
 class DicomAttributeTest(SimpleTestCase):
     """The native-model builder normalizes the tag, resolves the VR, and stores
-    the value unchanged (coercion is the renderer's job)."""
+    the value in its multi-value shape (coercion is the renderer's job)."""
 
     def test_vr_derived_from_data_dictionary(self):
         attr = dicom_attribute('PatientName', 'DOE^JANE')
-        self.assertEqual(attr, DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'DOE^JANE'}))
+        self.assertEqual(attr, DicomAttribute('00100010', 'PN', person_name=[{'Alphabetic': 'DOE^JANE'}]))
 
     def test_pn_encoded_as_alphabetic_mapping(self):
         # PN is part of the native model — stored as its component mapping.
         self.assertEqual(
             dicom_attribute('00100010', 'DOE^JANE').person_name,
-            {'Alphabetic': 'DOE^JANE'}
+            [{'Alphabetic': 'DOE^JANE'}]
         )
         self.assertEqual(
             dicom_attribute('00100010', 'Yamada^Tarou=山田^太郎=やまだ^たろう').person_name,
-            {
+            [{
                 'Alphabetic': 'Yamada^Tarou',
                 'Phonetic': 'やまだ^たろう',
                 'Ideographic': '山田^太郎',
-            }
+            }]
         )
         self.assertEqual(
             dicom_attribute('00100010', 'Yamada^Tarou==やまだ^たろう').person_name,
-            {
+            [{
                 'Alphabetic': 'Yamada^Tarou',
                 'Phonetic': 'やまだ^たろう',
-            }
+            }]
         )
         self.assertEqual(
             dicom_attribute('00100010', '==やまだ^たろう').person_name,
-            {'Phonetic': 'やまだ^たろう',}
+            [{'Phonetic': 'やまだ^たろう',}]
         )
         self.assertEqual(
             dicom_attribute('00100010', '=山田^太郎=').person_name,
-            {'Ideographic': '山田^太郎',}
+            [{'Ideographic': '山田^太郎',}]
         )
         self.assertEqual(
             dicom_attribute('00100010', '=山田^太郎=').person_name,
             dicom_attribute('00100010', '=山田^太郎').person_name,
         )
 
+    def test_multi_valued_pn_encoded_element_wise(self):
+        # A multi-valued PN stays a list of component mappings.
+        self.assertEqual(
+            dicom_attribute('00100010', ['DOE^JANE', 'SMITH^JOHN']).person_name,
+            [{'Alphabetic': 'DOE^JANE'}, {'Alphabetic': 'SMITH^JOHN'}]
+        )
+
     def test_empty_pn_left_for_renderer(self):
         # Empty PN is not turned into a mapping — the renderer omits it (§F.2.5).
         self.assertIsNone(dicom_attribute('00100010', None).person_name)
-        self.assertEqual(dicom_attribute('00100010', '').person_name, '')
+        self.assertEqual(dicom_attribute('00100010', '').person_name, [''])
 
     def test_non_pn_value_stored_unchanged(self):
-        # Raw value is preserved — no int coercion, no empty→None.
-        self.assertEqual(dicom_attribute('00200013', '42').value, '42')
+        # Value content is preserved — no int coercion, no empty→None — with
+        # single values wrapped as single-element lists.
+        self.assertEqual(dicom_attribute('00200013', '42').value, ['42'])
         self.assertEqual(dicom_attribute('00080020', date(2023, 1, 2)).value,
-                         date(2023, 1, 2))
+                         [date(2023, 1, 2)])
         self.assertEqual(dicom_attribute('00080060', ['CT', 'MR']).value, ['CT', 'MR'])
+        self.assertEqual(dicom_attribute('00080060', ('CT', 'MR')).value, ['CT', 'MR'])
 
     def test_explicit_vr_overrides_dictionary(self):
         self.assertEqual(dicom_attribute('00080016', 'x', vr='UI').VR, 'UI')
@@ -106,15 +115,15 @@ class DatasetTest(SimpleTestCase):
             ('00100010', 'PN', 'DOE^JANE'),   # (tag, vr, value)
             ('00080020', date(2023, 6, 1)),   # (tag, value) — VR derived
             ('00080060', 'CT'),
-            DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'PATIENT^TWO'}),
+            DicomAttribute('00100010', 'PN', person_name=[{'Alphabetic': 'PATIENT^TWO'}]),
         ])
         self.assertEqual(
             result,
             [
-                DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'DOE^JANE'}),
-                DicomAttribute('00080020', 'DA', value=date(2023, 6, 1)),
-                DicomAttribute('00080060', 'CS', value='CT'),
-                DicomAttribute('00100010', 'PN', person_name={'Alphabetic': 'PATIENT^TWO'}),
+                DicomAttribute('00100010', 'PN', person_name=[{'Alphabetic': 'DOE^JANE'}]),
+                DicomAttribute('00080020', 'DA', value=[date(2023, 6, 1)]),
+                DicomAttribute('00080060', 'CS', value=['CT']),
+                DicomAttribute('00100010', 'PN', person_name=[{'Alphabetic': 'PATIENT^TWO'}]),
             ],
         )
 
@@ -180,6 +189,13 @@ class DicomJsonRendererTest(SimpleTestCase):
         self.assertEqual(
             self._element('00100010', 'PN', 'DOE^JANE'),
             {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]},
+        )
+
+    def test_multi_valued_pn_rendered_as_array_of_objects(self):
+        self.assertEqual(
+            self._element('00100010', 'PN', ['DOE^JANE', 'SMITH^JOHN']),
+            {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'},
+                                   {'Alphabetic': 'SMITH^JOHN'}]},
         )
 
     def test_cs_single_and_multi(self):
