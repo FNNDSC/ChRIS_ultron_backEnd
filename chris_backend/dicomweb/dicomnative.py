@@ -80,11 +80,17 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
     field as a list of item datasets, a bare single-item dataset being wrapped
     as a one-item sequence. The renderer performs the remaining JSON-Model
     coercion (including rejecting binary VRs). Raises :class:`ValueError` for
-    any non-2-character (ambiguous/invalid) VR.
+    an unknown tag (VR lookup fails) or any non-2-character
+    (ambiguous/invalid) VR.
     """
     tag_hex = normalize_tag(tag)
     if vr is None:
-        vr = dictionary_VR(tag)
+        try:
+            vr = dictionary_VR(tag)
+        except KeyError:
+            # Unknown/private tag (e.g. (0009,1001)) or group length —
+            # unreachable for the fixed QIDO attribute set.
+            raise ValueError(f'Unknown tag {tag!r}; no VR in the DICOM data dictionary') from None
     if len(vr) != 2:
         # Every standard DICOM VR is exactly two characters. Anything else is an
         # ambiguous data-dictionary VR (e.g. 'US or SS', 'OB or OW') that the

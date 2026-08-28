@@ -164,6 +164,12 @@ class DicomAttributeTest(SimpleTestCase):
         with self.assertRaises(ValueError):
             dicom_attribute('00280106', 0, vr='US or SS')
 
+    def test_unknown_tag_raises_value_error(self):
+        # A private/unknown tag has no data-dictionary VR — the documented
+        # ValueError, not KeyError leaking from pydicom's dictionary_VR.
+        with self.assertRaises(ValueError):
+            dicom_attribute('00091001', 'x')
+
 
 class DatasetTest(SimpleTestCase):
 
@@ -414,9 +420,55 @@ class DicomJsonRendererTest(SimpleTestCase):
             parsed['0008002A'], {'vr': 'DT', 'Value': ['20230102143005']}
         )
 
+    def test_attributes_sorted_lexicographically(self):
+        # §F.2.2 "shall": attribute objects ordered by property name ascending,
+        # regardless of construction order. json.loads preserves document
+        # order, so asserting on the key sequence really checks the wire form.
+        parsed, = self._render(dataset([
+            ('0020000D', 'UI', '1.2.3'),      # StudyInstanceUID
+            ('00100010', 'PN', 'DOE^JANE'),   # PatientName
+            ('00080020', 'DA', date(2023, 1, 1)),
+        ]))
+        self.assertEqual(list(parsed), ['00080020', '00100010', '0020000D'])
+
+    def test_nested_sequence_items_sorted_lexicographically(self):
+        # SQ items recurse through _render_dataset, so nested attribute
+        # objects are sorted too.
+        item = dataset([
+            ('0020000E', 'UI', '1.2.3.4'),    # SeriesInstanceUID
+            ('00080060', 'CS', 'CT'),
+        ])
+        parsed, = self._render(dataset([('00081115', 'SQ', [item])]))
+        self.assertEqual(list(parsed['00081115']['Value'][0]),
+                         ['00080060', '0020000E'])
+
     def test_preformatted_temporal_string_passes_through(self):
         self.assertEqual(self._element('00080020', 'DA', '20230102')['Value'],
                          ['20230102'])
+
+    def test_datetime_narrowed_to_date_for_da(self):
+        # A datetime supplied for a DA attribute is narrowed to its date —
+        # the full 14-char DT wire form is not a valid DA value.
+        self.assertEqual(
+            self._element('00080020', 'DA', datetime(2023, 1, 2, 14, 30, 5))['Value'],
+            ['20230102'],
+        )
+        self.assertEqual(
+            self._element('00080020', 'DA', datetime(2023, 1, 2, 14, 30, 5, 123456))['Value'],
+            ['20230102'],
+        )
+
+    def test_datetime_narrowed_to_time_for_tm(self):
+        # A datetime supplied for a TM attribute is narrowed to its time;
+        # fractional seconds are preserved per the TM wire form.
+        self.assertEqual(
+            self._element('00080030', 'TM', datetime(2023, 1, 2, 14, 30, 5))['Value'],
+            ['143005'],
+        )
+        self.assertEqual(
+            self._element('00080030', 'TM', datetime(2023, 1, 2, 14, 30, 5, 123456))['Value'],
+            ['143005.123456'],
+        )
 
     def test_empty_attribute_omits_value_key(self):
         for empty in (None, '', []):
@@ -431,9 +483,25 @@ class DicomJsonRendererTest(SimpleTestCase):
             ['CT', None, 'MR'],
         )
 
-    def test_all_empty_multivalue_omits_value_key(self):
-        element = self._element('00080060', 'CS', ['', None])
+    def test_all_empty_multivalue_preserves_multiplicity_as_nulls(self):
+        # §F.2.5: a multi-valued attribute with one or more empty values keeps
+        # them as null array elements — VM and position preserved even when
+        # every element is empty (Value Length > 0 in the binary encoding).
+        self.assertEqual(
+            self._element('00080060', 'CS', ['', None])['Value'],
+            [None, None],
+        )
+        self.assertEqual(
+            self._element('00080060', 'CS', ['', ''])['Value'],
+            [None, None],
+        )
+
+    def test_single_empty_multivalue_element_is_empty_attribute(self):
+        # A single empty element is VM=1 with Value Length 0 — an empty
+        # attribute (§F.2.5), not a one-element [null] array.
+        element = self._element('00080060', 'CS', [''])
         self.assertEqual(element, {'vr': 'CS'})
+        self.assertNotIn('Value', element)
 
     def test_non_numeric_value_raises_at_render(self):
         # Bad data for a numeric VR fails during serialization, not silently.

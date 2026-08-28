@@ -17,6 +17,9 @@ the native model) live here:
   * AT → 8-char uppercase hex string
   * DA/TM/DT → DICOM wire strings, produced from the stdlib datetime type by
     ``DicomJsonEncoder``
+  * attribute objects ordered by property name in ascending lexicographic
+    order (§F.2.2 "shall"), applied at encoding time so the wire order is
+    independent of construction order
   * empty attribute → no ``"Value"`` key; empty element of a multi-valued
     attribute → JSON ``null`` (never ``""``; §F.2.5)
 
@@ -100,11 +103,9 @@ class DicomJsonRenderer(JSONRenderer):
     encoder_class = DicomJsonEncoder
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
-        payload = _to_json_model(data)
-        if renderer_context is None:
-            renderer_context = {}
-        renderer_context.get('encoder_kwargs', {})['sort_keys'] = True
-        return super().render(payload, accepted_media_type, renderer_context)
+        # Attribute ordering (§F.2.2) is applied in _render_dataset.
+        return super().render(_to_json_model(data), accepted_media_type,
+                              renderer_context)
 
 
 class ApplicationJsonDicomRenderer(DicomJsonRenderer):
@@ -123,9 +124,8 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
 
 def _to_json_model(data):
     """Convert DicomAttribute datasets into DICOM JSON Model objects."""
+    # A bare attribute is treated as a one-attribute dataset
     if isinstance(data, DicomAttribute):
-        # A bare attribute is a one-attribute dataset — wrap as a single-element
-        # array like any other single dataset.
         return [_render_dataset([data])]
     # Anything not a list is not a dataset, so pass through
     if not isinstance(data, list):
@@ -150,7 +150,10 @@ def _render_dataset(attributes):
         if coerced is not None:
             element['Value'] = coerced if isinstance(coerced, list) else [coerced]
         result[attr.tag] = element
-    return result
+    # §F.2.2 "shall": attribute objects ordered by property name ascending.
+    # Tags are canonical 8-char uppercase hex, so lexicographic order
+    # == numeric tag order.
+    return dict(sorted(result.items()))
 
 
 def _coerce(vr, value):
@@ -168,9 +171,11 @@ def _coerce(vr, value):
     if isinstance(value, (list, tuple)):
         # §F.2.5: empty elements of a multi-valued attribute are kept as JSON
         # null (never dropped, never ""), preserving value multiplicity and
-        # position. A wholly empty list is an empty attribute (Value omitted).
+        # position. One exception, per the binary encoding the list models:
+        # a single empty element is VM=1 with Value Length 0 — an empty
+        # attribute, rendered with no "Value" key.
         coerced = [_coerce_scalar(vr, v) for v in value]
-        if all(c is None for c in coerced):
+        if all(c is None for c in coerced) and len(coerced) == 1:
             return None
         return coerced
     return _coerce_scalar(vr, value)
@@ -189,6 +194,13 @@ def _coerce_scalar(vr, value):
         # Kept as the stdlib datetime type the caller supplies; DicomJsonEncoder
         # renders the wire form. An already-formatted string passes through and
         # is emitted verbatim.
+        # If value is a datetime instance, check the VR in case it
+        # should be a plain date or time instead.
+        if isinstance(value, datetime):
+            if vr == "DA":
+                return value.date()
+            if vr == "TM":
+                return value.time()
         return value
     if vr in _INT_VRS:
         # int()/float() raise here on bad data: failing during serialization
