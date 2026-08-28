@@ -112,6 +112,10 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
     The same DICOM JSON Model bytes advertised as ``application/json``. QIDO-RS
     requires ``Accept: application/json`` be treated as equivalent to
     ``application/dicom+json`` (PS3.18 §10.6.2), and it is handy for curl.
+
+    NOTE: This renderer conflicts with the default JSONRenderer. When
+    implementing views, pay attention to the order of
+    renderer_classes!
     """
     media_type = 'application/json'
     format = 'json'
