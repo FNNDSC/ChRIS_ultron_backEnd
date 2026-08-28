@@ -23,6 +23,7 @@ from typing import Optional, Any
 
 from pydicom.datadict import dictionary_VR
 from pydicom.tag import Tag, TagType
+from pydicom.valuerep import BYTES_VR
 
 
 @dataclass
@@ -90,6 +91,11 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
         raise ValueError(f'Ambiguous or invalid VR {vr!r}; a concrete 2-char VR is required')
     if vr == 'PN':
         return DicomAttribute(tag_hex, vr, person_name=_as_value_list(_encode_pn(value)))
+    if vr == 'SQ':
+        return DicomAttribute(tag_hex, vr, item=_as_value_list(value))
+    if vr in BYTES_VR:
+        return DicomAttribute(tag_hex, vr, inline_binary=value)
+    # TODO: handle bulk data
     return DicomAttribute(tag_hex, vr, value=_as_value_list(value))
 
 
