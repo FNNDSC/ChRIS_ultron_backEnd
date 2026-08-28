@@ -30,7 +30,7 @@ class DicomAttribute:
     tag: str
     VR: str
     value: Optional[list] = None
-    item: Optional[list["DicomAttribute"]] = None
+    item: Optional[list[list["DicomAttribute"]]] = None
     person_name: Optional[list[dict[str]]] = None
     bulk_data: Optional[str] = None     # uuid or uri
     inline_binary: Optional[bytes] = None
@@ -76,9 +76,11 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
     ``vr`` defaults to the DICOM data-dictionary VR of ``tag``. The value is
     stored in its multi-value shape: a single value is wrapped as a
     single-element list, and PN is encoded to its native Alphabetic component
-    mapping (wrapped the same way). The renderer performs the remaining
-    JSON-Model coercion (including rejecting binary VRs). Raises
-    :class:`ValueError` for any non-2-character (ambiguous/invalid) VR.
+    mapping (wrapped the same way). An SQ value is stored in the ``item``
+    field as a list of item datasets, a bare single-item dataset being wrapped
+    as a one-item sequence. The renderer performs the remaining JSON-Model
+    coercion (including rejecting binary VRs). Raises :class:`ValueError` for
+    any non-2-character (ambiguous/invalid) VR.
     """
     tag_hex = normalize_tag(tag)
     if vr is None:
@@ -91,7 +93,7 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
     if vr == 'PN':
         return DicomAttribute(tag_hex, vr, person_name=_as_value_list(_encode_pn(value)))
     if vr == 'SQ':
-        return DicomAttribute(tag_hex, vr, item=_as_value_list(value))
+        return DicomAttribute(tag_hex, vr, item=_as_sq_items(value))
     if vr in BYTES_VR:
         return DicomAttribute(tag_hex, vr, inline_binary=value)
     # TODO: handle bulk data
@@ -142,6 +144,22 @@ def _as_value_list(value):
     if isinstance(value, tuple):
         return list(value)
     return [value]
+
+
+def _as_sq_items(value):
+    """
+    SQ shape distinction: a sequence's items are themselves datasets
+    (``list[DicomAttribute]``), so a bare single-item dataset — itself a
+    list — is indistinguishable from a list of items by type alone. A list
+    whose elements are all :class:`DicomAttribute` is therefore a bare item
+    dataset, wrapped as a one-item sequence; a list of item datasets passes
+    through unchanged. ``None`` and ``[]`` (empty sequence) stay as
+    supplied — the renderer omits their ``Value`` (§F.2.5).
+    """
+    if (isinstance(value, list) and value
+            and all(isinstance(elem, DicomAttribute) for elem in value)):
+        return [value]
+    return _as_value_list(value)
 
 
 def dataset(

@@ -118,10 +118,18 @@ class DicomAttributeTest(SimpleTestCase):
 
     def test_sq_value_stored_as_item(self):
         # SQ values live in the item field: a list of item datasets is stored
-        # as supplied, an empty sequence stays None (renderer omits Value).
+        # as supplied, an empty sequence stays empty (renderer omits Value).
         item = dataset([('00080060', 'CS', 'CT')])
         self.assertEqual(dicom_attribute('00081115', [item]).item, [item])
         self.assertIsNone(dicom_attribute('00081115', None).item)
+        self.assertEqual(dicom_attribute('00081115', []).item, [])
+
+    def test_sq_bare_item_dataset_wrapped_as_single_item(self):
+        # A bare item dataset (list[DicomAttribute]) is one sequence item —
+        # wrapped as a one-item sequence, since a list of items is a list of
+        # datasets.
+        item = dataset([('00080060', 'CS', 'CT')])
+        self.assertEqual(dicom_attribute('00081115', item).item, [item])
 
     def test_binary_value_stored_as_inline_binary(self):
         # Binary VRs (pydicom BYTES_VR) are carried as raw bytes in
@@ -366,6 +374,22 @@ class DicomJsonRendererTest(SimpleTestCase):
         self.assertEqual(
             self._element('00081115', 'SQ', [item, []])['Value'],
             [{'00080060': {'vr': 'CS', 'Value': ['CT']}}, {}],
+        )
+
+    def test_sq_bare_item_dataset_rendered_as_single_item(self):
+        # A bare item dataset is wrapped as one sequence item.
+        item = dataset([('00080060', 'CS', 'CT')])
+        self.assertEqual(
+            self._element('00081115', 'SQ', item)['Value'],
+            [{'00080060': {'vr': 'CS', 'Value': ['CT']}}],
+        )
+
+    def test_sq_explicit_empty_item_rendered_as_empty_object(self):
+        # [[]] is one empty item → Value: [{}] (§F.2.5) — distinct from an
+        # empty sequence, which omits Value entirely.
+        self.assertEqual(
+            self._element('00081115', 'SQ', [[]]),
+            {'vr': 'SQ', 'Value': [{}]},
         )
 
     def test_sq_nested_sequence(self):
