@@ -14,6 +14,13 @@
 # Or persist the preference: just set-storage swift
 storage := `if [ -f '.storage' ]; then cat .storage; else echo fslink; fi`
 
+# Whether `compose run` should allocate a TTY, auto-detected from stdin.
+# Interactive recipes (`just bash`, `just shell`) need one; non-interactive
+# callers such as CI must not have one -- under `podman compose` on the GitHub
+# Actions runner, allocating a TTY makes `compose run` hang forever after the
+# image build. Force it off with `just tty=false ...`.
+tty := `if [ -t 0 ]; then echo true; else echo false; fi`
+
 # Start the ChRIS backend in development mode, and attach to the live-reloading server.
 [group('(1) start-up')]
 dev: chrisomatic attach
@@ -129,7 +136,7 @@ logs *args:
 # docker-compose ... run helper function.
 [group('(4) docker-compose')]
 run +command:
-    @just storage={{ storage }} docker-compose --profile=cube run --rm chris {{ command }}
+    @just storage={{ storage }} docker-compose --profile=cube run --rm {{ if tty == "false" { "-T" } else { "" } }} chris {{ command }}
 
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
