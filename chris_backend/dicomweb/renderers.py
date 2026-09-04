@@ -141,11 +141,15 @@ def _to_json_model(data):
         return data
     if not data:
         return []
-    # List of datasets
+    # Single dataset as a list
     if all(isinstance(elem, DicomAttribute) for elem in data):
         return [_render_dataset(data)]
-    # Anything else, map over the list and flatten results
-    return [item for item in _to_json_model(elem) for elem in data]
+    # List of datasets
+    if all(isinstance(elem, list) for elem in data):
+        if all(isinstance(subelem, DicomAttribute) for subelem in elem):
+            return [_render_dataset(elem) for elem in data]
+    # Anything else, recurse over the list
+    return [_to_json_model(elem) for elem in data]
 
 
 def _render_tag(tag: TagType) -> str:
@@ -160,10 +164,11 @@ def _render_dataset(attributes):
             # TODO: BulkDataURI, InlineBinary
             raise ValueError(f'Binary VR {attr.VR!r} not supported in dicomweb')
         if (value := attr.get_value()) is not None:
-            coerced = _coerce(attr.VR, attr.get_value())
-            value = coerced if isinstance(coerced, list) else [coerced]
+            value = _coerce(attr.VR, attr.get_value())
+            if not (value is None or isinstance(value, list)):
+                value = [value]
             # Replace with a properly rendered value
-            attr = dicom_attribute(attr.tag, attr.VR, value)
+            attr = dicom_attribute(attr.tag, value, vr=attr.VR)
         result[_render_tag(attr.tag)] = attr
     # §F.2.2 "shall": attribute objects ordered by property name ascending.
     # Tags are canonical 8-char uppercase hex, so lexicographic order
