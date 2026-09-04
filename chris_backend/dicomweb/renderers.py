@@ -252,6 +252,8 @@ def _coerce_scalar(vr, value):
                 return value.date()
             if vr == "TM":
                 return value.time()
+        if isinstance(value, date) and vr == "DT":
+            return datetime(value.year, value.month, value.day)
         return value
     if vr in _INT_VRS:
         # int()/float() raise here on bad data: failing during serialization
