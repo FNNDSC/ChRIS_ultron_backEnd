@@ -122,6 +122,17 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
     format = 'json'
 
 
+def _is_dataset(data):
+    """A DICOM Data Set is a list of DicomAttribute (§F.2.2)."""
+    return isinstance(data, list) and all(isinstance(elem, DicomAttribute) for elem in data)
+
+
+def _is_list_of_datasets(data):
+    """A multi-result payload: a non-empty list whose every element is a dataset."""
+    return (isinstance(data, list) and bool(data)
+            and all(_is_dataset(elem) for elem in data))
+
+
 def _to_json_model(data):
     """Convert DicomAttribute datasets into DICOM JSON Model objects."""
     # A bare attribute is treated as a one-attribute dataset
