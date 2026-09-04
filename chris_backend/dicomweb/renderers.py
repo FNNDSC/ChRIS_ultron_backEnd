@@ -29,11 +29,11 @@ and is passed through unchanged.
 from datetime import date, datetime, time
 
 import pydicom.valuerep
-from pydicom.tag import Tag
+from pydicom.tag import Tag, TagType
 from rest_framework.renderers import JSONRenderer
 from rest_framework.utils.encoders import JSONEncoder
 
-from dicomweb.dicomnative import DicomAttribute
+from dicomweb.dicomnative import DicomAttribute, dicom_attribute
 
 # VR classes (pydicom, PS3.5-derived) used for JSON Model value coercion.
 _BINARY_VRS = pydicom.valuerep.BYTES_VR
@@ -56,7 +56,6 @@ class DicomJsonEncoder(JSONEncoder):
     (``{"TAG": {"vr": …}}``, including BulkDataURI / InlineBinary, §F.2.2).
     Everything else defers to DRF's encoder.
     """
-
     def default(self, obj):
         # datetime is a subclass of date, so it must be checked first.
         if isinstance(obj, datetime):
@@ -74,7 +73,6 @@ class DicomJsonEncoder(JSONEncoder):
                 return obj.strftime('%H%M%S.%f')
             return obj.strftime('%H%M%S')
         if isinstance(obj, DicomAttribute):
-            tag = f"{Tag(obj.tag):08X}"
             encoded_attr = {
                 "vr": obj.VR,
             }
@@ -85,7 +83,7 @@ class DicomJsonEncoder(JSONEncoder):
                 encoded_attr["BulkDataURI"] = bulk_data
             elif (inline_binary := obj.get_inline_binary()) is not None:
                 encoded_attr["InlineBinary"] = inline_binary.decode("utf-8")
-            return super().default({tag: encoded_attr})
+            return super().default(encoded_attr)
         return super().default(obj)
 
 
@@ -146,8 +144,13 @@ def _to_json_model(data):
     # List of datasets
     if all(isinstance(elem, DicomAttribute) for elem in data):
         return [_render_dataset(data)]
-    # Anything else, map over the list
-    return [_to_json_model(elem) for elem in data]
+    # Anything else, map over the list and flatten results
+    return [item for item in _to_json_model(elem) for elem in data]
+
+
+def _render_tag(tag: TagType) -> str:
+    """Cast a tag to an 8-digit uppercase hex representation."""
+    return f"{Tag(tag):08X}"
 
 
 def _render_dataset(attributes):
@@ -156,11 +159,12 @@ def _render_dataset(attributes):
         if attr.VR in _BINARY_VRS:
             # TODO: BulkDataURI, InlineBinary
             raise ValueError(f'Binary VR {attr.VR!r} not supported in dicomweb')
-        element = {'vr': attr.VR}
-        coerced = _coerce(attr.VR, attr.get_value())
-        if coerced is not None:
-            element['Value'] = coerced if isinstance(coerced, list) else [coerced]
-        result[attr.tag] = element
+        if (value := attr.get_value()) is not None:
+            coerced = _coerce(attr.VR, attr.get_value())
+            value = coerced if isinstance(coerced, list) else [coerced]
+            # Replace with a properly rendered value
+            attr = dicom_attribute(attr.tag, attr.VR, value)
+        result[_render_tag(attr.tag)] = attr
     # §F.2.2 "shall": attribute objects ordered by property name ascending.
     # Tags are canonical 8-char uppercase hex, so lexicographic order
     # == numeric tag order.
@@ -200,7 +204,7 @@ def _coerce_scalar(vr, value):
     if vr == 'AT':
         # AT is in pydicom's INT_VR (hence excluded from the local _INT_VRS);
         # DICOM JSON encodes it as an 8-char uppercase hex string, not a number.
-        return f'{Tag(value):08X}'
+        return _render_tag(value)
     if vr in _TEMPORAL_VRS:
         # Kept as the stdlib datetime type the caller supplies; DicomJsonEncoder
         # renders the wire form. An already-formatted string passes through and
