@@ -229,18 +229,18 @@ class DicomJsonEncoderTest(SimpleTestCase):
         # which serializes a set as a JSON array.
         self.assertEqual(self._encode({'X'}), ['X'])
 
-    def test_dicom_attribute_encoded_as_json_model_object(self):
-        # A DicomAttribute reaching the encoder is emitted as its JSON Model
-        # object {"TAG": {"vr": …, "Value": […]}} (§F.2.2). An empty attribute
-        # emits only "vr" — no Value/BulkDataURI/InlineBinary key (§F.2.5).
+    def test_dicom_attribute_encoded_as_attribute_body(self):
+        # The encoder renders the attribute body only — the tag→attribute
+        # map is built by _render_dataset (§F.2.2). An empty attribute emits
+        # only "vr" — no Value/BulkDataURI/InlineBinary key (§F.2.5).
         self.assertEqual(
             self._encode(DicomAttribute('00100010', 'PN',
                                         person_name=[{'Alphabetic': 'DOE^JANE'}])),
-            {'00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]}},
+            {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]},
         )
         self.assertEqual(
             self._encode(DicomAttribute('00080060', 'CS')),
-            {'00080060': {'vr': 'CS'}},
+            {'vr': 'CS'},
         )
 
     def test_dicom_attribute_bulk_data_uri(self):
@@ -249,14 +249,14 @@ class DicomJsonEncoderTest(SimpleTestCase):
         # exercised directly for the future WADO-RS surface.
         self.assertEqual(
             self._encode(DicomAttribute('7FE00010', 'OW', bulk_data='http://x/bulk')),
-            {'7FE00010': {'vr': 'OW', 'BulkDataURI': 'http://x/bulk'}},
+            {'vr': 'OW', 'BulkDataURI': 'http://x/bulk'},
         )
 
     def test_dicom_attribute_inline_binary(self):
         # inline_binary → InlineBinary base64 string (§F.2.7).
         self.assertEqual(
             self._encode(DicomAttribute('7FE00010', 'OW', inline_binary=b'\x00\x01')),
-            {'7FE00010': {'vr': 'OW', 'InlineBinary': 'AAE='}},
+            {'vr': 'OW', 'InlineBinary': 'AAE='},
         )
 
 
@@ -509,13 +509,15 @@ class DicomJsonRendererTest(SimpleTestCase):
             self._render(dataset([('00200013', 'IS', 'not-a-number')]))
 
     def test_multiple_datasets(self):
+        # §F.2.1: multiple results are a single top-level array of JSON
+        # objects — one object per dataset, no extra nesting.
         parsed = self._render([
             dataset([('00080060', 'CT')]),
             dataset([('00080060', 'MR')]),
         ])
         self.assertEqual(len(parsed), 2)
-        self.assertEqual(parsed[0][0]['00080060']['Value'], ['CT'])
-        self.assertEqual(parsed[1][0]['00080060']['Value'], ['MR'])
+        self.assertEqual(parsed[0]['00080060']['Value'], ['CT'])
+        self.assertEqual(parsed[1]['00080060']['Value'], ['MR'])
 
     def test_empty_result_is_empty_array(self):
         self.assertEqual(self._render([]), [])
@@ -524,3 +526,65 @@ class DicomJsonRendererTest(SimpleTestCase):
         # A non-list payload (e.g. a DRF error dict) is passed through untouched
         # rather than treated as a dataset — avoids a KeyError on data[0].
         self.assertEqual(self._render({'detail': 'not found'}), {'detail': 'not found'})
+
+    def test_list_shaped_error_payload_passed_through(self):
+        # DRF's ValidationError('msg') yields a list-shaped payload; it is
+        # not a list of datasets and must pass through unchanged, not crash
+        # into _render_dataset.
+        self.assertEqual(self._render(['bad tag']), ['bad tag'])
+
+    def test_list_of_plain_dicts_passed_through(self):
+        self.assertEqual(self._render([{'detail': 'x'}, {'detail': 'y'}]),
+                         [{'detail': 'x'}, {'detail': 'y'}])
+
+    def test_dataset_nested_in_dict_payload_rendered_as_single_object(self):
+        # The paginated shape: DRF wraps the datasets in a dict. Each
+        # embedded dataset renders as a single tag→attribute object (§F.2.2)
+        # — never a list of encoded attributes. Multi-attribute on purpose:
+        # a merged object is distinguishable from a list of attribute
+        # objects only with two or more attributes.
+        ds = dataset([('00080060', 'CS', 'CT'), ('00200013', 'IS', '42')])
+        parsed = self._render({'count': 1, 'next': None, 'results': [ds]})
+        self.assertEqual(parsed['count'], 1)
+        self.assertIsNone(parsed['next'])
+        self.assertEqual(parsed['results'], [{
+            '00080060': {'vr': 'CS', 'Value': ['CT']},
+            '00200013': {'vr': 'IS', 'Value': [42]},
+        }])
+
+    def test_list_of_datasets_nested_in_dict_payload(self):
+        parsed = self._render({'results': [
+            dataset([('00080060', 'CS', 'CT')]),
+            dataset([('00080060', 'CS', 'MR')]),
+        ]})
+        self.assertEqual(parsed['results'], [
+            {'00080060': {'vr': 'CS', 'Value': ['CT']}},
+            {'00080060': {'vr': 'CS', 'Value': ['MR']}},
+        ])
+
+    def test_dataset_as_dict_value_rendered_as_single_object(self):
+        # A dataset as a bare dict value (not inside a list) — one object.
+        parsed = self._render(
+            {'patient': dataset([('00080060', 'CS', 'CT')])}
+        )
+        self.assertEqual(parsed['patient'],
+                         {'00080060': {'vr': 'CS', 'Value': ['CT']}})
+
+    def test_bare_attribute_nested_in_dict_payload(self):
+        parsed = self._render(
+            {'patient': DicomAttribute('00100010', 'PN',
+                                       person_name=[{'Alphabetic': 'DOE^JANE'}])}
+        )
+        self.assertEqual(
+            parsed['patient'],
+            {'00100010': {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'}]}},
+        )
+
+    def test_tuple_of_datasets_rendered_as_flat_array(self):
+        # Degenerate payload shape, but tags must not be lost (review #1c).
+        ds = dataset([('00080060', 'CS', 'CT')])
+        parsed = self._render((ds, ds))
+        self.assertEqual(parsed, [
+            {'00080060': {'vr': 'CS', 'Value': ['CT']}},
+            {'00080060': {'vr': 'CS', 'Value': ['CT']}},
+        ])

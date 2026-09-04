@@ -52,10 +52,12 @@ class DicomJsonEncoder(JSONEncoder):
     JSON encoder that serializes temporal stdlib types to their DICOM wire
     forms (DA ``YYYYMMDD``, TM ``HHMMSS[.FFFFFF]``,
     DT ``YYYYMMDDHHMMSS[.FFFFFF][&ZZXX]``) rather than ISO-8601, and
-    :class:`DicomAttribute` objects to their JSON Model object form
-    (``{"TAG": {"vr": …}}``, including BulkDataURI / InlineBinary, §F.2.2).
+    :class:`DicomAttribute` objects to their attribute body
+    (``{"vr": …}`` with Value / BulkDataURI / InlineBinary, §F.2.2). The
+    tag→attribute map is built by ``_render_dataset``, not the encoder.
     Everything else defers to DRF's encoder.
     """
+
     def default(self, obj):
         # datetime is a subclass of date, so it must be checked first.
         if isinstance(obj, datetime):
@@ -132,24 +134,50 @@ def _is_list_of_datasets(data):
 
 
 def _to_json_model(data):
-    """Convert DicomAttribute datasets into DICOM JSON Model objects."""
+    """
+    Convert a response payload into its DICOM JSON Model form.
+
+    At the top level a dataset (or bare attribute) becomes the response's
+    top-level array of DICOM JSON objects (§F.2.1), a list of datasets one
+    object per dataset. Any other payload — a DRF error value, a paginated
+    dict — passes through, with embedded datasets and attributes rendered
+    to their object form.
+    """
     # A bare attribute is treated as a one-attribute dataset
     if isinstance(data, DicomAttribute):
         return [_render_dataset([data])]
-    # Anything not a list is not a dataset, so pass through
     if not isinstance(data, list):
-        return data
+        return _to_json_model_object(data)
     if not data:
         return []
     # Single dataset as a list
-    if all(isinstance(elem, DicomAttribute) for elem in data):
+    if _is_dataset(data):
         return [_render_dataset(data)]
     # List of datasets
-    if all(isinstance(elem, list) for elem in data):
-        if all(isinstance(subelem, DicomAttribute) for subelem in elem):
+    if _is_list_of_datasets(data):
+        return [_render_dataset(elem) for elem in data]
+    # Anything else, render each embedded value in its object form
+    return _to_json_model_object(data)
+
+
+def _to_json_model_object(data):
+    """
+    The JSON Model object form of an embedded value: a dataset or bare
+    attribute becomes its tag→attribute object (§F.2.2), a list of datasets
+    an array of such objects, containers are walked, and anything without
+    DICOM content passes through unchanged.
+    """
+    if isinstance(data, DicomAttribute):
+        return _render_dataset([data])
+    if isinstance(data, (list, tuple)) and data:
+        if _is_dataset(data):
+            return _render_dataset(data)
+        if _is_list_of_datasets(data):
             return [_render_dataset(elem) for elem in data]
-    # Anything else, recurse over the list
-    return [_to_json_model(elem) for elem in data]
+        return [_to_json_model_object(elem) for elem in data]
+    if isinstance(data, dict):
+        return {key: _to_json_model_object(value) for key, value in data.items()}
+    return data
 
 
 def _render_tag(tag: TagType) -> str:
@@ -163,8 +191,11 @@ def _render_dataset(attributes):
         if attr.VR in _BINARY_VRS:
             # TODO: BulkDataURI, InlineBinary
             raise ValueError(f'Binary VR {attr.VR!r} not supported in dicomweb')
-        if (value := attr.get_value()) is not None:
-            value = _coerce(attr.VR, attr.get_value())
+        value = attr.get_value()
+        if value is not None:
+            value = _coerce(attr.VR, value)
+            # A scalar coerces to a one-element Value; None (empty attribute)
+            # and lists pass through unchanged.
             if not (value is None or isinstance(value, list)):
                 value = [value]
             # Replace with a properly rendered value
