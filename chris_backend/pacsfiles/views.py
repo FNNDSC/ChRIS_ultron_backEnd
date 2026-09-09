@@ -50,6 +50,9 @@ class PACSList(generics.ListAPIView):
         created with a POST request in the future but this is an initial implementation
         so no changes are required to other backend services (oxidicom for instance).
         """
+        if getattr(self, 'swagger_fake_view', False):
+            return PACS.objects.none()
+
         queryset = PACS.objects.all()
         existing_pacs_names_set = {pacs.identifier for pacs in queryset}
 
@@ -220,6 +223,9 @@ class AllPACSQueryList(generics.ListAPIView):
         Overriden to limit the returned queryset to only the queries owned by the user
         when the user is no longer in the pacs_users group.
         """
+        if getattr(self, 'swagger_fake_view', False):
+            return PACSQuery.objects.none()
+
         user = self.request.user
 
         if  user.username == 'chris' or user.groups.filter(name='pacs_users').exists():
@@ -241,6 +247,9 @@ class AllPACSQueryListQuerySearch(generics.ListAPIView):
         Overriden to limit the returned queryset to only the queries owned by the user
         when the user is no longer in the pacs_users group.
         """
+        if getattr(self, 'swagger_fake_view', False):
+            return PACSQuery.objects.none()
+
         user = self.request.user
 
         if user.username == 'chris' or user.groups.filter(name='pacs_users').exists():
