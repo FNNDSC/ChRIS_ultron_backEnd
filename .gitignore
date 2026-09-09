@@ -28,6 +28,9 @@ chris_backend/.lesshist
 # created by `just prefer`
 .preference
 
+# uv's download cache, written by the containerized `just uv` helper
+.uv-cache
+
 # created by `just set-storage`
 .storage
 

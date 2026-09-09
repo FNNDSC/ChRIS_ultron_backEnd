@@ -18,6 +18,11 @@ dc.out
 venv
 .venv
 .mambaenv
+.uv-cache
+
+# the benchmark harness builds from its own context (see benchmarks/Dockerfile) and is
+# not part of the CUBE image
+benchmarks
 
 # created by `just prefer`
 .preference

@@ -1,0 +1,68 @@
+[project]
+name = "chris-backend"
+# Placeholder only. The API version reported by the OpenAPI schema comes from
+# chris_backend/__version__.py, which CI overwrites from the git tag.
+version = "0"
+requires-python = ">=3.12"
+
+# Versions here mirror the requirements/*.txt files this replaces, exactly. Adopting uv
+# is a packaging change and nothing else; the dependency refresh is a separate commit.
+# uv.lock holds the fully resolved set, including transitive packages.
+dependencies = [
+    "django==5.2.9",
+    "django-filter==25.2",
+    "djangorestframework==3.16.1",
+    "django-cors-headers==4.9.0",
+    "psycopg[binary,pool]",
+    "environs==14.5.0",
+    "python-swiftclient==4.9.0",
+    "django-storage-swift==1.4.0",
+    "django-storages[s3]>=1.14",
+    "boto3>=1.35.0",
+    "celery[redis]==5.6.2",
+    "django-celery-beat==2.8.1",
+    "python-chrisstoreclient==1.0.0",
+    "python-pfconclient==4.0.0",
+    "django-auth-ldap==5.2.0",
+    "pyyaml==6.0.3",
+    "whitenoise[brotli]==6.11.0",
+    "pyjwt==2.10.1",
+    "channels==4.3.2",
+    "nats-py==2.12.0",
+    "pydicom>=3.0,<4.0",
+    "uvicorn[standard]==0.38.0",
+    "drf-spectacular",
+]
+
+[dependency-groups]
+dev = [
+    "django-debug-toolbar==6.1.0",
+    "django-extensions==4.1",
+    "collection-json==0.1.1",  # used directly by collectionjson.tests.test_renderers
+    "coverage==7.13.0",
+    "pylint==4.0.4",
+    "flake8==7.3.0",
+    "daphne==4.2.1",  # required by (django) channels.testing
+]
+
+[tool.uv]
+# CUBE is a Django project, not a distributable package. Without this, uv would try to
+# build and install ./chris_backend as a package.
+package = false
+
+# We ship linux/amd64 and linux/arm64 images, and developers work on linux or macOS.
+# Resolving universally across every platform lets irrelevant markers hold packages back:
+# autobahn declares `cbor2<6` for PyPy-on-Windows, which pulls cbor2 down to 5.9.0 for
+# everyone. Restricting the resolution keeps the lock matching what actually gets
+# installed.
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin'",
+]
+
+[tool.uv.sources]
+# Pinned to the commit that `refs/pull/1307/head` resolved to, rather than the PR ref
+# itself, which moves whenever the PR author pushes. PR #1307 makes ReadOnlyField with a
+# nullable source generate `nullable: true`; see the follow-up commit that replaces this
+# with drf-spectacular from PyPI plus in-repo @extend_schema_field annotations.
+drf-spectacular = { git = "https://github.com/tfranzel/drf-spectacular.git", rev = "4735b011600bd19f857a6ae3aa5a06487c0167a9" }

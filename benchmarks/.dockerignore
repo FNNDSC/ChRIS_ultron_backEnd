@@ -1,0 +1,6 @@
+# The harness source is bind-mounted at /app/benchmarks by docker-compose.benchmark.yml,
+# so the image build only needs the dependency manifests. Everything else is context the 
+# build would copy and never use.
+*
+!pyproject.toml
+!uv.lock
