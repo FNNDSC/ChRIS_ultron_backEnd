@@ -129,10 +129,10 @@ def _encode_pn(value):
     # At this point, we should only have a string
     if not isinstance(value, str):
         raise ValueError(f'Unable to encode PN value: {value}')
-    component_groups = value.split('=', maxsplit=3)
+    component_groups = value.split('=', maxsplit=2)
     encoded_pn = {}
     for label, group in zip(component_labels, component_groups):
-        components = group.split('^', maxsplit=5)
+        components = group.split('^', maxsplit=4)
         if any(components):
             encoded_pn[label] = group
     return encoded_pn
