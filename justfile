@@ -285,10 +285,9 @@ openapi-split:
 
 
 # The image is the non-slim `-python3.12-trixie` variant on purpose: the distroless `uv`
-# image has no shell (uv cannot detect libc and refuses to run) and no git (needed while
-# a dependency is still sourced from a git rev). The cache is kept in the working tree so
-# repeat locks are fast; UV_LINK_MODE=copy is required because hardlinks do not work
-# across the bind mount on macOS.
+# image has no shell, so uv cannot detect libc and refuses to run. The cache is kept in
+# the working tree so repeat locks are fast; UV_LINK_MODE=copy is required because
+# hardlinks do not work across the bind mount on macOS.
 #
 # Run uv in a throwaway container, so no local uv installation is required.
 [group('helper function')]

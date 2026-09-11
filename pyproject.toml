@@ -31,7 +31,11 @@ dependencies = [
     "nats-py==2.12.0",
     "pydicom>=3.0,<4.0",
     "uvicorn[standard]==0.38.0",
-    "drf-spectacular",
+    # 0.30.0 replaces the PR-#1307 git rev this project used to pin. That PR made a
+    # ReadOnlyField with a nullable source generate `nullable: true`; without it, twelve
+    # such fields lose their nullability, so they now carry explicit @extend_schema_field
+    # annotations in the serializers.
+    "drf-spectacular>=0.30",
 ]
 
 [dependency-groups]
@@ -59,10 +63,3 @@ environments = [
     "sys_platform == 'linux'",
     "sys_platform == 'darwin'",
 ]
-
-[tool.uv.sources]
-# Pinned to the commit that `refs/pull/1307/head` resolved to, rather than the PR ref
-# itself, which moves whenever the PR author pushes. PR #1307 makes ReadOnlyField with a
-# nullable source generate `nullable: true`; see the follow-up commit that replaces this
-# with drf-spectacular from PyPI plus in-repo @extend_schema_field annotations.
-drf-spectacular = { git = "https://github.com/tfranzel/drf-spectacular.git", rev = "4735b011600bd19f857a6ae3aa5a06487c0167a9" }
