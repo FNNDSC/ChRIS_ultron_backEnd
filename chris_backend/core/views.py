@@ -5,7 +5,6 @@ import jwt
 
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.conf import settings
 from rest_framework import generics, permissions
 from rest_framework.reverse import reverse
 from rest_framework import exceptions
@@ -13,6 +12,7 @@ from rest_framework.authentication import TokenAuthentication
 from drf_spectacular.extensions import OpenApiAuthenticationExtension
 
 from collectionjson import services
+from .utils import download_token_signing_key
 from .models import ChrisInstance, FileDownloadToken, FileDownloadTokenFilter
 from .serializers import ChrisInstanceSerializer, FileDownloadTokenSerializer
 from .permissions import IsOwnerOrChris
@@ -53,7 +53,7 @@ class FileDownloadTokenList(generics.ListCreateAPIView):
         user = self.request.user
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode({'user': user.username, 'nonce': str(uuid.uuid4()), 'exp': dt},
-                           settings.SECRET_KEY, algorithm='HS512')
+                           download_token_signing_key(), algorithm='HS512')
         serializer.save(token=token, owner=user)
 
     def list(self, request, *args, **kwargs):
@@ -137,7 +137,7 @@ class TokenAuthSupportQueryString(TokenAuthentication):
 def authenticate_token(token: str) -> User:
     err_msg = f'Invalid file download token: {token}'
     try:
-        info = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS512'])
+        info = jwt.decode(token, download_token_signing_key(), algorithms=['HS512'])
     except jwt.ExpiredSignatureError:
         err_msg = f'Expired file download token: {token}'
         logger.error(err_msg)
