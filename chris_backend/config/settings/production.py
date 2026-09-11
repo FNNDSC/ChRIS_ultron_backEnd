@@ -7,7 +7,7 @@ Production Configurations
 import ldap
 from django_auth_ldap.config import LDAPSearch, GroupOfNamesType
 from .common import *  # noqa
-from environs import Env, EnvValidationError
+from environs import Env, EnvError
 from core.storage import verify_storage_connection
 
 # Normally you should not import ANYTHING from Django directly
@@ -25,7 +25,9 @@ def get_secret(setting, secret_type=env, default=None):
     try:
         return secret_type(setting) if default is None else secret_type(setting,
                                                                         default=default)
-    except EnvValidationError as e:
+    except EnvError as e:
+        # EnvError is the common base of EnvValidationError (the value is present but
+        # unparseable) and EnvNotSetError (the variable is missing).
         raise ImproperlyConfigured(str(e))
 
 

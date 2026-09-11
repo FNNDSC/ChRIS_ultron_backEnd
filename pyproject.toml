@@ -14,7 +14,7 @@ dependencies = [
     "djangorestframework==3.16.1",
     "django-cors-headers==4.9.0",
     "psycopg[binary,pool]",
-    "environs==14.5.0",
+    "environs>=15.2",
     "python-swiftclient==4.9.0",
     "django-storage-swift==1.4.0",
     "django-storages[s3]>=1.14",
