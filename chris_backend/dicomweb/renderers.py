@@ -245,14 +245,16 @@ def _coerce_scalar(vr, value):
         # Kept as the stdlib datetime type the caller supplies; DicomJsonEncoder
         # renders the wire form. An already-formatted string passes through and
         # is emitted verbatim.
-        # If value is a datetime instance, check the VR in case it
-        # should be a plain date or time instead.
+        # The value is narrowed or widened to the VR's type so the wire form
+        # is valid: a datetime in a DA or TM slot is narrowed to its date or
+        # time, and a date in a DT slot is widened to midnight of that date
+        # rather than silently emitted as a date-only DT.
         if isinstance(value, datetime):
             if vr == "DA":
                 return value.date()
             if vr == "TM":
                 return value.time()
-        if isinstance(value, date) and vr == "DT":
+        elif isinstance(value, date) and vr == "DT":
             return datetime(value.year, value.month, value.day)
         return value
     if vr in _INT_VRS:

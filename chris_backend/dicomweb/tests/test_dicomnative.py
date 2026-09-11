@@ -164,6 +164,17 @@ class DicomAttributeTest(SimpleTestCase):
         with self.assertRaises(ValueError):
             dicom_attribute('00280106', 0, vr='US or SS')
 
+    def test_non_standard_vr_raises(self):
+        # VRs are validated against pydicom's PS3.5-derived VR set, not just
+        # by length: a two-character string that is not a VR (the dataset()
+        # (tag, vr, value) misbinding trap) and non-string VRs both raise.
+        with self.assertRaises(ValueError):
+            dicom_attribute('00080060', 'MR', vr='CT')
+        with self.assertRaises(ValueError):
+            dicom_attribute('7FE00010', b'\x00\x01', vr=b'OW')
+        with self.assertRaises(ValueError):
+            dataset([('00080060', 'CT', 'MR')])   # meant Modality = CT and MR
+
     def test_unknown_tag_raises_value_error(self):
         # A private/unknown tag has no data-dictionary VR — the documented
         # ValueError, not KeyError leaking from pydicom's dictionary_VR.
@@ -468,6 +479,14 @@ class DicomJsonRendererTest(SimpleTestCase):
         self.assertEqual(
             self._element('00080030', 'TM', datetime(2023, 1, 2, 14, 30, 5, 123456))['Value'],
             ['143005.123456'],
+        )
+
+    def test_date_widened_to_datetime_for_dt(self):
+        # A date supplied for a DT attribute is that date at midnight — the
+        # symmetric case of the DA/TM narrowing, not a silently date-only DT.
+        self.assertEqual(
+            self._element('0008002A', 'DT', date(2023, 1, 2))['Value'],
+            ['20230102000000'],
         )
 
     def test_empty_attribute_omits_value_key(self):

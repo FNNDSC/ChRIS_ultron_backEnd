@@ -22,7 +22,7 @@ from typing import Optional, Any
 
 from pydicom.datadict import dictionary_VR
 from pydicom.tag import Tag, TagType
-from pydicom.valuerep import BYTES_VR
+from pydicom.valuerep import BYTES_VR, VR
 
 
 @dataclass
@@ -80,8 +80,9 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
     field as a list of item datasets, a bare single-item dataset being wrapped
     as a one-item sequence. The renderer performs the remaining JSON-Model
     coercion (including rejecting binary VRs). Raises :class:`ValueError` for
-    an unknown tag (VR lookup fails) or any non-2-character
-    (ambiguous/invalid) VR.
+    an unknown tag (VR lookup fails) or any VR outside pydicom's PS3.5 VR
+    set — ambiguous data-dictionary VRs ('US or SS', 'OB or OW') and
+    non-standard or non-string values included.
     """
     tag_hex = normalize_tag(tag)
     if vr is None:
@@ -91,10 +92,14 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
             # Unknown/private tag (e.g. (0009,1001)) or group length —
             # unreachable for the fixed QIDO attribute set.
             raise ValueError(f'Unknown tag {tag!r}; no VR in the DICOM data dictionary') from None
-    if len(vr) != 2:
-        # Every standard DICOM VR is exactly two characters. Anything else is an
-        # ambiguous data-dictionary VR (e.g. 'US or SS', 'OB or OW') that the
-        # caller must resolve — unreachable for the fixed QIDO attribute set.
+    if not isinstance(vr, str) or len(vr) != 2 or vr not in _VALID_VRS:
+        # Every standard DICOM VR is a two-character member of pydicom's
+        # PS3.5-derived VR set. The length check rejects the ambiguous
+        # data-dictionary VRs ('US or SS', 'OB or OW') that the caller must
+        # resolve; the membership check rejects bogus two-character strings
+        # (e.g. a value bound into the vr slot); the type check rejects
+        # non-strings (e.g. raw bytes). Unreachable for the fixed QIDO
+        # attribute set.
         raise ValueError(f'Ambiguous or invalid VR {vr!r}; a concrete 2-char VR is required')
     if vr == 'PN':
         return DicomAttribute(tag_hex, vr, person_name=_as_value_list(_encode_pn(value)))
@@ -104,6 +109,11 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
         return DicomAttribute(tag_hex, vr, inline_binary=value)
     # TODO: handle bulk data
     return DicomAttribute(tag_hex, vr, value=_as_value_list(value))
+
+
+# pydicom's VR enumeration (PS3.5-derived, includes the ambiguous
+# data-dictionary combinations, which the length check above rejects).
+_VALID_VRS = frozenset(VR)
 
 
 _PN_COMPONENT_LABELS = ['Alphabetic', 'Ideographic', 'Phonetic']
