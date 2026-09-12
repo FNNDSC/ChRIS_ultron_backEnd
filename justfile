@@ -30,6 +30,19 @@ up: (docker-compose '--profile=cube up -d')
 [group('(3) development')]
 attach: (docker-compose '--profile=cube attach chris | grep -Fv "\"GET /api/v1/users/ HTTP/1.1\" 200"')
 
+# `runserver` is WSGI here — channels is wired up in config/asgi.py, not INSTALLED_APPS —
+# so it cannot serve WebSockets at all, and `channels.testing` exercises the consumers
+# in-process. Neither reaches the uvicorn protocol stack production uses
+# (websockets-sansio since uvicorn 0.50); this recipe does, on the dev stack and dev
+# settings. `just bench-start` also runs uvicorn, but under the benchmark envelope.
+# Publishes host port 8000, so stop the dev server (`just down`) before running it.
+#
+# Serve CUBE with uvicorn (ASGI) on port 8000 instead of the dev `runserver`.
+[group('(3) development')]
+dev-uvicorn *args: start-ancillary
+    @just storage={{ storage }} docker-compose --profile=cube run --rm --service-ports \
+        chris python3 -m uvicorn --host 0.0.0.0 --port 8000 config.asgi:application {{ args }}
+
 # Open a Python shell.
 [group('(3) development')]
 shell: (run 'python manage.py shell')

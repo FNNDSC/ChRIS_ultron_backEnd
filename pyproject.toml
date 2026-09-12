@@ -5,48 +5,64 @@ name = "chris-backend"
 version = "0"
 requires-python = ">=3.12"
 
-# Versions here mirror the requirements/*.txt files this replaces, exactly. Adopting uv
-# is a packaging change and nothing else; the dependency refresh is a separate commit.
-# uv.lock holds the fully resolved set, including transitive packages.
+# Constraints here are lower bounds; uv.lock holds the exact resolved versions, which is
+# where a reviewer can see the transitive effects of a bump. `django` is the exception and
+# stays pinned exactly until the stage that moves it, so that a blanket `uv lock --upgrade`
+# cannot walk Django forward as a side effect of refreshing something else.
 dependencies = [
     "django==5.2.9",
-    "django-filter==25.2",
-    "djangorestframework==3.16.1",
-    "django-cors-headers==4.9.0",
-    "psycopg[binary,pool]",
+    # django-filter 26.1's DRF integration requires DRF 3.18, so these two move together.
+    # Both still support Django 5.2, so they land here rather than alongside the Django
+    # bump: a regression from either is attributable to it and not to Django.
+    "django-filter>=26.1",
+    "djangorestframework>=3.18",
+    "django-cors-headers>=4.9",
+    # Django 6.0's stated minimum; the lock records the version actually installed.
+    "psycopg[binary,pool]>=3.1.12",
     "environs>=15.2",
-    "python-swiftclient==4.9.0",
-    "django-storage-swift==1.4.0",
-    "django-storages[s3]>=1.14",
-    "boto3>=1.35.0",
-    "celery[redis]==5.6.2",
-    "django-celery-beat==2.8.1",
-    "python-chrisstoreclient==1.0.0",
-    "python-pfconclient==4.0.0",
-    "django-auth-ldap==5.2.0",
-    "pyyaml==6.0.3",
-    "whitenoise[brotli]==6.11.0",
-    "pyjwt==2.10.1",
-    "channels==4.3.2",
-    "nats-py==2.12.0",
+    "python-swiftclient>=4.11",
+    "django-storage-swift>=1.4",
+    "django-storages[s3]>=1.14.6",
+    "boto3>=1.43",
+    "celery[redis]>=5.6.3",
+    # 2.9.0 caps Django below 6.1 and cron-descriptor below 2.0, which is why the lock
+    # moves cron-descriptor backwards. It is also the one dependency standing between
+    # this project and Django 6.1: upstream has 6.1 in its test matrix but has not
+    # released since 2.9.0.
+    "django-celery-beat>=2.9",
+    "python-chrisstoreclient>=1.0",
+    "python-pfconclient>=4.0",
+    "django-auth-ldap>=5.3",
+    "pyyaml>=6.0.2",
+    "whitenoise[brotli]>=6.12",
+    # 2.11 added a minimum HMAC key length check; see core.utils.download_token_signing_key.
+    # The floor is 2.14 rather than 2.13 because both releases are HMAC key-handling
+    # hardening, and there is no reason to allow the older one.
+    "pyjwt>=2.14",
+    "channels>=4.3.2",
+    "nats-py>=2.15",
     "pydicom>=3.0,<4.0",
-    "uvicorn[standard]==0.38.0",
+    # 0.50 made websockets-sansio the `--ws auto` default, replacing the now-deprecated
+    # legacy websockets implementation. LONK is served over this; see `just dev-uvicorn`.
+    "uvicorn[standard]>=0.52",
     # 0.30.0 replaces the PR-#1307 git rev this project used to pin. That PR made a
     # ReadOnlyField with a nullable source generate `nullable: true`; without it, twelve
-    # such fields lose their nullability, so they now carry explicit @extend_schema_field
-    # annotations in the serializers.
+    # such fields lose their nullability, so they now pass `allow_null=True` explicitly,
+    # e.g. `ReadOnlyField(source='previous.id', allow_null=True)`.
     "drf-spectacular>=0.30",
 ]
 
 [dependency-groups]
 dev = [
-    "django-debug-toolbar==6.1.0",
-    "django-extensions==4.1",
-    "collection-json==0.1.1",  # used directly by collectionjson.tests.test_renderers
-    "coverage==7.13.0",
-    "pylint==4.0.4",
-    "flake8==7.3.0",
-    "daphne==4.2.1",  # required by (django) channels.testing
+    # Two majors. 6.2 deprecated RedirectsPanel in favour of HistoryPanel, 7.0 moved the
+    # toolbar into a shadow DOM and dropped Django 4.2/5.1, 8.0 is a visual refresh.
+    "django-debug-toolbar>=8.0",
+    "django-extensions>=4.1",
+    "collection-json>=0.1.1",  # used directly by collectionjson.tests.test_renderers
+    "coverage>=7.16",
+    "pylint>=4.0.8",
+    "flake8>=7.3",
+    "daphne>=4.2.3",  # required by (django) channels.testing
 ]
 
 [tool.uv]
