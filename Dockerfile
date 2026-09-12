@@ -35,11 +35,14 @@
 # through the container engine's own proxy configuration.
 #
 
-FROM registry.access.redhat.com/ubi9/python-312:1-1765312055
+# The `1-<timestamp>` tags are individual, immutable builds of the same stream, so this
+# pins the OS layer as firmly as the digest does for the benchmark image, and stays
+# readable. Bump it deliberately for OS security updates.
+FROM registry.access.redhat.com/ubi9/python-312:1-1789044838
 
 # Pinned deliberately: `:latest` would make the image build irreproducible, which is the
 # opposite of the point of adopting a lockfile.
-COPY --from=ghcr.io/astral-sh/uv:0.12.11 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /uvx /usr/local/bin/
 
 # Install into the s2i-provided venv at /opt/app-root rather than creating .venv, so the
 # interpreter and console scripts stay where the rest of the image expects them, and the

@@ -312,7 +312,7 @@ uv +args:
         -e UV_LINK_MODE=copy \
         -e UV_PYTHON_DOWNLOADS=never \
         -v "$PWD:/w:z" -w /w \
-        ghcr.io/astral-sh/uv:0.12.11-python3.12-trixie uv {{ args }}
+        ghcr.io/astral-sh/uv:0.12.13-python3.12-trixie uv {{ args }}
 
 # Refresh both lockfiles (CUBE and the benchmark harness).
 [group('(3) development')]
