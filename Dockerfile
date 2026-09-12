@@ -68,7 +68,16 @@ RUN cd /tmp/build \
     && rm -rf /tmp/build
 
 COPY chris_backend/ ./
+
+# Development images skip collectstatic but whitenoise's middleware warns once per
+# instantiation when STATIC_ROOT is missing. An empty directory is the honest state:
+# under DEBUG, runserver serves static files from the app directories instead.
+# The path is read back from settings so it cannot drift from common.py.
 RUN if [ "$ENVIRONMENT" = "production" ]; then \
-    env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; fi
+        env DJANGO_SETTINGS_MODULE=config.settings.common ./manage.py collectstatic; \
+    else \
+        mkdir -p "$(env DJANGO_SETTINGS_MODULE=config.settings.common \
+            python3 -c 'from django.conf import settings; print(settings.STATIC_ROOT)')"; \
+    fi
 
 CMD ["python3", "-m", "uvicorn", "--host", "0.0.0.0", "--port", "8000", "config.asgi:application"]

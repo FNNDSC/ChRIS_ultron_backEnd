@@ -6,11 +6,11 @@ version = "0"
 requires-python = ">=3.12"
 
 # Constraints here are lower bounds; uv.lock holds the exact resolved versions, which is
-# where a reviewer can see the transitive effects of a bump. `django` is the exception and
-# stays pinned exactly until the stage that moves it, so that a blanket `uv lock --upgrade`
-# cannot walk Django forward as a side effect of refreshing something else.
+# where a reviewer can see the transitive effects of a bump. `django` additionally carries
+# an upper bound, so that a blanket `uv lock --upgrade` picks up patch releases within the
+# series we have tested but cannot walk us onto a new feature release by surprise.
 dependencies = [
-    "django==5.2.9",
+    "django>=5.2.17,<6",
     # django-filter 26.1's DRF integration requires DRF 3.18, so these two move together.
     # Both still support Django 5.2, so they land here rather than alongside the Django
     # bump: a regression from either is attributable to it and not to Django.
