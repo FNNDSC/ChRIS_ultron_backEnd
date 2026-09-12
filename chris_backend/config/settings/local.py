@@ -19,7 +19,7 @@ from core.storage import verify_storage_connection
 from django.core.exceptions import ImproperlyConfigured
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # as for urls for dev env
 ROOT_URLCONF = 'config.local_urls'
@@ -31,14 +31,14 @@ SECRET_KEY = 'w1kxu^l=@pnsf!5piqz6!!5kdcdpo79y6jebbp+2244yjm*#+k'
 CHRIS_SUPERUSER_PASSWORD = 'chris1234'
 
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/5.1/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/6.0/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/5.1/topics/logging/ for
+# See https://docs.djangoproject.com/en/6.0/topics/logging/ for
 # more details on how to customize your logging configuration.
 LOGGING = {
     'version': 1,
@@ -142,7 +142,7 @@ except Exception as e:
 CHRIS_STORE_URL = 'http://chris-store.local:8010/api/v1/'
 
 # Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 DATABASES['default']['NAME'] = 'chris_dev'
 DATABASES['default']['USER'] = 'chris'
 DATABASES['default']['PASSWORD'] = 'Chris1234'

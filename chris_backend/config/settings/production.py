@@ -33,7 +33,7 @@ def get_secret(setting, secret_type=env, default=None):
 
 # SECRET CONFIGURATION
 # ------------------------------------------------------------------------------
-# See: https://docs.djangoproject.com/en/5.1/ref/settings/#secret-key
+# See: https://docs.djangoproject.com/en/6.0/ref/settings/#secret-key
 # Raises ImproperlyConfigured exception if DJANGO_SECRET_KEY not in os.environ
 SECRET_KEY = get_secret('DJANGO_SECRET_KEY')
 
@@ -45,7 +45,7 @@ CHRIS_SUPERUSER_PASSWORD = get_secret('CHRIS_SUPERUSER_PASSWORD')
 # SITE CONFIGURATION
 # ------------------------------------------------------------------------------
 # Hosts/domain names that are valid for this site
-# See https://docs.djangoproject.com/en/5.1/ref/settings/#allowed-hosts
+# See https://docs.djangoproject.com/en/6.0/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = get_secret('DJANGO_ALLOWED_HOSTS', env.list)
 # END SITE CONFIGURATION
 
@@ -134,9 +134,9 @@ CHRIS_STORE_URL = get_secret('CHRIS_STORE_URL')
 
 
 # LOGGING CONFIGURATION
-# See https://docs.djangoproject.com/en/5.1/topics/logging/ for
+# See https://docs.djangoproject.com/en/6.0/topics/logging/ for
 # more details on how to customize your logging configuration.
-ADMINS = [('FNNDSC Developers', 'dev@babymri.org')]
+ADMINS = ['"FNNDSC Developers" <dev@babymri.org>']
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

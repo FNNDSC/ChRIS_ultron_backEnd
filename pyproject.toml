@@ -10,14 +10,10 @@ requires-python = ">=3.12"
 # an upper bound, so that a blanket `uv lock --upgrade` picks up patch releases within the
 # series we have tested but cannot walk us onto a new feature release by surprise.
 dependencies = [
-    "django>=5.2.17,<6",
-    # django-filter 26.1's DRF integration requires DRF 3.18, so these two move together.
-    # Both still support Django 5.2, so they land here rather than alongside the Django
-    # bump: a regression from either is attributable to it and not to Django.
+    "django>=6.0.8,<6.1",
     "django-filter>=26.1",
     "djangorestframework>=3.18",
     "django-cors-headers>=4.9",
-    # Django 6.0's stated minimum; the lock records the version actually installed.
     "psycopg[binary,pool]>=3.1.12",
     "environs>=15.2",
     "python-swiftclient>=4.11",
@@ -35,9 +31,6 @@ dependencies = [
     "django-auth-ldap>=5.3",
     "pyyaml>=6.0.2",
     "whitenoise[brotli]>=6.12",
-    # 2.11 added a minimum HMAC key length check; see core.utils.download_token_signing_key.
-    # The floor is 2.14 rather than 2.13 because both releases are HMAC key-handling
-    # hardening, and there is no reason to allow the older one.
     "pyjwt>=2.14",
     "channels>=4.3.2",
     "nats-py>=2.15",
@@ -45,17 +38,11 @@ dependencies = [
     # 0.50 made websockets-sansio the `--ws auto` default, replacing the now-deprecated
     # legacy websockets implementation. LONK is served over this; see `just dev-uvicorn`.
     "uvicorn[standard]>=0.52",
-    # 0.30.0 replaces the PR-#1307 git rev this project used to pin. That PR made a
-    # ReadOnlyField with a nullable source generate `nullable: true`; without it, twelve
-    # such fields lose their nullability, so they now pass `allow_null=True` explicitly,
-    # e.g. `ReadOnlyField(source='previous.id', allow_null=True)`.
     "drf-spectacular>=0.30",
 ]
 
 [dependency-groups]
 dev = [
-    # Two majors. 6.2 deprecated RedirectsPanel in favour of HistoryPanel, 7.0 moved the
-    # toolbar into a shadow DOM and dropped Django 4.2/5.1, 8.0 is a visual refresh.
     "django-debug-toolbar>=8.0",
     "django-extensions>=4.1",
     "collection-json>=0.1.1",  # used directly by collectionjson.tests.test_renderers

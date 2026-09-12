@@ -3,7 +3,6 @@ import json
 import re
 
 from django.contrib import admin
-from django.db import models as db_models
 from django.utils import timezone
 from django.urls import path
 from django.shortcuts import render
@@ -77,10 +76,6 @@ class ComputeResourceAdminForm(forms.ModelForm):
 
 class ComputeResourceAdmin(admin.ModelAdmin):
     form = ComputeResourceAdminForm
-    # compute_url and compute_auth_url are models.URLField, whose form field assumes a
-    # scheme when the admin submits a bare host. Django 6.0 changes that default from
-    # 'http' to 'https'; state it here so the behaviour is explicit and 5.2 stops warning.
-    formfield_overrides = {db_models.URLField: {'assume_scheme': 'https'}}
     readonly_fields = ['creation_date', 'modification_date', 'compute_innetwork',
                        'compute_requires_copy_job', 'compute_requires_upload_job']
     list_display = ('name', 'compute_url', 'compute_innetwork', 'description', 'id')
@@ -173,7 +168,7 @@ class UploadFileForm(forms.Form):
 class PluginAdminForm(forms.ModelForm):
     name = forms.CharField(max_length=100, required=False)
     version = forms.CharField(max_length=10, required=False)
-    url = forms.URLField(max_length=300, required=False, assume_scheme='https')
+    url = forms.URLField(max_length=300, required=False)
 
     def clean(self):
         """
