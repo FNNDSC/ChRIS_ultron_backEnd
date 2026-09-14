@@ -122,6 +122,14 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
     format = 'json'
 
 
+class DicomWebRendererMixin:
+    """
+    Mixin class that sets the correct order for renderer_classes,
+    ignoring builtin renderers.
+    """
+    renderer_classes = [DicomJsonRenderer, ApplicationJsonDicomRenderer]
+
+
 def _is_dataset(data):
     """A DICOM Data Set is a list of DicomAttribute (§F.2.2)."""
     return isinstance(data, list) and all(isinstance(elem, DicomAttribute) for elem in data)
