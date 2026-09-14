@@ -6,6 +6,10 @@ import json
 from datetime import date, datetime, time, timedelta, timezone
 
 from django.test import SimpleTestCase
+from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+from rest_framework.test import APIRequestFactory
+from rest_framework.views import APIView
 
 from dicomweb.dicomnative import (
     DicomAttribute,
@@ -13,7 +17,12 @@ from dicomweb.dicomnative import (
     dicom_attribute,
     normalize_tag,
 )
-from dicomweb.renderers import DicomJsonEncoder, DicomJsonRenderer
+from dicomweb.renderers import (
+    ApplicationJsonDicomRenderer,
+    DicomJsonEncoder,
+    DicomJsonRenderer,
+    DicomWebRendererMixin,
+)
 
 
 class NormalizeTagTest(SimpleTestCase):
@@ -607,3 +616,105 @@ class DicomJsonRendererTest(SimpleTestCase):
             {'00080060': {'vr': 'CS', 'Value': ['CT']}},
             {'00080060': {'vr': 'CS', 'Value': ['CT']}},
         ])
+
+
+class ApplicationJsonDicomRendererTest(SimpleTestCase):
+    """The application/json alias advertises the parent's exact bytes."""
+
+    def test_media_type_and_format(self):
+        self.assertEqual(ApplicationJsonDicomRenderer.media_type,
+                         'application/json')
+        self.assertEqual(ApplicationJsonDicomRenderer.format, 'json')
+
+    def test_bytes_identical_to_parent(self):
+        payload = dataset([('00080060', 'CS', 'CT'), ('00200013', 'IS', '42')])
+        self.assertEqual(
+            ApplicationJsonDicomRenderer().render(payload),
+            DicomJsonRenderer().render(payload),
+        )
+
+
+class DicomWebRendererMixinTest(SimpleTestCase):
+    """
+    A view with the mixin gets the full QIDO Accept matrix with no
+    configuration: renderer_classes are assigned (never appended to
+    DEFAULT_RENDERER_CLASSES), so DRF's built-in JSONRenderer — which
+    cannot serialize a DicomAttribute payload — is absent, and
+    application/json (via Accept or a .json format-suffix route) is
+    served by the alias (§10.6.2).
+    """
+
+    expected_body = [{
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+        '00200013': {'vr': 'IS', 'Value': [42]},
+    }]
+
+    def setUp(self):
+        class DicomView(DicomWebRendererMixin, APIView):
+            def get(self, request, format=None):
+                return Response(dataset([
+                    ('00080060', 'CS', 'CT'),
+                    ('00200013', 'IS', '42'),
+                ]))
+        # Instance attribute: a class attribute would bind self.view into a
+        # method of the test case and hijack its first argument.
+        self.view = DicomView.as_view()
+        self.factory = APIRequestFactory()
+
+    def _get(self, accept=None, **view_kwargs):
+        extra = {'HTTP_ACCEPT': accept} if accept is not None else {}
+        response = self.view(self.factory.get('/', **extra), **view_kwargs)
+        response.render()
+        return response
+
+    def test_renderer_classes_assigned_not_appended(self):
+        # The mixin overrides APIView's defaults with the exact renderer set.
+        self.assertEqual(self.view.view_class.renderer_classes,
+                         [DicomJsonRenderer, ApplicationJsonDicomRenderer])
+        self.assertNotIn(JSONRenderer, self.view.view_class.renderer_classes)
+
+    def test_builtin_json_renderer_cannot_render_datasets(self):
+        # Why the mixin must assign rather than append: the built-in
+        # JSONRenderer chokes on the native-model payload (round-2 #3).
+        with self.assertRaises(TypeError):
+            JSONRenderer().render(dataset([('00080060', 'CS', 'CT')]))
+
+    def test_accept_dicom_json(self):
+        response = self._get(accept='application/dicom+json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.accepted_media_type, 'application/dicom+json')
+        self.assertEqual(json.loads(response.rendered_content.decode()),
+                        self.expected_body)
+
+    def test_accept_application_json(self):
+        response = self._get(accept='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.accepted_media_type, 'application/json')
+        self.assertEqual(json.loads(response.rendered_content.decode()),
+                        self.expected_body)
+
+    def test_wildcard_accept_negotiates_to_dicom_json(self):
+        # DicomJsonRenderer is first, so */* (and a missing Accept header)
+        # get application/dicom+json — the QIDO default (§10.6.2).
+        response = self._get(accept='*/*')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.accepted_media_type, 'application/dicom+json')
+        self.assertEqual(json.loads(response.rendered_content.decode()),
+                        self.expected_body)
+
+    def test_format_suffix_selects_json_alias(self):
+        # A '.json' URL (routed via DRF's format_suffix_patterns) passes the
+        # format kwarg, filtering negotiation to the alias renderer.
+        response = self._get(format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.accepted_media_type, 'application/json')
+        self.assertEqual(json.loads(response.rendered_content.decode()),
+                        self.expected_body)
+
+    def test_unacceptable_accept_gets_406(self):
+        response = self._get(accept='text/html')
+        self.assertEqual(response.status_code, 406)
+        self.assertEqual(
+            json.loads(response.rendered_content.decode())['detail'],
+            'Could not satisfy the request Accept header.',
+        )
