@@ -14,7 +14,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv publishes no floating major tag past v7 (there is no `v10`), and its own
+      # README pins the release commit. Bump the SHA and the version comment together.
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.13"
       # Fails fast on a pyproject.toml edit without a matching `just lock`, rather than
