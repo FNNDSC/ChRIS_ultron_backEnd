@@ -142,8 +142,11 @@ def _encode_pn(value):
     component_groups = value.split('=', maxsplit=2)
     encoded_pn = {}
     for label, group in zip(component_labels, component_groups):
-        components = group.split('^', maxsplit=4)
-        if any(components):
+        # A non-empty group string is kept verbatim, delimiters included: a
+        # group of empty components such as "^^^^" is a present Alphabetic
+        # value, distinct from an absent group — §F.2.2 keeps the Data
+        # Element representation (matches pydicom).
+        if group:
             encoded_pn[label] = group
     return encoded_pn
 

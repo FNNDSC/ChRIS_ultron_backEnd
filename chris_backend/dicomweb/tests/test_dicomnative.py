@@ -111,6 +111,17 @@ class DicomAttributeTest(SimpleTestCase):
         with self.assertRaises(ValueError):
             dicom_attribute('00100010', 42)
 
+    def test_delimiter_only_pn_groups_kept_verbatim(self):
+        # "^^^^" is a present Alphabetic group whose five components are all
+        # empty — a non-empty group string, kept verbatim (§F.2.2 keeps the
+        # Data Element representation; matches pydicom). "==" has only
+        # absent groups, so it encodes as an empty object.
+        self.assertEqual(
+            dicom_attribute('00100010', '^^^^').person_name,
+            [{'Alphabetic': '^^^^'}],
+        )
+        self.assertEqual(dicom_attribute('00100010', '==').person_name, [{}])
+
     def test_empty_pn_left_for_renderer(self):
         # Empty PN is not turned into a mapping — the renderer omits it (§F.2.5).
         self.assertIsNone(dicom_attribute('00100010', None).person_name)
@@ -326,6 +337,21 @@ class DicomJsonRendererTest(SimpleTestCase):
             self._element('00100010', 'PN', ['DOE^JANE', 'SMITH^JOHN']),
             {'vr': 'PN', 'Value': [{'Alphabetic': 'DOE^JANE'},
                                    {'Alphabetic': 'SMITH^JOHN'}]},
+        )
+
+    def test_delimiter_only_pn_rendered(self):
+        # "^^^^": a present all-empty-components group → its raw string,
+        # per §F.2.2 (aligned with the Data Element representation, as
+        # pydicom). "==": all component groups absent → an empty object
+        # element — Value Length ≠ 0, so the element is kept rather than
+        # the attribute omitted (§F.2.5 reserves omission for length 0).
+        self.assertEqual(
+            self._element('00100010', 'PN', '^^^^'),
+            {'vr': 'PN', 'Value': [{'Alphabetic': '^^^^'}]},
+        )
+        self.assertEqual(
+            self._element('00100010', 'PN', '=='),
+            {'vr': 'PN', 'Value': [{}]},
         )
 
     def test_cs_single_and_multi(self):
