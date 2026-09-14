@@ -12,6 +12,9 @@ jobs:
   test:
     if: github.ref_type == 'branch' || github.ref_name == 'pull_request'
     runs-on: ubuntu-24.04
+    # A hung `compose run` otherwise burns the full 6h job budget.
+    # The slowest green run to date is ~10 min.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +26,19 @@ jobs:
         run: systemctl --user start podman.service
       - uses: taiki-e/install-action@just
       - uses: actions/checkout@v6
+      - name: Log container engine versions
+        # Recorded so a future hang can be correlated with a runner-image bump;
+        # `podman compose` delegates to the Docker Compose v2 binary, so both
+        # versions matter.
+        run: |
+          echo "::group::${{ matrix.engine }} version"
+          ${{ matrix.engine }} version || true
+          echo "::endgroup::"
+          echo "::group::compose version"
+          docker-compose version 2>/dev/null \
+            || /usr/libexec/docker/cli-plugins/docker-compose version \
+            || true
+          echo "::endgroup::"
       - name: Run ${{ matrix.test-kind }} tests on ${{ matrix.engine }}
         uses: ./
         with:
