@@ -1,0 +1,27 @@
+[project]
+name = "cube-benchmarks"
+# Placeholder; the harness is never published or installed as a package.
+version = "0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.33.0",
+    "pyyaml>=6.0",
+    "docker>=7.0",
+    "locust>=2.20",   # control plane (RED load test — see locustfile.py)
+]
+
+[dependency-groups]
+# pytest lives here rather than in the runtime set; `just bench-test` runs it inside the
+# benchmark image, which installs this group. The harness is a development artifact that
+# never ships, so there is no production/dev split to make.
+dev = ["pytest>=9.0.3"]
+
+[tool.uv]
+package = false
+
+# See the note in the root pyproject.toml; kept identical so both locks resolve the same
+# way for the platforms we actually build and develop on.
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin'",
+]
