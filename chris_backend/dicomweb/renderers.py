@@ -115,8 +115,7 @@ class ApplicationJsonDicomRenderer(DicomJsonRenderer):
     ``application/dicom+json`` (PS3.18 §10.6.2), and it is handy for curl.
 
     NOTE: This renderer conflicts with the default JSONRenderer. When
-    implementing views, pay attention to the order of
-    renderer_classes!
+    implementing views, use DicomWebRendererMixin.
     """
     media_type = 'application/json'
     format = 'json'
@@ -194,6 +193,10 @@ def _render_tag(tag: TagType) -> str:
 
 
 def _render_dataset(attributes):
+    """
+    Render a Dicom dataset from the native representation to the DICOM
+    JSON model.
+    """
     result = {}
     for attr in attributes:
         if attr.VR in _BINARY_VRS:
