@@ -27,7 +27,7 @@ from .models import DefaultPipingBoolParameter, DefaultPipingStrParameter
 
 
 class PluginPipingSerializer(serializers.HyperlinkedModelSerializer):
-    previous_id = serializers.ReadOnlyField(source='previous.id')
+    previous_id = serializers.ReadOnlyField(source='previous.id', allow_null=True)
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
@@ -115,7 +115,7 @@ class PipelineSerializer(serializers.HyperlinkedModelSerializer):
     plugin_inst_id = serializers.IntegerField(min_value=1, write_only=True,
                                               required=False)
     name = serializers.CharField(required=False)
-    owner_username = serializers.ReadOnlyField(source='owner.username')
+    owner_username = serializers.ReadOnlyField(source='owner.username', allow_null=True)
     plugins = serializers.HyperlinkedIdentityField(view_name='pipeline-plugin-list')
     plugin_pipings = serializers.HyperlinkedIdentityField(
         view_name='pipeline-pluginpiping-list')
@@ -830,11 +830,18 @@ class PipelineCustomJsonSerializer(serializers.HyperlinkedModelSerializer):
 
 class PipelineSourceFileSerializer(ChrisFileSerializer):
     fname = serializers.FileField(use_url=False, required=True)
-    ftype = serializers.ReadOnlyField(source='meta.type')
+    # allow_null below covers two things, because the source traverses a nullable
+    # relation: drf-spectacular cannot infer the nullability on its own
+    # (tfranzel/drf-spectacular#1307), and without it DRF drops the key from the
+    # response instead of emitting null, which breaks the schema's `required`.
+    # It does not affect input validation, which skips read-only fields.
+    ftype = serializers.ReadOnlyField(source='meta.type', allow_null=True)
     type = serializers.CharField(write_only=True, required=False)
-    uploader_username = serializers.ReadOnlyField(source='meta.uploader.username')
-    pipeline_id = serializers.ReadOnlyField(source='meta.pipeline.id')
-    pipeline_name = serializers.ReadOnlyField(source='meta.pipeline.name')
+    uploader_username = serializers.ReadOnlyField(source='meta.uploader.username',
+                                                  allow_null=True)
+    pipeline_id = serializers.ReadOnlyField(source='meta.pipeline.id', allow_null=True)
+    pipeline_name = serializers.ReadOnlyField(source='meta.pipeline.name',
+                                              allow_null=True)
 
     class Meta:
         model = PipelineSourceFile

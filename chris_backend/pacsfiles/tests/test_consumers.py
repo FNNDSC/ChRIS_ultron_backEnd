@@ -13,6 +13,7 @@ from channels.testing import WebsocketCommunicator
 from django.utils import timezone
 
 from core.models import FileDownloadToken
+from core.utils import download_token_signing_key
 from core.websockets.auth import TokenQsAuthMiddleware
 
 from pacsfiles.lonk import (
@@ -185,7 +186,7 @@ class PACSFileProgressTests(TransactionTestCase):
         dt = timezone.now() + timezone.timedelta(minutes=10)
         token = jwt.encode(
             {'user': self.user.username, 'exp': dt},
-            settings.SECRET_KEY,
+            download_token_signing_key(),
             algorithm='HS512',
         )
         return FileDownloadToken.objects.create(token=token, owner=self.user)

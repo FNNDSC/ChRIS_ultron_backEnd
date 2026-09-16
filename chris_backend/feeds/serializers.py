@@ -90,7 +90,7 @@ class TaggingSerializer(serializers.HyperlinkedModelSerializer):
 
 class FeedSerializer(serializers.HyperlinkedModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    folder_path = serializers.ReadOnlyField(source='folder.path')
+    folder_path = serializers.ReadOnlyField(source='folder.path', allow_null=True)
     created_jobs = serializers.SerializerMethodField()
     waiting_jobs = serializers.SerializerMethodField()
     copying_jobs = serializers.SerializerMethodField()

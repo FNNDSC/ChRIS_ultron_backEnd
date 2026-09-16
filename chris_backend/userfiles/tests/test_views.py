@@ -16,6 +16,7 @@ import jwt
 
 from core.models import ChrisFolder, FileDownloadToken
 from core.storage.helpers import connect_storage, mock_storage
+from core.utils import download_token_signing_key
 from userfiles.models import UserFile
 from userfiles import views
 
@@ -208,8 +209,8 @@ class UserFileResourceViewTests(UserFileViewTests):
     def test_integration_userfileresource_download_with_token_success(self):
         user = User.objects.get(username=self.chris_username)
         dt = timezone.now() + timezone.timedelta(minutes=10)
-        token = jwt.encode({'user': user.username, 'exp': dt}, settings.SECRET_KEY,
-                           algorithm='HS512')
+        token = jwt.encode({'user': user.username, 'exp': dt},
+                           download_token_signing_key(), algorithm='HS512')
         FileDownloadToken.objects.get_or_create(token=token, owner=user)
         response = self.client.get(f'{self.download_url}?download_token={token}')
         self.assertEqual(response.status_code, 200)
