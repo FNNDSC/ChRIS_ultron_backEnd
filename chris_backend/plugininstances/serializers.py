@@ -18,16 +18,24 @@ from .models import (FloatParameter, IntParameter, BoolParameter, PathParameter,
 class PluginInstanceSerializer(serializers.HyperlinkedModelSerializer):
     compute_resource_name = serializers.CharField(max_length=100, required=False,
                                                   source='compute_resource.name')
-    previous_id = serializers.ReadOnlyField(source='previous.id')
+    # allow_null below covers two things, because the source traverses a nullable
+    # relation: drf-spectacular cannot infer the nullability on its own
+    # (tfranzel/drf-spectacular#1307), and without it DRF drops the key from the
+    # response instead of emitting null, which breaks the schema's `required`.
+    # It does not affect input validation, which skips read-only fields.
+    previous_id = serializers.ReadOnlyField(source='previous.id', allow_null=True)
     plugin_id = serializers.ReadOnlyField(source='plugin.id')
     plugin_name = serializers.ReadOnlyField(source='plugin.meta.name')
     plugin_version = serializers.ReadOnlyField(source='plugin.version')
     plugin_type = serializers.ReadOnlyField(source='plugin.meta.type')
-    pipeline_id = serializers.ReadOnlyField(source='workflow.pipeline.id')
-    pipeline_name = serializers.ReadOnlyField(source='workflow.pipeline.name')
-    workflow_id = serializers.ReadOnlyField(source='workflow.id')
+    pipeline_id = serializers.ReadOnlyField(source='workflow.pipeline.id',
+                                            allow_null=True)
+    pipeline_name = serializers.ReadOnlyField(source='workflow.pipeline.name',
+                                              allow_null=True)
+    workflow_id = serializers.ReadOnlyField(source='workflow.id', allow_null=True)
     feed_id = serializers.ReadOnlyField(source='feed.id')
-    output_path = serializers.ReadOnlyField(source='output_folder.path')
+    output_path = serializers.ReadOnlyField(source='output_folder.path',
+                                            allow_null=True)
     summary = serializers.JSONField(binary=True, read_only=True)
     raw = serializers.ReadOnlyField()
     owner_username = serializers.ReadOnlyField(source='owner.username')

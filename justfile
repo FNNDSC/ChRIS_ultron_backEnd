@@ -37,6 +37,19 @@ up: (docker-compose '--profile=cube up -d')
 [group('(3) development')]
 attach: (docker-compose '--profile=cube attach chris | grep -Fv "\"GET /api/v1/users/ HTTP/1.1\" 200"')
 
+# `runserver` is WSGI here — channels is wired up in config/asgi.py, not INSTALLED_APPS —
+# so it cannot serve WebSockets at all, and `channels.testing` exercises the consumers
+# in-process. Neither reaches the uvicorn protocol stack production uses
+# (websockets-sansio since uvicorn 0.50); this recipe does, on the dev stack and dev
+# settings. `just bench-start` also runs uvicorn, but under the benchmark envelope.
+# Publishes host port 8000, so stop the dev server (`just down`) before running it.
+#
+# Serve CUBE with uvicorn (ASGI) on port 8000 instead of the dev `runserver`.
+[group('(3) development')]
+dev-uvicorn *args: start-ancillary
+    @just storage={{ storage }} docker-compose --profile=cube run --rm --service-ports \
+        chris python3 -m uvicorn --host 0.0.0.0 --port 8000 config.asgi:application {{ args }}
+
 # Open a Python shell.
 [group('(3) development')]
 shell: (run 'python manage.py shell')
@@ -290,3 +303,37 @@ openapi:
 openapi-split:
     env SPECTACULAR_SPLIT_REQUEST=true just storage={{ storage }} openapi
 
+
+# The image is the non-slim `-python3.12-trixie` variant on purpose: the distroless `uv`
+# image has no shell, so uv cannot detect libc and refuses to run. The cache is kept in
+# the working tree so repeat locks are fast; UV_LINK_MODE=copy is required because
+# hardlinks do not work across the bind mount on macOS.
+#
+# Run uv in a throwaway container, so no local uv installation is required.
+[group('helper function')]
+uv +args:
+    $(just get-engine) run --rm \
+        -u "$(id -u):$(id -g)" \
+        -e HOME=/w \
+        -e UV_CACHE_DIR=/w/.uv-cache \
+        -e UV_LINK_MODE=copy \
+        -e UV_PYTHON_DOWNLOADS=never \
+        -v "$PWD:/w:z" -w /w \
+        ghcr.io/astral-sh/uv:0.12.13-python3.12-trixie uv {{ args }}
+
+# Refresh both lockfiles (CUBE and the benchmark harness).
+[group('(3) development')]
+lock:
+    just uv lock
+    just uv lock --directory benchmarks
+
+# Upgrade one dependency, e.g. `just lock-upgrade django`.
+[group('(3) development')]
+lock-upgrade package:
+    just uv lock --upgrade-package {{ package }}
+
+# Fail if either lockfile is out of date with its pyproject.toml.
+[group('(3) development')]
+lock-check:
+    just uv lock --check
+    just uv lock --check --directory benchmarks

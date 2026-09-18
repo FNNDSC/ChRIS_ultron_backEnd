@@ -1,0 +1,68 @@
+[project]
+name = "chris-backend"
+# Placeholder only. The API version reported by the OpenAPI schema comes from
+# chris_backend/__version__.py, which CI overwrites from the git tag.
+version = "0"
+requires-python = ">=3.12"
+
+# Constraints here are lower bounds; uv.lock holds the exact resolved versions, which is
+# where a reviewer can see the transitive effects of a bump. `django` additionally carries
+# an upper bound, so that a blanket `uv lock --upgrade` picks up patch releases within the
+# series we have tested but cannot walk us onto a new feature release by surprise.
+dependencies = [
+    "django>=6.0.8,<6.1",
+    "django-filter>=26.1",
+    "djangorestframework>=3.18",
+    "django-cors-headers>=4.9",
+    "psycopg[binary,pool]>=3.1.12",
+    "environs>=15.2",
+    "python-swiftclient>=4.11",
+    "django-storage-swift>=1.4",
+    "django-storages[s3]>=1.14.6",
+    "boto3>=1.43",
+    "celery[redis]>=5.6.3",
+    # 2.9.0 caps Django below 6.1 and cron-descriptor below 2.0, which is why the lock
+    # moves cron-descriptor backwards. It is also the one dependency standing between
+    # this project and Django 6.1: upstream has 6.1 in its test matrix but has not
+    # released since 2.9.0.
+    "django-celery-beat>=2.9",
+    "python-chrisstoreclient>=1.0",
+    "python-pfconclient>=4.0",
+    "django-auth-ldap>=5.3",
+    "pyyaml>=6.0.2",
+    "whitenoise[brotli]>=6.12",
+    "pyjwt>=2.14",
+    "channels>=4.3.2",
+    "nats-py>=2.15",
+    "pydicom>=3.0,<4.0",
+    # 0.50 made websockets-sansio the `--ws auto` default, replacing the now-deprecated
+    # legacy websockets implementation. LONK is served over this; see `just dev-uvicorn`.
+    "uvicorn[standard]>=0.52",
+    "drf-spectacular>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "django-debug-toolbar>=8.0",
+    "django-extensions>=4.1",
+    "collection-json>=0.1.1",  # used directly by collectionjson.tests.test_renderers
+    "coverage>=7.16",
+    "pylint>=4.0.8",
+    "flake8>=7.3",
+    "daphne>=4.2.3",  # required by (django) channels.testing
+]
+
+[tool.uv]
+# CUBE is a Django project, not a distributable package. Without this, uv would try to
+# build and install ./chris_backend as a package.
+package = false
+
+# We ship linux/amd64 and linux/arm64 images, and developers work on linux or macOS.
+# Resolving universally across every platform lets irrelevant markers hold packages back:
+# autobahn declares `cbor2<6` for PyPy-on-Windows, which pulls cbor2 down to 5.9.0 for
+# everyone. Restricting the resolution keeps the lock matching what actually gets
+# installed.
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin'",
+]

@@ -3,6 +3,9 @@ import os
 import json
 import zlib, base64
 
+from django.conf import settings
+from django.utils.crypto import salted_hmac
+
 
 def get_file_resource_link(file_serializer, obj):
     """
@@ -72,3 +75,22 @@ def unique_files_queryset_by_folder(queryset):
             ids.append(f.id)
             hash_set.add(path)
     return queryset.filter(pk__in=ids)
+
+
+def download_token_signing_key() -> bytes:
+    """
+    Utility function to return the key used to sign file download tokens.
+
+    ``SECRET_KEY`` is not used directly. RFC 7518 Section 3.2 requires an HMAC key at
+    least as long as the hash output — 64 bytes for HS512 — and a Django secret key is
+    50 characters by default, so PyJWT >= 2.11 raises ``InsecureKeyLengthWarning`` on
+    every encode and decode. Deriving a key gets the right length whatever the
+    deployment sets, without asking operators to lengthen or rotate theirs.
+
+    The salt makes this key specific to download tokens, so a component that later
+    derives its own key from ``SECRET_KEY`` cannot land on the same bytes by coincidence.
+    ``salted_hmac`` is Django's own idiom for exactly this, and it accepts a ``str`` or
+    ``bytes`` secret.
+    """
+    return salted_hmac('core.utils.download_token_signing_key', '',
+                       secret=settings.SECRET_KEY, algorithm='sha512').digest()

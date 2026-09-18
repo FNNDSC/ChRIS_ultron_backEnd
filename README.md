@@ -139,11 +139,25 @@ just up
 
 #### Rebuild the image after changing package dependencies
 
-If you modify `Dockerfile` or `requirements/*.txt`, you need to rebuild the image and recreate your containers.
+If you modify `Dockerfile`, `pyproject.toml` or `uv.lock`, you need to rebuild the image and recreate your containers.
 
 ```shell
 just build && just up
 ```
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) and the resolved versions
+are committed in `uv.lock`. Change a version constraint in `pyproject.toml`, then refresh
+the lockfiles:
+
+```shell
+just lock                    # re-resolve both CUBE and the benchmark harness
+just lock-upgrade django     # bump a single dependency
+just lock-check              # fail if a lockfile is stale (also runs in CI)
+```
+
+These run uv in a throwaway container, so no local uv installation is required. The
+benchmark harness has its own `benchmarks/pyproject.toml` and `benchmarks/uv.lock`,
+because `docker-compose.benchmark.yml` builds it with `context: ./benchmarks`.
 
 #### Trying HTTP requests from the CLI
 
@@ -183,25 +197,28 @@ Not all text editors support using Docker, or configuring the LSP might be incon
 
 #### Installing Python Dependencies On-The-Metal
 
-The traditional but worst approach is to install Python 3.12, then run
+[Install uv](https://docs.astral.sh/uv/getting-started/installation/), then run
 
 ```shell
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements/local.txt
+uv sync
 ```
 
-Some dependencies (such as `python-ldap`) build C code during installation,
-requiring `clang` to be installed. Alternatively, my recommendation is to use
-`micromamba` to install Python 3.12 and `python-ldap`, then use `pip` to
-install everything else.
+`uv sync` creates `.venv/`, fetches Python 3.12 if you do not have it, and installs the
+exact versions recorded in `uv.lock` — including the `dev` dependency group, which is
+what an LSP wants.
+
+Some dependencies (such as `python-ldap`) build C code during installation, requiring
+`clang` and the OpenLDAP headers regardless of which installer you use. If that is
+inconvenient, use `micromamba` to provide Python 3.12 and a prebuilt `python-ldap`, and
+point uv at that environment for everything else.
 [Install micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html), then run
 
 ```shell
 micromamba create -p ./.mambaenv -c conda-forge -y python=3.12 python-ldap=3.4
-micromamba -p ./.mambaenv run pip install -r requirements/local.txt
+UV_PROJECT_ENVIRONMENT=./.mambaenv uv sync --inexact
 ```
 
+`--inexact` leaves the packages micromamba installed alone instead of pruning them.
 Now the environment is ready. Activate the environment
 
 ```shell
