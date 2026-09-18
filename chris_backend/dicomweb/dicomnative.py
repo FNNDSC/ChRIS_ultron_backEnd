@@ -6,8 +6,9 @@ dataset — a ``list[DicomAttribute]`` — which ``dicomweb.renderers`` encodes 
 the DICOM JSON Model (PS3.18 §F, ``application/dicom+json``). Values are stored
 as the caller supplies them (raw strings, numbers, ``datetime`` objects, …),
 always in their multi-value shape: a single value is wrapped as a
-single-element list. Person Names are represented as a component mapping
-(``{"Alphabetic": "DOE^JANE"}``; Alphabetic group only here), likewise wrapped.
+single-element list. Person Names are represented as a component-group
+mapping (``{"Alphabetic": "DOE^JANE"}``, plus ``Ideographic`` / ``Phonetic``
+when present), likewise wrapped.
 The remaining JSON-Model encoding — IS/DS-as-number, empty/null handling and
 the temporal wire-string form — lives in the renderer, since those rules belong
 to the JSON Model, not the native model. Keeping this layer free of Django/DRF
@@ -17,12 +18,32 @@ VR classification is taken from pydicom (generated from PS3.5) so it never drift
 from the standard.
 """
 import base64
+import logging
 from dataclasses import dataclass
 from typing import Optional, Any
 
 from pydicom.datadict import dictionary_VR
 from pydicom.tag import Tag, TagType
 from pydicom.valuerep import BYTES_VR, VR
+
+logger = logging.getLogger(__name__)
+
+# pydicom's VR enumeration (PS3.5-derived, includes the ambiguous
+# data-dictionary combinations, which _check_vr's length check rejects).
+_VALID_VRS = frozenset(VR)
+
+
+def _check_vr(vr):
+    if not isinstance(vr, str) or len(vr) != 2 or vr not in _VALID_VRS:
+        # Every standard DICOM VR is a two-character member of pydicom's
+        # PS3.5-derived VR set. The length check rejects the ambiguous
+        # data-dictionary VRs ('US or SS', 'OB or OW') that the caller must
+        # resolve; the membership check rejects bogus two-character strings
+        # (e.g. a value bound into the vr slot); the type check rejects
+        # non-strings (e.g. raw bytes). Unreachable for the fixed QIDO
+        # attribute set.
+        raise ValueError(f'Ambiguous or invalid VR {vr!r}; a concrete 2-char VR is '
+                         f'required')
 
 
 @dataclass
@@ -31,11 +52,14 @@ class DicomAttribute:
     VR: str
     value: Optional[list] = None
     item: Optional[list[list["DicomAttribute"]]] = None
-    person_name: Optional[list[dict[str]]] = None
+    person_name: Optional[list[dict[str, str]]] = None
     bulk_data: Optional[str] = None     # uuid or uri
     inline_binary: Optional[bytes] = None
 
     def __post_init__(self):
+        # Validated here, not only in dicom_attribute(), so a hand-built
+        # attribute cannot carry a bogus VR into the renderer.
+        _check_vr(self.VR)
         value_fields_count = sum([
             self.value is not None,
             self.item is not None,
@@ -44,16 +68,19 @@ class DicomAttribute:
             self.inline_binary is not None,
         ])
         if value_fields_count > 1:
-            raise ValueError(f"Invalid DicomAttribute: {self}. Only one of [value, item, person_name, bulk_data, inline_binary] may be set.")
+            raise ValueError(f"Invalid DicomAttribute: {self}. Only one of [value, item, "
+                             f"person_name, bulk_data, inline_binary] may be set.")
 
     def get_value(self):
-        """Get the non-binary value if there is one"""
+        """
+        Get the non-binary value if there is one
+        """
         for val in [self.value, self.item, self.person_name]:
             if val is not None:
                 return val
         return None
 
-    def get_inline_binary(self) -> bytes:
+    def get_inline_binary(self) -> Optional[bytes]:
         data = self.inline_binary
         if data is None:
             return None
@@ -75,7 +102,7 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
 
     ``vr`` defaults to the DICOM data-dictionary VR of ``tag``. The value is
     stored in its multi-value shape: a single value is wrapped as a
-    single-element list, and PN is encoded to its native Alphabetic component
+    single-element list, and PN is encoded to its native component-group
     mapping (wrapped the same way). An SQ value is stored in the ``item``
     field as a list of item datasets, a bare single-item dataset being wrapped
     as a one-item sequence. The renderer performs the remaining JSON-Model
@@ -91,16 +118,10 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
         except KeyError:
             # Unknown/private tag (e.g. (0009,1001)) or group length —
             # unreachable for the fixed QIDO attribute set.
-            raise ValueError(f'Unknown tag {tag!r}; no VR in the DICOM data dictionary') from None
-    if not isinstance(vr, str) or len(vr) != 2 or vr not in _VALID_VRS:
-        # Every standard DICOM VR is a two-character member of pydicom's
-        # PS3.5-derived VR set. The length check rejects the ambiguous
-        # data-dictionary VRs ('US or SS', 'OB or OW') that the caller must
-        # resolve; the membership check rejects bogus two-character strings
-        # (e.g. a value bound into the vr slot); the type check rejects
-        # non-strings (e.g. raw bytes). Unreachable for the fixed QIDO
-        # attribute set.
-        raise ValueError(f'Ambiguous or invalid VR {vr!r}; a concrete 2-char VR is required')
+            err_msg = f'Unknown tag {tag!r}; no VR in the DICOM data dictionary'
+            raise ValueError(err_msg) from None
+    # Checked before the VR-specific branches, which assume a hashable VR.
+    _check_vr(vr)
     if vr == 'PN':
         return DicomAttribute(tag_hex, vr, person_name=_as_value_list(_encode_pn(value)))
     if vr == 'SQ':
@@ -109,11 +130,6 @@ def dicom_attribute(tag, value, vr=None) -> DicomAttribute:
         return DicomAttribute(tag_hex, vr, inline_binary=value)
     # TODO: handle bulk data
     return DicomAttribute(tag_hex, vr, value=_as_value_list(value))
-
-
-# pydicom's VR enumeration (PS3.5-derived, includes the ambiguous
-# data-dictionary combinations, which the length check above rejects).
-_VALID_VRS = frozenset(VR)
 
 
 _PN_COMPONENT_LABELS = ['Alphabetic', 'Ideographic', 'Phonetic']
@@ -139,7 +155,14 @@ def _encode_pn(value):
     # At this point, we should only have a string
     if not isinstance(value, str):
         raise ValueError(f'Unable to encode PN value: {value}')
-    component_groups = value.split('=', maxsplit=2)
+    component_groups = value.split('=')
+    if len(component_groups) > len(component_labels):
+        # PS3.5 §6.2 allows at most two "=" group delimiters. Keep the first
+        # three groups, as pydicom does: PN values come from stored PACS data,
+        # so raising would fail a whole QIDO response over one malformed name.
+        # The value itself is PHI and is deliberately not logged.
+        logger.warning('PN value has %d component groups; only the first %d are kept',
+                       len(component_groups), len(component_labels))
     encoded_pn = {}
     for label, group in zip(component_labels, component_groups):
         # A non-empty group string is kept verbatim, delimiters included: a
