@@ -110,6 +110,109 @@ for u in 25 50 100 200 400; do just bench-locust "-u $u -r $u -t 90s --csv /app/
 BENCH_LOCUST_WRITE=1 just bench-locust '-u 10 -r 5 -t 60s --csv /app/benchmarks/results/locust/write_clean_u10'
 ```
 
+## Post-upgrade baseline — 2026-09-17 (commit 30fbbaf)
+
+Every analysis above was re-run after the Django 6.0 / DRF 3.18 upgrade, one run per benchmark
+command the issue set uses, so each claim has a baseline produced by the same invocation.
+`bench-compare` calls two runs comparable only when their workload fingerprints match, and the
+fingerprint covers `--topology`, `--axis` and `--cap` but not `--repeat` — so these, not the June
+runs, are what a candidate fix should be compared against. See [`../REPORT.md`](../REPORT.md) §13
+for what reproduced, what moved and the corrections these runs produced.
+
+Host and stack differences from June: Docker 27.3 → 29.8, kernel 7.0.0-22 → 7.0.0-31, Django
+6.0.8, DRF 3.18.1, Celery 5.6.3, psycopg 3.3.5, PostgreSQL 18.2. These runs used `pl-topologicalcopy`
+1.0.13, `pl-simpledsapp` 2.1.5 and `dbg-bigfiles` 1.0.0, registered from a locally edited
+`chrisomatic/chrisomatic.yml`; that edit is deliberately not committed, because the dev environment
+should not be stuck at the benchmark's plugin versions. The ChRIS store now serves
+`pl-topologicalcopy` 2.0.0 — a no-op image — under the name the harness resolves, so reproducing
+these runs needs the recipe in [`../envelope.md`](../envelope.md) § "Pinned workload plugin
+versions". `bench-compare` does not check plugin versions: read `workload_plugins` in
+`environment.json` before comparing.
+
+### Per-command baselines
+
+| Run | Command (`just bench-run --tier ...`) | Result |
+|---|---|---|
+| `2026-09-17T040629Z` | `smoke` | 10/10 PASS (also `120820Z`, `150526Z` as stack checks) |
+| `2026-09-17T040945Z` | `full --topology linear --axis file_count --cap 10000 --repeat 1` | PASS; 10k-file registration 32.4 s |
+| `2026-09-17T041540Z` | `… --cap 100000 --repeat 1 --restart-on-fail` | PASS; 100k 325 s, 3.2 ms/file at both decades |
+| `2026-09-17T045247Z` | `full --topology linear --axis depth --cap 64 --repeat 1 --restart-on-fail` | **FAIL@64** — `varchar(1024)` path ceiling, 11 silent cancellations |
+| `2026-09-17T050708Z` | `full --topology linear --axis feeds --cap 128 --repeat 1 --restart-on-fail` | PASS to 128 (June wall 64 — the wall is a race, see `110245Z`) |
+| `2026-09-17T110245Z` | same with `--repeat 3` | **FAIL@128** on the first repeat (one `ds3` cancelled from `waiting`) |
+| `2026-09-17T052243Z` | `full --topology fanout_fanin --axis feeds --cap 64 --repeat 1 --restart-on-fail` | PASS to 64 |
+| `2026-09-17T113103Z` | same with `--repeat 3` | **FAIL@32** |
+| `2026-09-17T053431Z` | `full --topology diamond --axis feeds --restart-on-fail` (June `153019Z`) | **FAIL@32**, 3 merges cancelled |
+| `2026-09-17T054523Z` / `054841Z` / `055413Z` | `full --topology linear --axis depth --cap 16 --repeat 1 --restart-on-fail` at poll 2 / 4 / 8 s | depth-8 makespan 35.6 / 69.9 / 142.1 s → poll-gated **75 / 88 / 94%** (not ~98%) |
+| `2026-09-17T060426Z` / `062118Z` / `063934Z` | same with `--cap 8 --sleep-length 60` | 516 / 550 / 587 s → ~5% poll-gated, as in June |
+| `2026-09-17T065941Z` | `full --topology fanout_fanin --axis branches --cap 64 --file-count 1000 --repeat 1 --restart-on-fail` | **FAIL@32**; the 64-branch level never completes |
+| `2026-09-17T221456Z` / `222124Z` / `222808Z` | same command, three attempts | **FAIL@64** in 3/3 — the deterministic reproducer for the duplicate-submission race |
+| `2026-09-17T070345Z` | `full --topology fanout_fanin --axis file_count --cap 100000 --repeat 1 --restart-on-fail` | PASS; the 400k-object merge took 130 s (0.33 ms/object) |
+| `2026-09-17T072731Z` | `full --topology diamond --axis layers --cap 8 --repeat 1 --restart-on-fail` | PASS; 11.8 / 19.9 / 41.5 / **3,260 s**, 32.7 GB `db` writes, 11 GB WAL |
+| `2026-09-17T083723Z` | `… --cap 16 --repeat 1 --restart-on-fail` (June `192652Z`) | **FAIL@16** (timeout, 41.9 GB) |
+| `2026-09-17T151047Z` | `full` (the whole sweep, June `022252Z`) | walls: linear depth 64, linear feeds 64, fanout feeds 64, diamond layers 16, diamond feeds 32 |
+
+### Fault injection — `fanout_fanin · feeds = 16`, pfcon disturbed mid-run
+
+Command: `full --topology fanout_fanin --axis feeds --cap 16 --repeat 1 --restart-on-fail`. The undisturbed
+feeds = 16 level takes 31 s (`2026-09-17T052243Z`).
+
+| Run | Disturbance | Result |
+|---|---|---|
+| `2026-09-17T072342Z` | `pause` 60 s, 29 s into feeds = 16 | PASS — nothing cancelled; the level took 91 s |
+| `2026-09-17T223529Z` | `pause` 60 s, 8 s into feeds = 16 | PASS — nothing cancelled; the level took 133 s |
+| `2026-09-17T223926Z` | `restart` (≈2 s), 8 s into feeds = 16 | **24 of 96 instances cancelled** |
+| `2026-09-17T224202Z` | `stop` 30 s, 8 s into feeds = 16 | **30 of 96 cancelled** — the copy job's 3 retries run back to back with no wait |
+
+### State aging — probes between `aging-grow` steps, to 1.85 M files
+
+`2026-09-17T115144Z`, `115614Z`, `120045Z`, `120517Z`, `122224Z`, `123913Z`, `125558Z`. Probe
+makespan and create latency stay flat, as in June; `list p95` instead grows with the file table
+(42 ms at 56k files → 385 ms at 1.85 M) rather than stepping once and plateauing. The series ends
+at 1.85 M instead of 1.9 M because the 400-user step of the Locust sweep before it wedged the
+`chris` pools, and the first probe and the first grow step failed.
+
+The grow steps themselves are not archived, with one exception: `2026-09-17T120620Z`
+(tier `aging-grow`, `file_count` 10000, levels 1/2/4 feeds, PASS) is the concurrent load for the
+head-of-line-blocking check, whose smoke sweep is `120820Z` and whose quiet control is `040629Z`.
+
+### Control plane
+
+[`locust_2026-09-17/`](locust_2026-09-17) holds `fresh/` (read sweep 25–400 users on a nearly
+empty database, knee ~50 users / 97 RPS), `aged/` (same sweep at 1.85 M files, saturated at 25
+users / 6 RPS) and `recovery/` (single read steps each followed by no-load probes, showing the API
+does not recover on its own from 100 users up, plus the 10-user write-path runs without and with
+the create task, `write_clean_u10` and `write_create_u10`). `fresh/` and `aged/` have a rendered
+`report.md`.
+
+### Reproducing these
+
+```bash
+# One targeted run per command, on a clean stack, in the order above
+just bench-compose '--profile cube --profile bench down -v' && just bench-start
+just bench-run --tier full --topology linear --axis depth --cap 64 --repeat 1 --restart-on-fail
+
+# The duplicate-submission reproducer (fails in every attempt)
+just bench-run --tier full --topology fanout_fanin --axis branches --cap 64 --file-count 1000 \
+    --repeat 1 --restart-on-fail
+
+# Fault injection: start the run, then disturb pfcon 8 s after levels.jsonl gets its feeds=8 row
+just bench-run --tier full --topology fanout_fanin --axis feeds --cap 16 --repeat 1 --restart-on-fail &
+just bench-compose 'restart pfcon'        # or: pause/unpause, stop/start
+
+# Control plane, fresh then aged (the aged sweep needs the aging series to have run first).
+# From 100 users up the pools do not recover after a step; restart chris between steps, or the
+# later steps measure a broken stack.
+for u in 25 50 100 200 400; do just bench-locust "-u $u -r $u -t 90s --csv /app/benchmarks/results/locust/read_u$u"; done
+BENCH_LOCUST_WRITE=1 just bench-locust '-u 10 -r 5 -t 60s --csv /app/benchmarks/results/locust/write_u10'
+```
+
+During the campaign `BENCH_LOCUST_WRITE` did not reach the `benchmark` container, so the first
+write-path run had no create requests and `write_create_u10` was run with `run --rm -e
+BENCH_LOCUST_WRITE=1 ...`. `docker-compose.benchmark.yml` passes the variable through since
+2026-09-18. Scenario `pg_stats.json` files of these runs hold only the 15 most expensive statements;
+the harness keeps all of them since the same date. The compose service is `pfcon`; `pfcon.remote`
+is only its network alias.
+
 ## Regenerating the archive
 
 ```bash

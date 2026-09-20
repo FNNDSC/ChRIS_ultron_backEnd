@@ -67,6 +67,18 @@ first match (CUBE orders by `-version`), so **install exactly one version of eac
 it warns and binds to the lexicographically-highest version string, not necessarily the pinned
 one. Each run now records the resolved versions (and how many matched) under `workload_plugins` in `environment.json`/`summary.json`; the pin is still what keeps a run reproducible, since the harness resolves by name.
 
+**Reproducing those versions.** The committed `chrisomatic/chrisomatic.yml` registers
+`pl-topologicalcopy` by name from the public ChRIS store, and the store now serves 2.0.0 — a no-op
+image — under that name, so a stock `just` can bind the harness to a plugin that does no work, and
+a run against it reads as a large speed-up rather than a failure. Before provisioning a benchmark
+stack, edit `chrisomatic.yml` locally: replace `- name: pl-topologicalcopy` with
+`- dock_image: fnndsc/pl-topologicalcopy:1.0.13` (Docker Hub carries the 1.0.x tags; the store's
+2.0.0 is not there), or add an empty `public_store:` under `on:` to disable the store lookup
+altogether. Keep that edit out of commits — the dev environment is deliberately not pinned to the
+benchmark's versions. If another version is already registered, remove it first (or `just nuke`),
+then confirm `workload_plugins` in the run's `environment.json` reads `pl-topologicalcopy` 1.0.13,
+`pl-simpledsapp` 2.1.5 and `dbg-bigfiles` 1.0.0, each with `"matches": 1`.
+
 ## Manual hardware fields
 
 `environment.json` auto-captures host CPU/mem (from `docker info`), image ids, engine

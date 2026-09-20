@@ -75,6 +75,8 @@ services:
       GIT_COMMIT: "${GIT_COMMIT:-}"
       GIT_DIRTY: "${GIT_DIRTY:-}"
       STORAGE_ENV: "fslink"
+      # opt-in create task for the Locust run: BENCH_LOCUST_WRITE=1 just bench-locust '...'
+      BENCH_LOCUST_WRITE: "${BENCH_LOCUST_WRITE:-}"
       # recorded envelope knobs (kept in sync with the service overrides above)
       CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
       CUBE_UVICORN_WORKERS: "${CUBE_UVICORN_WORKERS:-4}"

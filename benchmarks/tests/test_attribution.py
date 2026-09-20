@@ -6,7 +6,7 @@ pg_stat_statements snapshots.
 from benchmarks.broker import BrokerClient, encode_command, parse_reply
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
-from benchmarks.pg_stats import parse_psql_rows
+from benchmarks.pg_stats import PgStatStatements, parse_psql_rows
 from benchmarks.stats_sampler import StatsSampler
 
 
@@ -82,3 +82,33 @@ def test_parse_psql_rows_types_and_shape():
     assert len(rows) == 2
     assert rows[0]["calls"] == 120 and rows[0]["mean_ms"] == 37.67
     assert rows[0]["query"].startswith("SELECT * FROM")
+
+
+class FakeDbDocker:
+    """Records the SQL each ``psql`` call runs and answers with one statement row."""
+
+    def __init__(self):
+        self.sql = []
+
+    def service_env(self, service):
+        return {"POSTGRES_USER": "chris", "POSTGRES_DB": "chris_dev"}
+
+    def exec_in_service(self, service, cmd):
+        self.sql.append(cmd[-1])
+        return 0, "3\t12\t4.0\t3\tUPDATE feeds_feed SET name = $1\n"
+
+
+def test_snapshot_keeps_every_statement_by_default():
+    docker = FakeDbDocker()
+    rows = PgStatStatements(docker).snapshot()
+
+    assert "LIMIT" not in docker.sql[-1]
+    assert docker.sql[-1].rstrip().endswith("ORDER BY total_exec_time DESC")
+    assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"
+
+
+def test_snapshot_limit_is_optional():
+    docker = FakeDbDocker()
+    PgStatStatements(docker).snapshot(limit=15)
+
+    assert docker.sql[-1].endswith("ORDER BY total_exec_time DESC LIMIT 15")

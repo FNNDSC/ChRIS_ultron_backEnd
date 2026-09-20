@@ -2,8 +2,9 @@
 Per-scenario ``pg_stat_statements`` snapshots (best-effort).
 
 Turns "db CPU at 210%" into named queries: the runner resets the statement stats at
-scenario start and snapshots the top statements by total execution time at the end,
-persisting them under ``scenarios/<id>/pg_stats.json``.
+scenario start and snapshots every statement recorded since, most total execution time
+first, persisting them under ``scenarios/<id>/pg_stats.json``. Keeping all of them, not
+just the expensive ones, is what lets a run show that a cheap statement no longer runs.
 
 Runs ``psql`` *inside* the db container via the Docker socket (no client-side
 postgres dependency); credentials come from the container's own ``POSTGRES_*`` env.
@@ -18,13 +19,13 @@ from typing import Optional
 from .docker_client import DockerClient
 
 
-TOP_SQL = (
+STATEMENTS_SQL = (
     "SELECT calls, round(total_exec_time)::bigint AS total_ms, "
     "round(mean_exec_time::numeric, 2) AS mean_ms, rows, "
     "left(regexp_replace(query, '\\s+', ' ', 'g'), 300) AS query "
     "FROM pg_stat_statements "
     "WHERE query NOT ILIKE '%pg_stat_statements%' "
-    "ORDER BY total_exec_time DESC LIMIT {limit}"
+    "ORDER BY total_exec_time DESC"
 )
 
 
@@ -83,14 +84,17 @@ class PgStatStatements:
         if self.available:
             self._psql("SELECT pg_stat_statements_reset()")
 
-    def snapshot(self, limit: int = 15) -> list[dict]:
+    def snapshot(self, limit: Optional[int] = None) -> list[dict]:
         """
-        Top statements by total execution time since the last reset.
+        Statements since the last reset, most total execution time first: all of them
+        unless ``limit`` is given. Only entries evicted by ``pg_stat_statements.max``
+        (5,000 by default) can be missing.
         """
         if not self.available:
             return []
-        
-        code, out = self._psql(TOP_SQL.format(limit=limit))
+
+        sql = STATEMENTS_SQL if limit is None else f"{STATEMENTS_SQL} LIMIT {int(limit)}"
+        code, out = self._psql(sql)
 
         if code != 0:
             return []

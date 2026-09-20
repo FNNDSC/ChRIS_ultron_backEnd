@@ -107,9 +107,9 @@ Two attribution streams turn resource saturation into named culprits:
 - **Queue depths** — a sustained rise on `main2` means status checks are produced
   faster than the workers consume them; `main1` is job submission. Per-scenario
   peaks/means are in `scenario.json` (`queues`) and level rows (`peak_queue_depth`).
-- **`pg_stats.json`** — top statements by total execution time, reset per scenario
-  (via `pg_stat_statements`; the benchmark compose preloads it on `db`). Names the
-  queries behind a hot db. `environment.json`'s `attribution` block records whether
+- **`pg_stats.json`** — every statement the scenario ran, most total execution time
+  first, reset per scenario (via `pg_stat_statements`; the benchmark compose preloads it
+  on `db`). Names the queries behind a hot db, and shows whether a statement ran at all. `environment.json`'s `attribution` block records whether
   both streams were available for the run.
 
 ## Control plane: API saturation with Locust (RED)
@@ -227,4 +227,6 @@ a stack you can `just nuke` afterwards.
   first match (CUBE's `-version` order), so install **exactly one version of each** — with
   several present it warns and binds to the lexicographically-highest version string, not the
   pinned one. Each run records what it resolved under `workload_plugins` in `environment.json`
-  (see STRATEGY.md § Workload Plugins).
+  (see STRATEGY.md § Workload Plugins). The committed `chrisomatic.yml` is not pinned, and the
+  ChRIS store now serves a no-op `pl-topologicalcopy` 2.0.0 under the same name: `envelope.md`
+  § "Pinned workload plugin versions" has the local edit that gets you 1.0.13.
