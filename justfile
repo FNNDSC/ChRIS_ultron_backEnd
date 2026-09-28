@@ -154,7 +154,7 @@ run +command:
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else if storage == "s3" { "-f docker-compose.yml -f docker-compose_s3.yml" } else { "" } }} {{ command }}
+    env $(just get-user) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else if storage == "s3" { "-f docker-compose.yml -f docker-compose_s3.yml" } else { "" } }} {{ command }}
 
 # Get the container engine to use (docker or podman)
 [group('helper function')]
@@ -166,6 +166,22 @@ get-engine:
     else                                     \
       echo docker;                           \
     fi                                       \
+
+# This is every `user: ${UID}:${GID}` in the compose files, and pfcon's CONTAINER_USER for
+# plugin jobs. Under rootless Podman a container's root *is* the invoking user, and any
+# other uid maps to a subordinate uid that cannot write into the working tree (`just lock`,
+# `just makemigrations`, coverage), so there it is root. Everywhere else it is the invoking
+# user.
+#
+# Get the UID and GID that compose runs CUBE's containers as.
+[group('helper function')]
+get-user:
+    @if [ "$(just get-engine)" = 'podman' ] \
+        && [ "$(podman info --format '{{{{ .Host.Security.Rootless }}')" = 'true' ]; then \
+      echo 'UID=0 GID=0';                                                                 \
+    else                                                                                  \
+      echo "UID=$(id -u) GID=$(id -g)";                                                   \
+    fi
 
 # Get the docker daemon socket path.
 [group('helper function')]
@@ -223,7 +239,7 @@ unset-storage:
 # Compose helper for the benchmark stack (fslink + uvicorn-envelope override).
 [group('(6) benchmarks')]
 bench-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" \
+    env $(just get-user) DOCKER_SOCK="$(just get-socket)" \
         DOCKER_GID="$(stat -c '%g' "$(just get-socket)" 2>/dev/null || stat -f '%g' "$(just get-socket)" 2>/dev/null || echo 0)" \
         COMPOSE_PROJECT_NAME="$(basename "$(pwd)" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')" \
         GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
@@ -303,37 +319,19 @@ openapi:
 openapi-split:
     env SPECTACULAR_SPLIT_REQUEST=true just storage={{ storage }} openapi
 
-
-# The image is the non-slim `-python3.12-trixie` variant on purpose: the distroless `uv`
-# image has no shell, so uv cannot detect libc and refuses to run. The cache is kept in
-# the working tree so repeat locks are fast; UV_LINK_MODE=copy is required because
-# hardlinks do not work across the bind mount on macOS.
-#
 # Run uv in a throwaway container, so no local uv installation is required.
 [group('helper function')]
 uv +args:
-    $(just get-engine) run --rm \
-        -u "$(id -u):$(id -g)" \
-        -e HOME=/w \
-        -e UV_CACHE_DIR=/w/.uv-cache \
-        -e UV_LINK_MODE=copy \
-        -e UV_PYTHON_DOWNLOADS=never \
-        -v "$PWD:/w:z" -w /w \
-        ghcr.io/astral-sh/uv:0.12.13-python3.12-trixie uv {{ args }}
+    @just storage={{ storage }} docker-compose run --rm {{ if tty == "false" { "-T" } else { "" } }} uv uv {{ args }}
 
 # Refresh both lockfiles (CUBE and the benchmark harness).
 [group('(3) development')]
-lock:
-    just uv lock
-    just uv lock --directory benchmarks
+lock: (uv 'lock') (uv 'lock --directory benchmarks')
 
 # Upgrade one dependency, e.g. `just lock-upgrade django`.
 [group('(3) development')]
-lock-upgrade package:
-    just uv lock --upgrade-package {{ package }}
+lock-upgrade package: (uv 'lock --upgrade-package' package)
 
 # Fail if either lockfile is out of date with its pyproject.toml.
 [group('(3) development')]
-lock-check:
-    just uv lock --check
-    just uv lock --check --directory benchmarks
+lock-check: (uv 'lock --check') (uv 'lock --check --directory benchmarks')

@@ -50,19 +50,32 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /uvx /usr/local/bin/
 #
 # UV_PYTHON_DOWNLOADS=never keeps uv from silently swapping in an interpreter of its own
 # if the venv ever stops satisfying requires-python; we want that to fail loudly.
-# UV_NO_CACHE=1 keeps uv's download cache out of the image layer.
+# UV_LINK_MODE=copy because uv's cache (a cache mount, below) and the venv are on
+# different filesystems, where uv cannot hardlink.
 ENV UV_PROJECT_ENVIRONMENT=/opt/app-root \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never \
-    UV_NO_CACHE=1
+    UV_PYTHON_DOWNLOADS=never
 
 # Copied before chris_backend/ so that a source-only change does not reinstall
 # dependencies. `--locked` fails the build if uv.lock is stale rather than silently
 # re-resolving; `--frozen` would skip the check entirely and is the wrong choice here.
+#
+# COPY, not the `RUN --mount=type=bind` that uv's Docker guide suggests: Podman before 5.4
+# (Buildah before 1.39, e.g. Ubuntu 24.04's 4.9.3, which CI runs) leaves the content of a
+# bind mount out of its layer cache key, so after a change to uv.lock it reuses the old
+# layer and `--locked` never runs (containers/buildah#5400).
+#
+# uv's cache is a cache mount, kept by the builder between builds and never written to a
+# layer, so a rebuild after a lock change only downloads (or, for python-ldap, compiles)
+# what changed. uid/gid are the image's default user, which runs uv. It lives under /tmp
+# rather than uv's default under $HOME because Podman leaves the directories it creates
+# for a mount target in the image, owned by root: a root-owned $HOME/.cache otherwise.
 ARG ENVIRONMENT=production
 COPY --chown=default:root pyproject.toml uv.lock /tmp/build/
-RUN cd /tmp/build \
+RUN --mount=type=cache,target=/tmp/uv-cache,uid=1001,gid=0 \
+    export UV_CACHE_DIR=/tmp/uv-cache \
+    && cd /tmp/build \
     && if [ "$ENVIRONMENT" = "production" ]; then \
            uv sync --locked --no-dev; \
        else \

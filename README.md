@@ -76,6 +76,8 @@ just prefer docker
 
 With Podman, DragonflyDB might fail to start. Simply retry the command. See https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/573
 
+**Note**: Under rootless Podman, `just` runs the containers that otherwise run as your UID and GID (_CUBE_, its workers, the tool containers such as `uv`, and the plugin containers pfcon starts) as `root` inside the container, which Podman maps to your own user on the host. Any other user inside the container would map to a subordinate UID that cannot write into your checkout, so `just lock` or `just makemigrations` would fail with "Permission denied". With Docker, or rootful Podman, those containers run as your own UID and GID.
+
 </details>
 
 ### Just Commands

@@ -92,8 +92,9 @@ services:
     working_dir: /app
     userns_mode: host
     user: ${UID}:${GID}
-    # add the host docker socket's group so the non-root container can sample stats /
-    # reap job containers (DOCKER_GID is computed by the `bench-compose` recipe)
+    # add the host docker socket's group so the container, when it does not run as root,
+    # can sample stats / reap job containers (DOCKER_GID is computed by the `bench-compose`
+    # recipe; under rootless Podman it runs as container root, see `just get-user`)
     group_add:
       - "${DOCKER_GID:-0}"
     networks:
