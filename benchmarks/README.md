@@ -109,7 +109,8 @@ Two attribution streams turn resource saturation into named culprits:
   peaks/means are in `scenario.json` (`queues`) and level rows (`peak_queue_depth`).
 - **`pg_stats.json`** — every statement the scenario ran, most total execution time
   first, reset per scenario (via `pg_stat_statements`; the benchmark compose preloads it
-  on `db`). Names the queries behind a hot db, and shows whether a statement ran at all. `environment.json`'s `attribution` block records whether
+  on `db`). Names the queries behind a hot db, and shows whether a statement ran at all
+  (statements that failed with an error are never recorded). `environment.json`'s `attribution` block records whether
   both streams were available for the run.
 
 ## Control plane: API saturation with Locust (RED)

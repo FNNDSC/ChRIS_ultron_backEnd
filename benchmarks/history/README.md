@@ -112,8 +112,8 @@ BENCH_LOCUST_WRITE=1 just bench-locust '-u 10 -r 5 -t 60s --csv /app/benchmarks/
 
 ## Post-upgrade baseline — 2026-09-17 (commit 30fbbaf)
 
-Every analysis above was re-run after the Django 6.0 / DRF 3.18 upgrade, one run per benchmark
-command the issue set uses, so each claim has a baseline produced by the same invocation.
+Every analysis the issue set cites was re-run after the Django 6.0 / DRF 3.18 upgrade, one run per
+benchmark command the issue set uses, so each claim has a baseline produced by the same invocation.
 `bench-compare` calls two runs comparable only when their workload fingerprints match, and the
 fingerprint covers `--topology`, `--axis` and `--cap` but not `--repeat` — so these, not the June
 runs, are what a candidate fix should be compared against. See [`../REPORT.md`](../REPORT.md) §13
@@ -144,7 +144,7 @@ versions". `bench-compare` does not check plugin versions: read `workload_plugin
 | `2026-09-17T053431Z` | `full --topology diamond --axis feeds --restart-on-fail` (June `153019Z`) | **FAIL@32**, 3 merges cancelled |
 | `2026-09-17T054523Z` / `054841Z` / `055413Z` | `full --topology linear --axis depth --cap 16 --repeat 1 --restart-on-fail` at poll 2 / 4 / 8 s | depth-8 makespan 35.6 / 69.9 / 142.1 s → poll-gated **75 / 88 / 94%** (not ~98%) |
 | `2026-09-17T060426Z` / `062118Z` / `063934Z` | same with `--cap 8 --sleep-length 60` | 516 / 550 / 587 s → ~5% poll-gated, as in June |
-| `2026-09-17T065941Z` | `full --topology fanout_fanin --axis branches --cap 64 --file-count 1000 --repeat 1 --restart-on-fail` | **FAIL@32**; the 64-branch level never completes |
+| `2026-09-17T065941Z` | `full --topology fanout_fanin --axis branches --cap 64 --file-count 1000 --repeat 1 --restart-on-fail` | **FAIL@32**; the run stops there, so 64 branches are not attempted |
 | `2026-09-17T221456Z` / `222124Z` / `222808Z` | same command, three attempts | **FAIL@64** in 3/3 — the deterministic reproducer for the duplicate-submission race |
 | `2026-09-17T070345Z` | `full --topology fanout_fanin --axis file_count --cap 100000 --repeat 1 --restart-on-fail` | PASS; the 400k-object merge took 130 s (0.33 ms/object) |
 | `2026-09-17T072731Z` | `full --topology diamond --axis layers --cap 8 --repeat 1 --restart-on-fail` | PASS; 11.8 / 19.9 / 41.5 / **3,260 s**, 32.7 GB `db` writes, 11 GB WAL |

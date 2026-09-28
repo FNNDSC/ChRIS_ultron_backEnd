@@ -62,7 +62,7 @@ the Compose envelope; note the plugin-job defaults separately if you change them
 ## Pinned workload plugin versions
 
 Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13
-(provisioned by `chrisomatic.yml`). The harness resolves each plugin **by name** and uses the
+(provisioned by a local edit to `chrisomatic.yml`, below). The harness resolves each plugin **by name** and uses the
 first match (CUBE orders by `-version`), so **install exactly one version of each** — otherwise
 it warns and binds to the lexicographically-highest version string, not necessarily the pinned
 one. Each run now records the resolved versions (and how many matched) under `workload_plugins` in `environment.json`/`summary.json`; the pin is still what keeps a run reproducible, since the harness resolves by name.
@@ -74,7 +74,9 @@ a run against it reads as a large speed-up rather than a failure. Before provisi
 stack, edit `chrisomatic.yml` locally: replace `- name: pl-topologicalcopy` with
 `- dock_image: fnndsc/pl-topologicalcopy:1.0.13` (Docker Hub carries the 1.0.x tags; the store's
 2.0.0 is not there), or add an empty `public_store:` under `on:` to disable the store lookup
-altogether. Keep that edit out of commits — the dev environment is deliberately not pinned to the
+altogether. The second option also needs every `- name:` entry turned into a pinned
+`- dock_image:`: without a store, chrisomatic cannot resolve a plugin from its name alone, so
+those plugins fail to register and `just bench-start` fails. Keep that edit out of commits — the dev environment is deliberately not pinned to the
 benchmark's versions. If another version is already registered, remove it first (or `just nuke`),
 then confirm `workload_plugins` in the run's `environment.json` reads `pl-topologicalcopy` 1.0.13,
 `pl-simpledsapp` 2.1.5 and `dbg-bigfiles` 1.0.0, each with `"matches": 1`.

@@ -87,8 +87,9 @@ class PgStatStatements:
     def snapshot(self, limit: Optional[int] = None) -> list[dict]:
         """
         Statements since the last reset, most total execution time first: all of them
-        unless ``limit`` is given. Only entries evicted by ``pg_stat_statements.max``
-        (5,000 by default) can be missing.
+        unless ``limit`` is given. Two kinds of statement can still be missing: entries
+        evicted by ``pg_stat_statements.max`` (5,000 by default), and statements that
+        failed with an error, which ``pg_stat_statements`` never records.
         """
         if not self.available:
             return []
