@@ -11,7 +11,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /uvx /usr/local/bin/
 
 # Install into the image's system Python so `python -m benchmarks.run_bench` works with no
 # PATH change, and so the /app/benchmarks bind mount cannot shadow a project-local .venv.
-# UV_LINK_MODE=copy because uv's cache (a cache mount, below) and /usr/local are on
+# UV_LINK_MODE=copy because uv's cache (a cache mount below) and /usr/local are on
 # different filesystems, where uv cannot hardlink.
 ENV UV_PROJECT_ENVIRONMENT=/usr/local \
     UV_COMPILE_BYTECODE=1 \
@@ -19,12 +19,13 @@ ENV UV_PROJECT_ENVIRONMENT=/usr/local \
     UV_PYTHON_DOWNLOADS=never
 
 WORKDIR /app
-# Copied rather than bind-mounted, with uv's cache in a cache mount, for the reasons given
-# at the same step of the root Dockerfile. The sync runs as root, so the cache sits at
-# uv's default location for root.
-COPY pyproject.toml uv.lock ./
-# The dev group carries pytest, which `just bench-test` runs inside this image.
+# pyproject.toml and uv.lock are bind-mounted and uv's cache is a cache mount, as at the
+# same step of the root Dockerfile (Podman must be 5.4 or above: see `just check-builder`).
+# The sync runs as root, so the cache sits at uv's default location for root. The dev
+# group carries pytest, which `just bench-test` runs inside this image.
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --locked
 
 # Drop root in the image; the compose override sets `user:`/`group_add` at runtime so the

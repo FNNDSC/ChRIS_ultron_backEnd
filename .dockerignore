@@ -26,3 +26,14 @@ benchmarks
 
 # created by `just prefer`
 .preference
+
+# left in chris_backend/ by the dev containers (UBI sets HOME to the source directory),
+# and bytecode
+chris_backend/.bash_history
+chris_backend/.python_history
+chris_backend/.lesshist
+chris_backend/.config
+chris_backend/.cache
+chris_backend/.coverage
+chris_backend/coverage.xml
+**/__pycache__

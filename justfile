@@ -135,7 +135,7 @@ reap-plugin-instances: (docker-compose 'run --rm pfcon python -c' '''
 
 # (Re-)build the container image.
 [group('(4) docker-compose')]
-build: (docker-compose '--profile=cube build')
+build: check-builder (docker-compose '--profile=cube build')
 
 # Pull container images.
 [group('(4) docker-compose')]
@@ -181,6 +181,31 @@ get-user:
       echo 'UID=0 GID=0';                                                                 \
     else                                                                                  \
       echo "UID=$(id -u) GID=$(id -g)";                                                   \
+    fi
+
+# Podman must be 5.4 or above (the Dockerfiles, README, CLAUDE.md and ci.yml point
+# here): both Dockerfiles bind-mount pyproject.toml and uv.lock, and Buildah before 1.39
+# (the one in Podman before 5.4) leaves bind-mounted content out of its layer cache key, so
+# a rebuild after a lock change reuses the old layer and silently keeps the old
+# dependencies (containers/buildah#5400). `podman info` reports the Buildah that builds,
+# the server's when Podman is remote. The recipes that rebuild an image depend on this.
+# `run` and `up` only build a missing image; on older Podman that build can still reuse a
+# cached layer, a corner not worth gating every recipe for.
+#
+# Fail if the container engine cannot rebuild CUBE's images correctly.
+[group('helper function')]
+check-builder:
+    @if [ "$(just get-engine)" = 'podman' ]; then                                                \
+      v="$(podman info --format '{{{{ .Version.Version }} {{{{ .Host.BuildahVersion }}' 2>/dev/null)"; \
+      if [ -z "$v" ]; then                                                                       \
+        >&2 echo "Cannot tell which Buildah builds CUBE's images: 'podman info' failed.";        \
+        exit 1;                                                                                  \
+      fi;                                                                                        \
+      if [ "$(printf '%s\n' 1.39.0 "${v#* }" | sort -V | head -n 1)" != '1.39.0' ]; then         \
+        >&2 echo "Podman ${v% *} (Buildah ${v#* }) is too old to rebuild CUBE's images:"         \
+          "Podman 5.4 or above is required, or use Docker ('just prefer docker').";              \
+        exit 1;                                                                                  \
+      fi;                                                                                        \
     fi
 
 # Get the docker daemon socket path.
@@ -248,7 +273,7 @@ bench-compose +command:
 
 # Start the benchmark stack (fslink + uvicorn envelope), migrate, and register plugins.
 [group('(6) benchmarks')]
-bench-start:
+bench-start: check-builder
     just bench-compose 'up -d --build db dragonflydb nats pfcon cube-nonroot-user-volume-fix'
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
@@ -256,20 +281,20 @@ bench-start:
 
 # Run the benchmark harness, e.g. `just bench-run --tier smoke` or `just bench-run --tier full`.
 [group('(6) benchmarks')]
-bench-run *args:
+bench-run *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     just bench-compose '--profile cube --profile bench run --rm benchmark python -m benchmarks.run_bench {{ args }}'
 
 # Run the harness unit tests inside the benchmark image.
 [group('(6) benchmarks')]
-bench-test *args:
+bench-test *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m pytest -p no:cacheprovider benchmarks/tests {{ args }}'
 
 # Control-plane RED load test (Locust). Args pass through, e.g.
 # `just bench-locust '-u 100 -r 20 -t 3m'`. CSVs land in benchmarks/results/locust/.
 [group('(6) benchmarks')]
-bench-locust *args:
+bench-locust *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     mkdir -p benchmarks/results/locust
     just bench-compose '--profile cube --profile bench run --rm benchmark locust -f benchmarks/locustfile.py --headless --csv /app/benchmarks/results/locust/run {{ args }}'
