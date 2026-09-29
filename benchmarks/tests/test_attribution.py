@@ -102,13 +102,13 @@ def test_snapshot_keeps_every_statement_by_default():
     docker = FakeDbDocker()
     rows = PgStatStatements(docker).snapshot()
 
-    assert "LIMIT" not in docker.sql[-1]
-    assert docker.sql[-1].rstrip().endswith("ORDER BY total_exec_time DESC")
-    assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"
+    assert "LIMIT" not in docker.sql[-1]  # nosec B101 - pytest assertion
+    assert docker.sql[-1].rstrip().endswith("ORDER BY total_exec_time DESC")  # nosec B101 - pytest assertion
+    assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"  # nosec B101 - pytest assertion
 
 
 def test_snapshot_limit_is_optional():
     docker = FakeDbDocker()
     PgStatStatements(docker).snapshot(limit=15)
 
-    assert docker.sql[-1].endswith("ORDER BY total_exec_time DESC LIMIT 15")
+    assert docker.sql[-1].endswith("ORDER BY total_exec_time DESC LIMIT 15")  # nosec B101 - pytest assertion
