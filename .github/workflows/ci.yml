@@ -11,7 +11,7 @@ on:
 jobs:
   lockfiles:
     name: Lockfiles are current
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
       # setup-uv publishes no floating major tag past v7 (there is no `v10`), and its own
@@ -26,7 +26,9 @@ jobs:
 
   test:
     if: github.ref_type == 'branch' || github.ref_name == 'pull_request'
-    runs-on: ubuntu-24.04
+    # 26.04 ships Podman 5.7, a version the README supports (5.4 or above, see
+    # `just check-builder`).
+    runs-on: ubuntu-26.04
     # A hung `compose run` otherwise burns the full 6h job budget.
     # The slowest green run to date is ~10 min.
     timeout-minutes: 30
@@ -63,7 +65,7 @@ jobs:
   build:
     name: Build
     if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
       - name: Update __version__.py
@@ -119,7 +121,7 @@ jobs:
 
   openapi:
     name: Generate OpenAPI Schema
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: taiki-e/install-action@just
       - uses: actions/checkout@v6
@@ -153,7 +155,7 @@ jobs:
     name: Generate OpenAPI Documentation
     if: startsWith(github.ref, 'refs/tags/v')
     needs: openapi
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -175,7 +177,7 @@ jobs:
   deploy-docs:
     name: Update GitHub Pages
     needs: build-docs
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
@@ -193,7 +195,7 @@ jobs:
 
   draft-release:
     name: Draft GitHub Release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - build

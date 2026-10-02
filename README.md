@@ -36,7 +36,7 @@ The HTTP API primarily supports the [collection+json](http://amundsen.com/media-
 
 Development is mainly supported on Linux. MacOS and WSL on Windows also work (because Docker Desktop is a Linux VM). You will need at least 8GM RAM, 20GB disk space, and a good internet connection.
 
-Install Docker (version 27 or above) or Podman (version 5.2 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
+Install Docker (version 27 or above) or Podman (version 5.4 or above), Docker Compose, and [just](https://github.com/casey/just?tab=readme-ov-file#installation).
 
 <details>
 <summary>
@@ -59,7 +59,7 @@ Docker Installation Instructions
 Podman Setup Instructions
 </summary>
 
-Rootless Podman is supported. You must install and configure Podman to use `docker-compose`, _not_ `podman-compose`. `podman-compose` is missing features, see issues [#575](https://github.com/containers/podman-compose/issues/575) and [#866](https://github.com/containers/podman-compose/issues/866).
+Rootless Podman is supported. Podman must be version 5.4 or above: the Dockerfiles bind-mount `pyproject.toml` and `uv.lock` but older Podman reuses a stale cached layer after they change, so a rebuild would silently keep the old dependencies. `just build`, and the benchmark recipes that build, refuse older Podman. You must install and configure Podman to use `docker-compose`, _not_ `podman-compose`. `podman-compose` is missing features, see issues [#575](https://github.com/containers/podman-compose/issues/575) and [#866](https://github.com/containers/podman-compose/issues/866).
 
 A Podman daemon must be running, because _ChRIS_ runs containers of its own. To start the Podman daemon on Linux, run
 
@@ -75,6 +75,20 @@ just prefer docker
 ```
 
 With Podman, DragonflyDB might fail to start. Simply retry the command. See https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/573
+
+On Ubuntu 26.04, `just down` or `just nuke` can fail with "rootless netns: kill network process: permission denied": the AppArmor profile for `pasta` does not let it receive a signal from Podman ([Debian bug 1100135](https://bugs.debian.org/1100135)). Add the missing rule (running this again changes nothing):
+
+```shell
+profile=/etc/apparmor.d/usr.bin.pasta
+if ! grep -q 'peer=podman' "$profile"; then
+  sudo sed -i 's|^}|  signal (receive) peer=podman,\n}|' "$profile"
+  sudo apparmor_parser -r "$profile"
+fi
+```
+
+The profile is a configuration file of the `passt` package: a later update may ask whether to keep your edit, and taking the package's version drops the rule again.
+
+Under rootless Podman, `just` runs the containers that otherwise run as your UID and GID (_CUBE_, its workers, the tool containers such as `uv`, and the plugin containers pfcon starts) as `root` inside the container, which Podman maps to your own user on the host. Any other user inside the container would map to a subordinate UID that cannot write into your checkout, so `just lock` or `just makemigrations` would fail with "Permission denied". With Docker, or rootful Podman, those containers run as your own UID and GID.
 
 </details>
 
@@ -263,7 +277,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Run ChRIS backend integration tests
         uses: FNNDSC/ChRIS_ultron_backEnd@master
@@ -276,6 +290,8 @@ jobs:
           CUBE_IMAGE: localhost/fnndsc/cube:dev
           PFCON_IMAGE: localhost/fnndsc/pfcon:dev
 ```
+
+With `engine: podman`, start the Podman service in a step before this one (`systemctl --user start podman.service`). On Ubuntu 26.04 the action also adds the AppArmor rule for `pasta` described under the Podman setup instructions, when `sudo` needs no password, as on GitHub-hosted runners.
 
 ## Load & Scalability Benchmarks
 

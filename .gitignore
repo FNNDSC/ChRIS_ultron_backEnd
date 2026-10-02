@@ -20,6 +20,7 @@ venv
 .mambaenv
 
 # created by dev container bc UBI sets HOME to the project src dir
+chris_backend/.cache
 chris_backend/.config
 chris_backend/.bash_history
 chris_backend/.python_history

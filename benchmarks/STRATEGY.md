@@ -219,7 +219,7 @@ CPU/mem, block-I/O deltas and peak pids per container — `chris`, `worker-mains
 
 ### 9.4 DB / state deltas and query attribution
 
-Per scenario: feed/instance/file count deltas **and absolute totals** (the x-axis for state-aging analysis — the `aging-grow`/`aging-probe` tier pair), total registered output bytes, and a **`pg_stat_statements` snapshot** (reset at scenario start, top statements by total execution time at the end, `pg_stats.py`) that names the queries behind db load. Folder deltas and connection-pool stats are future work.
+Per scenario: feed/instance/file count deltas **and absolute totals** (the x-axis for state-aging analysis — the `aging-grow`/`aging-probe` tier pair), total registered output bytes, and a **`pg_stat_statements` snapshot** (reset at scenario start, every statement at the end, most total execution time first, `pg_stats.py`) that names the queries behind db load. Folder deltas and connection-pool stats are future work.
 
 ### 9.5 The key artifact
 

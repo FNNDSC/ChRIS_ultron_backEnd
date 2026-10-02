@@ -1,0 +1,120 @@
+{
+  "collected_at": "2026-09-17T12:00:45.985390+00:00",
+  "host": {
+    "operating_system": "Ubuntu 26.04.1 LTS",
+    "kernel_version": "7.0.0-31-generic",
+    "architecture": "x86_64",
+    "ncpu": 16,
+    "mem_total_bytes": 132318998528,
+    "docker_root_dir": "/var/lib/docker",
+    "server_version": "29.8.0"
+  },
+  "docker": {
+    "engine_version": "29.8.0",
+    "api_version": "1.56",
+    "platform": "Docker Engine - Community"
+  },
+  "images": {
+    "chris": {
+      "image_id": "sha256:34f4b764ab6ae0bdeaa0b827ed8e8ee85c9992d18e6bf83f8d6e0aa2334d489c",
+      "tags": [
+        "localhost/fnndsc/cube:dev"
+      ]
+    },
+    "pfcon": {
+      "image_id": "sha256:351577ac85653697e863203bbcc501f2478bf4d36a719344f26fde3e0d999535",
+      "tags": [
+        "ghcr.io/fnndsc/pfcon:latest"
+      ]
+    }
+  },
+  "git": {
+    "commit": "30fbbaf",
+    "dirty": "true"
+  },
+  "storage_mode": "fslink",
+  "envelope": {
+    "CUBE_CELERY_POLL_INTERVAL": "2.0",
+    "CUBE_UVICORN_WORKERS": "4",
+    "CUBE_DB_POOL_MIN_SIZE": "2",
+    "CUBE_DB_POOL_MAX_SIZE": "10",
+    "CUBE_DB_POOL_TIMEOUT": "10",
+    "CUBE_DB_MAX_CONNECTIONS": "300",
+    "CUBE_WORKER_MAINS_CONCURRENCY": "4",
+    "PFCON_WORKERS": "8",
+    "STORAGE_ENV": "fslink"
+  },
+  "noise_floor": {
+    "health_p50_ms": 13.0,
+    "health_p95_ms": 14.3,
+    "samples": 20
+  },
+  "manual_fields": {
+    "storage_device_type_throughput": "TODO",
+    "power_thermal_mode": "TODO",
+    "other_significant_workloads": "TODO"
+  },
+  "api_auth_mode": "token",
+  "matrix": {
+    "tier": "aging-probe",
+    "workload": {
+      "baseline": {
+        "file_count": 100,
+        "file_size": "1KiB",
+        "depth": 1,
+        "branches": 1,
+        "layers": 1,
+        "merges": 1,
+        "feeds": 1,
+        "sleep_length": 0
+      },
+      "topology_axes": {
+        "linear": {
+          "depth": 1
+        }
+      },
+      "axis_steps": {
+        "depth": 2
+      },
+      "poll_every_s": 1
+    },
+    "workload_sha256": "098af03db263a65bc3917f981abf228c28152cf4a9936a30fa685c8a257a51c8",
+    "thresholds": {
+      "healthcheck_timeout_s": 30,
+      "api_request_timeout_s": 30,
+      "api_p95_latency_ms": 2000,
+      "no_progress_timeout_s": 300,
+      "scenario_timeout_s": 600,
+      "quiesce_timeout_s": 300
+    },
+    "repeat": 3
+  },
+  "attribution": {
+    "queue_sampling": true,
+    "pg_stat_statements": true
+  },
+  "workload_plugins": {
+    "fs": {
+      "name": "dbg-bigfiles",
+      "version": "1.0.0",
+      "id": 1,
+      "dock_image": "fnndsc/dbg-bigfiles",
+      "matches": 1
+    },
+    "ds": {
+      "name": "pl-simpledsapp",
+      "version": "2.1.5",
+      "id": 2,
+      "dock_image": "fnndsc/pl-simpledsapp",
+      "matches": 1
+    },
+    "ts": {
+      "name": "pl-topologicalcopy",
+      "version": "1.0.13",
+      "id": 6,
+      "dock_image": "fnndsc/pl-topologicalcopy",
+      "matches": 1
+    }
+  },
+  "workload_plugins_ambiguous": []
+}

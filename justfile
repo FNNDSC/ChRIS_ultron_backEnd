@@ -135,7 +135,7 @@ reap-plugin-instances: (docker-compose 'run --rm pfcon python -c' '''
 
 # (Re-)build the container image.
 [group('(4) docker-compose')]
-build: (docker-compose '--profile=cube build')
+build: check-builder (docker-compose '--profile=cube build')
 
 # Pull container images.
 [group('(4) docker-compose')]
@@ -154,7 +154,7 @@ run +command:
 # docker-compose ... helper function.
 [group('(4) docker-compose')]
 docker-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else if storage == "s3" { "-f docker-compose.yml -f docker-compose_s3.yml" } else { "" } }} {{ command }}
+    env $(just get-user) DOCKER_SOCK="$(just get-socket)" $(just get-engine) compose {{ if storage == "swift" { "-f docker-compose.yml -f docker-compose_swift.yml" } else if storage == "s3" { "-f docker-compose.yml -f docker-compose_s3.yml" } else { "" } }} {{ command }}
 
 # Get the container engine to use (docker or podman)
 [group('helper function')]
@@ -166,6 +166,47 @@ get-engine:
     else                                     \
       echo docker;                           \
     fi                                       \
+
+# This is every `user: ${UID}:${GID}` in the compose files, and pfcon's CONTAINER_USER for
+# plugin jobs. Under rootless Podman a container's root *is* the invoking user, and any
+# other uid maps to a subordinate uid that cannot write into the working tree (`just lock`,
+# `just makemigrations`, coverage), so there it is root. Everywhere else it is the invoking
+# user.
+#
+# Get the UID and GID that compose runs CUBE's containers as.
+[group('helper function')]
+get-user:
+    @if [ "$(just get-engine)" = 'podman' ] \
+        && [ "$(podman info --format '{{{{ .Host.Security.Rootless }}')" = 'true' ]; then \
+      echo 'UID=0 GID=0';                                                                 \
+    else                                                                                  \
+      echo "UID=$(id -u) GID=$(id -g)";                                                   \
+    fi
+
+# Podman must be 5.4 or above (the Dockerfiles, README, CLAUDE.md and ci.yml point
+# here): both Dockerfiles bind-mount pyproject.toml and uv.lock, and Buildah before 1.39
+# (the one in Podman before 5.4) leaves bind-mounted content out of its layer cache key, so
+# a rebuild after a lock change reuses the old layer and silently keeps the old
+# dependencies (containers/buildah#5400). `podman info` reports the Buildah that builds,
+# the server's when Podman is remote. The recipes that rebuild an image depend on this.
+# `run` and `up` only build a missing image; on older Podman that build can still reuse a
+# cached layer, a corner not worth gating every recipe for.
+#
+# Fail if the container engine cannot rebuild CUBE's images correctly.
+[group('helper function')]
+check-builder:
+    @if [ "$(just get-engine)" = 'podman' ]; then                                                \
+      v="$(podman info --format '{{{{ .Version.Version }} {{{{ .Host.BuildahVersion }}' 2>/dev/null)"; \
+      if [ -z "$v" ]; then                                                                       \
+        >&2 echo "Cannot tell which Buildah builds CUBE's images: 'podman info' failed.";        \
+        exit 1;                                                                                  \
+      fi;                                                                                        \
+      if [ "$(printf '%s\n' 1.39.0 "${v#* }" | sort -V | head -n 1)" != '1.39.0' ]; then         \
+        >&2 echo "Podman ${v% *} (Buildah ${v#* }) is too old to rebuild CUBE's images:"         \
+          "Podman 5.4 or above is required, or use Docker ('just prefer docker').";              \
+        exit 1;                                                                                  \
+      fi;                                                                                        \
+    fi
 
 # Get the docker daemon socket path.
 [group('helper function')]
@@ -223,7 +264,7 @@ unset-storage:
 # Compose helper for the benchmark stack (fslink + uvicorn-envelope override).
 [group('(6) benchmarks')]
 bench-compose +command:
-    env UID=$(id -u) GID=$(id -g) DOCKER_SOCK="$(just get-socket)" \
+    env $(just get-user) DOCKER_SOCK="$(just get-socket)" \
         DOCKER_GID="$(stat -c '%g' "$(just get-socket)" 2>/dev/null || stat -f '%g' "$(just get-socket)" 2>/dev/null || echo 0)" \
         COMPOSE_PROJECT_NAME="$(basename "$(pwd)" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')" \
         GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
@@ -232,7 +273,7 @@ bench-compose +command:
 
 # Start the benchmark stack (fslink + uvicorn envelope), migrate, and register plugins.
 [group('(6) benchmarks')]
-bench-start:
+bench-start: check-builder
     just bench-compose 'up -d --build db dragonflydb nats pfcon cube-nonroot-user-volume-fix'
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
@@ -240,20 +281,20 @@ bench-start:
 
 # Run the benchmark harness, e.g. `just bench-run --tier smoke` or `just bench-run --tier full`.
 [group('(6) benchmarks')]
-bench-run *args:
+bench-run *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     just bench-compose '--profile cube --profile bench run --rm benchmark python -m benchmarks.run_bench {{ args }}'
 
 # Run the harness unit tests inside the benchmark image.
 [group('(6) benchmarks')]
-bench-test *args:
+bench-test *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m pytest -p no:cacheprovider benchmarks/tests {{ args }}'
 
 # Control-plane RED load test (Locust). Args pass through, e.g.
 # `just bench-locust '-u 100 -r 20 -t 3m'`. CSVs land in benchmarks/results/locust/.
 [group('(6) benchmarks')]
-bench-locust *args:
+bench-locust *args: check-builder
     just bench-compose '--profile cube --profile bench build benchmark'
     mkdir -p benchmarks/results/locust
     just bench-compose '--profile cube --profile bench run --rm benchmark locust -f benchmarks/locustfile.py --headless --csv /app/benchmarks/results/locust/run {{ args }}'
@@ -303,37 +344,19 @@ openapi:
 openapi-split:
     env SPECTACULAR_SPLIT_REQUEST=true just storage={{ storage }} openapi
 
-
-# The image is the non-slim `-python3.12-trixie` variant on purpose: the distroless `uv`
-# image has no shell, so uv cannot detect libc and refuses to run. The cache is kept in
-# the working tree so repeat locks are fast; UV_LINK_MODE=copy is required because
-# hardlinks do not work across the bind mount on macOS.
-#
 # Run uv in a throwaway container, so no local uv installation is required.
 [group('helper function')]
 uv +args:
-    $(just get-engine) run --rm \
-        -u "$(id -u):$(id -g)" \
-        -e HOME=/w \
-        -e UV_CACHE_DIR=/w/.uv-cache \
-        -e UV_LINK_MODE=copy \
-        -e UV_PYTHON_DOWNLOADS=never \
-        -v "$PWD:/w:z" -w /w \
-        ghcr.io/astral-sh/uv:0.12.13-python3.12-trixie uv {{ args }}
+    @just storage={{ storage }} docker-compose run --rm {{ if tty == "false" { "-T" } else { "" } }} uv uv {{ args }}
 
 # Refresh both lockfiles (CUBE and the benchmark harness).
 [group('(3) development')]
-lock:
-    just uv lock
-    just uv lock --directory benchmarks
+lock: (uv 'lock') (uv 'lock --directory benchmarks')
 
 # Upgrade one dependency, e.g. `just lock-upgrade django`.
 [group('(3) development')]
-lock-upgrade package:
-    just uv lock --upgrade-package {{ package }}
+lock-upgrade package: (uv 'lock --upgrade-package' package)
 
 # Fail if either lockfile is out of date with its pyproject.toml.
 [group('(3) development')]
-lock-check:
-    just uv lock --check
-    just uv lock --check --directory benchmarks
+lock-check: (uv 'lock --check') (uv 'lock --check --directory benchmarks')

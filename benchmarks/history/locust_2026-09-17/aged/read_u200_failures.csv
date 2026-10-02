@@ -1,0 +1,5 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,list-files,CatchResponseError('HTTP 401'),494,2026-09-17T13:02:02Z,2026-09-17T13:03:21Z
+GET,search-plugins,CatchResponseError('HTTP 500'),220,2026-09-17T13:02:13Z,2026-09-17T13:03:21Z
+GET,list-instances,CatchResponseError('HTTP 500'),648,2026-09-17T13:02:12Z,2026-09-17T13:03:21Z
+POST,auth-token,CatchResponseError('auth HTTP 500'),200,2026-09-17T13:02:02Z,2026-09-17T13:02:55Z
