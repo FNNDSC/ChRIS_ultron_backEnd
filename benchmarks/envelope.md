@@ -25,6 +25,20 @@ artificial dev cap.
 | `PFCON_WORKERS` | `8` | `gunicorn -w` on `pfcon` (compute-side request parallelism) |
 | `PFCON_CPUS` / `PFCON_MEM_LIMIT` | `2` / `2g` | `pfcon` CPU and memory |
 | `CUBE_CELERY_POLL_INTERVAL` | `2.0` | Celery-beat scheduling/status poll cadence (s) — sweep `{2, 4, 8}` |
+| `CUBE_DEBUG` | `false` | Django `DEBUG` on `chris` and the Celery services (see below) |
+
+**Why `DEBUG` is off:** production runs with `DEBUG = False`, and `DEBUG` changes what is
+measured: every SQL statement goes through Django's query recorder, the debug toolbar's
+middleware runs on every request, and a 500 renders a page that re-runs the QuerySets of each
+stack frame. Runs up to and including 2026-09-17 had it on (it came from
+`config.settings.local`), so `bench-compare` reports `envelope.CUBE_DEBUG` as a caution against
+them. `CUBE_DEBUG=true` brings that overhead back for a comparison with those runs, but not the
+connection leak that broke their Locust steps from 100 users up, which CUBE has fixed since
+(REPORT.md § 14).
+
+**Not part of the envelope:** `CUBE_DB_POOL_STATS_INTERVAL` (default `5`) is the number of
+seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
+recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
 **Why the 2.0 s floor for the Celery poll interval:** the periodic tasks are guarded by `skip_if_running`
 (`plugininstances/tasks.py`), which spends ~1 s in a broker-wide `inspect().active()`
