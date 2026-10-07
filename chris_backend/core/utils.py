@@ -1,10 +1,17 @@
 
 import os
 import json
+import logging
+import threading
+import time
 import zlib, base64
 
 from django.conf import settings
+from django.db import connections
 from django.utils.crypto import salted_hmac
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_file_resource_link(file_serializer, obj):
@@ -94,3 +101,50 @@ def download_token_signing_key() -> bytes:
     """
     return salted_hmac('core.utils.download_token_signing_key', '',
                        secret=settings.SECRET_KEY, algorithm='sha512').digest()
+
+
+def db_pool_stats(alias='default'):
+    """
+    Utility function to return the counters of this process's psycopg connection pool
+    for a database alias, or None when the database is not pooled. Adds ``checked_out``,
+    the connections handed out and not yet returned: once the pool has settled it is 0
+    unless some code still holds a connection. Opens no database connection.
+    """
+    pool = getattr(connections[alias], 'pool', None)
+    if pool is None:
+        return None
+
+    stats = pool.get_stats()
+    # a pool counts its min_size connections as soon as it is created, before it opens
+    # them on the first request
+    stats['checked_out'] = (0 if pool.closed
+                            else stats['pool_size'] - stats['pool_available'])
+    return stats
+
+
+def start_db_pool_stats_logger(interval, alias='default'):
+    """
+    Utility function to log ``db_pool_stats()`` of this process every ``interval`` seconds
+    from a daemon thread, as one ``db_pool_stats {json}`` line each time, so that the pool
+    of every API worker can be read from the service log. Returns an event that stops the
+    thread when set, or None without starting anything when ``interval`` is not positive.
+    """
+    if interval <= 0:
+        return None
+
+    stop = threading.Event()
+
+    def log_stats():
+        while not stop.wait(interval):
+            try:
+                stats = db_pool_stats(alias)
+            except Exception as e:
+                logger.warning('could not read the %s connection pool: %s', alias, e)
+                continue
+
+            if stats is not None:
+                logger.info('db_pool_stats %s', json.dumps(
+                    {'pid': os.getpid(), 'ts': time.time(), 'alias': alias, **stats}))
+
+    threading.Thread(target=log_stats, name='db-pool-stats', daemon=True).start()
+    return stop
