@@ -66,10 +66,12 @@ def test_a_recovered_step_is_recorded_and_keeps_locusts_exit_code(tmp_path, monk
     locustfile._record_recovery(env)
 
     rec = record(tmp_path)
-    assert rec["healthy_at_start"] is True and rec["recovered"] is True
-    assert "CUBE_DEBUG" in rec["envelope"]
-    assert env.process_exit_code is None
-    assert env.runner.stopped          # users stopped before the API is probed
+    assert rec["healthy_at_start"] is True  # nosec B101 - pytest assertion
+    assert rec["recovered"] is True  # nosec B101 - pytest assertion
+    assert "CUBE_DEBUG" in rec["envelope"]  # nosec B101 - pytest assertion
+    assert env.process_exit_code is None  # nosec B101 - pytest assertion
+    # the users were stopped before the API was probed
+    assert env.runner.stopped  # nosec B101 - pytest assertion
 
 
 def test_a_step_that_did_not_recover_exits_3(tmp_path, monkeypatch):
@@ -78,8 +80,9 @@ def test_a_step_that_did_not_recover_exits_3(tmp_path, monkeypatch):
 
     locustfile._record_recovery(env)
 
-    assert record(tmp_path)["recovered"] is False
-    assert env.process_exit_code == locustfile.UNHEALTHY_EXIT_CODE == 3
+    assert record(tmp_path)["recovered"] is False  # nosec B101 - pytest assertion
+    assert env.process_exit_code == locustfile.UNHEALTHY_EXIT_CODE  # nosec B101 - pytest assertion
+    assert locustfile.UNHEALTHY_EXIT_CODE == 3  # nosec B101 - pytest assertion
 
 
 def test_a_step_that_started_on_an_unhealthy_api_exits_3(tmp_path, monkeypatch):
@@ -89,8 +92,8 @@ def test_a_step_that_started_on_an_unhealthy_api_exits_3(tmp_path, monkeypatch):
 
     locustfile._record_recovery(env)
 
-    assert record(tmp_path)["healthy_at_start"] is False
-    assert env.process_exit_code == 3
+    assert record(tmp_path)["healthy_at_start"] is False  # nosec B101 - pytest assertion
+    assert env.process_exit_code == 3  # nosec B101 - pytest assertion
 
 
 def test_a_check_that_fails_is_recorded_as_not_recovered(tmp_path, monkeypatch):
@@ -103,8 +106,9 @@ def test_a_check_that_fails_is_recorded_as_not_recovered(tmp_path, monkeypatch):
     locustfile._record_recovery(env)
 
     rec = record(tmp_path)
-    assert rec["recovered"] is False and "docker socket gone" in rec["error"]
-    assert env.process_exit_code == 3
+    assert rec["recovered"] is False  # nosec B101 - pytest assertion
+    assert "docker socket gone" in rec["error"]  # nosec B101 - pytest assertion
+    assert env.process_exit_code == 3  # nosec B101 - pytest assertion
 
 
 def test_both_probes_use_the_host_locust_was_given(tmp_path, monkeypatch):
@@ -117,7 +121,7 @@ def test_both_probes_use_the_host_locust_was_given(tmp_path, monkeypatch):
     locustfile._probe_before_step(env)
     locustfile._record_recovery(env)
 
-    assert seen == ["http://other:8000/api/v1/"] * 2
+    assert seen == ["http://other:8000/api/v1/"] * 2  # nosec B101 - pytest assertion
 
 
 def test_no_check_with_a_zero_window(tmp_path, monkeypatch):
@@ -127,8 +131,8 @@ def test_no_check_with_a_zero_window(tmp_path, monkeypatch):
 
     locustfile._record_recovery(env)
 
-    assert not (tmp_path / "read_u10_recovery.json").exists()
-    assert env.process_exit_code is None
+    assert not (tmp_path / "read_u10_recovery.json").exists()  # nosec B101 - pytest assertion
+    assert env.process_exit_code is None  # nosec B101 - pytest assertion
 
 
 def test_no_check_in_a_worker_process(tmp_path, monkeypatch):
@@ -137,5 +141,5 @@ def test_no_check_in_a_worker_process(tmp_path, monkeypatch):
 
     locustfile._record_recovery(env)
 
-    assert not (tmp_path / "read_u10_recovery.json").exists()
-    assert env.process_exit_code is None
+    assert not (tmp_path / "read_u10_recovery.json").exists()  # nosec B101 - pytest assertion
+    assert env.process_exit_code is None  # nosec B101 - pytest assertion

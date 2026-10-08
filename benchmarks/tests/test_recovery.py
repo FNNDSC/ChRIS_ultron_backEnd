@@ -94,8 +94,10 @@ def pool(pid, checked_out):
 
 
 def test_all_ok_needs_a_burst_of_2xx():
-    assert all_ok([200, 204])
-    assert not all_ok([200, 500]) and not all_ok([200, None]) and not all_ok([])
+    assert all_ok([200, 204])  # nosec B101 - pytest assertion
+    assert not all_ok([200, 500])  # nosec B101 - pytest assertion
+    assert not all_ok([200, None])  # nosec B101 - pytest assertion
+    assert not all_ok([])  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_passes_on_a_healthy_first_burst():
@@ -103,8 +105,9 @@ def test_probe_recovery_passes_on_a_healthy_first_burst():
     result = probe_recovery(bursts(clock, [200] * 4), window_s=60, clock=clock,
                             sleep=clock.sleep)
 
-    assert result["recovered"] and result["seconds"] == 0.0
-    assert result["rounds"] == [{"t": 0.0, "statuses": {"200": 4}, "ok": True}]
+    assert result["recovered"] and result["seconds"] == 0.0  # nosec B101 - pytest assertion
+    only_round = {"t": 0.0, "statuses": {"200": 4}, "ok": True}
+    assert result["rounds"] == [only_round]  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_waits_for_every_request_of_a_burst():
@@ -112,8 +115,10 @@ def test_probe_recovery_waits_for_every_request_of_a_burst():
     result = probe_recovery(bursts(clock, [500, 200], [500, 200], [200, 200]),
                             window_s=60, interval_s=5, clock=clock, sleep=clock.sleep)
 
-    assert result["recovered"] and result["seconds"] == 11.0   # two failed rounds
-    assert [r["ok"] for r in result["rounds"]] == [False, False, True]
+    # after two failed rounds
+    assert result["recovered"] and result["seconds"] == 11.0  # nosec B101 - pytest assertion
+    oks = [r["ok"] for r in result["rounds"]]
+    assert oks == [False, False, True]  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_gives_up_after_the_window():
@@ -121,8 +126,9 @@ def test_probe_recovery_gives_up_after_the_window():
     result = probe_recovery(bursts(clock, [500]), window_s=20, interval_s=5, clock=clock,
                             sleep=clock.sleep)
 
-    assert not result["recovered"] and result["seconds"] is None
-    assert len(result["rounds"]) == 5        # rounds at 0, 5.5, 11, 16.5 and 22 s
+    assert not result["recovered"] and result["seconds"] is None  # nosec B101 - pytest assertion
+    # rounds at 0, 5.5, 11, 16.5 and 22 s
+    assert len(result["rounds"]) == 5  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_needs_every_pool_back_after_the_burst():
@@ -137,11 +143,12 @@ def test_probe_recovery_needs_every_pool_back_after_the_burst():
     result = probe_recovery(bursts(clock, [200]), window_s=60, interval_s=5, pools=pools,
                             settle_s=6, clock=clock, sleep=clock.sleep)
 
-    assert result["recovered"]
-    assert result["rounds"][0]["checked_out"] == {"1": 0, "2": 10}
-    assert not result["rounds"][0]["ok"] and result["rounds"][1]["ok"]
+    assert result["recovered"]  # nosec B101 - pytest assertion
+    assert result["rounds"][0]["checked_out"] == {"1": 0, "2": 10}  # nosec B101 - pytest assertion
+    assert not result["rounds"][0]["ok"]  # nosec B101 - pytest assertion
+    assert result["rounds"][1]["ok"]  # nosec B101 - pytest assertion
     # each round reads only what the workers logged after its burst ended
-    assert seen == [1000.5, 1000.5 + 6 + 5 + 0.5]
+    assert seen == [1000.5, 1000.5 + 6 + 5 + 0.5]  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_records_the_pools_of_a_failed_round():
@@ -155,9 +162,10 @@ def test_probe_recovery_records_the_pools_of_a_failed_round():
     result = probe_recovery(bursts(clock, [500, 200]), window_s=0, pools=pools,
                             settle_s=6, clock=clock, sleep=clock.sleep)
 
-    assert not result["recovered"]
-    assert result["rounds"][0]["checked_out"] == {"1": 10, "2": 0}
-    assert seen == [1000.0]                  # logged since the round started, no settling
+    assert not result["recovered"]  # nosec B101 - pytest assertion
+    assert result["rounds"][0]["checked_out"] == {"1": 10, "2": 0}  # nosec B101 - pytest assertion
+    # logged since the round started, no settling
+    assert seen == [1000.0]  # nosec B101 - pytest assertion
 
 
 def test_probe_recovery_needs_every_worker_to_report():
@@ -166,7 +174,7 @@ def test_probe_recovery_needs_every_worker_to_report():
                             pools=lambda since: {**pool(1, 0), **pool(2, 0)}, workers=4,
                             clock=clock, sleep=clock.sleep)
 
-    assert not result["recovered"]
+    assert not result["recovered"]  # nosec B101 - pytest assertion
 
 
 def test_parse_pool_stats_keeps_the_latest_line_of_each_worker():
@@ -178,8 +186,8 @@ def test_parse_pool_stats_keeps_the_latest_line_of_each_worker():
         "[INFO][core.utils] db_pool_stats {not json}",
     ])
 
-    assert parse_pool_stats(log) == {9: {"pid": 9, "checked_out": 0},
-                                     10: {"pid": 10, "checked_out": 0}}
+    expected = {9: {"pid": 9, "checked_out": 0}, 10: {"pid": 10, "checked_out": 0}}
+    assert parse_pool_stats(log) == expected  # nosec B101 - pytest assertion
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -196,11 +204,12 @@ def test_http_burst_reports_each_request():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     try:
-        assert http_burst(url, 4, timeout=5) == [200] * 4
+        assert http_burst(url, 4, timeout=5) == [200] * 4  # nosec B101 - pytest assertion
     finally:
         server.shutdown()
         server.server_close()
-    assert http_burst(url, 2, timeout=1) == [None, None]       # nothing listening now
+    # nothing listens on that port any more
+    assert http_burst(url, 2, timeout=1) == [None, None]  # nosec B101 - pytest assertion
 
 
 class FakeChrisDocker:
@@ -228,9 +237,9 @@ def test_api_recovery_checks_the_pools_when_workers_log_them(monkeypatch):
     result = api_recovery("http://chris:8000/api/v1/", docker, window_s=60,
                           stats_interval_s=5, workers=2)
 
-    assert result["recovered"] and result["pools_checked"]
-    assert result["connections"][0]["count"] == 20
-    assert docker.since and docker.since[0] is not None
+    assert result["recovered"] and result["pools_checked"]  # nosec B101 - pytest assertion
+    assert result["connections"][0]["count"] == 20  # nosec B101 - pytest assertion
+    assert docker.since and docker.since[0] is not None  # nosec B101 - pytest assertion
 
 
 def test_api_recovery_without_pool_stats_relies_on_the_bursts(monkeypatch):
@@ -240,5 +249,5 @@ def test_api_recovery_without_pool_stats_relies_on_the_bursts(monkeypatch):
 
     result = api_recovery("http://chris:8000/api/v1/", docker, window_s=60)
 
-    assert result["recovered"] and not result["pools_checked"]
-    assert docker.since == []
+    assert result["recovered"] and not result["pools_checked"]  # nosec B101 - pytest assertion
+    assert docker.since == []  # nosec B101 - pytest assertion

@@ -102,10 +102,12 @@ def test_sweep_says_whether_each_step_started_healthy_and_recovered(tmp_path):
     _write_recovery(tmp_path / "read_u200_recovery.json", True, False)
     md = render(str(tmp_path))
 
-    assert "| Healthy before | Recovered |" in md
-    assert "| 100 | 900 | 9 | 1.0% | 10 | 1 | 2 | 3 | yes | yes, 6 s |" in md
-    assert "| 200 | 900 | 9 | 1.0% | 10 | 1 | 2 | 3 | yes | **no** |" in md
-    assert "| 400 | 900 | 9 | 1.0% | 10 | 1 | 2 | 3 | ? | ? |" in md   # no recovery file
+    stats = "900 | 9 | 1.0% | 10 | 1 | 2 | 3"
+    assert "| Healthy before | Recovered |" in md  # nosec B101 - pytest assertion
+    assert f"| 100 | {stats} | yes | yes, 6 s |" in md  # nosec B101 - pytest assertion
+    assert f"| 200 | {stats} | yes | **no** |" in md  # nosec B101 - pytest assertion
+    # the 400-user step has no recovery file
+    assert f"| 400 | {stats} | ? | ? |" in md  # nosec B101 - pytest assertion
 
 
 def test_sweep_without_recovery_files_keeps_its_columns(tmp_path):
@@ -113,8 +115,8 @@ def test_sweep_without_recovery_files_keeps_its_columns(tmp_path):
     _write_stats(tmp_path / "read_u25_stats.csv", [("Aggregated", 500, 0, 67, 22, 61, 190)])
     md = render(str(tmp_path))
 
-    assert "Recovered" not in md
-    assert "| 25 | 500 | 0 | 0.0% | 67 | 22 | 61 | 190 |\n" in md
+    assert "Recovered" not in md  # nosec B101 - pytest assertion
+    assert "| 25 | 500 | 0 | 0.0% | 67 | 22 | 61 | 190 |\n" in md  # nosec B101 - pytest assertion
 
 
 def test_recovery_without_pool_counters_is_flagged(tmp_path):
@@ -122,4 +124,5 @@ def test_recovery_without_pool_counters_is_flagged(tmp_path):
     _write_recovery(tmp_path / "run_recovery.json", False, True, 0, pools_checked=False)
     md = render(str(tmp_path))
 
-    assert "Healthy before: **no**. Recovered: yes, 0 s (pools not checked)." in md
+    expected = "Healthy before: **no**. Recovered: yes, 0 s (pools not checked)."
+    assert expected in md  # nosec B101 - pytest assertion
