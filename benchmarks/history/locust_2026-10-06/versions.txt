@@ -1,0 +1,1 @@
+3.12.14 django 6.0.8 asgiref 3.12.1 uvicorn 0.52.4 psycopg 3.3.5 pool 3.3.3 DEBUG False
