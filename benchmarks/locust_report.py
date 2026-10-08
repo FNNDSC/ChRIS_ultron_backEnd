@@ -46,7 +46,7 @@ def _users(path: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def _recovery(stats_path: str) -> "dict | None":
+def _recovery(stats_path: str) -> dict | None:
     """
     The step's ``<prefix>_recovery.json`` next to its ``<prefix>_stats.csv``, if any.
     """
@@ -57,7 +57,7 @@ def _recovery(stats_path: str) -> "dict | None":
         return None
 
 
-def _health_cells(rec: "dict | None") -> list[str]:
+def _health_cells(rec: dict | None) -> list[str]:
     """
     "Healthy before" and "Recovered" cells of a step.
     """
@@ -154,7 +154,7 @@ def render(csv_dir: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main(argv: "list[str] | None" = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
         print("usage: python -m benchmarks.locust_report <csv_dir> [out.md]")

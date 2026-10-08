@@ -27,7 +27,7 @@ ENVELOPE_KEYS = (
 )
 
 
-def collect_environment(docker: DockerClient, *, env: "os._Environ | dict | None" = None,
+def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
                         image_services: tuple[str, ...] = ("chris", "pfcon")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()

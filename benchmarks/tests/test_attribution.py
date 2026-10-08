@@ -3,6 +3,8 @@ Tests for the bottleneck-attribution instrumentation: broker queue depths and
 pg_stat_statements snapshots, and pg_stat_activity connection states.
 """
 
+import pytest
+
 from benchmarks.broker import BrokerClient, encode_command, parse_reply
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
@@ -22,8 +24,6 @@ def test_parse_reply_integer_and_simple_string():
 
 
 def test_parse_reply_rejects_errors():
-    import pytest
-
     with pytest.raises(ValueError):
         parse_reply(b"-ERR unknown command\r\n")
 

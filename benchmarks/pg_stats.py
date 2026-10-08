@@ -67,7 +67,7 @@ def parse_psql_rows(output: str, columns: tuple[str, ...]) -> list[dict]:
 
 
 def psql(docker: DockerClient, sql: str, *, service: str = "db",
-         env: Optional[dict] = None) -> "tuple[int, str]":
+         env: Optional[dict] = None) -> tuple[int, str]:
     """
     Run one statement with ``psql -At -F<tab>`` inside the db container, as its own
     ``POSTGRES_USER`` on its ``POSTGRES_DB`` (read from ``env``, else the container).
@@ -133,5 +133,5 @@ class PgStatStatements:
             return []
         return parse_psql_rows(out, ("calls", "total_ms", "mean_ms", "rows", "query"))
 
-    def _psql(self, sql: str) -> "tuple[int, str]":
+    def _psql(self, sql: str) -> tuple[int, str]:
         return psql(self._docker, sql, service=self._service, env=self._env)
