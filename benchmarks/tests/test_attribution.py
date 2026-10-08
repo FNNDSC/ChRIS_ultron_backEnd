@@ -1,12 +1,12 @@
 """
 Tests for the bottleneck-attribution instrumentation: broker queue depths and
-pg_stat_statements snapshots.
+pg_stat_statements snapshots, and pg_stat_activity connection states.
 """
 
 from benchmarks.broker import BrokerClient, encode_command, parse_reply
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
-from benchmarks.pg_stats import PgStatStatements, parse_psql_rows
+from benchmarks.pg_stats import PgStatStatements, connection_states, parse_psql_rows
 from benchmarks.stats_sampler import StatsSampler
 
 
@@ -112,3 +112,27 @@ def test_snapshot_limit_is_optional():
     PgStatStatements(docker).snapshot(limit=15)
 
     assert docker.sql[-1].endswith("ORDER BY total_exec_time DESC LIMIT 15")  # nosec B101 - pytest assertion
+
+
+def test_connection_states_counts_connections_by_client_and_state():
+    class ActivityDocker(FakeDbDocker):
+        def exec_in_service(self, service, cmd):
+            self.sql.append(cmd[-1])
+            return 0, "172.18.0.7\tidle\t40\nlocal\tactive\t1\n"
+
+    docker = ActivityDocker()
+    rows = connection_states(docker)
+
+    expected = [{"client_addr": "172.18.0.7", "state": "idle", "count": 40},
+                {"client_addr": "local", "state": "active", "count": 1}]
+
+    assert "pg_stat_activity" in docker.sql[-1]  # nosec B101 - pytest assertion
+    assert rows == expected  # nosec B101 - pytest assertion
+
+
+def test_connection_states_is_empty_when_psql_cannot_run():
+    class DownDocker(FakeDbDocker):
+        def exec_in_service(self, service, cmd):
+            return -1, "service 'db' not running"
+
+    assert connection_states(DownDocker()) == []  # nosec B101 - pytest assertion

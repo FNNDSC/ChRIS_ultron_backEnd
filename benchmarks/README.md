@@ -139,6 +139,18 @@ for u in 25 50 100 200 400; do
 done
 ```
 
+Each step also checks the API's health, so that a stack an overload left broken cannot pass
+for the next step's measurement. Before the step starts, and for up to
+`BENCH_LOCUST_RECOVERY_S` seconds after it ends (default 60; `0` disables both checks), the
+locustfile sends bursts of 16 concurrent `GET plugins/` requests, each on its own connection,
+which most likely reaches every `uvicorn` worker: a single request can be answered by the one
+healthy worker. The API counts as recovered once a burst succeeds and every worker's
+`db_pool_stats` log line reports no checked-out connection, which does make sure of every
+worker (see `CUBE_DB_POOL_STATS_INTERVAL` in [envelope.md](envelope.md)). The result,
+with every probe round and the database's connection states, goes to
+`<csv prefix>_recovery.json`, and Locust exits with code 3 when the API was unhealthy before
+the step or did not recover after it.
+
 Locust writes `*_stats.csv` / `*_failures.csv` to `benchmarks/results/locust/` (a plain run
 uses the `run_*` prefix). Render a human-readable summary — the control-plane counterpart of
 the data-plane `report.md` — with:
@@ -146,6 +158,9 @@ the data-plane `report.md` — with:
 ```bash
 python -m benchmarks.locust_report benchmarks/results/locust   # writes report.md there
 ```
+
+The report's sweep table then also says, for each step, whether the API was healthy before it
+and how long it took to recover after it.
 
 **Reading it:** throughput climbs to a peak then *collapses* past the knee while p95 spikes;
 a p95 pinned at `CUBE_DB_POOL_TIMEOUT` (10 s) with rising 5xx/401s is the signature of **DB
