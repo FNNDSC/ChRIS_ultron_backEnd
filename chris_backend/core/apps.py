@@ -51,4 +51,9 @@ class Core(AppConfig):
     name = 'core'
 
     def ready(self):
+        from .middleware import backport_thread_sensitive_error_responses
+
         post_migrate.connect(setup_chris, sender=self)
+
+        # before any ASGI handler builds its middleware chain
+        backport_thread_sensitive_error_responses()

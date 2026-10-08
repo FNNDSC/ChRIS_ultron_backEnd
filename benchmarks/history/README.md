@@ -200,8 +200,8 @@ just bench-run --tier full --topology fanout_fanin --axis feeds --cap 16 --repea
 just bench-compose 'restart pfcon'        # or: pause/unpause, stop/start
 
 # Control plane, fresh then aged (the aged sweep needs the aging series to have run first).
-# From 100 users up the pools do not recover after a step; restart chris between steps, or the
-# later steps measure a broken stack.
+# On 2026-09-17 the pools did not recover after a step from 100 users up, so chris had to be
+# restarted between steps; since the fix (locust_2026-10-06) each step checks it by itself.
 for u in 25 50 100 200 400; do just bench-locust "-u $u -r $u -t 90s --csv /app/benchmarks/results/locust/read_u$u"; done
 BENCH_LOCUST_WRITE=1 just bench-locust '-u 10 -r 5 -t 60s --csv /app/benchmarks/results/locust/write_u10'
 ```
@@ -212,6 +212,26 @@ BENCH_LOCUST_WRITE=1 ...`. `docker-compose.benchmark.yml` passes the variable th
 2026-09-18. Scenario `pg_stats.json` files of these runs hold only the 15 most expensive statements;
 the harness keeps all of them since the same date. The compose service is `pfcon`; `pfcon.remote`
 is only its network alias.
+
+## Pool-leak fix, `DEBUG` off — 2026-10-06
+
+The fix for the API's database pools staying exhausted after an overload (REPORT.md § 14). From
+here on the benchmark runs with `DEBUG` off (`CUBE_DEBUG`, see [`../envelope.md`](../envelope.md)),
+so `bench-compare` flags `envelope.CUBE_DEBUG` against every earlier run. The two data-plane runs
+that issue 1 compares against were repeated at the new envelope:
+
+| Run | Command (`just bench-run --tier ...`) | Result |
+|---|---|---|
+| `2026-10-07T002040Z` | `full --topology linear --axis file_count --cap 100000 --repeat 1 --restart-on-fail` | PASS; 100k 1,731 s (041540Z: 1,766 s) |
+| `2026-10-07T005703Z` | `full --topology diamond --axis layers --cap 8 --repeat 1 --restart-on-fail` | PASS; 12.5 / 19.2 / 41.0 / **2,906 s** (072731Z: 3,260 s) |
+
+[`locust_2026-10-06/`](locust_2026-10-06) holds the Locust runs:
+`sweep/` is the read sweep 25–400 users on a fresh stack with no restarts between steps, each
+step with its `*_recovery.json` (healthy before, recovered after, every worker's pool back to no
+checked-out connection) and `pool_after_u400.txt` (three minutes of probes after the last
+step); `howto/` is the issue's single 100-user step followed by three minutes of probes;
+`aeb4b94/` is the same 100- and 400-user steps on the pre-upgrade commit built with the June
+package versions (`versions.txt`), which does not recover after 400 users either.
 
 ## Regenerating the archive
 

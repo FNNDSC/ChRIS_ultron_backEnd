@@ -1,0 +1,1 @@
+3.12.11 django 5.2.9 asgiref 3.11.1 uvicorn 0.38.0 psycopg 3.3.4 pool 3.3.1 drf 3.16.1

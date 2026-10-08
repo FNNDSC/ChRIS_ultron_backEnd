@@ -15,6 +15,9 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from django.core.asgi import get_asgi_application
 django_asgi_app = get_asgi_application()
 
+from django.conf import settings
+
+from core.utils import start_db_pool_stats_logger
 from core.websockets.urls import websocket_urlpatterns
 from core.websockets.auth import TokenQsAuthMiddleware
 
@@ -24,6 +27,8 @@ from channels.security.websocket import AllowedHostsOriginValidator
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
 
+# one thread per worker process, and only when the settings ask for it (the benchmark)
+start_db_pool_stats_logger(settings.DB_POOL_STATS_INTERVAL)
 
 # see https://channels.readthedocs.io/en/3.x/installation.html
 application = ProtocolTypeRouter({

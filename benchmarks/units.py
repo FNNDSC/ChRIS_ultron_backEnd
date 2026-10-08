@@ -21,7 +21,7 @@ _UNIT_BYTES = {
 _SIZE_RE = re.compile(r"^\s*([0-9]*\.?[0-9]+)\s*([a-zA-Z]*)\s*$")
 
 
-def parse_size(size: "str | int | float") -> int:
+def parse_size(size: str | int | float) -> int:
     """
     Parse a human size into an integer number of bytes.
 
@@ -46,7 +46,7 @@ def parse_size(size: "str | int | float") -> int:
     return int(float(number) * _UNIT_BYTES[unit])
 
 
-def to_dbg_params(file_count: int, file_size: "str | int") -> dict:
+def to_dbg_params(file_count: int, file_size: str | int) -> dict:
     """
     Map (file_count, file_size) to dbg-bigfiles ``{total, size}`` byte strings.
 

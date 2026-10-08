@@ -30,6 +30,7 @@ from .models import (BreakingPoint, Classification, LevelResult, PluginRole,
 from .poller import ProgressProbe, poll_to_completion
 from .recovery import recover_after_failure, wait_for_health, wait_for_quiescence
 from .results import ResultsStore, default_results_root
+from .stats_sampler import StatsSampler
 from .units import parse_size
 
 
@@ -90,8 +91,6 @@ class BenchmarkRunner:
                                     topology, axis, level, repeat_index)
 
     def run_scenario(self, params: ScenarioParams) -> ScenarioResult:
-        from .stats_sampler import StatsSampler
-
         self._sink = MetricSink()                      # isolate this scenario's events
         topo = topologies.build(params.topology, params)
         before_counts = self._global_counts()

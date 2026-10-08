@@ -23,11 +23,11 @@ from .metrics import percentile
 ENVELOPE_KEYS = (
     "CUBE_CELERY_POLL_INTERVAL", "CUBE_UVICORN_WORKERS", "CUBE_DB_POOL_MIN_SIZE",
     "CUBE_DB_POOL_MAX_SIZE", "CUBE_DB_POOL_TIMEOUT", "CUBE_DB_MAX_CONNECTIONS",
-    "CUBE_WORKER_MAINS_CONCURRENCY", "PFCON_WORKERS", "STORAGE_ENV",
+    "CUBE_WORKER_MAINS_CONCURRENCY", "PFCON_WORKERS", "STORAGE_ENV", "CUBE_DEBUG",
 )
 
 
-def collect_environment(docker: DockerClient, *, env: "os._Environ | dict | None" = None,
+def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
                         image_services: tuple[str, ...] = ("chris", "pfcon")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()

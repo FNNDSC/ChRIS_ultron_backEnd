@@ -20,6 +20,9 @@ services:
       CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DEBUG: "${CUBE_DEBUG:-false}"
+      # one db_pool_stats log line per uvicorn worker every N seconds (0 disables)
+      CUBE_DB_POOL_STATS_INTERVAL: "${CUBE_DB_POOL_STATS_INTERVAL:-5}"
 
   worker-mains:
     command: celery -A core worker -c ${CUBE_WORKER_MAINS_CONCURRENCY:-4} -l info -Q main1,main2
@@ -31,6 +34,7 @@ services:
       CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DEBUG: "${CUBE_DEBUG:-false}"
 
   worker-periodic:
     environment:
@@ -39,6 +43,7 @@ services:
       CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DEBUG: "${CUBE_DEBUG:-false}"
 
   celery-scheduler:
     environment:
@@ -47,6 +52,7 @@ services:
       CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DEBUG: "${CUBE_DEBUG:-false}"
 
   db:
     # pg_stat_statements gives the harness per-scenario query attribution
@@ -77,12 +83,17 @@ services:
       STORAGE_ENV: "fslink"
       # opt-in create task for the Locust run: BENCH_LOCUST_WRITE=1 just bench-locust '...'
       BENCH_LOCUST_WRITE: "${BENCH_LOCUST_WRITE:-}"
+      # how long to probe the API for recovery after each Locust step (0 disables this and
+      # the health check before the step); the probe also reads chris's db_pool_stats lines
+      BENCH_LOCUST_RECOVERY_S: "${BENCH_LOCUST_RECOVERY_S:-60}"
+      CUBE_DB_POOL_STATS_INTERVAL: "${CUBE_DB_POOL_STATS_INTERVAL:-5}"
       # recorded envelope knobs (kept in sync with the service overrides above)
       CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
       CUBE_UVICORN_WORKERS: "${CUBE_UVICORN_WORKERS:-4}"
       CUBE_DB_POOL_MIN_SIZE: "${CUBE_DB_POOL_MIN_SIZE:-2}"
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
+      CUBE_DEBUG: "${CUBE_DEBUG:-false}"
       CUBE_DB_MAX_CONNECTIONS: "${CUBE_DB_MAX_CONNECTIONS:-300}"
       CUBE_WORKER_MAINS_CONCURRENCY: "${CUBE_WORKER_MAINS_CONCURRENCY:-4}"
       PFCON_WORKERS: "${PFCON_WORKERS:-8}"
