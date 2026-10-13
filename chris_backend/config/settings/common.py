@@ -127,6 +127,10 @@ DATABASES = {
     }
 }
 
+# Seconds between the log lines that report each ASGI worker's database connection pool
+# counters (core.utils.start_db_pool_stats_logger, started by config/asgi.py); 0 is off.
+DB_POOL_STATS_INTERVAL = 0
+
 # QIDO-RS fuzzy Person-Name matching (PS3.18 §8.3.4.2 / PS3.4 §C.2.2.2.1.1).
 # Backed by pg_trgm's '%' similarity operator; this value is applied as the
 # session GUC pg_trgm.similarity_threshold per DB connection (see the DATABASES

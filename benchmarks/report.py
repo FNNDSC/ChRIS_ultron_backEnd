@@ -8,6 +8,9 @@ and per-axis approach-to-failure curves (also available as tidy CSV).
 
 from __future__ import annotations
 
+import argparse
+import json
+from pathlib import Path
 from typing import Iterable
 
 
@@ -181,7 +184,7 @@ def _environment_section(env: dict) -> list[str]:
 
 # -- helpers (shared with ``compare``) ---------------------------------------------------
 
-def markdown_table(headers: "list[str]", rows: "list[list]") -> list[str]:
+def markdown_table(headers: list[str], rows: list[list]) -> list[str]:
     """
     A GFM table as a list of lines; ``None`` cells render as an em dash, and pipes
     and newlines in cell values are escaped so they cannot break the table.
@@ -236,10 +239,6 @@ def _group_by_axis(levels: Iterable[dict]) -> dict[tuple[str, str], list[dict]]:
 
 def main(argv: list[str] | None = None) -> int:
     """Re-render report.md + levels.csv from a results run directory (for `bench-report`)."""
-    import argparse
-    import json
-    from pathlib import Path
-
     ap = argparse.ArgumentParser(description="Re-render a benchmark report")
     ap.add_argument("run_dir", help="path to results/<run_id>")
     args = ap.parse_args(argv)

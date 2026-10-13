@@ -9,6 +9,7 @@ the Docker API works too.
 from __future__ import annotations
 
 import contextlib
+import time
 from typing import Optional
 
 from .models import ResourceSample
@@ -74,8 +75,6 @@ class DockerClient:
     # -- sampling --------------------------------------------------------------------
 
     def sample(self, container) -> ResourceSample:
-        import time
-
         stats = container.stats(stream=False)
         kind = "job" if self.job_label.split("=")[0] in container.labels else "service"
         mem = stats.get("memory_stats", {})
@@ -95,9 +94,13 @@ class DockerClient:
 
     # -- ops -------------------------------------------------------------------------
 
-    def logs(self, container, tail: int = 200) -> str:
+    def logs(self, container, tail: int | str = 200, since: Optional[float] = None) -> str:
+        """
+        The container's last ``tail`` log lines (``"all"`` for every one), only those
+        written after the epoch time ``since`` when given.
+        """
         try:
-            return container.logs(tail=tail).decode("utf-8", "replace")
+            return container.logs(tail=tail, since=since).decode("utf-8", "replace")
         except Exception as exc:                       # noqa: BLE001 - best effort
             return f"<could not read logs: {exc}>"
 
@@ -109,7 +112,7 @@ class DockerClient:
                 removed += 1
         return removed
 
-    def exec_in_service(self, service: str, cmd: list) -> "tuple[int, str]":
+    def exec_in_service(self, service: str, cmd: list) -> tuple[int, str]:
         """
         Run a command inside a service container; (-1, reason) when unavailable.
         """
@@ -131,6 +134,7 @@ class DockerClient:
         container = self.find_service(service)
         if container is None:
             return {}
+
         env = container.attrs.get("Config", {}).get("Env", []) or []
         return dict(item.split("=", 1) for item in env if "=" in item)
 

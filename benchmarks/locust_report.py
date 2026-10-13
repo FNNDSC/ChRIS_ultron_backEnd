@@ -4,7 +4,9 @@ Render Locust control-plane CSVs into a human-readable RED report (pure transfor
 The data-plane equivalent is ``report.py``; this is its control-plane counterpart. It reads
 the CSVs Locust writes with ``--csv`` (``read_u<N>_stats.csv`` saturation sweep,
 ``write_*_stats.csv`` per-endpoint, ``*_failures.csv``) and emits a Markdown summary —
-RED = Rate, Errors, Duration percentiles.
+RED = Rate, Errors, Duration percentiles. When the steps have ``*_recovery.json`` files
+(written by the locustfile), it also says whether the API was healthy before each step
+and whether it recovered after it.
 
     python -m benchmarks.locust_report <csv_dir> [out.md]      # default out: <csv_dir>/report.md
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import glob
+import json
 import os
 import re
 import sys
@@ -43,6 +46,33 @@ def _users(path: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def _recovery(stats_path: str) -> dict | None:
+    """
+    The step's ``<prefix>_recovery.json`` next to its ``<prefix>_stats.csv``, if any.
+    """
+    try:
+        with open(stats_path[:-len("_stats.csv")] + "_recovery.json") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def _health_cells(rec: dict | None) -> list[str]:
+    """
+    "Healthy before" and "Recovered" cells of a step.
+    """
+    if rec is None:
+        return ["?", "?"]
+
+    before = "yes" if rec.get("healthy_at_start") else "**no**"
+    after = (f"yes, {rec.get('seconds') or 0:.0f} s" if rec.get("recovered")
+             else "**no**")
+
+    if not rec.get("pools_checked"):
+        after += " (pools not checked)"
+    return [before, after]
+
+
 def render(csv_dir: str) -> str:
     lines = [
         "# CUBE Control-Plane RED — Locust Report",
@@ -51,22 +81,36 @@ def render(csv_dir: str) -> str:
         "Pair with the data-plane per-run `report.md` files for the full picture._",
         "",
     ]
-
     reads = sorted(glob.glob(os.path.join(csv_dir, "read_u*_stats.csv")), key=_users)
+    
     if reads:
+        recoveries = [_recovery(p) for p in reads]
+        health = any(r is not None for r in recoveries)
+        header = "| Users | Requests | Failures | Fail % | RPS | p50 (ms) | p95 (ms) | p99 (ms) |"
         lines += ["## Read-only saturation sweep", "",
-                  "| Users | Requests | Failures | Fail % | RPS | p50 (ms) | p95 (ms) | p99 (ms) |",
-                  "|---|---|---|---|---|---|---|---|"]
-        for p in reads:
+                  header + (" Healthy before | Recovered |" if health else ""),
+                  "|---" * (8 + 2 * health) + "|"]
+
+        for p, rec in zip(reads, recoveries):
             a = _agg(p)
             u = _users(p)
             rc = int(_f(a.get("Request Count")))
             fc = int(_f(a.get("Failure Count")))
-            lines.append(
-                f"| {u} | {rc} | {fc} | {(100 * fc / rc if rc else 0):.1f}% | "
-                f"{_f(a.get('Requests/s')):.0f} | {a.get('50%', '?')} | "
-                f"{a.get('95%', '?')} | {a.get('99%', '?')} |")
+            row = (f"| {u} | {rc} | {fc} | {(100 * fc / rc if rc else 0):.1f}% | "
+                   f"{_f(a.get('Requests/s')):.0f} | {a.get('50%', '?')} | "
+                   f"{a.get('95%', '?')} | {a.get('99%', '?')} |")
+            
+            if health:
+                row += "".join(f" {c} |" for c in _health_cells(rec))
+            lines.append(row)
+
         lines.append("")
+        
+        if health:
+            lines += ["_Healthy before: the API answered a burst of probes before the step "
+                      "started. Recovered: seconds after the step until it did again, with "
+                      "every API worker's pool back to no checked-out connections. A step "
+                      "that started on an unhealthy stack measured a broken stack._", ""]
 
     # every non-sweep *_stats.csv (the recipe's default `run`, write runs, ad-hoc) rendered
     # as a per-endpoint table so a plain `just bench-locust …` still produces a real report
@@ -79,20 +123,30 @@ def render(csv_dir: str) -> str:
         lines += [f"## {labels.get(stem, f'Run: `{stem}`')}", "",
                   "| Endpoint | Requests | Failures | p50 (ms) | p95 (ms) |",
                   "|---|---|---|---|---|"]
+        
         for r in _rows(wp):
             lines.append(f"| {r.get('Name')} | {r.get('Request Count')} | "
                          f"{r.get('Failure Count')} | {r.get('50%', '?')} | "
                          f"{r.get('95%', '?')} |")
+        
         lines.append("")
+        
+        rec = _recovery(wp)
+        if rec is not None:
+            before, after = _health_cells(rec)
+            lines += [f"Healthy before: {before}. Recovered: {after}.", ""]
 
     fails = sorted(glob.glob(os.path.join(csv_dir, "read_u*_failures.csv")), key=_users)
+    
     if fails:
         fp = fails[-1]
         rows = [r for r in _rows(fp) if r.get("Error")]
+
         if rows:
             rows.sort(key=lambda r: -int(_f(r.get("Occurrences"))))
             lines += [f"## Top failures ({os.path.basename(fp)})", "",
                       "| Occurrences | Endpoint | Error |", "|---|---|---|"]
+            
             for r in rows[:8]:
                 lines.append(f"| {r.get('Occurrences')} | {r.get('Name')} | {r.get('Error')} |")
             lines.append("")
@@ -100,13 +154,15 @@ def render(csv_dir: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main(argv: "list[str] | None" = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
         print("usage: python -m benchmarks.locust_report <csv_dir> [out.md]")
         return 2
+
     csv_dir = argv[0]
     out = argv[1] if len(argv) > 1 else os.path.join(csv_dir, "report.md")
+    
     with open(out, "w") as fh:
         fh.write(render(csv_dir))
     print(f"wrote {out}")

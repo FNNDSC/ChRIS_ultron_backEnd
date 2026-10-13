@@ -2,6 +2,8 @@
 Tests for the Locust control-plane report renderer (pure CSV -> Markdown transform).
 """
 
+import json
+
 from benchmarks.locust_report import _agg, _f, _users, render
 
 STATS_HEADER = "Type,Name,Request Count,Failure Count,Requests/s,50%,95%,99%\n"
@@ -84,3 +86,43 @@ def test_empty_dir_is_header_only(tmp_path):
     md = render(str(tmp_path))
     assert md.startswith("# CUBE Control-Plane RED")
     assert "## Read-only saturation sweep" not in md and "## Top failures" not in md
+
+
+def _write_recovery(path, healthy_at_start, recovered, seconds=None, pools_checked=True):
+    with open(path, "w") as fh:
+        json.dump({"healthy_at_start": healthy_at_start, "recovered": recovered,
+                   "seconds": seconds, "pools_checked": pools_checked}, fh)
+
+
+def test_sweep_says_whether_each_step_started_healthy_and_recovered(tmp_path):
+    _write_stats(tmp_path / "read_u100_stats.csv", [("Aggregated", 900, 9, 10, 1, 2, 3)])
+    _write_stats(tmp_path / "read_u200_stats.csv", [("Aggregated", 900, 9, 10, 1, 2, 3)])
+    _write_stats(tmp_path / "read_u400_stats.csv", [("Aggregated", 900, 9, 10, 1, 2, 3)])
+    _write_recovery(tmp_path / "read_u100_recovery.json", True, True, 6.2)
+    _write_recovery(tmp_path / "read_u200_recovery.json", True, False)
+    md = render(str(tmp_path))
+
+    stats = "900 | 9 | 1.0% | 10 | 1 | 2 | 3"
+    assert "| Healthy before | Recovered |" in md  # nosec B101 - pytest assertion
+    assert f"| 100 | {stats} | yes | yes, 6 s |" in md  # nosec B101 - pytest assertion
+    assert f"| 200 | {stats} | yes | **no** |" in md  # nosec B101 - pytest assertion
+    # the 400-user step has no recovery file
+    assert f"| 400 | {stats} | ? | ? |" in md  # nosec B101 - pytest assertion
+
+
+def test_sweep_without_recovery_files_keeps_its_columns(tmp_path):
+    # archives recorded before the recovery check render as they always did
+    _write_stats(tmp_path / "read_u25_stats.csv", [("Aggregated", 500, 0, 67, 22, 61, 190)])
+    md = render(str(tmp_path))
+
+    assert "Recovered" not in md  # nosec B101 - pytest assertion
+    assert "| 25 | 500 | 0 | 0.0% | 67 | 22 | 61 | 190 |\n" in md  # nosec B101 - pytest assertion
+
+
+def test_recovery_without_pool_counters_is_flagged(tmp_path):
+    _write_stats(tmp_path / "run_stats.csv", [("Aggregated", 97, 0, 1, 62, 140, 150)])
+    _write_recovery(tmp_path / "run_recovery.json", False, True, 0, pools_checked=False)
+    md = render(str(tmp_path))
+
+    expected = "Healthy before: **no**. Recovered: yes, 0 s (pools not checked)."
+    assert expected in md  # nosec B101 - pytest assertion

@@ -23,7 +23,7 @@ from .models import QueueSample
 
 class StatsSampler:
     def __init__(self, docker: DockerClient, sink: MetricSink, interval: float = 2.0,
-                 broker: "BrokerClient | None" = None):
+                 broker: BrokerClient | None = None):
         self._docker = docker
         self._sink = sink
         self._broker = broker
@@ -31,7 +31,7 @@ class StatsSampler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
-    def start(self) -> "StatsSampler":
+    def start(self) -> StatsSampler:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="stats-sampler",
                                         daemon=True)
@@ -44,7 +44,7 @@ class StatsSampler:
             self._thread.join(timeout=self._interval + 5)
             self._thread = None
 
-    def __enter__(self) -> "StatsSampler":
+    def __enter__(self) -> StatsSampler:
         return self.start()
 
     def __exit__(self, *exc) -> None:

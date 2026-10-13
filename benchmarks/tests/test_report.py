@@ -2,7 +2,7 @@
 Tests for benchmarks.report — Markdown/CSV rendering of a run.
 """
 
-from benchmarks.report import csv_cell, markdown_table, render, render_levels_csv
+from benchmarks.report import _human_bytes, csv_cell, markdown_table, render, render_levels_csv
 
 
 # -- fixtures --------------------------------------------------------------------------
@@ -54,7 +54,6 @@ def test_peak_io_note_skips_zero_write_services():
 
 
 def test_human_bytes_unit_boundaries():
-    from benchmarks.report import _human_bytes
     assert _human_bytes(0) == "0 B"
     assert _human_bytes(512) == "512 B"
     assert _human_bytes(2048) == "2.0 KiB"

@@ -10,6 +10,10 @@ Runs ``psql`` *inside* the db container via the Docker socket (no client-side
 postgres dependency); credentials come from the container's own ``POSTGRES_*`` env.
 Requires ``shared_preload_libraries=pg_stat_statements`` — the benchmark compose sets
 it — and degrades to unavailable (with the reason recorded once) otherwise.
+
+``connection_states`` uses the same access for ``pg_stat_activity``: how many connections
+each client holds and in which state, which tells idle pooled connections apart from ones
+left ``idle in transaction``.
 """
 
 from __future__ import annotations
@@ -26,6 +30,13 @@ STATEMENTS_SQL = (
     "FROM pg_stat_statements "
     "WHERE query NOT ILIKE '%pg_stat_statements%' "
     "ORDER BY total_exec_time DESC"
+)
+
+CONNECTION_STATES_SQL = (
+    "SELECT coalesce(host(client_addr), 'local'), coalesce(state, 'unknown'), count(*) "
+    "FROM pg_stat_activity "
+    "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+    "GROUP BY 1, 2 ORDER BY 1, 2"
 )
 
 
@@ -55,6 +66,30 @@ def parse_psql_rows(output: str, columns: tuple[str, ...]) -> list[dict]:
     return rows
 
 
+def psql(docker: DockerClient, sql: str, *, service: str = "db",
+         env: Optional[dict] = None) -> tuple[int, str]:
+    """
+    Run one statement with ``psql -At -F<tab>`` inside the db container, as its own
+    ``POSTGRES_USER`` on its ``POSTGRES_DB`` (read from ``env``, else the container).
+    """
+    env = docker.service_env(service) if env is None else env
+
+    return docker.exec_in_service(
+        service, ["psql", "-U", env.get("POSTGRES_USER", "chris"),
+                  "-d", env.get("POSTGRES_DB", "chris_dev"), "-At", "-F", "\t", "-c", sql])
+
+
+def connection_states(docker: DockerClient, service: str = "db") -> list[dict]:
+    """
+    Connections to the database by client address and state; [] when psql cannot run.
+    """
+    code, out = psql(docker, CONNECTION_STATES_SQL, service=service)
+
+    if code != 0:
+        return []
+    return parse_psql_rows(out, ("client_addr", "state", "count"))
+
+
 class PgStatStatements:
     """
     Reset/snapshot interface over the db container; no-op when unavailable.
@@ -65,10 +100,7 @@ class PgStatStatements:
         self._service = service
         self.unavailable_reason: Optional[str] = None
 
-        env = docker.service_env(service)
-
-        self._user = env.get("POSTGRES_USER", "chris")
-        self._db = env.get("POSTGRES_DB", "chris_dev")
+        self._env = docker.service_env(service)
         
         code, out = self._psql("CREATE EXTENSION IF NOT EXISTS pg_stat_statements")
         
@@ -101,7 +133,5 @@ class PgStatStatements:
             return []
         return parse_psql_rows(out, ("calls", "total_ms", "mean_ms", "rows", "query"))
 
-    def _psql(self, sql: str) -> "tuple[int, str]":
-        return self._docker.exec_in_service(
-            self._service, ["psql", "-U", self._user, "-d", self._db,
-                            "-At", "-F", "\t", "-c", sql])
+    def _psql(self, sql: str) -> tuple[int, str]:
+        return psql(self._docker, sql, service=self._service, env=self._env)

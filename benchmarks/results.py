@@ -51,7 +51,7 @@ def to_json(obj: Any, *, indent: int | None = 2) -> str:
 
 
 class ResultsStore:
-    def __init__(self, root: "str | Path", run_id: str | None = None):
+    def __init__(self, root: str | Path, run_id: str | None = None):
         self.run_id = run_id or new_run_id()
         self.run_dir = Path(root) / self.run_id
         (self.run_dir / "scenarios").mkdir(parents=True, exist_ok=True)
@@ -110,14 +110,14 @@ def history_root() -> Path:
     return Path(__file__).with_name("history")
 
 
-def is_run_dir(path: "str | Path") -> bool:
+def is_run_dir(path: str | Path) -> bool:
     """
     A run directory is any directory containing a ``summary.json``.
     """
     return (Path(path) / "summary.json").is_file()
 
 
-def resolve_run(token: str, roots: "tuple[Path, ...] | None" = None) -> Path:
+def resolve_run(token: str, roots: tuple[Path, ...] | None = None) -> Path:
     """
     Resolve a run-directory path or a bare run id against the given roots
     (default: live results, then the committed history archive).
@@ -137,7 +137,7 @@ def resolve_run(token: str, roots: "tuple[Path, ...] | None" = None) -> Path:
 
 # -- read-only loading ------------------------------------------------------------------
 
-def load_run(run_dir: "str | Path") -> RunData:
+def load_run(run_dir: str | Path) -> RunData:
     """
     Load a persisted run. ``summary.json`` is required; environment and levels
     degrade to empty defaults so older or partial runs still load (the comparator
@@ -163,7 +163,7 @@ def load_run(run_dir: "str | Path") -> RunData:
                    environment=environment, summary=summary, levels=levels)
 
 
-def find_runs(*roots: "str | Path") -> list[Path]:
+def find_runs(*roots: str | Path) -> list[Path]:
     """
     Run directories (those containing a ``summary.json``) under the given roots,
     newest first — run ids are UTC timestamps, so name order is time order.
