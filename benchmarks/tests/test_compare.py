@@ -90,6 +90,71 @@ def test_commit_difference_is_informational():
     assert any(d.field == "git.commit" and d.severity == "info" for d in c.diffs)
 
 
+def _pg(**settings):
+    return {"settings": {"shared_buffers": "128MB", "TimeZone": "Etc/UTC", **settings},
+            "altered": [], "table_options": {"core_chrisfile": []}}
+
+
+def test_postgres_setting_difference_is_a_caution():
+    c = check_comparability(_env(postgres=_pg()),
+                            _env(postgres=_pg(shared_buffers="1GB", TimeZone="UTC")))
+    by_field = {d.field: d for d in c.diffs}
+
+    assert c.status == "caution"  # nosec B101 - pytest assertion
+    assert by_field["postgres.shared_buffers"].candidate == "1GB"  # nosec B101 - pytest assertion
+    assert by_field["postgres.TimeZone"].severity == "warning"  # nosec B101 - pytest assertion
+
+
+def test_unrecorded_postgres_settings_give_a_single_caution():
+    # a run from before the settings were recorded: one caution, not one per setting
+    c = check_comparability(_env(), _env(postgres=_pg()))
+    pg = [d for d in c.diffs if d.field.startswith("postgres")]
+
+    assert c.status == "caution"  # nosec B101 - pytest assertion
+    assert [(d.field, d.baseline, d.candidate) for d in pg] == [  # nosec B101 - pytest assertion
+        ("postgres", "not recorded", "recorded")]
+
+
+def test_table_options_and_alter_system_overrides_are_cautions():
+    altered = dict(_pg(), altered=["work_mem"],
+                   table_options={"core_chrisfile": ["autovacuum_vacuum_scale_factor=0.02"]})
+    fields = {d.field for d in check_comparability(_env(postgres=_pg()),
+                                                   _env(postgres=altered)).diffs}
+
+    assert "postgres.altered" in fields  # nosec B101 - pytest assertion
+    assert "postgres.table_options.core_chrisfile" in fields  # nosec B101 - pytest assertion
+
+
+def _limits(shm):
+    return {"db": {"cpus": 2.0, "mem_limit": 4294967296, "memswap_limit": None,
+                   "shm_size": shm}}
+
+
+def test_container_limit_difference_is_a_caution():
+    c = check_comparability(_env(limits=_limits(67108864)),
+                            _env(limits=_limits(1073741824)))
+    shm = [d for d in c.diffs if d.field == "limits.db.shm_size"]
+
+    assert c.status == "caution"  # nosec B101 - pytest assertion
+    changes = [(d.baseline, d.candidate) for d in shm]
+    assert changes == [(67108864, 1073741824)]  # nosec B101 - pytest assertion
+
+
+def test_unrecorded_limits_give_a_single_caution():
+    fields = [d.field for d in check_comparability(_env(), _env(limits=_limits(1))).diffs]
+
+    assert fields == ["limits"]  # nosec B101 - pytest assertion
+
+
+def test_db_image_difference_is_informational():
+    c = check_comparability(_env(images={"db": {"image_id": "sha256:a"}}),
+                            _env(images={"db": {"image_id": "sha256:b"}}))
+
+    assert c.status == "comparable"  # nosec B101 - pytest assertion
+    severities = [d.severity for d in c.diffs if d.field == "images.db"]
+    assert severities == ["info"]  # nosec B101 - pytest assertion
+
+
 # -- delta classification ------------------------------------------------------------------
 
 def test_sub_floor_change_is_unchanged_despite_large_percent():
@@ -248,6 +313,14 @@ def test_trend_tables_track_metric_across_runs():
     assert rows[-1] == ["breaking point", None, None, 4]
 
 
+def test_trend_tables_follow_a_dotted_metric_into_nested_values():
+    runs = [_run(rid, [dict(_lvl(level=8), peak_write_bytes={"db": written})])
+            for rid, written in (("A", 300), ("B", 200), ("C", 100))]
+    (_, _, rows), = trend_tables(runs, "peak_write_bytes.db")
+
+    assert rows[0] == [8, 300, 200, 100]  # nosec B101 - pytest assertion
+
+
 # -- CLI ---------------------------------------------------------------------------------
 
 def _write_run(root, run_id, levels, breaking_points=(), env=None):
@@ -305,6 +378,67 @@ def test_main_renders_trend_for_three_runs(tmp_path):
     md = (out / "compare.md").read_text()
     assert "## Trend — makespan_median_s across 3 runs" in md
     assert "| Level | A | B | C |" in md
+
+
+def test_trend_tables_reach_per_process_type_counters_and_tolerate_scalars():
+    io_key = "io_write_bytes:relation:client_backend"
+    runs = [_run(rid, [dict(_lvl(), db_counters={"workload": {io_key: n}})])
+            for n, rid in ((10, "A"), (20, "B"))]
+    (_, _, rows), = trend_tables(runs, f"db_counters.workload.{io_key}")
+
+    assert rows[0] == [1, 10, 20]  # nosec B101 - pytest assertion
+
+    # a path through a scalar finds nothing rather than failing
+    (_, _, rows), = trend_tables(runs, "makespan_median_s.x")
+    assert rows[0] == [1, None, None]  # nosec B101 - pytest assertion
+
+
+def test_main_renders_a_two_run_trend_for_an_explicit_metric(tmp_path):
+    paths = [_write_run(tmp_path, rid, [dict(_lvl(), peak_write_bytes={"db": written})])
+             for rid, written in (("A", 300), ("B", 200))]
+    out = tmp_path / "cmp"
+
+    assert main([str(p) for p in paths]  # nosec B101 - pytest assertion
+                + ["--out", str(out), "--metric", "peak_write_bytes.db"]) == 0
+    md = (out / "compare.md").read_text()
+    assert "## Trend — peak_write_bytes.db across 2 runs" in md  # nosec B101 - pytest assertion
+    assert "| 1 | 300 | 200 |" in md  # nosec B101 - pytest assertion
+
+    # without --metric two runs keep the short report
+    assert main([str(p) for p in paths] + ["--out", str(out)]) == 0  # nosec B101 - pytest assertion
+    assert "## Trend" not in (out / "compare.md").read_text()  # nosec B101 - pytest assertion
+
+
+def test_render_markdown_shows_whole_run_counters_side_by_side():
+    base = _run("A", [_lvl()])
+    base.summary["db_counters"] = {"run": {"num_requested": 17, "wal_bytes": 1000}}
+    cand = _run("B", [_lvl()])
+    cand.summary["db_counters"] = {"run": {"reset": True, "cgroup_oom_kill": 1}}
+    md = render_markdown(compare_runs(base, cand))
+
+    assert "## Postgres over the whole run" in md  # nosec B101 - pytest assertion
+    assert "| num_requested | 17 | — | — |" in md  # nosec B101 - pytest assertion
+    assert "| reset | — | True | — |" in md  # nosec B101 - pytest assertion
+    assert "| cgroup_oom_kill | — | 1 | — |" in md  # nosec B101 - pytest assertion
+
+
+def test_render_markdown_omits_run_counters_for_older_runs():
+    md = render_markdown(compare_runs(_run("A", [_lvl()]), _run("B", [_lvl()])))
+
+    assert "Postgres over the whole run" not in md  # nosec B101 - pytest assertion
+
+
+def test_main_trend_accepts_a_dotted_metric(tmp_path):
+    paths = [_write_run(tmp_path, rid,
+                        [dict(_lvl(), db_counters={"workload": {"num_requested": n}})])
+             for n, rid in enumerate(("A", "B", "C"))]
+    out = tmp_path / "cmp"
+
+    assert main([str(p) for p in paths]  # nosec B101 - pytest assertion
+                + ["--out", str(out), "--metric", "db_counters.workload.num_requested"]) == 0
+    md = (out / "compare.md").read_text()
+    assert "| 1 | 0 | 1 | 2 |" in md  # nosec B101 - pytest assertion
+    assert "not found" not in md  # nosec B101 - pytest assertion
 
 
 def test_render_markdown_echoes_policy_thresholds():

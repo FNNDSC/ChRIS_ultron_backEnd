@@ -1,8 +1,10 @@
 # Benchmark Resource Envelope
 
 A breaking point is only reproducible relative to a **fixed, recorded resource envelope**.
-`docker-compose.benchmark.yml` pins one and restores a production-like `uvicorn` runtime;
-every value below is also written into each run's `environment.json` and `report.md`.
+`docker-compose.benchmark.yml` pins one and restores a production-like `uvicorn` runtime.
+Every value below is also written into each run's `environment.json` and `report.md`: the
+CPU and memory limits as each container's limits were actually applied (`limits`), the other
+knobs as the environment variables gave them (`envelope`).
 
 The dev defaults deliberately throttle CUBE (single `uvicorn` worker, DB pool `max_size: 2`).
 The benchmark instead sets explicit, production-like values via `config/settings/benchmark.py`
@@ -21,6 +23,7 @@ artificial dev cap.
 | `CUBE_DB_POOL_MAX_SIZE` | `10` | psycopg pool `max_size` (per process) |
 | `CUBE_DB_POOL_TIMEOUT` | `10` | psycopg pool acquire timeout (s) |
 | `CUBE_DB_MAX_CONNECTIONS` | `300` | Postgres `max_connections` (must cover all process pools) |
+| `CUBE_DB_SYNCHRONOUS_COMMIT` | `on` | Postgres `synchronous_commit` (see below) |
 | `CUBE_DB_CPUS` / `CUBE_DB_MEM_LIMIT` | `2` / `4g` | `db` CPU and memory |
 | `PFCON_WORKERS` | `8` | `gunicorn -w` on `pfcon` (compute-side request parallelism) |
 | `PFCON_CPUS` / `PFCON_MEM_LIMIT` | `2` / `2g` | `pfcon` CPU and memory |
@@ -35,6 +38,15 @@ stack frame. Runs up to and including 2026-09-17 had it on (it came from
 them. `CUBE_DEBUG=true` brings that overhead back for a comparison with those runs, but not the
 connection leak that broke their Locust steps from 100 users up, which CUBE has fixed since
 (REPORT.md § 14).
+
+**Why `synchronous_commit` stays on:** it is PostgreSQL's default, and what a deployment that
+cannot lose acknowledged writes runs with: each commit waits until its WAL is flushed to disk.
+`CUBE_DB_SYNCHRONOUS_COMMIT=off` exists in the benchmark override only, never on the dev stack.
+With it a commit returns before the flush, so a crash can lose up to about three
+`wal_writer_delay` periods (600 ms) of transactions their clients saw commit, though it never
+corrupts the database. Use it to measure how much of a scenario waits on commit flushes, not
+as a baseline: `bench-compare` flags `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` and
+`postgres.synchronous_commit` between an `on` and an `off` run.
 
 **Not part of the envelope:** `CUBE_DB_POOL_STATS_INTERVAL` (default `5`) is the number of
 seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
@@ -65,7 +77,67 @@ per scenario); this is measurement instrumentation, not part of the SUT envelope
 them when the stack starts; the harness reads them again at run time to *record* them. If
 the two invocations use different values, the report's recorded envelope won't match the
 running stack. The simplest way to stay consistent is to export them once (or put them in
-a shell/env file) before both commands.
+a shell/env file) before both commands. The container limits and the Postgres settings are
+read from the running stack instead, so they cannot drift.
+
+## What each run records about Postgres
+
+The harness reads these from the running server and the `db` container.
+
+- **Settings** — `environment.json` → `postgres`:
+  - `settings` holds every setting's value as `SHOW` prints it. Two runs therefore hold the
+    same names, unless the server version or the preloaded libraries differ (the benchmark
+    `db` preloads `pg_stat_statements`, which adds its own `pg_stat_statements.*` settings).
+  - `key_settings` names the ones `report.md` lists: a fixed list (`POSTGRES_SETTINGS` in
+    `environment.py`: version and config file, memory, WAL and checkpoints, IO, planner,
+    instrumentation) plus every setting a configuration file or the command line sets.
+  - `altered` lists the settings in effect from `ALTER SYSTEM`. They win over the
+    configuration file and survive restarts in the `db` volume.
+  - `table_options` holds the storage parameters of `core_chrisfile` and `core_chrisfolder`.
+
+  The `db` image id is under `images`, and each container's CPU, memory, swap and `/dev/shm`
+  limits are under `limits`. `bench-compare` reports a differing setting or limit as a
+  caution. A run that predates a block gets a single "not recorded" caution instead. Runs
+  from before 2026-10-13 have neither block nor the `CUBE_DB_SYNCHRONOUS_COMMIT` knob, which
+  then reads `None` although they ran with PostgreSQL's default, `on`. So a new run gets
+  those three cautions against every archived run. Locust steps record the same `postgres`
+  block in their `<csv prefix>_recovery.json`.
+- **Counters** — snapshots of the server's cumulative counters, plus the `db` container's
+  cgroup counters:
+  - Server: checkpoints done, timed and requested, WAL bytes and full-page images, temp files,
+    sessions, and autovacuum and autoanalyze runs on the two file tables. Also the bytes each
+    process type wrote or extended, per object (`pg_stat_io`; keys
+    `io_write_bytes:<object>:<process_type>` with spaces as underscores, e.g.
+    `io_write_bytes:relation:client_backend`, non-zero ones only). `num_timed` also counts
+    the timed checkpoints an idle server skips, so `num_done` is the number written.
+  - `db` container: bytes written to disk, pages swapped out and in, OOM kills.
+
+  Each scenario records deltas for two windows. `workload` runs from scenario start to the end
+  of the workload, slightly wider than the 2 s samples behind `peak_write_bytes`, so its
+  `cgroup_write_bytes` is at least `peak_write_bytes.db`. `cleanup` covers feed deletion and
+  quiescence. Both windows go into `scenario.json` (`db_counters`, with the raw snapshots).
+  Each `levels.jsonl` row gets each counter's largest value across the level's repeats, so the
+  counters of one row can come from different repeats. The run's total, taken 11 s after the
+  last level, goes into `summary.json` (`db_counters.run`).
+
+  Backends publish their statistics up to about 10 s after they go idle, so a few seconds of
+  short transactions can land in the next window. The run total holds everything published by
+  its end. Dirty pages Postgres or the kernel has not written yet are in no window.
+
+  Postgres's counters and the container's reset independently:
+  - A crash restart, which an OOM-killed backend causes, zeroes Postgres's statistics. The
+    window then reads `"reset": true` instead of Postgres's counters, which are unknown, not
+    zero.
+  - The container keeps running through a crash, so its counters, OOM kills included, keep
+    their delta.
+  - A server or container restart invalidates both.
+  - When Postgres cannot be read at one end of a window (during crash recovery, say), the
+    window reads `"unreadable": true` instead of its counters, and the container's remain.
+
+  `report.md` shows the run total and the last level's windows. `bench-compare` shows the two
+  runs' totals side by side under "Postgres over the whole run". It trends any level-row value
+  through a dotted `--metric`, e.g. `--metric db_counters.workload.num_requested` or
+  `--metric peak_write_bytes.db`. Given explicitly, the trend renders for two runs as well.
 
 ## Pinned compute resource (per plugin job)
 

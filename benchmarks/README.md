@@ -88,21 +88,21 @@ Each run writes `benchmarks/results/<run_id>/`:
 
 ```
 report.md            # ticket-ready: environment, breaking-point table, approach-to-failure curves
-summary.json         # machine-readable run summary
+summary.json         # machine-readable run summary (+ Postgres counters over the whole run)
 levels.jsonl/.csv    # one row per (topology, axis, level): the approach-to-failure curve
-environment.json     # host hardware, image ids, envelope knobs, workload plugin versions, noise floor, attribution availability
+environment.json     # host hardware, image ids, envelope knobs, container limits, Postgres settings, workload plugin versions, noise floor, attribution availability
 api_requests.jsonl   # every measured API call (latency, status, endpoint class)
 status_samples.jsonl # per-instance status timelines (client-observed phase timing)
 docker_stats.jsonl   # service + job container CPU/mem/blkio samples
 queue_depths.jsonl   # Celery queue depths (main1/main2/periodic), sampled every 2 s
-scenarios/<id>/      # scenario.json (+ pg_stats.json; failure.json + logs/ on hard failures)
+scenarios/<id>/      # scenario.json with db_counters (+ pg_stats.json; failure.json + logs/ on hard failures)
 ```
 
 The key artifact is the **approach-to-failure curve** (in `report.md` and `levels.csv`):
 per-level makespan, worst p95, 5xx counts, completions, and peak per-service CPU and disk
 write — so each breaking point comes with a *cause*, not just a pass/fail.
 
-Two attribution streams turn resource saturation into named culprits:
+Three attribution streams turn resource saturation into named culprits:
 
 - **Queue depths** — a sustained rise on `main2` means status checks are produced
   faster than the workers consume them; `main1` is job submission. Per-scenario
@@ -110,8 +110,16 @@ Two attribution streams turn resource saturation into named culprits:
 - **`pg_stats.json`** — every statement the scenario ran, most total execution time
   first, reset per scenario (via `pg_stat_statements`; the benchmark compose preloads it
   on `db`). Names the queries behind a hot db, and shows whether a statement ran at all
-  (statements that failed with an error are never recorded). `environment.json`'s `attribution` block records whether
-  both streams were available for the run.
+  (statements that failed with an error are never recorded).
+- **Postgres counters** — checkpoints (done, timed and requested), WAL and full-page images,
+  temp files, bytes written or extended per process type, autovacuum runs, and the `db`
+  container's disk writes, swap and OOM kills, as deltas over each scenario's workload and
+  cleanup windows (`scenario.json` and level rows, `db_counters`) and over the whole run
+  (`summary.json`, which `bench-compare` shows side by side).
+  [envelope.md](envelope.md) § "What each run records about Postgres" has the details.
+
+`environment.json`'s `attribution` block records whether each stream was available for the
+run.
 
 ## Control plane: API saturation with Locust (RED)
 
@@ -177,6 +185,7 @@ later whether two runs are comparable and to diff them:
 ```bash
 just bench-compare <baseline_run_id> <candidate_run_id>
 just bench-compare A B C D                        # 3+ runs: adds a per-axis trend table
+just bench-compare A B --metric peak_write_bytes.db     # trend a level-row value (dotted path)
 just bench-compare A B --fail-on-regression       # CI gate: exit 1 on any regression,
                                                   # downward breaking-point shift, or
                                                   # when the runs are NOT COMPARABLE

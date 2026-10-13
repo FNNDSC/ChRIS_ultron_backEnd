@@ -14,13 +14,47 @@ it — and degrades to unavailable (with the reason recorded once) otherwise.
 ``connection_states`` uses the same access for ``pg_stat_activity``: how many connections
 each client holds and in which state, which tells idle pooled connections apart from ones
 left ``idle in transaction``.
+
+``server_settings`` and ``server_counters`` use it too: the settings the server runs with,
+which the environment manifest records, and its cumulative counters (checkpoints, WAL, temp
+files, writes by process type, autovacuum runs), which the runner snapshots around each
+scenario, together with the db container's cgroup counters, and turns into per-window
+deltas with ``counter_windows``.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+import json
+from typing import Iterable, Optional
 
-from .docker_client import DockerClient
+from .docker_client import CONTAINER_START_KEY, DockerClient
+
+
+#: the tables whose storage parameters and autovacuum runs are recorded: the two that
+#: registering and deleting feeds churn by millions of rows
+TRACKED_TABLES = ("core_chrisfile", "core_chrisfolder")
+
+#: snapshot keys that name a statistics epoch: when one differs between two snapshots,
+#: Postgres reset its counters in between (a crash restart, or ``pg_stat_reset_shared``)
+STATS_EPOCH_KEYS = ("checkpointer_reset", "wal_reset")
+
+#: the server's start time: it changes when the server, and with it the db container,
+#: restarts, which also restarts the container's cgroup counters
+SERVER_START_KEY = "server_start"
+
+#: the db container's cgroup counters (``DockerClient.cgroup_counters``): a Postgres crash
+#: restart keeps the container, so they keep counting across it
+CGROUP_PREFIX = "cgroup_"
+
+#: per-process-type write counters (``io_write_bytes:<object>:<process_type>``, spaces as
+#: underscores), present in a snapshot only once they are non-zero, so one missing from the
+#: earlier snapshot counts from 0; any other counter missing from either snapshot is left
+#: out of the delta
+IO_PREFIX = "io_write_bytes:"
+
+#: a delta's markers for Postgres counters it cannot give: ``reset`` (its statistics were
+#: reset in the window) and ``unreadable`` (psql failed at one end of the window)
+UNKNOWN_FLAGS = ("reset", "unreadable")
 
 
 STATEMENTS_SQL = (
@@ -88,6 +122,242 @@ def connection_states(docker: DockerClient, service: str = "db") -> list[dict]:
     if code != 0:
         return []
     return parse_psql_rows(out, ("client_addr", "state", "count"))
+
+
+# -- server settings and cumulative counters ----------------------------------------------
+
+def _text_array(values: Iterable[str]) -> str:
+    quoted = ", ".join("'" + value.replace("'", "''") + "'" for value in values)
+    return f"ARRAY[{quoted}]::text[]"
+
+
+def settings_sql(names: Iterable[str], tables: Iterable[str] = TRACKED_TABLES) -> str:
+    """
+    One JSON document: the value ``SHOW`` prints for every setting; ``key_settings``,
+    the names among them that are ``names`` or that a configuration file or the command
+    line sets; the settings in effect from ``ALTER SYSTEM``; and the storage parameters
+    of ``tables``.
+    """
+    return (
+        "SELECT json_build_object("
+        "'settings', (SELECT json_object_agg(name, current_setting(name) ORDER BY name) "
+        "FROM pg_settings), "
+        "'key_settings', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
+        f"WHERE name = ANY({_text_array(names)}) "
+        "OR source IN ('configuration file', 'command line')), "
+        "'altered', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
+        "WHERE sourcefile LIKE '%/postgresql.auto.conf'), "
+        "'table_options', (SELECT json_object_agg(relname, coalesce(reloptions, '{}') "
+        f"ORDER BY relname) FROM pg_class WHERE relname = ANY({_text_array(tables)}) "
+        "AND relkind = 'r'))"
+    )
+
+
+def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
+    """
+    One JSON document of the server's cumulative counters: checkpoints, WAL, the current
+    database's temp files and sessions, autovacuum runs on ``tables``, and the bytes each
+    process type wrote or extended per object (``io_write_bytes:<object>:<process_type>``,
+    from ``pg_stat_io``, non-zero ones only, spaces as underscores so the key passes
+    through a shell unquoted). ``at`` is the server clock, ``server_start``
+    the ``SERVER_START_KEY`` and the ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
+    """
+    return (
+        "SELECT jsonb_build_object("
+        "'at', extract(epoch FROM clock_timestamp()), "
+        "'server_start', pg_postmaster_start_time(), "
+        "'checkpointer_reset', c.stats_reset, 'num_timed', c.num_timed, "
+        "'num_requested', c.num_requested, 'num_done', c.num_done, "
+        "'buffers_written', c.buffers_written, "
+        "'checkpoint_write_ms', c.write_time, 'checkpoint_sync_ms', c.sync_time, "
+        "'wal_reset', w.stats_reset, 'wal_records', w.wal_records, 'wal_fpi', w.wal_fpi, "
+        "'wal_bytes', w.wal_bytes, 'wal_buffers_full', w.wal_buffers_full, "
+        "'temp_files', d.temp_files, 'temp_bytes', d.temp_bytes, "
+        "'sessions', d.sessions, 'xact_commit', d.xact_commit, "
+        "'autovacuum_count', v.autovacuum_count, 'autoanalyze_count', v.autoanalyze_count"
+        ") || coalesce((SELECT jsonb_object_agg("
+        "'io_write_bytes:' || replace(object, ' ', '_') || ':' "
+        "|| replace(backend_type, ' ', '_'), written) "
+        "FROM (SELECT backend_type, object, "
+        "sum(coalesce(write_bytes, 0) + coalesce(extend_bytes, 0)) AS written "
+        "FROM pg_stat_io GROUP BY 1, 2) io WHERE written > 0), '{}') "
+        "FROM pg_stat_checkpointer c, pg_stat_wal w, pg_stat_database d, "
+        "(SELECT sum(autovacuum_count) AS autovacuum_count, "
+        "sum(autoanalyze_count) AS autoanalyze_count FROM pg_stat_user_tables "
+        f"WHERE relname = ANY({_text_array(tables)})) v "
+        "WHERE d.datname = current_database()"
+    )
+
+
+def _psql_json(docker: DockerClient, sql: str, *, service: str,
+               env: Optional[dict]) -> tuple[object, Optional[str]]:
+    """
+    The JSON document a one-value query prints, and ``None``; or ``None`` and why it
+    could not be read (psql's own output, trimmed).
+    """
+    code, out = psql(docker, sql, service=service, env=env)
+    lines = [line for line in out.splitlines() if line.strip()]
+
+    if code == 0 and lines:
+        try:
+            return json.loads(lines[-1]), None   # exec output also carries psql's stderr
+        except ValueError:
+            pass
+    return None, out.strip()[:300] or f"psql exit {code}"
+
+
+def server_settings(docker: DockerClient, names: Iterable[str], *,
+                    tables: Iterable[str] = TRACKED_TABLES, service: str = "db",
+                    env: Optional[dict] = None) -> dict:
+    """
+    What the server runs with. ``settings`` maps every setting to its value as ``SHOW``
+    prints it; values stay strings, so archived runs compare as text, and a setting
+    missing from one run means a different server version, never a different source.
+    ``key_settings`` names the ones a report shows: ``names`` and every setting a
+    configuration file or the command line sets. ``altered`` lists the settings in
+    effect from ``ALTER SYSTEM`` (``postgresql.auto.conf`` wins over the configuration
+    file), and ``table_options`` holds the storage parameters of ``tables``. Returns
+    ``{}`` when psql cannot run.
+    """
+    doc, _ = _psql_json(docker, settings_sql(names, tables), service=service, env=env)
+
+    if not isinstance(doc, dict):
+        return {}
+    return {"settings": doc.get("settings") or {},
+            "key_settings": doc.get("key_settings") or [],
+            "altered": doc.get("altered") or [],
+            "table_options": doc.get("table_options") or {}}
+
+
+def server_counters(docker: DockerClient, *, tables: Iterable[str] = TRACKED_TABLES,
+                    service: str = "db", env: Optional[dict] = None) -> dict:
+    """
+    One snapshot of the server's cumulative counters (``counters_sql``); ``{}`` when
+    psql cannot run or the server predates PostgreSQL 18's ``pg_stat_io`` byte columns.
+    Backends publish their counters between transactions, up to ~10 s after they go
+    idle, so a snapshot can miss a few seconds of short transactions; a long statement
+    shows up when it ends.
+    """
+    doc, _ = _psql_json(docker, counters_sql(tables), service=service, env=env)
+    return doc if isinstance(doc, dict) else {}
+
+
+def server_counters_error(docker: DockerClient, *, service: str = "db",
+                          env: Optional[dict] = None) -> Optional[str]:
+    """
+    Why ``server_counters`` reads nothing (psql's output: no such view on a server
+    before PostgreSQL 18, too many clients, crash recovery...); ``None`` when it works.
+    """
+    doc, error = _psql_json(docker, counters_sql(), service=service, env=env)
+
+    if isinstance(doc, dict):
+        return None
+    return error or f"unexpected output: {doc!r}"[:300]
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def counter_delta(before: dict, after: dict) -> Optional[dict]:
+    """
+    ``after - before`` for every numeric counter in both snapshots (an
+    ``io_write_bytes:`` counter missing from ``before`` counts from 0), plus the
+    ``seconds`` between them; ``None`` when a snapshot is missing.
+
+    Postgres's counters and the db container's cgroup counters reset independently. A
+    crash restart, or ``pg_stat_reset_shared``, zeroes Postgres's statistics: the
+    ``STATS_EPOCH_KEYS`` change, or a counter goes down, and the delta reads
+    ``"reset": True`` instead of Postgres's counters, which are unknown. After a crash
+    ``num_requested`` can even read the same, because the end-of-recovery checkpoint is
+    counted after the reset. The container keeps running through a crash, so its
+    counters, OOM kills included, still have a delta. A server or container restart
+    (``SERVER_START_KEY`` or ``CONTAINER_START_KEY`` changes) invalidates both. When
+    Postgres could not be read at either end, the delta reads ``"unreadable": True``
+    instead of its counters, and the container's counters remain.
+    """
+    if not before or not after:
+        return None
+
+    pg_readable = SERVER_START_KEY in before and SERVER_START_KEY in after
+    restarted = any(key in before and key in after and before[key] != after[key]
+                    for key in (SERVER_START_KEY, CONTAINER_START_KEY))
+    stats_reset = restarted or (
+        pg_readable and any(before.get(key) != after.get(key) for key in STATS_EPOCH_KEYS))
+
+    pg: dict = {}
+    cgroup: dict = {}
+    for key, value in after.items():
+        in_cgroup = key.startswith(CGROUP_PREFIX)
+        prior = before.get(key, 0 if key.startswith(IO_PREFIX) else None)
+
+        if (key == "at" or not _is_number(value) or not _is_number(prior)
+                or not (in_cgroup or pg_readable)):
+            continue
+
+        if value < prior:                    # counters only grow until they restart
+            if in_cgroup:
+                restarted = True
+            else:
+                stats_reset = True
+            continue
+
+        diff = value - prior
+        (cgroup if in_cgroup else pg)[key] = round(diff, 1) if isinstance(diff, float) else diff
+
+    if not pg_readable:
+        delta = {"unreadable": True}
+    elif stats_reset:
+        delta = {"reset": True}
+    else:
+        delta = pg
+
+    if not restarted:
+        delta.update(cgroup)
+
+    if _is_number(before.get("at")) and _is_number(after.get("at")):
+        delta["seconds"] = round(after["at"] - before["at"], 1)
+    return delta
+
+
+def max_deltas(deltas: Iterable[dict]) -> dict:
+    """
+    Each counter's largest delta across several windows (a level's repeats), so the
+    counters of one result may come from different windows. When Postgres's counters
+    are unknown for any window (a statistics reset, or Postgres unreadable), only the
+    cgroup counters and ``seconds`` survive, with that window's ``UNKNOWN_FLAGS``.
+    """
+    deltas = list(deltas)
+    merged: dict = {}
+
+    for delta in deltas:
+        for key, value in delta.items():
+            if key not in UNKNOWN_FLAGS:
+                merged[key] = max(merged.get(key, value), value)
+
+    flags = {flag: True for flag in UNKNOWN_FLAGS
+             if any(delta.get(flag) for delta in deltas)}
+
+    if flags:
+        merged = {**flags, **{key: value for key, value in merged.items()
+                              if key.startswith(CGROUP_PREFIX) or key == "seconds"}}
+    return merged
+
+
+def counter_windows(start: dict, workload_end: dict,
+                    cleanup_end: Optional[dict]) -> dict:
+    """
+    A scenario's counter deltas, with the raw ``snapshots``. ``workload`` runs from
+    scenario start to the end of the workload, the window of the resource samples.
+    ``cleanup`` covers feed deletion and quiescence, and is ``None`` when the scenario
+    keeps its feeds.
+    """
+    return {
+        "workload": counter_delta(start, workload_end),
+        "cleanup": None if cleanup_end is None else counter_delta(workload_end, cleanup_end),
+        "snapshots": {"start": start, "workload_end": workload_end,
+                      "cleanup_end": cleanup_end},
+    }
 
 
 class PgStatStatements:

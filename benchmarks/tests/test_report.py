@@ -99,6 +99,113 @@ def test_render_omits_workload_plugins_when_absent():
     assert "Workload plugins" not in render(summary, [])     # back-compat for old runs
 
 
+def test_render_key_postgres_settings_overrides_and_table_options():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {"postgres": {
+                   "settings": {"work_mem": "32MB", "TimeZone": "UTC", "DateStyle": "ISO"},
+                   "key_settings": ["TimeZone", "work_mem"],
+                   "altered": ["work_mem"],
+                   "table_options": {"core_chrisfile": ["autovacuum_vacuum_scale_factor=0.02"],
+                                     "core_chrisfolder": []}}}}
+    md = render(summary, [])
+
+    heading = "### PostgreSQL (key settings; environment.json has all)"
+    assert heading in md  # nosec B101 - pytest assertion
+    assert "| work_mem | 32MB |" in md  # nosec B101 - pytest assertion
+    # recorded, but not a key setting
+    assert "DateStyle" not in md  # nosec B101 - pytest assertion
+    assert "`ALTER SYSTEM` (postgresql.auto.conf): work_mem" in md  # nosec B101 - pytest assertion
+    assert "`core_chrisfolder` storage parameters: defaults" in md  # nosec B101 - pytest assertion
+
+
+def test_render_omits_postgres_settings_and_limits_for_older_runs():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {}}
+    md = render(summary, [])
+
+    assert "PostgreSQL" not in md  # nosec B101 - pytest assertion
+    assert "Container limits" not in md  # nosec B101 - pytest assertion
+
+
+def test_render_container_limits():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {"limits": {"db": {
+                   "cpus": 2.0, "mem_limit": 4 * 1024 ** 3, "memswap_limit": -1,
+                   "shm_size": 1024 ** 3}}}}
+
+    row = "| db | 2.0 | 4.0 GiB | unlimited | 1.0 GiB |"
+    assert row in render(summary, [])  # nosec B101 - pytest assertion
+
+
+def test_render_db_counters_per_level_and_for_the_whole_run():
+    workload = {"num_done": 3, "num_timed": 4, "num_requested": 0,
+                "wal_bytes": 3 * 1024 ** 3, "wal_fpi": 210000, "temp_bytes": 0,
+                "cgroup_write_bytes": 20 * 1024 ** 3, "cgroup_pswpout": 12}
+    summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 1,
+               "breaking_points": [],
+               "db_counters": {"run": dict(workload, num_requested=1)}}
+    md = render(summary, [_level(db_counters={"workload": workload,
+                                              "cleanup": {"reset": True}})])
+
+    assert "## Postgres over the whole run" in md  # nosec B101 - pytest assertion
+    assert "checkpoints 3 done (4 timed / 1 requested)" in md  # nosec B101 - pytest assertion
+    note = ("_Postgres at level 1: workload checkpoints 3 done (4 timed / 0 requested), "
+            "WAL 3.0 GiB (210,000 full-page images), temp files 0 B, "
+            "db container wrote 20.0 GiB, swapped out 12 pages; "
+            "cleanup Postgres counters n/a (statistics reset")
+    assert note in md  # nosec B101 - pytest assertion
+
+
+def test_render_keeps_the_oom_kill_through_a_postgres_reset():
+    # an OOM-killed backend crash-restarts Postgres: its counters are unknown, the
+    # container's are not, and the OOM kill is the point
+    summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 0,
+               "breaking_points": [],
+               "db_counters": {"run": {"reset": True, "cgroup_oom_kill": 1,
+                                       "cgroup_write_bytes": 1024}}}
+    md = render(summary, [])
+
+    assert "Postgres counters n/a (statistics reset" in md  # nosec B101 - pytest assertion
+    assert "db container wrote 1.0 KiB, **1 OOM kill(s)**" in md  # nosec B101 - pytest assertion
+
+
+def test_render_prefers_the_reset_message_when_both_flags_are_set():
+    # a level whose repeats saw a reset in one window and Postgres unreadable in another
+    rows = [_level(db_counters={"workload": {"reset": True, "unreadable": True,
+                                             "cgroup_oom_kill": 1}})]
+    summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 1,
+               "breaking_points": []}
+    md = render(summary, rows)
+
+    assert "statistics reset in between" in md  # nosec B101 - pytest assertion
+    assert "unreadable at one end" not in md  # nosec B101 - pytest assertion
+    assert "**1 OOM kill(s)**" in md  # nosec B101 - pytest assertion
+
+
+def test_render_skips_db_counters_when_absent_or_unreadable():
+    summary = {"run_id": "R", "tier": "smoke", "environment": {}, "levels_run": 1,
+               "breaking_points": []}
+    assert "Postgres" not in render(summary, [_level()])  # nosec B101 - pytest assertion
+
+    # nothing could be read at the start or the end of the run: no delta
+    unreadable = dict(summary, db_counters={"run": None, "snapshots": {}})
+    md = render(unreadable, [_level(db_counters={})])
+    assert "Postgres" not in md  # nosec B101 - pytest assertion
+
+
+def test_render_never_shows_unread_postgres_counters_as_zeros():
+    # Postgres was unreadable at one end; only the container's counters are known
+    summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 0,
+               "breaking_points": [],
+               "db_counters": {"run": {"unreadable": True, "cgroup_write_bytes": 2048}}}
+    md = render(summary, [])
+
+    unread = "Postgres counters n/a (Postgres unreadable at one end"
+    assert unread in md  # nosec B101 - pytest assertion
+    assert "temp files" not in md  # nosec B101 - pytest assertion
+    assert "db container wrote 2.0 KiB" in md  # nosec B101 - pytest assertion
+
+
 def test_csv_cell_rfc4180_quoting():
     assert csv_cell("plain") == "plain"
     assert csv_cell("a,b") == '"a,b"'
