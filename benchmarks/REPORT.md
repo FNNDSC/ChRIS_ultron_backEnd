@@ -21,6 +21,8 @@ Key findings:
 
 **Post-upgrade baseline (2026-09-17).** Every analysis the issue set cites was re-run after the upgrade to Django 6.0 and DRF 3.18, and §13 records what reproduced, what moved, and eight further corrections to §3, §4, §5 and §8.
 
+**PostgreSQL configuration (2026-10-14).** Both compose stacks now run `db` on a committed `postgres/cube.conf` sized for the benchmark's 4 GiB `db`. On the layered diamond it removes every size-triggered checkpoint and cuts what `db` writes by 40%. §15 has the before and after runs; the after runs are the baselines from here on.
+
 ### 1.1 Recommendations
 
 Grouped by implementation cost; each cites the section with the supporting measurement and analysis.
@@ -44,7 +46,7 @@ Grouped by implementation cost; each cites the section with the supporting measu
 - **Index the `core_chrisfile` hot path** — the `fname` prefix search above, plus verifying indexes cover the registration/listing `WHERE`/`JOIN` columns (`parent_folder_id`, `fname`) (§8.2).
 - **Stop rewriting the whole `raw`/`summary` JSONB on every status update** — store large per-instance output metadata out-of-row or update incrementally; the 44 s/call UPDATE feeds the diamond-layers cliff (§8.2).
 - **Batch and bound file/folder registration** — 233k `core_chrisfolder` inserts in one scenario points to a folder-model and batch-size review (§8.2).
-- **Tune Postgres for the write-heavy registration path** — `db` reached 200%+ CPU and tens of GiB of WAL (write-ahead log) under deep DAGs; review WAL/checkpoint settings and `db` resourcing (§3.2, §8.2).
+- **Tune Postgres for the write-heavy registration path** — `db` reached 200%+ CPU and tens of GiB of WAL (write-ahead log) under deep DAGs; review WAL/checkpoint settings and `db` resourcing (§3.2, §8.2). The settings are done for the compose stacks (§15); `db` still saturates its 2 CPUs at 8 layers, and its resources are unchanged.
 
 ## 2. Test Environment & Methodology
 
@@ -344,3 +346,61 @@ After every step all four pools reported no checked-out connection, and three mi
 - The September Locust results from 100 users up measured a broken stack (§13). The control-plane knee of §4 (~50 users, p95 pinned at the 10 s pool timeout, in June as in September) is the leak's and `DEBUG`'s together, and no run separates the two: at 25 users, where nothing failed and so nothing leaked, p50 still fell from 29 to 12 ms. With both changed, throughput keeps rising to 400 users and most failures are logins.
 - Turning `DEBUG` off moves every baseline. Runs up to 2026-09-17 had it on, and `bench-compare` reports `envelope.CUBE_DEBUG` as a caution against them. The two runs issue 1 ([#150](https://github.com/FNNDSC/HARBOR-planning/issues/150)) compares against were run again at the new envelope: `2026-10-07T002040Z` (linear · file_count, 1,731 s at 100,000 files against 1,766 s) and `2026-10-07T005703Z` (diamond · layers, 2,906 s at 8 layers against 3,260 s). `bench-compare` finds no regression against 041540Z and 072731Z, and the API p95 the harness measured during those runs was 28–51% lower at 9 of their 10 levels.
 - Production runs with `DEBUG` off, where `ResponseMiddleware` turns a view's exception into its own 500 on the request's thread, so the September failure does not happen there in that form. One path remains: Django still logs error responses from the default executor, and with `ADMINS` set (production) the error email reports the request's user, which for a session-authenticated request queries the database on that thread. Django 6.2 does not change that call; it is left for later.
+
+## 15. PostgreSQL configuration (2026-10-14)
+
+Issue 1 ([#150](https://github.com/FNNDSC/HARBOR-planning/issues/150)) replaces the stock `postgres:18` configuration of both compose stacks with a committed `postgres/cube.conf`, sized for the benchmark's `db` limit (4 GiB, 2 CPUs), and adds migration `core.0004`, which vacuums and analyzes the file and folder tables sooner. [envelope.md](envelope.md) § "PostgreSQL configuration" lists each value and why; the main ones are `shared_buffers` 1GB, `work_mem` 32MB, `max_wal_size` 8GB, `checkpoint_timeout` 15min, `wal_compression` lz4 (the issue asked for `on`, which means pglz and costs far more CPU on a 2-CPU `db`) and `timezone` UTC. `db` also gets a 1 GB `/dev/shm`: at 32 MB `work_mem` a parallel hash join no longer fits in Docker's 64 MB default.
+
+The harness now records what the server runs with and what it does. `environment.json` has every Postgres setting and each container's limits, and each scenario has deltas of checkpoints, WAL, full-page images, temp files, writes by process type and what the `db` container wrote, for its workload and its cleanup, with whole-run totals in `summary.json` ([envelope.md](envelope.md) § "What each run records about Postgres"). The figures below come from those counters; checkpoint causes come from the `db` log, and the WAL zero-fill of the before runs was read by hand from `pg_stat_io` at the end of each run.
+
+**Protocol.** All runs were made in one session on the benchmark box, from 2026-10-13 23:38 to 2026-10-14 05:57 UTC, each on a fresh stack (`down -v`, plugin-job containers removed, `just bench-start`). The before runs are at 8ea010b: the stock configuration and the harness that records settings, limits and most counters, though not `wal_init_bytes` or the per-statement temp and WAL columns, which 2d52608 adds. The after runs are at 2d52608, the configuration. diamond · layers = 8 varied by about 10% between fresh-stack runs on 2026-09-17, enough to move a single pair's result, so it was run twice each way, alternating (before, after, before, after), and the criterion is judged on the means. All eight runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13 (`workload_plugins` in `environment.json`); repeating them on a later commit needs the `chrisomatic.yml` edit in [envelope.md](envelope.md) § "Pinned workload plugin versions".
+
+| Command (`just bench-run --tier ...`) | Before | After |
+|---|---|---|
+| `smoke` | `2026-10-13T233911Z` | `2026-10-14T022103Z` |
+| `full --topology linear --axis file_count --cap 100000 --repeat 1 --restart-on-fail` | `2026-10-13T234257Z` | `2026-10-14T022450Z` |
+| `full --topology diamond --axis layers --cap 8 --repeat 1 --restart-on-fail` | `2026-10-14T001854Z`, `040048Z` | `2026-10-14T030059Z`, `045928Z` |
+
+**Results.**
+
+| Acceptance criterion | Before | After |
+|---|---|---|
+| Temp files during linear · file_count = 100000 (the 100,000-file level) | 166.2 MB, and 61.5 MB more in its cleanup | 0, and 0 in the whole run |
+| Requested checkpoints during diamond · layers = 8, whole run | 19 and 21 (the `db` log names 18 and 21 as triggered by WAL size) | 0 and 0; the `db` log names only timed ones |
+| What `db` wrote at diamond · layers = 8 (`peak_write_bytes.db`) | 30.47 and 32.34 GB, mean 31.41 GB | 18.91 and 18.80 GB, mean 18.85 GB: **−40.0%** (target −30%) |
+| Effective settings in `environment.json` | — | in every run |
+| `test-unit`, `test-integration`, `bench-run --tier smoke` | — | pass (see Tests) |
+
+Against the earlier baselines of that command the drop is 35.1% (`2026-10-07T005703Z`, 29.05 GB, `DEBUG` off but run on a stack the linear run had used) and 42.4% (`2026-09-17T072731Z`, 32.74 GB, `DEBUG` on).
+
+**Where the bytes went** (diamond · layers = 8, means of the two runs each way). The `pg_stat_io` rows count what Postgres handed to the kernel; a page rewritten before the kernel flushes it reaches the disk once, so these rows do not add up to what the container wrote.
+
+| At 8 layers | Before | After |
+|---|---|---|
+| Table and index pages written by backends to free a buffer (`pg_stat_io`) | 22.96 GB | 5.53 GB |
+| … written by the checkpointer and the background writer | 1.95 GB | 2.06 GB |
+| WAL generated | 10.09 GB | 5.22 GB |
+| Full-page images in it | 846k | 11.7k |
+| Checkpoints written (`num_done`) | 21 | 1 |
+| Checkpoint triggers counted, timed / requested (skipped checkpoints included) | 7 / 17 | 3 / 0 |
+| Temp files | 1.54 GB | 1.07 GB |
+| Zero-filling new WAL segments (see below) | at most about 1.1 GB | 4.04 GB |
+| `db` wrote, net of that zero-fill | about 30.3 GB | 14.81 GB (about −51%) |
+| Its cleanup: requested checkpoints; `db` wrote | 2.5; 3.88 GB | 0; 1.14 GB |
+| Makespan | 2,898 s | 2,861 s |
+
+Most of the saving is buffer evictions. With 128 MB of `shared_buffers`, registering layer 8's files filled the pool with dirty table and index pages, and backends had to write pages out to make room, many of them again and again as the next rows touched them. With 1 GB they mostly stay in memory until a checkpoint writes them once. The rest is the WAL: at `max_wal_size` 1GB a checkpoint completed every few minutes, 21 in the level, many in the middle of the large `INSERT … UNNEST` statements, and after each one every page those statements touched again went to the WAL in full. With one checkpoint completed during the level, the same work wrote 98.6% fewer full-page images, and lz4 compresses the ones that remain. Over the whole run, cleanups included, `db` wrote 43.9% less (35.87 → 20.12 GB).
+
+**WAL zero-fill.** PostgreSQL writes zeros into every new 16 MB WAL segment before using it, and keeps old segments for reuse only up to about what recent checkpoints needed. At `max_wal_size` 1GB a fresh volume's pool stayed at 64 segments (1.16 and 1.11 GB zero-filled since the stack started); at 8GB it grew to 258 and 261 segments, 4.29 and 4.33 GB, of which 4.04 GB fell in the measured level each time. On a volume whose pool is already that large, the saving would be larger by about the zero-fill (−51% instead of −40%). How a larger, aged database changes the eviction saving was not measured: every run started from an empty database.
+
+**Unchanged.** Every level that takes more than a minute moved by less than 2% (100,000 files: 1,719 → 1,724 s; 8 layers: 2,898 → 2,861 s), shorter ones by up to one 2 s poll interval either way, and `bench-compare` flags no makespan change. The time goes to registration, most of it outside Postgres: all the statements of the 100,000-file level take 90 s of its 1,724 s, and issue 4 ([#155](https://github.com/FNNDSC/HARBOR-planning/issues/155)) addresses the rest. The pre-submission scan of that output shows what `work_mem` buys and what it does not: its sort, which spilled before, now runs in memory and still takes 1.93 s per call instead of 2.10 s, because the cost is locale-aware comparison (issue 8b, [#160](https://github.com/FNNDSC/HARBOR-planning/issues/160)). API latency is within its noise: the worst p95 at 8 layers was 718 and 318 ms before, 353 and 355 ms after, and the latency flags `bench-compare` raised (one "regressed", three "improved") are each the p95 of a handful of requests. `db`'s memory use, page cache included, reached its 4.0 GiB limit in all four diamond runs, with no swap and no OOM kill; its CPU still peaks at its 2-CPU limit.
+
+**What remains.** In diamond · layers = 8, cleanup included, three statements still spill to temp files, each because it handles hundreds of thousands of rows at once (from `pg_stats.json`, which now has each statement's temp and WAL bytes): Django's deletion collector (`parent_folder_id IN (…) ORDER BY fname DESC`, 354–657 MB over 148 calls), registration's bulk insert (1,638,400 rows in 10 statements, 644 MB; it also writes 4.39 of the 5.42 GB of WAL that the level and its cleanup wrote) and the pre-submission scan (`fname LIKE … ORDER BY fname DESC`, 422 MB over 64 calls). Issues 4 ([#155](https://github.com/FNNDSC/HARBOR-planning/issues/155)) and 6 ([#157](https://github.com/FNNDSC/HARBOR-planning/issues/157)) address all three. Until registration's inserts each finish in under a second, `log_min_duration_statement` logs them with every file path inlined, because Django binds parameters on the client: the `db` log grew to 816 MB in each diamond run on this configuration (135 KB before) and to 73 MB in the linear one.
+
+**Tests.** On the final commit, 58285cf, on the benchmark box, both suites pass on the development stack with `cube.conf`: `just test-unit` (1,368 tests, 17 skipped, 1 expected failure) and `just test-integration` (77 tests, 34 skipped) on Docker, and the same two jobs as CI's podman job runs them, under rootless Podman 5.7 on Ubuntu 26.04 with the branch merged into `master` (same counts). Among them, `core.tests.test_models` checks that the server reads `cube.conf`, that its default time zone is the one Django connects with, and that migration `core.0004` applies and reverses. The smoke tier passes before and after, 10 levels each, with no level flagged.
+
+**Consequences.**
+
+- The after runs are the baselines for these three commands from here on; the epic's baseline table ([#148](https://github.com/FNNDSC/HARBOR-planning/issues/148)) is to be updated to point at them. Other commands get their own baseline run on this configuration when an issue needs one.
+- `bench-compare` against any earlier run reports three cautions it did not before: `postgres` and `limits` "not recorded", and `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` (shown as `—`, though those runs had PostgreSQL's default `on`). Against a run of this configuration, a differing setting is a caution of its own.
+- The development stack runs on the same file, and CUBE's tests run on it (Tests above).
