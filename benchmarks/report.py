@@ -140,7 +140,12 @@ def _counters_summary(delta: dict) -> str:
                  f"temp files {_human_bytes(delta.get('temp_bytes'))}"]
 
     if "cgroup_write_bytes" in delta:
-        parts.append(f"db container wrote {_human_bytes(delta['cgroup_write_bytes'])}")
+        written = f"db container wrote {_human_bytes(delta['cgroup_write_bytes'])}"
+
+        if delta.get("wal_init_bytes"):
+            written += (f", of which zero-filling new WAL segments "
+                        f"{_human_bytes(delta['wal_init_bytes'])}")
+        parts.append(written)
 
     if delta.get("cgroup_pswpout"):
         parts.append(f"swapped out {delta['cgroup_pswpout']:,} pages")

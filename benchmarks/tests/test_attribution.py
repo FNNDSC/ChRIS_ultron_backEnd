@@ -107,7 +107,7 @@ class FakeDbDocker:
 
     def exec_in_service(self, service, cmd):
         self.sql.append(cmd[-1])
-        return 0, "3\t12\t4.0\t3\tUPDATE feeds_feed SET name = $1\n"
+        return 0, "3\t12\t4.0\t3\t128\t4096\t1\tUPDATE feeds_feed SET name = $1\n"
 
 
 def test_snapshot_keeps_every_statement_by_default():
@@ -117,6 +117,8 @@ def test_snapshot_keeps_every_statement_by_default():
     assert "LIMIT" not in docker.sql[-1]  # nosec B101 - pytest assertion
     assert docker.sql[-1].rstrip().endswith("ORDER BY total_exec_time DESC")  # nosec B101 - pytest assertion
     assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"  # nosec B101 - pytest assertion
+    # the temp blocks and WAL a statement wrote name the one behind a spill or a burst
+    assert rows[0]["temp_blks_written"] == 128 and rows[0]["wal_fpi"] == 1  # nosec B101 - pytest assertion
 
 
 def test_snapshot_limit_is_optional():
@@ -498,7 +500,7 @@ def test_the_queries_run_on_the_benchmark_stacks_postgres():
     assert set(POSTGRES_SETTINGS) <= set(recorded["settings"])  # nosec B101 - pytest assertion
     assert set(POSTGRES_SETTINGS) <= set(recorded["key_settings"])  # nosec B101 - pytest assertion
     expected = {"server_start", "num_requested", "num_done", "wal_bytes", "wal_fpi",
-                "temp_bytes"}
+                "wal_init_bytes", "temp_bytes"}
     assert expected <= set(counters)  # nosec B101 - pytest assertion
     io_keys = [key for key in counters if key.startswith("io_write_bytes:")]
     assert io_keys and not any(" " in key for key in io_keys)  # nosec B101 - pytest assertion
@@ -506,3 +508,8 @@ def test_the_queries_run_on_the_benchmark_stacks_postgres():
     cgroup = docker.cgroup_counters("db")
     expected = {"cgroup_write_bytes", "cgroup_oom_kill", CONTAINER_START_KEY}
     assert expected <= set(cgroup)  # nosec B101 - pytest assertion
+
+    # the statements view has the per-statement temp and WAL columns the harness reads
+    statements = PgStatStatements(docker)
+    if statements.available:
+        assert statements.snapshot(limit=1)  # nosec B101 - pytest assertion

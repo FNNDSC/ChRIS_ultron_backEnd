@@ -140,7 +140,8 @@ def test_render_container_limits():
 def test_render_db_counters_per_level_and_for_the_whole_run():
     workload = {"num_done": 3, "num_timed": 4, "num_requested": 0,
                 "wal_bytes": 3 * 1024 ** 3, "wal_fpi": 210000, "temp_bytes": 0,
-                "cgroup_write_bytes": 20 * 1024 ** 3, "cgroup_pswpout": 12}
+                "cgroup_write_bytes": 20 * 1024 ** 3, "wal_init_bytes": 1024 ** 3,
+                "cgroup_pswpout": 12}
     summary = {"run_id": "R", "tier": "full", "environment": {}, "levels_run": 1,
                "breaking_points": [],
                "db_counters": {"run": dict(workload, num_requested=1)}}
@@ -151,7 +152,8 @@ def test_render_db_counters_per_level_and_for_the_whole_run():
     assert "checkpoints 3 done (4 timed / 1 requested)" in md  # nosec B101 - pytest assertion
     note = ("_Postgres at level 1: workload checkpoints 3 done (4 timed / 0 requested), "
             "WAL 3.0 GiB (210,000 full-page images), temp files 0 B, "
-            "db container wrote 20.0 GiB, swapped out 12 pages; "
+            "db container wrote 20.0 GiB, of which zero-filling new WAL segments 1.0 GiB, "
+            "swapped out 12 pages; "
             "cleanup Postgres counters n/a (statistics reset")
     assert note in md  # nosec B101 - pytest assertion
 
@@ -167,6 +169,14 @@ def test_render_keeps_the_oom_kill_through_a_postgres_reset():
 
     assert "Postgres counters n/a (statistics reset" in md  # nosec B101 - pytest assertion
     assert "db container wrote 1.0 KiB, **1 OOM kill(s)**" in md  # nosec B101 - pytest assertion
+
+
+def test_render_attributes_wal_zero_fill_only_to_the_containers_writes():
+    from benchmarks.report import _counters_summary
+
+    # Postgres counters without the container's: nothing to be "of which" part of
+    line = _counters_summary({"num_done": 1, "wal_init_bytes": 1024})
+    assert "zero-filling" not in line  # nosec B101 - pytest assertion
 
 
 def test_render_prefers_the_reset_message_when_both_flags_are_set():

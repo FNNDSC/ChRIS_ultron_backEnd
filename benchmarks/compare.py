@@ -44,8 +44,8 @@ COMPARED_METRICS = ("makespan_median_s", "worst_p95_ms")
 #: whole-run Postgres and db-container counters (``summary.json`` ``db_counters.run``)
 #: shown side by side, unflagged: what they should be depends on the change under test
 RUN_COUNTERS = ("reset", "unreadable", "num_done", "num_timed", "num_requested",
-                "wal_bytes", "wal_fpi", "temp_bytes", "cgroup_write_bytes", "cgroup_pswpout",
-                "cgroup_oom_kill", "seconds")
+                "wal_bytes", "wal_fpi", "temp_bytes", "cgroup_write_bytes", "wal_init_bytes",
+                "cgroup_pswpout", "cgroup_oom_kill", "seconds")
 
 _VERDICT_SEVERITY = {"PASS": 0, "DEGRADED": 1, "FAIL": 2}
 

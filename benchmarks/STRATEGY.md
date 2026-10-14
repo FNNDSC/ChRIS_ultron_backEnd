@@ -186,7 +186,7 @@ services:
     cpus: ${CUBE_WORKER_CPUS:-4}
     mem_limit: ${CUBE_WORKER_MEM_LIMIT:-4g}
   db:
-    command: postgres -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300}
+    command: postgres -c config_file=/etc/postgresql/cube.conf -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300}
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
   pfcon:

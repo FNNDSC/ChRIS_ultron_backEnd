@@ -8,8 +8,9 @@ just the expensive ones, is what lets a run show that a cheap statement no longe
 
 Runs ``psql`` *inside* the db container via the Docker socket (no client-side
 postgres dependency); credentials come from the container's own ``POSTGRES_*`` env.
-Requires ``shared_preload_libraries=pg_stat_statements`` — the benchmark compose sets
-it — and degrades to unavailable (with the reason recorded once) otherwise.
+Requires ``shared_preload_libraries=pg_stat_statements`` — ``postgres/cube.conf`` sets it
+on both compose stacks — and degrades to unavailable (with the reason recorded once)
+otherwise.
 
 ``connection_states`` uses the same access for ``pg_stat_activity``: how many connections
 each client holds and in which state, which tells idle pooled connections apart from ones
@@ -57,9 +58,15 @@ IO_PREFIX = "io_write_bytes:"
 UNKNOWN_FLAGS = ("reset", "unreadable")
 
 
+#: per statement: calls, time, rows, the temp blocks it wrote (a sort or hash that spilled
+#: past work_mem) and the WAL it generated, full-page images included
+STATEMENT_COLUMNS = ("calls", "total_ms", "mean_ms", "rows", "temp_blks_written",
+                     "wal_bytes", "wal_fpi", "query")
+
 STATEMENTS_SQL = (
     "SELECT calls, round(total_exec_time)::bigint AS total_ms, "
-    "round(mean_exec_time::numeric, 2) AS mean_ms, rows, "
+    "round(mean_exec_time::numeric, 2) AS mean_ms, rows, temp_blks_written, "
+    "wal_bytes, wal_fpi, "
     "left(regexp_replace(query, '\\s+', ' ', 'g'), 300) AS query "
     "FROM pg_stat_statements "
     "WHERE query NOT ILIKE '%pg_stat_statements%' "
@@ -159,7 +166,9 @@ def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
     database's temp files and sessions, autovacuum runs on ``tables``, and the bytes each
     process type wrote or extended per object (``io_write_bytes:<object>:<process_type>``,
     from ``pg_stat_io``, non-zero ones only, spaces as underscores so the key passes
-    through a shell unquoted). ``at`` is the server clock, ``server_start``
+    through a shell unquoted). ``wal_init_bytes`` is the part of the WAL writes that only
+    zero-fills new WAL segment files, a one-time cost a fresh volume pays until its pool of
+    segments reaches its working size. ``at`` is the server clock, ``server_start``
     the ``SERVER_START_KEY`` and the ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
     """
     return (
@@ -172,6 +181,8 @@ def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
         "'checkpoint_write_ms', c.write_time, 'checkpoint_sync_ms', c.sync_time, "
         "'wal_reset', w.stats_reset, 'wal_records', w.wal_records, 'wal_fpi', w.wal_fpi, "
         "'wal_bytes', w.wal_bytes, 'wal_buffers_full', w.wal_buffers_full, "
+        "'wal_init_bytes', (SELECT coalesce(sum(write_bytes), 0) FROM pg_stat_io "
+        "WHERE object = 'wal' AND context = 'init'), "
         "'temp_files', d.temp_files, 'temp_bytes', d.temp_bytes, "
         "'sessions', d.sessions, 'xact_commit', d.xact_commit, "
         "'autovacuum_count', v.autovacuum_count, 'autoanalyze_count', v.autoanalyze_count"
@@ -375,7 +386,7 @@ class PgStatStatements:
         code, out = self._psql("CREATE EXTENSION IF NOT EXISTS pg_stat_statements")
         
         if code != 0:
-            # most commonly: shared_preload_libraries not set (base dev compose)
+            # most commonly: a db that does not preload pg_stat_statements
             self.unavailable_reason = out.strip()[:300] or f"psql exit {code}"
 
     @property
@@ -401,7 +412,7 @@ class PgStatStatements:
 
         if code != 0:
             return []
-        return parse_psql_rows(out, ("calls", "total_ms", "mean_ms", "rows", "query"))
+        return parse_psql_rows(out, STATEMENT_COLUMNS)
 
     def _psql(self, sql: str) -> tuple[int, str]:
         return psql(self._docker, sql, service=self._service, env=self._env)

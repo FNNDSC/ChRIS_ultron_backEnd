@@ -157,6 +157,10 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
 
 ## Gotchas
 
+- `postgres/cube.conf` is the `db` server's whole configuration: both compose files start it
+  with `-c config_file=/etc/postgresql/cube.conf` (the benchmark override repeats that command
+  line), so the file replaces initdb's and restates `listen_addresses` and the locale lines.
+  Restart `db` after editing it. `work_mem` there is why `db` needs `shm_size`.
 - `pyproject.toml` constraints are lower bounds; `uv.lock` is the source of truth. Django is
   capped `<6.1` because django-celery-beat 2.9 requires it. After any pyproject change run
   `just lock` and commit the lockfile, otherwise CI and the image build fail.

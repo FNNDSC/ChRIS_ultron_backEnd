@@ -70,8 +70,9 @@ CUBE_UVICORN_WORKERS=8 CUBE_DB_POOL_MAX_SIZE=20 CUBE_DB_MAX_CONNECTIONS=500 \
 pool of up to `CUBE_DB_POOL_MAX_SIZE` connections, so keep
 `CUBE_DB_MAX_CONNECTIONS ≥ (uvicorn_workers + celery_processes) × pool_max + headroom`.
 
-The benchmark `db` also preloads `pg_stat_statements` (the harness snapshots top queries
-per scenario); this is measurement instrumentation, not part of the SUT envelope.
+`postgres/cube.conf` (below) also preloads `pg_stat_statements` on both stacks (the harness
+snapshots every statement per scenario); this is measurement instrumentation, not part of the
+SUT envelope.
 
 **Set the knobs consistently across `bench-start` and `bench-run`.** The services read
 them when the stack starts; the harness reads them again at run time to *record* them. If
@@ -80,14 +81,63 @@ running stack. The simplest way to stay consistent is to export them once (or pu
 a shell/env file) before both commands. The container limits and the Postgres settings are
 read from the running stack instead, so they cannot drift.
 
+## PostgreSQL configuration
+
+Both compose stacks start `db` with `postgres -c config_file=/etc/postgresql/cube.conf`, the
+committed [`postgres/cube.conf`](../postgres/cube.conf); this override only adds
+`max_connections` and `synchronous_commit` to that command line. The file replaces the
+`postgresql.conf` that initdb wrote into the data directory, so it first restates the image's
+own lines (`listen_addresses = '*'`, the locale, the text-search configuration). Then it sets:
+
+| Setting | Value | Why |
+|---|---|---|
+| `shared_buffers` / `effective_cache_size` | 1GB / 3GB | 25% / 75% of the `db` limit (`CUBE_DB_MEM_LIMIT`, 4 GB); an aged `core_chrisfile` of about 2 M rows is 1 GB with its indexes |
+| `work_mem` / `maintenance_work_mem` | 32MB / 512MB | the file-table sorts of a 100k-file output stay in memory; vacuum and index builds on the file table |
+| `max_wal_size` / `min_wal_size` / `checkpoint_timeout` / `checkpoint_completion_target` | 8GB / 1GB / 15min / 0.9 | at 1 GB, a deep DAG's registrations forced a checkpoint every few minutes, and after each one every page changed again is written to the WAL in full |
+| `wal_compression` | lz4 | compresses those full-page images; lz4 costs far less CPU than pglz (`on`) on a 2-CPU `db` |
+| `random_page_cost` / `effective_io_concurrency` | 1.1 / 200 | SSD/NVMe rather than rotating-disk defaults; PostgreSQL 18's `io_max_concurrency` bounds the 200 |
+| `timezone` | UTC | Django compares it as a string, and the image's `Etc/UTC` costs a `set_config` on every new connection |
+| `shared_preload_libraries`, `track_io_timing`, `log_min_duration_statement`, `log_lock_waits` | pg_stat_statements, on, 1s, on | query attribution, IO timings, and slow statements and lock waits in the `db` log |
+
+Autovacuum and autoanalyze on `core_chrisfile` and `core_chrisfolder` run after 2% and 1% of
+their rows change. Migration `core.0004` sets this, and each run records it under
+`table_options`.
+
+What follows from the file:
+
+- **`shm_size: 1g` on `db`.** A parallel hash join keeps its table in `/dev/shm`, up to
+  `work_mem` × `hash_mem_multiplier` (2) per process. Docker's 64 MB default fails such joins
+  at 32 MB with "could not resize shared memory segment". The tmpfs counts against the
+  container's memory as it fills.
+- **The sizes do not follow `CUBE_DB_MEM_LIMIT`.** About 1.1 GB of shared memory is
+  allocated whatever the limit, so keep the limit well above it. Watch `cgroup_oom_kill` in
+  the counters.
+- **Slow bulk inserts are logged in full.** Django binds parameters on the client, so a
+  registration's `INSERT … UNNEST` reaches the server with every file path inlined, and
+  `log_min_duration_statement` logs all of it: 10–15 MB per 100,000 files, more with deeper
+  paths. The `db` container's log can grow by hundreds of MB in a deep run until
+  registration is batched. Docker writes it outside the container, so `cgroup_write_bytes`
+  does not include it.
+- **A fresh volume zero-fills its WAL segments first.** PostgreSQL writes zeros into each
+  new 16 MB WAL segment before using it, and recycles segments once the pool covers the WAL
+  between checkpoints. At `max_wal_size` 8GB that pool, and the one-time cost of zero-filling
+  it, can grow to several GB on a fresh stack, where the default 1GB capped it near 1 GB. A
+  long-lived database has paid it already. The counters record it as `wal_init_bytes`, part
+  of `cgroup_write_bytes`, so compare what `db` wrote with and without it.
+- **Restart `db` after editing the file** (`just bench-compose 'restart db'`).
+  `shared_buffers`, `shared_preload_libraries`, `listen_addresses` and
+  `dynamic_shared_memory_type` change only then; the others would also follow
+  `SELECT pg_reload_conf()`. The data directory's `postgresql.conf` is no longer read. `ALTER SYSTEM` (`postgresql.auto.conf`) still overrides the file, and a run
+  records any such override under `altered`.
+
 ## What each run records about Postgres
 
 The harness reads these from the running server and the `db` container.
 
 - **Settings** — `environment.json` → `postgres`:
   - `settings` holds every setting's value as `SHOW` prints it. Two runs therefore hold the
-    same names, unless the server version or the preloaded libraries differ (the benchmark
-    `db` preloads `pg_stat_statements`, which adds its own `pg_stat_statements.*` settings).
+    same names, unless the server version or the preloaded libraries differ (a `db` that does
+    not preload `pg_stat_statements` lacks its `pg_stat_statements.*` settings).
   - `key_settings` names the ones `report.md` lists: a fixed list (`POSTGRES_SETTINGS` in
     `environment.py`: version and config file, memory, WAL and checkpoints, IO, planner,
     instrumentation) plus every setting a configuration file or the command line sets.
@@ -104,7 +154,8 @@ The harness reads these from the running server and the `db` container.
   block in their `<csv prefix>_recovery.json`.
 - **Counters** — snapshots of the server's cumulative counters, plus the `db` container's
   cgroup counters:
-  - Server: checkpoints done, timed and requested, WAL bytes and full-page images, temp files,
+  - Server: checkpoints done, timed and requested, WAL bytes and full-page images, the WAL
+    writes that only zero-filled new segments (`wal_init_bytes`), temp files,
     sessions, and autovacuum and autoanalyze runs on the two file tables. Also the bytes each
     process type wrote or extended, per object (`pg_stat_io`; keys
     `io_write_bytes:<object>:<process_type>` with spaces as underscores, e.g.

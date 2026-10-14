@@ -3,7 +3,9 @@
 #   1. swaps CUBE from the dev `runserver` to a production-like uvicorn with N workers,
 #      Django `DEBUG` off as in production (`CUBE_DEBUG=false`, on `chris` and the Celery
 #      services), a larger DB pool, and a higher Postgres max_connections — a pinned,
-#      *recorded* resource envelope so breaking points are reproducible;
+#      *recorded* resource envelope so breaking points are reproducible. Postgres reads
+#      the dev stack's postgres/cube.conf; this file only adds max_connections and
+#      synchronous_commit to its command line;
 #   2. adds a `benchmark` service (profile `bench`) that runs the harness as an external
 #      API client, with the Docker socket mounted for stats/logs/reaping.
 #
@@ -59,11 +61,12 @@ services:
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
 
   db:
-    # pg_stat_statements gives the harness per-scenario query attribution;
-    # synchronous_commit stays on unless CUBE_DB_SYNCHRONOUS_COMMIT=off (see envelope.md)
+    # docker-compose.yml's command line (postgres/cube.conf) plus the envelope's
+    # max_connections; synchronous_commit stays on unless CUBE_DB_SYNCHRONOUS_COMMIT=off
+    # (see envelope.md)
     command: >-
-      postgres -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300}
-      -c shared_preload_libraries=pg_stat_statements
+      postgres -c config_file=/etc/postgresql/cube.conf
+      -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300}
       -c synchronous_commit=${CUBE_DB_SYNCHRONOUS_COMMIT:-on}
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}

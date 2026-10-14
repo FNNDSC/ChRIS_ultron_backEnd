@@ -7,6 +7,7 @@ from unittest import mock
 from django.test import TestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import connection
 
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, PathAccessError,
                          validate_path_access, user_can_access_obj)
@@ -261,3 +262,35 @@ class ValidatePathAccessStorageTests(ModelTests):
 
         # delete files from storage
         self.storage_manager.delete_path(f'home/{self.username}/uploads')
+
+
+class DatabaseSettingsTests(TestCase):
+
+    def test_file_and_folder_tables_vacuum_after_two_percent_of_rows_change(self):
+        """
+        Test whether the file and folder tables carry the autovacuum storage parameters
+        that migration core.0004 sets.
+        """
+        tables = (ChrisFile._meta.db_table, ChrisFolder._meta.db_table)
+
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relname, reloptions FROM pg_class "
+                           "WHERE relname = ANY(%s) AND relkind = 'r'", [list(tables)])
+            options = dict(cursor.fetchall())
+
+        expected = {'autovacuum_vacuum_scale_factor=0.02',
+                    'autovacuum_analyze_scale_factor=0.01'}
+
+        for table in tables:
+            self.assertLessEqual(expected, set(options[table] or []), table)
+
+    def test_server_time_zone_is_the_one_django_connects_with(self):
+        """
+        Test whether the database server's default time zone (postgres/cube.conf) is the
+        one Django's connections use, so Django need not set it on every new connection.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT reset_val FROM pg_settings WHERE name = 'TimeZone'")
+            server_default = cursor.fetchone()[0]
+
+        self.assertEqual(server_default, connection.timezone_name)
