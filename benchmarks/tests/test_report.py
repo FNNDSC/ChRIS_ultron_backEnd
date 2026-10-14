@@ -152,7 +152,7 @@ def test_render_db_counters_per_level_and_for_the_whole_run():
     assert "checkpoints 3 done (4 timed / 1 requested)" in md  # nosec B101 - pytest assertion
     note = ("_Postgres at level 1: workload checkpoints 3 done (4 timed / 0 requested), "
             "WAL 3.0 GiB (210,000 full-page images), temp files 0 B, "
-            "db container wrote 20.0 GiB, of which zero-filling new WAL segments 1.0 GiB, "
+            "db container wrote 20.0 GiB, WAL segments zero-filled 1.0 GiB, "
             "swapped out 12 pages; "
             "cleanup Postgres counters n/a (statistics reset")
     assert note in md  # nosec B101 - pytest assertion
@@ -171,12 +171,17 @@ def test_render_keeps_the_oom_kill_through_a_postgres_reset():
     assert "db container wrote 1.0 KiB, **1 OOM kill(s)**" in md  # nosec B101 - pytest assertion
 
 
-def test_render_attributes_wal_zero_fill_only_to_the_containers_writes():
+def test_render_shows_wal_zero_fill_only_when_there_was_some():
     from benchmarks.report import _counters_summary
 
-    # Postgres counters without the container's: nothing to be "of which" part of
-    line = _counters_summary({"num_done": 1, "wal_init_bytes": 1024})
-    assert "zero-filling" not in line  # nosec B101 - pytest assertion
+    line = _counters_summary({"num_done": 1, "cgroup_write_bytes": 2048,
+                              "wal_init_bytes": 1024})
+    assert "WAL segments zero-filled 1.0 KiB" in line  # nosec B101 - pytest assertion
+
+    # none in this window (a warm pool), or a run that predates the counter
+    for delta in ({"num_done": 1, "cgroup_write_bytes": 2048, "wal_init_bytes": 0},
+                  {"num_done": 1, "cgroup_write_bytes": 2048}):
+        assert "zero-filled" not in _counters_summary(delta)  # nosec B101 - pytest assertion
 
 
 def test_render_prefers_the_reset_message_when_both_flags_are_set():

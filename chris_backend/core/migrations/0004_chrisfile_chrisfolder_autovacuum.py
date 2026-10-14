@@ -1,10 +1,12 @@
 """
-Vacuum and analyze the file and folder tables after 2% and 1% of their rows change
-instead of PostgreSQL's default 20% and 10%.
+Vacuum the file and folder tables once 2% of their rows are updated or deleted and analyze
+them once 1% are inserted, updated or deleted, instead of PostgreSQL's default 20% and 10%.
+Inserts alone still trigger a vacuum at the default 20%
+(autovacuum_vacuum_insert_scale_factor).
 
 Registering and deleting feeds churns these tables by millions of rows so at the
-defaults a table of a few million files carries hundreds of thousands of dead rows and
-stale planner statistics between runs. Django has no field or Meta option for table
+defaults a table of a few million files carries hundreds of thousands of dead rows after a
+deletion and stale planner statistics after a registration. Django has no field or Meta option for table
 storage parameters. A migration applies them wherever CUBE runs.
 
 ALTER TABLE ... SET takes a SHARE UPDATE EXCLUSIVE lock: reads and writes go on but the

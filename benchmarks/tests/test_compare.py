@@ -422,6 +422,19 @@ def test_render_markdown_shows_whole_run_counters_side_by_side():
     assert "| cgroup_oom_kill | — | 1 | — |" in md  # nosec B101 - pytest assertion
 
 
+def test_whole_run_counters_include_wal_zero_fill():
+    # a run from before the counter against one with it
+    base = _run("A", [_lvl()])
+    base.summary["db_counters"] = {"run": {"cgroup_write_bytes": 1000}}
+    cand = _run("B", [_lvl()])
+    cand.summary["db_counters"] = {"run": {"cgroup_write_bytes": 900,
+                                           "wal_init_bytes": 1073741824}}
+    md = render_markdown(compare_runs(base, cand))
+
+    assert "| wal_init_bytes | — | 1073741824 | — |" in md  # nosec B101 - pytest assertion
+    assert "| cgroup_write_bytes | 1000 | 900 | -10.0% |" in md  # nosec B101 - pytest assertion
+
+
 def test_render_markdown_omits_run_counters_for_older_runs():
     md = render_markdown(compare_runs(_run("A", [_lvl()]), _run("B", [_lvl()])))
 

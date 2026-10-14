@@ -99,9 +99,11 @@ own lines (`listen_addresses = '*'`, the locale, the text-search configuration).
 | `timezone` | UTC | Django compares it as a string, and the image's `Etc/UTC` costs a `set_config` on every new connection |
 | `shared_preload_libraries`, `track_io_timing`, `log_min_duration_statement`, `log_lock_waits` | pg_stat_statements, on, 1s, on | query attribution, IO timings, and slow statements and lock waits in the `db` log |
 
-Autovacuum and autoanalyze on `core_chrisfile` and `core_chrisfolder` run after 2% and 1% of
-their rows change. Migration `core.0004` sets this, and each run records it under
-`table_options`.
+On `core_chrisfile` and `core_chrisfolder`, autovacuum runs once 2% of the rows are updated or
+deleted, and autoanalyze once 1% are inserted, updated or deleted (PostgreSQL's defaults: 20%
+and 10%). Inserts alone still trigger a vacuum at the default 20%
+(`autovacuum_vacuum_insert_scale_factor`). Migration `core.0004` sets this, and each run
+records it under `table_options`.
 
 What follows from the file:
 
@@ -118,17 +120,28 @@ What follows from the file:
   paths. The `db` container's log can grow by hundreds of MB in a deep run until
   registration is batched. Docker writes it outside the container, so `cgroup_write_bytes`
   does not include it.
-- **A fresh volume zero-fills its WAL segments first.** PostgreSQL writes zeros into each
-  new 16 MB WAL segment before using it, and recycles segments once the pool covers the WAL
-  between checkpoints. At `max_wal_size` 8GB that pool, and the one-time cost of zero-filling
-  it, can grow to several GB on a fresh stack, where the default 1GB capped it near 1 GB. A
-  long-lived database has paid it already. The counters record it as `wal_init_bytes`, part
-  of `cgroup_write_bytes`, so compare what `db` wrote with and without it.
-- **Restart `db` after editing the file** (`just bench-compose 'restart db'`).
-  `shared_buffers`, `shared_preload_libraries`, `listen_addresses` and
-  `dynamic_shared_memory_type` change only then; the others would also follow
-  `SELECT pg_reload_conf()`. The data directory's `postgresql.conf` is no longer read. `ALTER SYSTEM` (`postgresql.auto.conf`) still overrides the file, and a run
-  records any such override under `altered`.
+- **New WAL segments are zero-filled.** PostgreSQL writes zeros into each new 16 MB WAL
+  segment before using it. At each checkpoint it keeps old segments for reuse only up to
+  about what the recent checkpoints needed (never below `min_wal_size`) and deletes the rest.
+  So zero-filling happens whenever the WAL between checkpoints outgrows the pool it kept:
+  on a fresh volume, and again after lighter load or a server restart has shrunk the pool.
+  At `max_wal_size` 8GB that can be several GB in one heavy run, where the default 1GB
+  capped it near 1 GB. The counters record it as `wal_init_bytes`, part of
+  `cgroup_write_bytes`. Compare what `db` wrote with and without it, and keep the order of
+  runs on a volume the same between the runs you compare.
+- **The `db` volume keeps its WAL.** Once written, at least `min_wal_size` (1 GB) of
+  segments stays in the volume, and up to about `max_wal_size` after heavy runs. The dev
+  and benchmark stacks share the volume, so a laptop keeps it after a benchmark;
+  `just nuke` reclaims it.
+- **Restart the stack after editing the file** (`just bench-down && just bench-start`),
+  not `db` alone. CUBE's connection pools would keep the connections the restart closed,
+  each would fail one request with a 500, and the harness counts any 5xx as a hard failure.
+  `just bench-start` against a running stack recreates `db` when its configuration changed,
+  but not the CUBE services, so bring the stack down first. `shared_buffers`,
+  `shared_preload_libraries`, `listen_addresses` and `dynamic_shared_memory_type` change
+  only at server start; the others would also follow `SELECT pg_reload_conf()`. The data
+  directory's `postgresql.conf` is no longer read. `ALTER SYSTEM` (`postgresql.auto.conf`)
+  still overrides the file, and a run records any such override under `altered`.
 
 ## What each run records about Postgres
 

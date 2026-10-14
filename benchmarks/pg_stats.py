@@ -167,8 +167,9 @@ def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
     process type wrote or extended per object (``io_write_bytes:<object>:<process_type>``,
     from ``pg_stat_io``, non-zero ones only, spaces as underscores so the key passes
     through a shell unquoted). ``wal_init_bytes`` is the part of the WAL writes that only
-    zero-fills new WAL segment files, a one-time cost a fresh volume pays until its pool of
-    segments reaches its working size. ``at`` is the server clock, ``server_start``
+    zero-fills new WAL segment files, paid whenever the WAL between checkpoints outgrows the
+    pool of segments kept for reuse (on a fresh volume, and after lighter load or a restart
+    has shrunk the pool). ``at`` is the server clock, ``server_start``
     the ``SERVER_START_KEY`` and the ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
     """
     return (

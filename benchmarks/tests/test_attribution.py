@@ -7,6 +7,7 @@ manifest that records the settings.
 
 import json
 import os
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -17,10 +18,10 @@ from benchmarks.docker_client import (CGROUP_COUNTERS_CMD, CONTAINER_START_KEY, 
 from benchmarks.environment import ENVELOPE_KEYS, POSTGRES_SETTINGS, collect_environment
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
-from benchmarks.pg_stats import (PgStatStatements, connection_states, counter_delta,
-                                 counter_windows, max_deltas, parse_psql_rows,
-                                 server_counters, server_counters_error, server_settings,
-                                 settings_sql)
+from benchmarks.pg_stats import (STATEMENT_COLUMNS, STATEMENTS_SQL, PgStatStatements,
+                                 connection_states, counter_delta, counter_windows,
+                                 max_deltas, parse_psql_rows, server_counters,
+                                 server_counters_error, server_settings, settings_sql)
 from benchmarks.stats_sampler import StatsSampler
 
 
@@ -119,6 +120,15 @@ def test_snapshot_keeps_every_statement_by_default():
     assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"  # nosec B101 - pytest assertion
     # the temp blocks and WAL a statement wrote name the one behind a spill or a burst
     assert rows[0]["temp_blks_written"] == 128 and rows[0]["wal_fpi"] == 1  # nosec B101 - pytest assertion
+
+
+def test_statement_columns_follow_the_select_list():
+    # parse_psql_rows names the columns by position, so the SQL must select them in order
+    select_list = STATEMENTS_SQL.split(" FROM pg_stat_statements")[0]
+    positions = [re.search(rf"\b{column}\b", select_list).start()
+                 for column in STATEMENT_COLUMNS]
+
+    assert positions == sorted(positions)  # nosec B101 - pytest assertion
 
 
 def test_snapshot_limit_is_optional():
@@ -508,8 +518,14 @@ def test_the_queries_run_on_the_benchmark_stacks_postgres():
     cgroup = docker.cgroup_counters("db")
     expected = {"cgroup_write_bytes", "cgroup_oom_kill", CONTAINER_START_KEY}
     assert expected <= set(cgroup)  # nosec B101 - pytest assertion
+    # zero-filling is a part of the WAL writes
+    wal_writes = sum(v for k, v in counters.items() if k.startswith("io_write_bytes:wal:"))
+    assert counters["wal_init_bytes"] <= wal_writes  # nosec B101 - pytest assertion
 
-    # the statements view has the per-statement temp and WAL columns the harness reads
+    # postgres/cube.conf preloads pg_stat_statements, and the statements view has the
+    # per-statement temp and WAL columns the harness reads
     statements = PgStatStatements(docker)
-    if statements.available:
-        assert statements.snapshot(limit=1)  # nosec B101 - pytest assertion
+    assert statements.available, statements.unavailable_reason  # nosec B101 - pytest assertion
+    rows = statements.snapshot(limit=1)
+    assert rows and set(rows[0]) == set(STATEMENT_COLUMNS)  # nosec B101 - pytest assertion
+    assert isinstance(rows[0]["query"], str)  # nosec B101 - pytest assertion

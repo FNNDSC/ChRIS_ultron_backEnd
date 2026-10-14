@@ -108,9 +108,10 @@ Three attribution streams turn resource saturation into named culprits:
   faster than the workers consume them; `main1` is job submission. Per-scenario
   peaks/means are in `scenario.json` (`queues`) and level rows (`peak_queue_depth`).
 - **`pg_stats.json`** — every statement the scenario ran (calls, time, rows, temp blocks
-  written, WAL and full-page images), most total execution time first, reset per scenario (via `pg_stat_statements`, which `postgres/cube.conf` preloads
-  on `db`). Names the queries behind a hot db, and shows whether a statement ran at all
-  (statements that failed with an error are never recorded).
+  written, WAL and full-page images), most total execution time first, reset per scenario
+  (via `pg_stat_statements`, which `postgres/cube.conf` preloads on `db`). Names the
+  queries behind a hot db, and shows whether a statement ran at all (statements that failed
+  with an error are never recorded).
 - **Postgres counters** — checkpoints (done, timed and requested), WAL and full-page images,
   temp files, bytes written or extended per process type, autovacuum runs, and the `db`
   container's disk writes, swap and OOM kills, as deltas over each scenario's workload and
