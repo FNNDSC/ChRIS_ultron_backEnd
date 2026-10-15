@@ -36,7 +36,7 @@ just bench-compose <args>        # low-level compose helper the other bench-* re
 ```
 
 The **combined-stress number** — how many concurrent feeds before CUBE breaks —
-is the linear `feeds` axis of the `full` tier. For a heavier per-feed DAG and a single
+is the linear `feeds` axis of the `full` tier. For more files per feed (same DAG) and a single
 repeat (each scenario is large), run it directly:
 
 ```bash

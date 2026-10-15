@@ -68,8 +68,8 @@ tiers:
 
   # Overnight on the dedicated Linux box; pushes each axis toward the breaking point.
   # The linear `feeds` axis is the combined-stress "marquee number" (how many concurrent
-  # feeds before CUBE breaks). For the heavier per-feed variant, run it with a bigger
-  # baseline and a single repeat:
+  # feeds before CUBE breaks). For more files per feed (same DAG), raise the file_count
+  # baseline and run a single repeat:
   #   just bench-run --tier full --topology linear --axis feeds --cap 128 --repeat 1 --file-count 100
   full:
     repeat: 3

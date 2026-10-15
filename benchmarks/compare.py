@@ -155,6 +155,7 @@ _NOISE_FLOOR_RATIO = 3.0
 
 def _dig(env: dict, path: tuple) -> object:
     cur: object = env
+
     for key in path:
         cur = cur.get(key) if isinstance(cur, dict) else None
     return cur
@@ -336,7 +337,7 @@ def compare_levels(base_levels: list[dict], cand_levels: list[dict],
     return tuple(out)
 
 
-# --- breaking-point shifts ----------------------------------------------------------------
+# --- breaking-point shifts --------------------------------------------------------------
 
 def breaking_point_shifts(base: RunData, cand: RunData) -> tuple[AxisShift, ...]:
     def bp_levels(run: RunData) -> dict[tuple, int]:
@@ -394,7 +395,7 @@ def has_regressions(comparison: RunComparison) -> bool:
             or any(s.direction == "regressed" for s in comparison.shifts))
 
 
-# --- trend (3+ runs) ----------------------------------------------------------------------
+# --- trend (3+ runs) --------------------------------------------------------------------
 
 def _metric_path(metric: str) -> tuple:
     """
@@ -617,6 +618,7 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--fail-on-regression", action="store_true",
                     help="exit 1 if any level regresses, a breaking point moves down, "
                          "or the runs are not comparable")
+
     args = ap.parse_args(argv)
     if len(args.runs) < 2:
         ap.error("need at least two runs (baseline and candidate)")

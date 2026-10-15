@@ -1,12 +1,12 @@
 """
-Locust control-plane load test for CUBE — the deferred Layer-1 (control plane / RED)
-from STRATEGY §4, built on the ``chris_api`` Collection+JSON seam.
+Locust control-plane load test for CUBE — the Layer-1 (control plane / RED) from
+STRATEGY §4 built on the ``chris_api`` Collection+JSON seam.
 
 The data-plane harness (``run_bench``) measures orchestration (makespan, DAG execution).
 This complements it by driving *concurrent API clients* against the control-plane
 endpoints (list feeds/instances/files, plugin search, create instance) and reporting RED
 metrics — Rate, Errors, Duration percentiles — via Locust's own statistics. It is the
-right tool to find the API saturation knee, error onset, and DB connection-pool
+right tool to find the API saturation knee, error onset and DB connection-pool
 exhaustion under client concurrency, which the data plane does not exercise.
 
 Run headless via ``just bench-locust``, e.g.::
@@ -17,9 +17,9 @@ Run headless via ``just bench-locust``, e.g.::
 needed. Pure Collection+JSON helpers are reused from ``chris_api`` (the shared seam).
 
 Each step also records whether the API was healthy when it started and whether it
-recovered once the load stopped (``recovery.api_recovery``), in
-``<csv prefix>_recovery.json``, and exits non-zero otherwise: a step that ran on, or
-left behind, a broken stack does not measure CUBE under load. That file also records the
+recovered once the load stopped (``recovery.api_recovery``) in
+``<csv prefix>_recovery.json`` and exits non-zero otherwise: a step that ran on or
+left behind a broken stack does not measure CUBE under load. That file also records the
 envelope knobs and the Postgres server's effective settings.
 """
 

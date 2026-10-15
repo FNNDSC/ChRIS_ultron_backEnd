@@ -18,9 +18,9 @@ from .models import ResourceSample
 #: pfcon labels every plugin-job container with this (see docker-compose.yml JOB_LABELS)
 JOB_LABEL = "org.chrisproject.miniChRIS=plugininstance"
 
-#: run inside a container, it reads the container's own cgroup v2 files (each container gets
-#: a private cgroup namespace): ``io.stat`` is what ``docker stats`` reports as block I/O,
-#: and the swap and OOM-kill counters are ones the stats API leaves out
+#: run inside a container, it reads the container's own cgroup v2 files (each container
+#: gets a private cgroup namespace): ``io.stat`` is what ``docker stats`` reports as block
+#: I/O, and the swap and OOM-kill counters are ones the stats API leaves out
 CGROUP_COUNTERS_CMD = [
     "sh", "-c",
     "cat /sys/fs/cgroup/io.stat; "
@@ -263,8 +263,10 @@ def parse_cgroup_counters(text: str) -> dict:
         if fields and ":" in fields[0]:                # io.stat: one line per device
             for item in fields[1:]:
                 key, _, value = item.partition("=")
+
                 if key == "wbytes" and value.isdigit():
                     written = (written or 0) + int(value)
+
         elif len(fields) == 2 and fields[0] in _CGROUP_KEYS and fields[1].isdigit():
             counters[f"cgroup_{fields[0]}"] = int(fields[1])
 

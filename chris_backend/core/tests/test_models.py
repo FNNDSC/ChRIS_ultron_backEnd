@@ -276,6 +276,7 @@ class DatabaseSettingsTests(TestCase):
         with connection.cursor() as cursor:
             cursor.execute("SELECT relname, reloptions FROM pg_class "
                            "WHERE relname = ANY(%s) AND relkind = 'r'", [list(self.TABLES)])
+
             return {table: {option for option in (options or [])
                             if option.startswith('autovacuum_')}
                     for table, options in cursor.fetchall()}

@@ -194,10 +194,12 @@ def _peak_io_note(rows: list[dict]) -> list[str]:
 
 def _human_bytes(n: int) -> str:
     size = float(n or 0)
+
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
         if size < 1024 or unit == "TiB":
             return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
+
     return f"{size:.1f} TiB"
 
 
@@ -276,7 +278,8 @@ def _postgres_section(postgres: dict) -> list[str]:
 
     names = sorted(postgres.get("key_settings") or settings, key=str.lower)
     out = ["", "### PostgreSQL (key settings; environment.json has all)", ""]
-    out += markdown_table(["Setting", "Value"], [[name, settings.get(name)] for name in names])
+    out += markdown_table(["Setting", "Value"], 
+                          [[name, settings.get(name)] for name in names])
 
     if postgres.get("altered"):
         out += ["", "_Overridden by `ALTER SYSTEM` (postgresql.auto.conf): "
@@ -343,7 +346,9 @@ def _group_by_axis(levels: Iterable[dict]) -> dict[tuple[str, str], list[dict]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Re-render report.md + levels.csv from a results run directory (for `bench-report`)."""
+    """
+    Re-render report.md + levels.csv from a results run directory (for `bench-report`).
+    """
     ap = argparse.ArgumentParser(description="Re-render a benchmark report")
     ap.add_argument("run_dir", help="path to results/<run_id>")
     args = ap.parse_args(argv)
@@ -351,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = Path(args.run_dir)
     summary = json.loads((run_dir / "summary.json").read_text())
     levels_path = run_dir / "levels.jsonl"
+
     levels = [json.loads(line) for line in
               (levels_path.read_text().splitlines() if levels_path.exists() else [])
               if line.strip()]

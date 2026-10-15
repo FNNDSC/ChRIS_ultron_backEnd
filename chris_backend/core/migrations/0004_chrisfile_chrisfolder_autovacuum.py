@@ -5,9 +5,9 @@ Inserts alone still trigger a vacuum at the default 20%
 (autovacuum_vacuum_insert_scale_factor).
 
 Registering and deleting feeds churns these tables by millions of rows so at the
-defaults a table of a few million files carries hundreds of thousands of dead rows after a
-deletion and stale planner statistics after a registration. Django has no field or Meta option for table
-storage parameters. A migration applies them wherever CUBE runs.
+defaults a table of a few million files carries hundreds of thousands of dead rows after 
+a deletion and stale planner statistics after a registration. Django has no field or Meta
+option for table storage parameters. A migration applies them wherever CUBE runs.
 
 ALTER TABLE ... SET takes a SHARE UPDATE EXCLUSIVE lock: reads and writes go on but the
 migration waits for a manual VACUUM or ANALYZE, or an anti-wraparound autovacuum, running

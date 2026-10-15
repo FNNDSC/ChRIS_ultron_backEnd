@@ -2,10 +2,10 @@
 Environment / hardware manifest collection.
 
 Auto-collects what it can (Docker engine info gives the *host* CPU/mem, image ids,
-versions and each service container's resource limits), reads the effective settings from
-the Postgres server, and reads the envelope
-knobs + git provenance from environment variables the ``justfile`` injects. Manual hardware
-fields are left as explicit placeholders for the generated report.
+versions and each service container's resource limits), reads the effective settings
+from the Postgres server, and reads the envelope knobs + git provenance from environment 
+variables the ``justfile`` injects. Manual hardware fields are left as explicit 
+placeholders for the generated report.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ ENVELOPE_KEYS = (
     "STORAGE_ENV", "CUBE_DEBUG",
 )
 
-#: Postgres settings recorded with every run whatever their source: the server version and
-#: config file, what governs memory, WAL, checkpoints, IO and the planner, and the
+#: Postgres settings recorded with every run whatever their source: the server version
+#: and config file, what governs memory, WAL, checkpoints, IO and the planner, and the
 #: instrumentation. Every setting a configuration file or the command line sets is
 #: recorded as well, so a new line in the configuration needs no change here.
 POSTGRES_SETTINGS = (
@@ -38,10 +38,11 @@ POSTGRES_SETTINGS = (
     "shared_buffers", "effective_cache_size", "work_mem", "hash_mem_multiplier",
     "maintenance_work_mem", "max_wal_size", "min_wal_size", "checkpoint_timeout",
     "checkpoint_completion_target", "wal_compression", "wal_buffers", "wal_level",
-    "full_page_writes", "synchronous_commit", "random_page_cost", "effective_io_concurrency",
-    "io_method", "io_workers", "max_parallel_workers_per_gather", "jit",
-    "autovacuum_max_workers", "shared_preload_libraries", "track_io_timing",
-    "log_min_duration_statement", "log_lock_waits", "TimeZone",
+    "full_page_writes", "synchronous_commit", "random_page_cost",
+    "effective_io_concurrency", "io_method", "io_workers",
+    "max_parallel_workers_per_gather", "jit", "autovacuum_max_workers",
+    "shared_preload_libraries", "track_io_timing", "log_min_duration_statement",
+    "log_lock_waits", "TimeZone",
 )
 
 
@@ -53,7 +54,8 @@ def postgres_settings(docker: DockerClient) -> dict:
 
 
 def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
-                        image_services: tuple[str, ...] = ("chris", "pfcon", "db")) -> dict:
+                        image_services: tuple[str, ...] = ("chris", "pfcon", 
+                                                           "db")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()
     version = docker.version()

@@ -17,9 +17,9 @@ each client holds and in which state, which tells idle pooled connections apart 
 left ``idle in transaction``.
 
 ``server_settings`` and ``server_counters`` use it too: the settings the server runs with,
-which the environment manifest records, and its cumulative counters (checkpoints, WAL, temp
-files, writes by process type, autovacuum runs), which the runner snapshots around each
-scenario, together with the db container's cgroup counters, and turns into per-window
+which the environment manifest records, and its cumulative counters (checkpoints, WAL,
+temp files, writes by process type, autovacuum runs), which the runner snapshots around
+each scenario, together with the db container's cgroup counters, and turns into per-window
 deltas with ``counter_windows``.
 """
 
@@ -48,15 +48,14 @@ SERVER_START_KEY = "server_start"
 CGROUP_PREFIX = "cgroup_"
 
 #: per-process-type write counters (``io_write_bytes:<object>:<process_type>``, spaces as
-#: underscores), present in a snapshot only once they are non-zero, so one missing from the
-#: earlier snapshot counts from 0; any other counter missing from either snapshot is left
-#: out of the delta
+#: underscores), present in a snapshot only once they are non-zero, so one missing from
+#: the earlier snapshot counts from 0; any other counter missing from either snapshot is
+#: left out of the delta
 IO_PREFIX = "io_write_bytes:"
 
 #: a delta's markers for Postgres counters it cannot give: ``reset`` (its statistics were
 #: reset in the window) and ``unreadable`` (psql failed at one end of the window)
 UNKNOWN_FLAGS = ("reset", "unreadable")
-
 
 #: per statement: calls, time, rows, the temp blocks it wrote (a sort or hash that spilled
 #: past work_mem) and the WAL it generated, full-page images included
@@ -116,8 +115,8 @@ def psql(docker: DockerClient, sql: str, *, service: str = "db",
     env = docker.service_env(service) if env is None else env
 
     return docker.exec_in_service(
-        service, ["psql", "-U", env.get("POSTGRES_USER", "chris"),
-                  "-d", env.get("POSTGRES_DB", "chris_dev"), "-At", "-F", "\t", "-c", sql])
+        service, ["psql", "-U", env.get("POSTGRES_USER", "chris"), "-d", 
+                  env.get("POSTGRES_DB", "chris_dev"), "-At", "-F", "\t", "-c", sql])
 
 
 def connection_states(docker: DockerClient, service: str = "db") -> list[dict]:
@@ -131,7 +130,7 @@ def connection_states(docker: DockerClient, service: str = "db") -> list[dict]:
     return parse_psql_rows(out, ("client_addr", "state", "count"))
 
 
-# -- server settings and cumulative counters ----------------------------------------------
+# -- server settings and cumulative counters ---------------------------------------------
 
 def _text_array(values: Iterable[str]) -> str:
     quoted = ", ".join("'" + value.replace("'", "''") + "'" for value in values)
@@ -167,9 +166,9 @@ def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
     process type wrote or extended per object (``io_write_bytes:<object>:<process_type>``,
     from ``pg_stat_io``, non-zero ones only, spaces as underscores so the key passes
     through a shell unquoted). ``wal_init_bytes`` is the part of the WAL writes that only
-    zero-fills new WAL segment files, paid whenever the WAL between checkpoints outgrows the
-    pool of segments kept for reuse (on a fresh volume, and after lighter load or a restart
-    has shrunk the pool). ``at`` is the server clock, ``server_start``
+    zero-fills new WAL segment files, paid whenever the WAL between checkpoints outgrows
+    the pool of segments kept for reuse (on a fresh volume, and after lighter load or a
+    restart has shrunk the pool). ``at`` is the server clock, ``server_start``
     the ``SERVER_START_KEY`` and the ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
     """
     return (
@@ -299,6 +298,7 @@ def counter_delta(before: dict, after: dict) -> Optional[dict]:
 
     pg: dict = {}
     cgroup: dict = {}
+
     for key, value in after.items():
         in_cgroup = key.startswith(CGROUP_PREFIX)
         prior = before.get(key, 0 if key.startswith(IO_PREFIX) else None)
@@ -315,7 +315,8 @@ def counter_delta(before: dict, after: dict) -> Optional[dict]:
             continue
 
         diff = value - prior
-        (cgroup if in_cgroup else pg)[key] = round(diff, 1) if isinstance(diff, float) else diff
+        (cgroup if in_cgroup else pg)[key] = round(diff, 1) if isinstance(diff, 
+                                                                          float) else diff
 
     if not pg_readable:
         delta = {"unreadable": True}
@@ -366,7 +367,8 @@ def counter_windows(start: dict, workload_end: dict,
     """
     return {
         "workload": counter_delta(start, workload_end),
-        "cleanup": None if cleanup_end is None else counter_delta(workload_end, cleanup_end),
+        "cleanup": None if cleanup_end is None else counter_delta(workload_end, 
+                                                                  cleanup_end),
         "snapshots": {"start": start, "workload_end": workload_end,
                       "cleanup_end": cleanup_end},
     }

@@ -135,10 +135,10 @@ services:
       - POSTGRES_USER=chris
       - POSTGRES_PASSWORD=Chris1234
     healthcheck:
-      # as the database's own user: without -U pg_isready connects as root, and the server
-      # logs a FATAL "role "root" does not exist" on every check. To the postgres database:
-      # a check against chris_dev would add a session every 2 s to the statistics the
-      # benchmark records for it
+      # as the database's own user: without -U pg_isready connects as root, and the
+      # server logs a FATAL "role "root" does not exist" on every check. Use the postgres
+      # database here because a check against chris_dev would add a session every 2s to
+      # the statistics the benchmark harness records for it.
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
       interval: 2s
       timeout: 4s

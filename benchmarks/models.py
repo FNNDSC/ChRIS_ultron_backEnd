@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 
-# --- plugin instance status vocabulary (mirrors chris_backend/plugininstances/enums.py) ---
+# --- plugin instance status vocabulary (mirrors chris_backend/plugininstances/enums.py) -
 
 ACTIVE_STATUSES: frozenset[str] = frozenset(
     {"created", "waiting", "copying", "scheduled", "started", "uploading", 
