@@ -116,14 +116,30 @@ services:
 
   db:
     image: docker.io/library/postgres:18
+    # Postgres reads postgres/cube.conf instead of the postgresql.conf in its data directory.
+    # docker-compose.benchmark.yml repeats this command line: change them together.
+    command: postgres -c config_file=/etc/postgresql/cube.conf
+    # parallel hash joins allocate their tables in /dev/shm, and Docker's 64 MB default
+    # fails them ("could not resize shared memory segment") at cube.conf's work_mem
+    shm_size: 1g
+    # a fast shutdown writes up to shared_buffers (1 GB) of dirty pages first; killed
+    # sooner, the next start replays the WAL since the last checkpoint instead
+    stop_grace_period: 2m
     volumes:
       - db:/var/lib/postgresql
+      # a directory, not the file: a single-file mount keeps serving the old file after a
+      # git checkout or an editor replaces it
+      - ./postgres:/etc/postgresql:ro
     environment:
       - POSTGRES_DB=chris_dev
       - POSTGRES_USER=chris
       - POSTGRES_PASSWORD=Chris1234
     healthcheck:
-      test: ["CMD", "pg_isready"]
+      # as the database's own user: without -U pg_isready connects as root, and the
+      # server logs a FATAL "role "root" does not exist" on every check. Use the postgres
+      # database here because a check against chris_dev would add a session every 2s to
+      # the statistics the benchmark harness records for it.
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
       interval: 2s
       timeout: 4s
       retries: 3

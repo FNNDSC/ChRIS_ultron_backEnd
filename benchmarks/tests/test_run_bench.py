@@ -2,15 +2,20 @@
 Tests for benchmarks.run_bench — scenario params, tier filtering, level rollup, plugin resolution.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
+from benchmarks import run_bench
 from benchmarks.config import load_tier
-from benchmarks.models import (Classification, LevelResult, PluginRole, ScenarioParams,
-                               ScenarioResult, StatusTimeline, Verdict)
-from benchmarks.run_bench import (_filter_tier, _level_row, _override_baseline,
-                                  ambiguous_plugins, apply_build_errors,
-                                  build_workload_manifest, effective_poll_cadence,
-                                  make_scenario_params, plugin_ambiguity_warning)
+from benchmarks.models import (Classification, LevelResult, PluginRole, PollResult,
+                               ScenarioParams, ScenarioResult, StatusTimeline, Verdict)
+from benchmarks.results import ResultsStore
+from benchmarks.run_bench import (RUN_STATS_SETTLE_S, BenchmarkRunner, _filter_tier,
+                                  _level_row, _override_baseline, ambiguous_plugins,
+                                  apply_build_errors, build_workload_manifest,
+                                  effective_poll_cadence, make_scenario_params,
+                                  plugin_ambiguity_warning)
 
 
 # -- scenario params -------------------------------------------------------------------
@@ -140,6 +145,195 @@ def test_level_row_excludes_job_containers_and_keeps_service_io():
     assert row["peak_cpu_pct"] == {"db": 70.0}         # ephemeral job container excluded
     assert row["peak_job_cpu_pct"] == 250.0            # surfaced as one aggregate
     assert row["peak_write_bytes"] == {"db": 2048}     # service disk write only
+
+
+def _with_counters(db_counters):
+    sr = _scenario(Verdict.PASS, 5.0, 100, 40, 1, 0)
+    sr.db_counters = db_counters
+    return sr
+
+
+def test_level_row_rolls_up_db_counters_as_the_worst_repeat_per_window():
+    reps = [_with_counters({"workload": {"num_requested": 0, "wal_bytes": 900},
+                            "cleanup": {"temp_bytes": 70}}),
+            _with_counters({"workload": {"num_requested": 2, "wal_bytes": 500},
+                            "cleanup": None})]
+    row = _level_row(LevelResult("diamond", "layers", 8, Verdict.PASS, (), reps))
+
+    assert row["db_counters"] == {  # nosec B101 - pytest assertion
+        "workload": {"num_requested": 2, "wal_bytes": 900},
+        "cleanup": {"temp_bytes": 70}}
+
+
+def test_level_row_surfaces_a_counter_reset_instead_of_a_number():
+    reps = [_with_counters({"workload": {"num_requested": 0}}),
+            _with_counters({"workload": {"reset": True}})]
+    row = _level_row(LevelResult("diamond", "layers", 8, Verdict.PASS, (), reps))
+
+    assert row["db_counters"] == {"workload": {"reset": True}}  # nosec B101 - pytest assertion
+
+
+def test_level_row_keeps_the_container_counters_of_a_reset_repeat():
+    reps = [_with_counters({"workload": {"num_requested": 0, "cgroup_oom_kill": 0}}),
+            _with_counters({"workload": {"reset": True, "cgroup_oom_kill": 1}})]
+    row = _level_row(LevelResult("diamond", "layers", 8, Verdict.PASS, (), reps))
+
+    workload = row["db_counters"]["workload"]
+    assert workload == {"reset": True, "cgroup_oom_kill": 1}  # nosec B101 - pytest assertion
+
+
+def test_level_row_without_db_counters_has_an_empty_block():
+    row = _level_row(LevelResult("linear", "depth", 1, Verdict.PASS, (),
+                                 [_scenario(Verdict.PASS, 1.0, 10, 5, 1, 0)]))
+
+    assert row["db_counters"] == {}  # nosec B101 - pytest assertion
+
+
+# -- Postgres counter windows and run totals ------------------------------------------------
+
+class _Sampler:
+    """Stands in for StatsSampler, recording when the resource samples start and stop."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+    def __enter__(self):
+        self.events.append("samples start")
+        return self
+
+    def __exit__(self, *exc):
+        self.events.append("samples stop")
+
+
+def _scenario_runner(monkeypatch, tmp_path, *, cleanup):
+    """
+    A runner whose adapters are fakes that record, in order, what ``run_scenario`` does.
+    """
+    events = []
+    snapshots = iter([{"at": 0.0, "server_start": "s", "wal_bytes": 0},
+                      {"at": 5.0, "server_start": "s", "wal_bytes": 100},
+                      {"at": 8.0, "server_start": "s", "wal_bytes": 130}])
+
+    def snapshot():
+        events.append("snapshot")
+        return next(snapshots)
+
+    poll = PollResult(timelines=[], makespan_s=1.0, terminal=True, hard_failures=(),
+                      no_progress=False, timed_out=False, final_status_counts={})
+
+    monkeypatch.setattr(run_bench, "StatsSampler", _Sampler(events))
+    monkeypatch.setattr(run_bench, "build_feeds", lambda *a, **k: [])
+    monkeypatch.setattr(run_bench, "poll_to_completion", lambda *a, **k: poll)
+    monkeypatch.setattr(run_bench, "ProgressProbe", lambda docker: None)
+
+    runner = BenchmarkRunner.__new__(BenchmarkRunner)   # no API or Docker connection
+    runner.tier = load_tier("smoke")
+    runner.cleanup = cleanup
+    runner.store = ResultsStore(tmp_path)
+    runner.docker = runner.api = runner.broker = None
+    runner.plugin_ids = {}
+    runner.pg_stats = SimpleNamespace(reset=lambda: events.append("pg_stats reset"))
+    runner._global_counts = lambda: {}
+    runner._db_snapshot = snapshot
+    runner._db_deltas = lambda *a: events.append("db deltas") or {}
+    runner._cleanup_and_quiesce = lambda *a: events.append("cleanup")
+    runner._persist_scenario = lambda *a: events.append("persist")
+    return runner, events
+
+
+def test_scenario_counter_windows_match_the_resource_samples_and_cleanup(monkeypatch,
+                                                                         tmp_path):
+    runner, events = _scenario_runner(monkeypatch, tmp_path, cleanup=True)
+    result = runner.run_scenario(make_scenario_params(runner.tier.baseline, 2.0, "linear",
+                                                      "depth", 1, 0))
+
+    expected = ["pg_stats reset", "snapshot", "samples start", "samples stop",
+                "snapshot", "db deltas", "cleanup", "snapshot", "persist"]
+    assert events == expected  # nosec B101 - pytest assertion
+    workload, cleanup = result.db_counters["workload"], result.db_counters["cleanup"]
+    assert workload == {"wal_bytes": 100, "seconds": 5.0}  # nosec B101 - pytest assertion
+    assert cleanup == {"wal_bytes": 30, "seconds": 3.0}  # nosec B101 - pytest assertion
+
+
+def test_a_scenario_that_keeps_its_feeds_has_no_cleanup_window(monkeypatch, tmp_path):
+    runner, events = _scenario_runner(monkeypatch, tmp_path, cleanup=False)
+    result = runner.run_scenario(make_scenario_params(runner.tier.baseline, 2.0, "linear",
+                                                      "depth", 1, 0))
+
+    assert events.count("snapshot") == 2  # nosec B101 - pytest assertion
+    assert result.db_counters["cleanup"] is None  # nosec B101 - pytest assertion
+
+
+def test_db_snapshot_survives_failing_reads(monkeypatch):
+    class Docker:
+        def cgroup_counters(self, service):
+            return {"cgroup_write_bytes": 10}
+
+    def broken(docker):
+        raise RuntimeError("docker API went away")
+
+    runner = BenchmarkRunner.__new__(BenchmarkRunner)
+    runner.docker = Docker()
+    monkeypatch.setattr(run_bench, "server_counters", broken)
+
+    # the container half is still read, and nothing escapes into the scenario or run
+    assert runner._db_snapshot() == {"cgroup_write_bytes": 10}  # nosec B101 - pytest assertion
+
+    runner.docker.cgroup_counters = broken
+    assert runner._db_snapshot() == {}  # nosec B101 - pytest assertion
+
+
+def _run_runner(monkeypatch, tmp_path, snapshots, sleeps):
+    monkeypatch.setattr(run_bench.environment, "collect_environment",
+                        lambda docker: {"postgres": {}})
+    monkeypatch.setattr(run_bench.environment, "measure_noise_floor", lambda api: {})
+    monkeypatch.setattr(run_bench.escalation, "run", lambda *a, **k: ([], []))
+    monkeypatch.setattr(run_bench.time, "sleep", sleeps.append)
+
+    runner = BenchmarkRunner.__new__(BenchmarkRunner)
+    runner.tier = load_tier("smoke")
+    runner.store = ResultsStore(tmp_path)
+    runner.api = SimpleNamespace(auth_mode="token")
+    runner.broker = SimpleNamespace(available=True)
+    runner.pg_stats = SimpleNamespace(available=False,
+                                      unavailable_reason="psql: connection refused")
+    runner.plugins = {}
+    runner.docker = None
+    runner._db_snapshot = lambda: snapshots.pop(0)
+    monkeypatch.setattr(run_bench, "server_counters_error",
+                        lambda docker: "psql: FATAL:  sorry, too many clients already")
+    return runner
+
+
+def test_run_totals_wait_for_the_statistics_to_settle(monkeypatch, tmp_path):
+    sleeps = []
+    snapshots = [{"at": 0.0, "server_start": "s", "num_requested": 1},
+                 {"at": 60.0, "server_start": "s", "num_requested": 1}]
+    summary = _run_runner(monkeypatch, tmp_path, snapshots, sleeps).run()
+
+    assert sleeps == [RUN_STATS_SETTLE_S]  # nosec B101 - pytest assertion
+    run_delta = summary["db_counters"]["run"]
+    assert run_delta == {"num_requested": 0, "seconds": 60.0}  # nosec B101 - pytest assertion
+    attribution = summary["environment"]["attribution"]
+    assert attribution["db_counters"] is True  # nosec B101 - pytest assertion
+
+
+def test_run_without_readable_counters_skips_the_wait_and_says_why(monkeypatch, tmp_path,
+                                                                   capsys):
+    sleeps = []
+    summary = _run_runner(monkeypatch, tmp_path, [{}, {}], sleeps).run()
+
+    assert sleeps == []  # nosec B101 - pytest assertion
+    assert summary["db_counters"]["run"] is None  # nosec B101 - pytest assertion
+    attribution = summary["environment"]["attribution"]
+    assert attribution["db_counters"] == (  # nosec B101 - pytest assertion
+        "Postgres counters unreadable: psql: FATAL:  sorry, too many clients already")
+    # the empty settings block was reported as it happened
+    out = capsys.readouterr().out
+    assert "could not read the Postgres settings" in out  # nosec B101 - pytest assertion
 
 
 # -- workload plugins ------------------------------------------------------------------

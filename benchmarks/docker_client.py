@@ -18,6 +18,22 @@ from .models import ResourceSample
 #: pfcon labels every plugin-job container with this (see docker-compose.yml JOB_LABELS)
 JOB_LABEL = "org.chrisproject.miniChRIS=plugininstance"
 
+#: run inside a container, it reads the container's own cgroup v2 files (each container
+#: gets a private cgroup namespace): ``io.stat`` is what ``docker stats`` reports as block
+#: I/O, and the swap and OOM-kill counters are ones the stats API leaves out
+CGROUP_COUNTERS_CMD = [
+    "sh", "-c",
+    "cat /sys/fs/cgroup/io.stat; "
+    "grep -E '^(pswpin|pswpout) ' /sys/fs/cgroup/memory.stat; "
+    "grep '^oom_kill ' /sys/fs/cgroup/memory.events",
+]
+
+_CGROUP_KEYS = ("pswpin", "pswpout", "oom_kill")
+
+#: the cgroup counters' identity: when it differs between two readings the container
+#: restarted in between and its counters started again from zero
+CONTAINER_START_KEY = "cgroup_container_started_at"
+
 
 class DockerClient:
     """
@@ -120,12 +136,46 @@ class DockerClient:
 
         if container is None:
             return -1, f"service {service!r} not running"
-        
-        try:
-            code, output = container.exec_run(cmd)
-            return code, output.decode("utf-8", "replace")
-        except Exception as exc:                       # noqa: BLE001 - best effort
-            return -1, str(exc)
+        return _exec(container, cmd)
+
+    def cgroup_counters(self, service: str) -> dict:
+        """
+        Counters of a service container's cgroup since it started:
+        ``cgroup_write_bytes`` (bytes written to disk), ``cgroup_pswpout`` and
+        ``cgroup_pswpin`` (pages swapped out and in) and ``cgroup_oom_kill``, with the
+        container's start time under ``CONTAINER_START_KEY``. Only the counters that
+        could be read are present, so ``{}`` when none could.
+        """
+        container = self.find_service(service)
+
+        if container is None:
+            return {}
+
+        code, out = _exec(container, CGROUP_COUNTERS_CMD)
+        counters = {} if code == -1 else parse_cgroup_counters(out)
+
+        if counters:
+            counters[CONTAINER_START_KEY] = (container.attrs.get("State") or {}).get(
+                "StartedAt")
+        return counters
+
+    def service_limits(self) -> dict:
+        """
+        The resource limits the engine applies to each running service container:
+        ``cpus``, ``mem_limit`` and ``memswap_limit`` (bytes; -1 = unlimited swap) and
+        ``shm_size`` (bytes), each ``None`` when unset.
+        """
+        limits = {}
+
+        for container in self.service_containers():
+            host = container.attrs.get("HostConfig", {}) or {}
+            service = container.labels.get("com.docker.compose.service", container.name)
+
+            limits[service] = {"cpus": _cpus(host),
+                               "mem_limit": host.get("Memory") or None,
+                               "memswap_limit": host.get("MemorySwap") or None,
+                               "shm_size": host.get("ShmSize") or None}
+        return limits
 
     def service_env(self, service: str) -> dict:
         """
@@ -176,6 +226,53 @@ def _cpu_pct(stats: dict) -> float:
     if system_delta > 0 and cpu_delta > 0:
         return round((cpu_delta / system_delta) * ncpu * 100.0, 2)
     return 0.0
+
+
+def _exec(container, cmd: list) -> tuple[int, str]:
+    try:
+        code, output = container.exec_run(cmd)
+        return code, output.decode("utf-8", "replace")
+    except Exception as exc:                           # noqa: BLE001 - best effort
+        return -1, str(exc)
+
+
+def _cpus(host: dict) -> Optional[float]:
+    """
+    A container's CPU limit: Docker sets ``NanoCpus``, while Podman can report the
+    same limit as a CFS quota over its period.
+    """
+    if host.get("NanoCpus"):
+        return host["NanoCpus"] / 1e9
+
+    quota, period = host.get("CpuQuota") or 0, host.get("CpuPeriod") or 0
+    return quota / period if quota > 0 and period > 0 else None
+
+
+def parse_cgroup_counters(text: str) -> dict:
+    """
+    Parse ``CGROUP_COUNTERS_CMD`` output: ``io.stat`` lines (``<major:minor> wbytes=N
+    ...``, summed over devices) and ``<key> <value>`` lines from ``memory.stat`` and
+    ``memory.events``; anything else is ignored.
+    """
+    counters: dict[str, int] = {}
+    written = None
+
+    for line in text.splitlines():
+        fields = line.split()
+
+        if fields and ":" in fields[0]:                # io.stat: one line per device
+            for item in fields[1:]:
+                key, _, value = item.partition("=")
+
+                if key == "wbytes" and value.isdigit():
+                    written = (written or 0) + int(value)
+
+        elif len(fields) == 2 and fields[0] in _CGROUP_KEYS and fields[1].isdigit():
+            counters[f"cgroup_{fields[0]}"] = int(fields[1])
+
+    if written is not None:
+        counters["cgroup_write_bytes"] = written
+    return counters
 
 
 def _blkio(stats: dict) -> tuple[float, float]:

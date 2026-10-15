@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 
-# --- plugin instance status vocabulary (mirrors chris_backend/plugininstances/enums.py) ---
+# --- plugin instance status vocabulary (mirrors chris_backend/plugininstances/enums.py) -
 
 ACTIVE_STATUSES: frozenset[str] = frozenset(
     {"created", "waiting", "copying", "scheduled", "started", "uploading", 
@@ -223,6 +223,8 @@ class ScenarioResult:
     ended_at: float
     queues: dict = field(default_factory=dict)  # broker queue depth rollup
     notes: list[str] = field(default_factory=list)
+    # Postgres and db-container counter deltas per window (pg_stats.counter_windows)
+    db_counters: dict = field(default_factory=dict)
 
 
 @dataclass

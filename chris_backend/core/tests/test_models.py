@@ -7,6 +7,8 @@ from unittest import mock
 from django.test import TestCase, tag
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 
 from core.models import (ChrisFolder, ChrisFile, ChrisLinkFile, PathAccessError,
                          validate_path_access, user_can_access_obj)
@@ -261,3 +263,67 @@ class ValidatePathAccessStorageTests(ModelTests):
 
         # delete files from storage
         self.storage_manager.delete_path(f'home/{self.username}/uploads')
+
+
+class DatabaseSettingsTests(TestCase):
+
+    TABLES = (ChrisFile._meta.db_table, ChrisFolder._meta.db_table)
+
+    AUTOVACUUM_OPTIONS = {'autovacuum_vacuum_scale_factor=0.02',
+                          'autovacuum_analyze_scale_factor=0.01'}
+
+    def _autovacuum_options(self):
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relname, reloptions FROM pg_class "
+                           "WHERE relname = ANY(%s) AND relkind = 'r'", [list(self.TABLES)])
+
+            return {table: {option for option in (options or [])
+                            if option.startswith('autovacuum_')}
+                    for table, options in cursor.fetchall()}
+
+    def _migrate_core(self, name):
+        MigrationExecutor(connection).migrate([('core', name)])
+
+    def test_file_and_folder_tables_vacuum_and_analyze_sooner(self):
+        """
+        Test whether the file and folder tables carry the autovacuum storage parameters
+        that migration core.0004 sets.
+        """
+        self.assertEqual(self._autovacuum_options(),
+                         {table: self.AUTOVACUUM_OPTIONS for table in self.TABLES})
+
+    def test_autovacuum_migration_reverses_and_reapplies(self):
+        """
+        Test whether migration core.0004 can be reversed, which resets the storage
+        parameters, and applied again. PostgreSQL's DDL is transactional, so the test's
+        transaction rolls both back.
+        """
+        try:
+            self._migrate_core('0003_chrisfolder_deletion_error_and_more')
+            self.assertEqual(self._autovacuum_options(),
+                             {table: set() for table in self.TABLES})
+        finally:
+            self._migrate_core('0004_chrisfile_chrisfolder_autovacuum')
+
+        self.assertEqual(self._autovacuum_options(),
+                         {table: self.AUTOVACUUM_OPTIONS for table in self.TABLES})
+
+    def test_server_time_zone_is_the_one_django_connects_with(self):
+        """
+        Test whether the database server's default time zone (postgres/cube.conf) is the
+        one Django's connections use, so Django need not set it on every new connection.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT reset_val FROM pg_settings WHERE name = 'TimeZone'")
+            server_default = cursor.fetchone()[0]
+
+        self.assertEqual(server_default, connection.timezone_name)
+
+    def test_server_reads_postgres_cube_conf(self):
+        """
+        Test whether the database server runs on postgres/cube.conf, as the compose
+        stacks start it.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute('SHOW config_file')
+            self.assertEqual(cursor.fetchone()[0], '/etc/postgresql/cube.conf')
