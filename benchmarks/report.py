@@ -257,9 +257,10 @@ def _limits_section(limits: dict) -> list[str]:
     def size(value) -> str:
         return "unlimited" if value == -1 else _human_bytes(value) if value else "—"
 
+    shm = "/dev/shm"  # nosec B108 - a column heading, not a path
     out = ["", "### Container limits (as applied)", ""]
     out += markdown_table(
-        ["Service", "CPUs", "Memory", "Memory + swap", "/dev/shm"],
+        ["Service", "CPUs", "Memory", "Memory + swap", shm],
         [[service, values.get("cpus"), size(values.get("mem_limit")),
           size(values.get("memswap_limit")), size(values.get("shm_size"))]
          for service, values in sorted(limits.items())])

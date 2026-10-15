@@ -18,10 +18,11 @@ from benchmarks.docker_client import (CGROUP_COUNTERS_CMD, CONTAINER_START_KEY, 
 from benchmarks.environment import ENVELOPE_KEYS, POSTGRES_SETTINGS, collect_environment
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
-from benchmarks.pg_stats import (STATEMENT_COLUMNS, STATEMENTS_SQL, PgStatStatements,
-                                 connection_states, counter_delta, counter_windows,
-                                 max_deltas, parse_psql_rows, server_counters,
-                                 server_counters_error, server_settings, settings_sql)
+from benchmarks.pg_stats import (COUNTERS_SQL, SETTINGS_SQL, STATEMENT_COLUMNS,
+                                 STATEMENTS_SQL, PgStatStatements, connection_states,
+                                 counter_delta, counter_windows, max_deltas,
+                                 parse_psql_rows, server_counters, server_counters_error,
+                                 server_settings)
 from benchmarks.stats_sampler import StatsSampler
 
 
@@ -180,36 +181,37 @@ class JsonDocker(FakeDbDocker):
 
 SETTINGS_DOC = {"settings": {"random_page_cost": "1.1", "max_wal_size": "8GB",
                              "DateStyle": "ISO, MDY"},
-                "key_settings": ["max_wal_size", "random_page_cost"],
+                "configured": ["max_wal_size"],
                 "altered": None,
-                "table_options": {"core_chrisfile": ["autovacuum_vacuum_scale_factor=0.02"]}}
+                "table_options": {"core_chrisfile": ["autovacuum_vacuum_scale_factor=0.02"],
+                                  "feeds_feed": []}}
 
 
 def test_server_settings_keeps_values_as_text():
     docker = JsonDocker(SETTINGS_DOC)
-    recorded = server_settings(docker, ("random_page_cost", "it's"))
+    recorded = server_settings(docker, ("random_page_cost", "no_such_setting"))
 
     # strings, so archived runs compare as text; no ALTER SYSTEM override -> []
     assert recorded["settings"]["random_page_cost"] == "1.1"  # nosec B101 - pytest assertion
+    assert recorded["altered"] == []  # nosec B101 - pytest assertion
+    # the asked-for names the server knows, and every configured one
     assert recorded["key_settings"] == [  # nosec B101 - pytest assertion
         "max_wal_size", "random_page_cost"]
-    assert recorded["altered"] == []  # nosec B101 - pytest assertion
-    assert recorded["table_options"]["core_chrisfile"] == [  # nosec B101 - pytest assertion
-        "autovacuum_vacuum_scale_factor=0.02"]
-    assert "'it''s'" in docker.sql[-1]  # nosec B101 - pytest assertion
-    assert "'core_chrisfile'" in docker.sql[-1]  # nosec B101 - pytest assertion
+    # the tracked tables' storage parameters only
+    assert recorded["table_options"] == {  # nosec B101 - pytest assertion
+        "core_chrisfile": ["autovacuum_vacuum_scale_factor=0.02"]}
+    assert docker.sql[-1] == SETTINGS_SQL  # nosec B101 - pytest assertion
 
 
 def test_settings_sql_records_every_setting_and_only_overrides_in_effect():
-    sql = settings_sql(("work_mem",))
-
     # every setting, so a run on another configuration file still has every name
     every_setting = "current_setting(name) ORDER BY name) FROM pg_settings)"
-    assert every_setting in sql  # nosec B101 - pytest assertion
+    assert every_setting in SETTINGS_SQL  # nosec B101 - pytest assertion
     # pg_file_settings would also list ALTER SYSTEM lines that -c overrides or that
     # await a reload; pg_settings.sourcefile names only the file a value came from
-    assert "pg_file_settings" not in sql  # nosec B101 - pytest assertion
-    assert "sourcefile LIKE '%/postgresql.auto.conf'" in sql  # nosec B101 - pytest assertion
+    assert "pg_file_settings" not in SETTINGS_SQL  # nosec B101 - pytest assertion
+    auto_conf = "sourcefile LIKE '%/postgresql.auto.conf'"
+    assert auto_conf in SETTINGS_SQL  # nosec B101 - pytest assertion
 
 
 def test_server_settings_is_empty_when_psql_fails_or_prints_no_json():
@@ -228,10 +230,23 @@ def test_server_counters_returns_the_snapshot_or_nothing():
     docker = JsonDocker(doc)
 
     assert server_counters(docker) == doc  # nosec B101 - pytest assertion
+    assert docker.sql[-1] == COUNTERS_SQL  # nosec B101 - pytest assertion
     assert "pg_stat_checkpointer" in docker.sql[-1]  # nosec B101 - pytest assertion
     # spaces in a process type become underscores, so the key passes through a shell
     assert "replace(backend_type, ' ', '_')" in docker.sql[-1]  # nosec B101 - pytest assertion
     assert server_counters(JsonDocker(doc, code=1)) == {}  # nosec B101 - pytest assertion
+
+
+def test_server_counters_sum_autovacuum_runs_over_the_tracked_tables():
+    by_table = {"core_chrisfile": [2, 5], "core_chrisfolder": [1, 3], "feeds_feed": [9, 9]}
+    counters = server_counters(JsonDocker({"at": 1.0, "autovacuum_by_table": by_table}))
+
+    expected = {"at": 1.0, "autovacuum_count": 3, "autoanalyze_count": 8}
+    assert counters == expected  # nosec B101 - pytest assertion
+
+    # none of the tracked tables yet (a database before migrations): no such counters
+    counters = server_counters(JsonDocker({"at": 1.0, "autovacuum_by_table": None}))
+    assert counters == {"at": 1.0}  # nosec B101 - pytest assertion
 
 
 def test_server_counters_error_says_why_the_counters_read_nothing():

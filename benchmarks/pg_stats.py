@@ -132,72 +132,60 @@ def connection_states(docker: DockerClient, service: str = "db") -> list[dict]:
 
 # -- server settings and cumulative counters ---------------------------------------------
 
-def _text_array(values: Iterable[str]) -> str:
-    quoted = ", ".join("'" + value.replace("'", "''") + "'" for value in values)
-    return f"ARRAY[{quoted}]::text[]"
+#: one JSON document: the value ``SHOW`` prints for every setting; ``configured``, the
+#: settings a configuration file or the command line sets; ``altered``, the settings in
+#: effect from ``ALTER SYSTEM``; and the storage parameters of every table in ``public``.
+#: A constant, like every query here: ``server_settings`` picks what it needs in Python.
+SETTINGS_SQL = (
+    "SELECT json_build_object("
+    "'settings', (SELECT json_object_agg(name, current_setting(name) ORDER BY name) "
+    "FROM pg_settings), "
+    "'configured', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
+    "WHERE source IN ('configuration file', 'command line')), "
+    "'altered', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
+    "WHERE sourcefile LIKE '%/postgresql.auto.conf'), "
+    "'table_options', (SELECT json_object_agg(relname, coalesce(reloptions, '{}') "
+    "ORDER BY relname) FROM pg_class "
+    "WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace))"
+)
 
-
-def settings_sql(names: Iterable[str], tables: Iterable[str] = TRACKED_TABLES) -> str:
-    """
-    One JSON document: the value ``SHOW`` prints for every setting; ``key_settings``,
-    the names among them that are ``names`` or that a configuration file or the command
-    line sets; the settings in effect from ``ALTER SYSTEM``; and the storage parameters
-    of ``tables``.
-    """
-    return (
-        "SELECT json_build_object("
-        "'settings', (SELECT json_object_agg(name, current_setting(name) ORDER BY name) "
-        "FROM pg_settings), "
-        "'key_settings', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
-        f"WHERE name = ANY({_text_array(names)}) "
-        "OR source IN ('configuration file', 'command line')), "
-        "'altered', (SELECT json_agg(name ORDER BY name) FROM pg_settings "
-        "WHERE sourcefile LIKE '%/postgresql.auto.conf'), "
-        "'table_options', (SELECT json_object_agg(relname, coalesce(reloptions, '{}') "
-        f"ORDER BY relname) FROM pg_class WHERE relname = ANY({_text_array(tables)}) "
-        "AND relkind = 'r'))"
-    )
-
-
-def counters_sql(tables: Iterable[str] = TRACKED_TABLES) -> str:
-    """
-    One JSON document of the server's cumulative counters: checkpoints, WAL, the current
-    database's temp files and sessions, autovacuum runs on ``tables``, and the bytes each
-    process type wrote or extended per object (``io_write_bytes:<object>:<process_type>``,
-    from ``pg_stat_io``, non-zero ones only, spaces as underscores so the key passes
-    through a shell unquoted). ``wal_init_bytes`` is the part of the WAL writes that only
-    zero-fills new WAL segment files, paid whenever the WAL between checkpoints outgrows
-    the pool of segments kept for reuse (on a fresh volume, and after lighter load or a
-    restart has shrunk the pool). ``at`` is the server clock, ``server_start``
-    the ``SERVER_START_KEY`` and the ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
-    """
-    return (
-        "SELECT jsonb_build_object("
-        "'at', extract(epoch FROM clock_timestamp()), "
-        "'server_start', pg_postmaster_start_time(), "
-        "'checkpointer_reset', c.stats_reset, 'num_timed', c.num_timed, "
-        "'num_requested', c.num_requested, 'num_done', c.num_done, "
-        "'buffers_written', c.buffers_written, "
-        "'checkpoint_write_ms', c.write_time, 'checkpoint_sync_ms', c.sync_time, "
-        "'wal_reset', w.stats_reset, 'wal_records', w.wal_records, 'wal_fpi', w.wal_fpi, "
-        "'wal_bytes', w.wal_bytes, 'wal_buffers_full', w.wal_buffers_full, "
-        "'wal_init_bytes', (SELECT coalesce(sum(write_bytes), 0) FROM pg_stat_io "
-        "WHERE object = 'wal' AND context = 'init'), "
-        "'temp_files', d.temp_files, 'temp_bytes', d.temp_bytes, "
-        "'sessions', d.sessions, 'xact_commit', d.xact_commit, "
-        "'autovacuum_count', v.autovacuum_count, 'autoanalyze_count', v.autoanalyze_count"
-        ") || coalesce((SELECT jsonb_object_agg("
-        "'io_write_bytes:' || replace(object, ' ', '_') || ':' "
-        "|| replace(backend_type, ' ', '_'), written) "
-        "FROM (SELECT backend_type, object, "
-        "sum(coalesce(write_bytes, 0) + coalesce(extend_bytes, 0)) AS written "
-        "FROM pg_stat_io GROUP BY 1, 2) io WHERE written > 0), '{}') "
-        "FROM pg_stat_checkpointer c, pg_stat_wal w, pg_stat_database d, "
-        "(SELECT sum(autovacuum_count) AS autovacuum_count, "
-        "sum(autoanalyze_count) AS autoanalyze_count FROM pg_stat_user_tables "
-        f"WHERE relname = ANY({_text_array(tables)})) v "
-        "WHERE d.datname = current_database()"
-    )
+#: one JSON document of the server's cumulative counters: checkpoints, WAL, the current
+#: database's temp files and sessions, autovacuum and autoanalyze runs per table in
+#: ``public`` (``autovacuum_by_table``, which ``server_counters`` sums over the tracked
+#: tables), and the bytes each process type wrote or extended per object
+#: (``io_write_bytes:<object>:<process_type>``, from ``pg_stat_io``, non-zero ones only,
+#: spaces as underscores so the key passes through a shell unquoted).
+#: ``wal_init_bytes`` is the part of the WAL writes that only zero-fills new WAL segment
+#: files, paid whenever the WAL between checkpoints outgrows the pool of segments kept
+#: for reuse (on a fresh volume, and after lighter load or a restart has shrunk the
+#: pool). ``at`` is the server clock, ``server_start`` the ``SERVER_START_KEY`` and the
+#: ``*_reset`` keys the ``STATS_EPOCH_KEYS``.
+COUNTERS_SQL = (
+    "SELECT jsonb_build_object("
+    "'at', extract(epoch FROM clock_timestamp()), "
+    "'server_start', pg_postmaster_start_time(), "
+    "'checkpointer_reset', c.stats_reset, 'num_timed', c.num_timed, "
+    "'num_requested', c.num_requested, 'num_done', c.num_done, "
+    "'buffers_written', c.buffers_written, "
+    "'checkpoint_write_ms', c.write_time, 'checkpoint_sync_ms', c.sync_time, "
+    "'wal_reset', w.stats_reset, 'wal_records', w.wal_records, 'wal_fpi', w.wal_fpi, "
+    "'wal_bytes', w.wal_bytes, 'wal_buffers_full', w.wal_buffers_full, "
+    "'wal_init_bytes', (SELECT coalesce(sum(write_bytes), 0) FROM pg_stat_io "
+    "WHERE object = 'wal' AND context = 'init'), "
+    "'temp_files', d.temp_files, 'temp_bytes', d.temp_bytes, "
+    "'sessions', d.sessions, 'xact_commit', d.xact_commit, "
+    "'autovacuum_by_table', (SELECT jsonb_object_agg(relname, "
+    "jsonb_build_array(autovacuum_count, autoanalyze_count)) FROM pg_stat_user_tables "
+    "WHERE schemaname = 'public')"
+    ") || coalesce((SELECT jsonb_object_agg("
+    "'io_write_bytes:' || replace(object, ' ', '_') || ':' "
+    "|| replace(backend_type, ' ', '_'), written) "
+    "FROM (SELECT backend_type, object, "
+    "sum(coalesce(write_bytes, 0) + coalesce(extend_bytes, 0)) AS written "
+    "FROM pg_stat_io GROUP BY 1, 2) io WHERE written > 0), '{}') "
+    "FROM pg_stat_checkpointer c, pg_stat_wal w, pg_stat_database d "
+    "WHERE d.datname = current_database()"
+)
 
 
 def _psql_json(docker: DockerClient, sql: str, *, service: str,
@@ -230,27 +218,45 @@ def server_settings(docker: DockerClient, names: Iterable[str], *,
     file), and ``table_options`` holds the storage parameters of ``tables``. Returns
     ``{}`` when psql cannot run.
     """
-    doc, _ = _psql_json(docker, settings_sql(names, tables), service=service, env=env)
+    doc, _ = _psql_json(docker, SETTINGS_SQL, service=service, env=env)
 
     if not isinstance(doc, dict):
         return {}
-    return {"settings": doc.get("settings") or {},
-            "key_settings": doc.get("key_settings") or [],
+
+    settings = doc.get("settings") or {}
+    key_settings = {name for name in names if name in settings}
+    key_settings.update(doc.get("configured") or [])
+    options = doc.get("table_options") or {}
+
+    return {"settings": settings,
+            "key_settings": sorted(key_settings, key=str.lower),
             "altered": doc.get("altered") or [],
-            "table_options": doc.get("table_options") or {}}
+            "table_options": {table: options[table] for table in tables
+                              if table in options}}
 
 
 def server_counters(docker: DockerClient, *, tables: Iterable[str] = TRACKED_TABLES,
                     service: str = "db", env: Optional[dict] = None) -> dict:
     """
-    One snapshot of the server's cumulative counters (``counters_sql``); ``{}`` when
+    One snapshot of the server's cumulative counters (``COUNTERS_SQL``), with
+    ``autovacuum_count`` and ``autoanalyze_count`` summed over ``tables``; ``{}`` when
     psql cannot run or the server predates PostgreSQL 18's ``pg_stat_io`` byte columns.
     Backends publish their counters between transactions, up to ~10 s after they go
     idle, so a snapshot can miss a few seconds of short transactions; a long statement
     shows up when it ends.
     """
-    doc, _ = _psql_json(docker, counters_sql(tables), service=service, env=env)
-    return doc if isinstance(doc, dict) else {}
+    doc, _ = _psql_json(docker, COUNTERS_SQL, service=service, env=env)
+
+    if not isinstance(doc, dict):
+        return {}
+
+    per_table = doc.pop("autovacuum_by_table", None) or {}
+    runs = [per_table[table] for table in tables if table in per_table]
+
+    if runs:
+        doc["autovacuum_count"] = sum(run[0] for run in runs)
+        doc["autoanalyze_count"] = sum(run[1] for run in runs)
+    return doc
 
 
 def server_counters_error(docker: DockerClient, *, service: str = "db",
@@ -259,7 +265,7 @@ def server_counters_error(docker: DockerClient, *, service: str = "db",
     Why ``server_counters`` reads nothing (psql's output: no such view on a server
     before PostgreSQL 18, too many clients, crash recovery...); ``None`` when it works.
     """
-    doc, error = _psql_json(docker, counters_sql(), service=service, env=env)
+    doc, error = _psql_json(docker, COUNTERS_SQL, service=service, env=env)
 
     if isinstance(doc, dict):
         return None
