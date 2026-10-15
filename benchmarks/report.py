@@ -278,7 +278,7 @@ def _postgres_section(postgres: dict) -> list[str]:
 
     names = sorted(postgres.get("key_settings") or settings, key=str.lower)
     out = ["", "### PostgreSQL (key settings; environment.json has all)", ""]
-    out += markdown_table(["Setting", "Value"], 
+    out += markdown_table(["Setting", "Value"],
                           [[name, settings.get(name)] for name in names])
 
     if postgres.get("altered"):

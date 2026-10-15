@@ -3,8 +3,8 @@ Environment / hardware manifest collection.
 
 Auto-collects what it can (Docker engine info gives the *host* CPU/mem, image ids,
 versions and each service container's resource limits), reads the effective settings
-from the Postgres server, and reads the envelope knobs + git provenance from environment 
-variables the ``justfile`` injects. Manual hardware fields are left as explicit 
+from the Postgres server, and reads the envelope knobs + git provenance from environment
+variables the ``justfile`` injects. Manual hardware fields are left as explicit
 placeholders for the generated report.
 """
 
@@ -54,7 +54,7 @@ def postgres_settings(docker: DockerClient) -> dict:
 
 
 def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
-                        image_services: tuple[str, ...] = ("chris", "pfcon", 
+                        image_services: tuple[str, ...] = ("chris", "pfcon",
                                                            "db")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()

@@ -115,7 +115,7 @@ def psql(docker: DockerClient, sql: str, *, service: str = "db",
     env = docker.service_env(service) if env is None else env
 
     return docker.exec_in_service(
-        service, ["psql", "-U", env.get("POSTGRES_USER", "chris"), "-d", 
+        service, ["psql", "-U", env.get("POSTGRES_USER", "chris"), "-d",
                   env.get("POSTGRES_DB", "chris_dev"), "-At", "-F", "\t", "-c", sql])
 
 
@@ -315,7 +315,7 @@ def counter_delta(before: dict, after: dict) -> Optional[dict]:
             continue
 
         diff = value - prior
-        (cgroup if in_cgroup else pg)[key] = round(diff, 1) if isinstance(diff, 
+        (cgroup if in_cgroup else pg)[key] = round(diff, 1) if isinstance(diff,
                                                                           float) else diff
 
     if not pg_readable:
@@ -367,7 +367,7 @@ def counter_windows(start: dict, workload_end: dict,
     """
     return {
         "workload": counter_delta(start, workload_end),
-        "cleanup": None if cleanup_end is None else counter_delta(workload_end, 
+        "cleanup": None if cleanup_end is None else counter_delta(workload_end,
                                                                   cleanup_end),
         "snapshots": {"start": start, "workload_end": workload_end,
                       "cleanup_end": cleanup_end},

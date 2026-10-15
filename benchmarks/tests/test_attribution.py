@@ -119,7 +119,8 @@ def test_snapshot_keeps_every_statement_by_default():
     assert docker.sql[-1].rstrip().endswith("ORDER BY total_exec_time DESC")  # nosec B101 - pytest assertion
     assert rows[0]["query"] == "UPDATE feeds_feed SET name = $1"  # nosec B101 - pytest assertion
     # the temp blocks and WAL a statement wrote name the one behind a spill or a burst
-    assert rows[0]["temp_blks_written"] == 128 and rows[0]["wal_fpi"] == 1  # nosec B101 - pytest assertion
+    assert rows[0]["temp_blks_written"] == 128  # nosec B101 - pytest assertion
+    assert rows[0]["wal_fpi"] == 1  # nosec B101 - pytest assertion
 
 
 def test_statement_columns_follow_the_select_list():
