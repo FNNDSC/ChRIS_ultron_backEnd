@@ -58,6 +58,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
 
 - Runner is Django's `manage.py test` (not pytest). Integration tests are marked
   `@tag('integration')`; they talk to the real pfcon service and run real plugin containers.
+  Tests marked `@tag('compose')` check how the compose stacks run PostgreSQL
+  (`postgres/cube.conf`); add `--exclude-tag compose` to run the suite against any other server.
 - Tests that exercise Celery use `TransactionTestCase` and start an in-process worker with
   `celery.contrib.testing.worker.start_worker(celery_app)` after setting
   `celery_app.conf.update(task_routes=None)`, so tasks land on the default `celery` queue, which

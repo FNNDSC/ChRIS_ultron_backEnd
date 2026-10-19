@@ -266,6 +266,11 @@ class ValidatePathAccessStorageTests(ModelTests):
 
 
 class DatabaseSettingsTests(TestCase):
+    """
+    The table storage parameters migration core.0004 sets, and (tagged 'compose') how the
+    compose stacks run the database server: exclude those with --exclude-tag compose when
+    testing against any other PostgreSQL.
+    """
 
     TABLES = (ChrisFile._meta.db_table, ChrisFolder._meta.db_table)
 
@@ -308,6 +313,7 @@ class DatabaseSettingsTests(TestCase):
         self.assertEqual(self._autovacuum_options(),
                          {table: self.AUTOVACUUM_OPTIONS for table in self.TABLES})
 
+    @tag('compose')
     def test_server_time_zone_is_the_one_django_connects_with(self):
         """
         Test whether the database server's default time zone (postgres/cube.conf) is the
@@ -319,6 +325,7 @@ class DatabaseSettingsTests(TestCase):
 
         self.assertEqual(server_default, connection.timezone_name)
 
+    @tag('compose')
     def test_server_reads_postgres_cube_conf(self):
         """
         Test whether the database server runs on postgres/cube.conf, as the compose
