@@ -19,6 +19,7 @@ def render(summary: dict, levels: list[dict]) -> str:
     lines: list[str] = []
     lines += _header(summary, env)
     lines += _breaking_points(summary.get("breaking_points", []))
+    lines += _run_db_counters(summary.get("db_counters") or {})
     lines += _approach_curves(levels)
     lines += _environment_section(env)
     return "\n".join(lines) + "\n"
@@ -90,7 +91,67 @@ def _approach_curves(levels: list[dict]) -> list[str]:
         out.append("")
         out += _peak_cpu_note(rows)
         out += _peak_io_note(rows)
+        out += _db_counters_note(rows)
     return out
+
+
+def _run_db_counters(db_counters: dict) -> list[str]:
+    """
+    Postgres over the whole run, cleanups included.
+    """
+    run = db_counters.get("run")
+
+    if not run:
+        return []
+    return ["## Postgres over the whole run", "", f"_{_counters_summary(run)}_", ""]
+
+
+def _db_counters_note(rows: list[dict]) -> list[str]:
+    """
+    Postgres at the highest level reached, per window: checkpoints, WAL, temp files and
+    what the db container wrote.
+    """
+    last = rows[-1] if rows else {}
+    windows = last.get("db_counters") or {}
+    parts = [f"{window} {_counters_summary(windows[window])}"
+             for window in ("workload", "cleanup") if windows.get(window)]
+
+    if not parts:
+        return []
+    return [f"_Postgres at level {last.get('level')}: {'; '.join(parts)}_", ""]
+
+
+def _counters_summary(delta: dict) -> str:
+    """
+    One line of counters. ``num_timed`` also counts the timed checkpoints an idle server
+    skips, so the line leads with the checkpoints actually done.
+    """
+    if delta.get("reset"):
+        parts = ["Postgres counters n/a (statistics reset in between, e.g. a db crash "
+                 "restart)"]
+    elif delta.get("unreadable"):
+        parts = ["Postgres counters n/a (Postgres unreadable at one end of the window)"]
+    else:
+        parts = [f"checkpoints {delta.get('num_done', 0)} done "
+                 f"({delta.get('num_timed', 0)} timed / "
+                 f"{delta.get('num_requested', 0)} requested)",
+                 f"WAL {_human_bytes(delta.get('wal_bytes'))} "
+                 f"({delta.get('wal_fpi', 0):,} full-page images)",
+                 f"temp files {_human_bytes(delta.get('temp_bytes'))}"]
+
+    if "cgroup_write_bytes" in delta:
+        parts.append(f"db container wrote {_human_bytes(delta['cgroup_write_bytes'])}")
+
+    # its own item, since a level's maxima can come from different repeats
+    if delta.get("wal_init_bytes"):
+        parts.append(f"WAL segments zero-filled {_human_bytes(delta['wal_init_bytes'])}")
+
+    if delta.get("cgroup_pswpout"):
+        parts.append(f"swapped out {delta['cgroup_pswpout']:,} pages")
+
+    if delta.get("cgroup_oom_kill"):
+        parts.append(f"**{delta['cgroup_oom_kill']} OOM kill(s)**")
+    return ", ".join(parts)
 
 
 def _peak_cpu_note(rows: list[dict]) -> list[str]:
@@ -133,10 +194,12 @@ def _peak_io_note(rows: list[dict]) -> list[str]:
 
 def _human_bytes(n: int) -> str:
     size = float(n or 0)
+
     for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
         if size < 1024 or unit == "TiB":
             return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
+
     return f"{size:.1f} TiB"
 
 
@@ -162,7 +225,9 @@ def _environment_section(env: dict) -> list[str]:
     out.append("")
     out += ["### Envelope (recorded knobs)", ""]
     out += markdown_table(["Knob", "Value"], [[k, v] for k, v in envelope.items()])
-    
+    out += _limits_section(env.get("limits") or {})
+    out += _postgres_section(env.get("postgres") or {})
+
     plugins = env.get("workload_plugins", {})
     if plugins:
         out.append("")
@@ -179,6 +244,50 @@ def _environment_section(env: dict) -> list[str]:
         out.append(f"- **{k}:** {v}")
 
     out.append("")
+    return out
+
+
+def _limits_section(limits: dict) -> list[str]:
+    """
+    The resource limits each service container ran with; nothing for older runs.
+    """
+    if not limits:
+        return []
+
+    def size(value) -> str:
+        return "unlimited" if value == -1 else _human_bytes(value) if value else "—"
+
+    shm = "/dev/shm"  # nosec B108 - a column heading, not a path
+    out = ["", "### Container limits (as applied)", ""]
+    out += markdown_table(
+        ["Service", "CPUs", "Memory", "Memory + swap", shm],
+        [[service, values.get("cpus"), size(values.get("mem_limit")),
+          size(values.get("memswap_limit")), size(values.get("shm_size"))]
+         for service, values in sorted(limits.items())])
+    return out
+
+
+def _postgres_section(postgres: dict) -> list[str]:
+    """
+    The key settings the Postgres server ran with (``environment.json`` has all of
+    them); nothing for runs that predate recording them.
+    """
+    settings = postgres.get("settings") or {}
+
+    if not settings:
+        return []
+
+    names = sorted(postgres.get("key_settings") or settings, key=str.lower)
+    out = ["", "### PostgreSQL (key settings; environment.json has all)", ""]
+    out += markdown_table(["Setting", "Value"],
+                          [[name, settings.get(name)] for name in names])
+
+    if postgres.get("altered"):
+        out += ["", "_Overridden by `ALTER SYSTEM` (postgresql.auto.conf): "
+                    f"{', '.join(postgres['altered'])}_"]
+
+    for table, options in sorted((postgres.get("table_options") or {}).items()):
+        out += ["", f"_`{table}` storage parameters: {', '.join(options) or 'defaults'}_"]
     return out
 
 
@@ -238,7 +347,9 @@ def _group_by_axis(levels: Iterable[dict]) -> dict[tuple[str, str], list[dict]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Re-render report.md + levels.csv from a results run directory (for `bench-report`)."""
+    """
+    Re-render report.md + levels.csv from a results run directory (for `bench-report`).
+    """
     ap = argparse.ArgumentParser(description="Re-render a benchmark report")
     ap.add_argument("run_dir", help="path to results/<run_id>")
     args = ap.parse_args(argv)
@@ -246,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = Path(args.run_dir)
     summary = json.loads((run_dir / "summary.json").read_text())
     levels_path = run_dir / "levels.jsonl"
+
     levels = [json.loads(line) for line in
               (levels_path.read_text().splitlines() if levels_path.exists() else [])
               if line.strip()]

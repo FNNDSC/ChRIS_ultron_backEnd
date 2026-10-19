@@ -74,6 +74,30 @@ def test_a_recovered_step_is_recorded_and_keeps_locusts_exit_code(tmp_path, monk
     assert env.runner.stopped  # nosec B101 - pytest assertion
 
 
+def test_a_step_records_the_postgres_settings(tmp_path, monkeypatch):
+    monkeypatch.setattr(locustfile, "api_recovery", recovery())
+    monkeypatch.setattr(locustfile, "postgres_settings",
+                        lambda docker: {"settings": {"work_mem": "32MB"}})
+
+    locustfile._record_recovery(step_environment(tmp_path))
+
+    rec = record(tmp_path)
+    assert rec["postgres"] == {"settings": {"work_mem": "32MB"}}  # nosec B101 - pytest assertion
+
+
+def test_unreadable_postgres_settings_do_not_change_the_verdict(tmp_path, monkeypatch):
+    # the autouse fixture's Docker stand-in has no psql access at all
+    monkeypatch.setattr(locustfile, "api_recovery", recovery())
+    env = step_environment(tmp_path)
+
+    locustfile._record_recovery(env)
+
+    rec = record(tmp_path)
+    assert rec["recovered"] is True  # nosec B101 - pytest assertion
+    assert rec["postgres"] == {}  # nosec B101 - pytest assertion
+    assert env.process_exit_code is None  # nosec B101 - pytest assertion
+
+
 def test_a_step_that_did_not_recover_exits_3(tmp_path, monkeypatch):
     monkeypatch.setattr(locustfile, "api_recovery", recovery(recovered=False))
     env = step_environment(tmp_path)

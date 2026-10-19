@@ -186,7 +186,7 @@ services:
     cpus: ${CUBE_WORKER_CPUS:-4}
     mem_limit: ${CUBE_WORKER_MEM_LIMIT:-4g}
   db:
-    command: postgres -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300}
+    command: postgres -c config_file=/etc/postgresql/cube.conf -c max_connections=${CUBE_DB_MAX_CONNECTIONS:-300} -c synchronous_commit=${CUBE_DB_SYNCHRONOUS_COMMIT:-on}
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
   pfcon:
@@ -219,7 +219,7 @@ CPU/mem, block-I/O deltas and peak pids per container — `chris`, `worker-mains
 
 ### 9.4 DB / state deltas and query attribution
 
-Per scenario: feed/instance/file count deltas **and absolute totals** (the x-axis for state-aging analysis — the `aging-grow`/`aging-probe` tier pair), total registered output bytes, and a **`pg_stat_statements` snapshot** (reset at scenario start, every statement at the end, most total execution time first, `pg_stats.py`) that names the queries behind db load. Folder deltas and connection-pool stats are future work.
+Per scenario: feed/instance/file count deltas **and absolute totals** (the x-axis for state-aging analysis — the `aging-grow`/`aging-probe` tier pair), total registered output bytes, and a **`pg_stat_statements` snapshot** (reset at scenario start, every statement at the end, most total execution time first, `pg_stats.py`) that names the queries behind db load, and **Postgres counter deltas** for the workload and cleanup windows plus a whole-run total: checkpoints done, timed and requested, WAL and full-page images, temp files, bytes written or extended per process type, autovacuum runs, and the `db` container's disk writes, swap and OOM kills (`pg_stats.py`, `docker_client.py`). Folder deltas and connection-pool stats are future work.
 
 ### 9.5 The key artifact
 
@@ -310,7 +310,7 @@ Authoritative `full`-tier runs are performed on a **dedicated bare-metal Linux b
 
 The runner auto-collects what it can and leaves explicit manual placeholders.
 
-- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon image ids, git commit + dirty status, storage mode, the full envelope knob set, API auth mode, the resolved workload-plugin versions, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`), and a measured idle noise floor.
+- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon/db image ids, git commit + dirty status, storage mode, the full envelope knob set, each service container's applied CPU/memory/swap/`/dev/shm` limits, the Postgres server's settings, API auth mode, the resolved workload-plugin versions, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`, Postgres counters), and a measured idle noise floor.
 - **Manual (in the report):** storage device type/throughput, power/thermal mode, and other significant workloads running during the benchmark.
 
 ## 14. Implementation Phases

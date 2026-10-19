@@ -24,6 +24,9 @@ venv
 # not part of the CUBE image
 benchmarks
 
+# the db service's configuration, mounted at run time; not part of the CUBE image
+postgres
+
 # created by `just prefer`
 .preference
 

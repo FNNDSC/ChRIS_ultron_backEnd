@@ -4,9 +4,9 @@ Compare benchmark runs over time (pure logic + rendering + CLI).
 Answers two questions about a *baseline* and a *candidate* run:
 
 1. **Are they comparable at all?** Mismatched workload fingerprint, storage mode or
-   auth mode are *blockers*; envelope/host/threshold differences are *cautions*;
-   commit and image differences are the point of comparing. The comparison never
-   refuses — a loudly-labelled report beats an error.
+   auth mode are *blockers*; envelope, container-limit, Postgres-settings, host and
+   threshold differences are *cautions*; commit and image differences are the point of
+   comparing. The comparison never refuses — a loudly-labelled report beats an error.
 2. **What changed?** Per (topology, axis, level): makespan and worst-p95 deltas
    flagged REGRESSED/IMPROVED only when they exceed BOTH a relative threshold and the
    metric's absolute floor (makespan is quantized by the poll cadence; latency has a
@@ -40,6 +40,12 @@ ONLY_ONE_RUN = "—"          # level present in only one run (explained by a bp
 
 #: level-row metrics that get delta flags (others are diagnostic, not SLO-like)
 COMPARED_METRICS = ("makespan_median_s", "worst_p95_ms")
+
+#: whole-run Postgres and db-container counters (``summary.json`` ``db_counters.run``)
+#: shown side by side, unflagged: what they should be depends on the change under test
+RUN_COUNTERS = ("reset", "unreadable", "num_done", "num_timed", "num_requested",
+                "wal_bytes", "wal_fpi", "temp_bytes", "cgroup_write_bytes", "wal_init_bytes",
+                "cgroup_pswpout", "cgroup_oom_kill", "seconds")
 
 _VERDICT_SEVERITY = {"PASS": 0, "DEGRADED": 1, "FAIL": 2}
 
@@ -141,6 +147,7 @@ _SCALAR_FIELDS = (
     # part of "what version ran" — visible, never blocking
     ("images.chris", ("images", "chris", "image_id"), INFO),
     ("images.pfcon", ("images", "pfcon", "image_id"), INFO),
+    ("images.db", ("images", "db", "image_id"), INFO),
 )
 
 _NOISE_FLOOR_RATIO = 3.0
@@ -148,6 +155,7 @@ _NOISE_FLOOR_RATIO = 3.0
 
 def _dig(env: dict, path: tuple) -> object:
     cur: object = env
+
     for key in path:
         cur = cur.get(key) if isinstance(cur, dict) else None
     return cur
@@ -172,16 +180,12 @@ def check_comparability(base_env: dict, cand_env: dict) -> Comparability:
         if a != b:
             diffs.append(FieldDiff(label, a, b, severity))
 
-    base_knobs = base_env.get("envelope") or {}
-    cand_knobs = cand_env.get("envelope") or {}
+    # STORAGE_ENV is already reported via the blocker-level storage_mode
+    diffs += _block_diffs("envelope", base_env.get("envelope") or {},
+                          cand_env.get("envelope") or {}, WARNING, skip=("STORAGE_ENV",))
 
-    for knob in sorted(set(base_knobs) | set(cand_knobs)):
-        if knob == "STORAGE_ENV":
-            continue  # already reported via the blocker-level storage_mode
-        
-        if base_knobs.get(knob) != cand_knobs.get(knob):
-            diffs.append(FieldDiff(f"envelope.{knob}", base_knobs.get(knob),
-                                   cand_knobs.get(knob), WARNING))
+    diffs += _limits_diffs(base_env.get("limits") or {}, cand_env.get("limits") or {})
+    diffs += _postgres_diffs(base_env.get("postgres") or {}, cand_env.get("postgres") or {})
 
     a = _dig(base_env, ("noise_floor", "health_p50_ms"))
     b = _dig(cand_env, ("noise_floor", "health_p50_ms"))
@@ -197,6 +201,68 @@ def check_comparability(base_env: dict, cand_env: dict) -> Comparability:
         status = "comparable"
         
     return Comparability(status, tuple(diffs))
+
+
+def _block_diffs(label: str, base: dict, cand: dict, severity: str,
+                 skip: tuple = ()) -> list[FieldDiff]:
+    """
+    One diff per key whose value differs between two flat blocks of the environment.
+    """
+    return [FieldDiff(f"{label}.{key}", base.get(key), cand.get(key), severity)
+            for key in sorted(set(base) | set(cand))
+            if key not in skip and base.get(key) != cand.get(key)]
+
+
+def _unrecorded(label: str, base: dict, cand: dict) -> Optional[list[FieldDiff]]:
+    """
+    For an environment block older runs lack: no diff when neither run recorded it, one
+    caution when only one did (not one per entry), ``None`` when both did.
+    """
+    if not base and not cand:
+        return []
+
+    if not base or not cand:
+        return [FieldDiff(label, "recorded" if base else "not recorded",
+                          "recorded" if cand else "not recorded", WARNING)]
+    return None
+
+
+def _limits_diffs(base: dict, cand: dict) -> list[FieldDiff]:
+    """
+    Cautions for differing container resource limits (``limits.<service>.<limit>``).
+    """
+    unrecorded = _unrecorded("limits", base, cand)
+
+    if unrecorded is not None:
+        return unrecorded
+
+    def flat(limits: dict) -> dict:
+        return {f"{service}.{name}": value for service, values in limits.items()
+                for name, value in (values or {}).items()}
+
+    return _block_diffs("limits", flat(base), flat(cand), WARNING)
+
+
+def _postgres_diffs(base: dict, cand: dict) -> list[FieldDiff]:
+    """
+    Cautions for differing Postgres settings, ``ALTER SYSTEM`` overrides and table
+    storage parameters.
+    """
+    unrecorded = _unrecorded("postgres", base, cand)
+
+    if unrecorded is not None:
+        return unrecorded
+
+    diffs = _block_diffs("postgres", base.get("settings") or {},
+                         cand.get("settings") or {}, WARNING)
+
+    diffs += _block_diffs("postgres.table_options", base.get("table_options") or {},
+                          cand.get("table_options") or {}, WARNING)
+
+    if (base.get("altered") or []) != (cand.get("altered") or []):
+        diffs.append(FieldDiff("postgres.altered", base.get("altered"),
+                               cand.get("altered"), WARNING))
+    return diffs
 
 
 # --- level deltas -----------------------------------------------------------------------
@@ -271,7 +337,7 @@ def compare_levels(base_levels: list[dict], cand_levels: list[dict],
     return tuple(out)
 
 
-# --- breaking-point shifts ----------------------------------------------------------------
+# --- breaking-point shifts --------------------------------------------------------------
 
 def breaking_point_shifts(base: RunData, cand: RunData) -> tuple[AxisShift, ...]:
     def bp_levels(run: RunData) -> dict[tuple, int]:
@@ -329,13 +395,23 @@ def has_regressions(comparison: RunComparison) -> bool:
             or any(s.direction == "regressed" for s in comparison.shifts))
 
 
-# --- trend (3+ runs) ----------------------------------------------------------------------
+# --- trend (3+ runs) --------------------------------------------------------------------
+
+def _metric_path(metric: str) -> tuple:
+    """
+    A level-row metric as a key path: ``peak_write_bytes.db`` or
+    ``db_counters.workload.num_requested`` reach into the nested blocks.
+    """
+    return tuple(metric.split("."))
+
 
 def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, list]]:
     """
-    Per (topology, axis): ((topology, axis), headers, rows) tracking ``metric``
-    across all runs (chronological = argument order); last row is the breaking point.
+    Per (topology, axis): ((topology, axis), headers, rows) tracking ``metric`` (a
+    dotted path for nested values) across all runs (chronological = argument order);
+    last row is the breaking point.
     """
+    path = _metric_path(metric)
     indexes = [_index(r.levels) for r in runs]
 
     axes = sorted({(r.get("topology"), r.get("axis"))
@@ -353,7 +429,7 @@ def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, li
         
         headers = ["Level"] + [run.run_id for run in runs]
 
-        rows = [[lvl] + [idx.get((*axis_key, lvl), {}).get(metric) for idx in indexes]
+        rows = [[lvl] + [_dig(idx.get((*axis_key, lvl), {}), path) for idx in indexes]
                 for lvl in levels]
         
         rows.append(["breaking point"] + [bps.get(axis_key) for bps in bp_maps])
@@ -413,6 +489,7 @@ def render_markdown(comparison: RunComparison, trend_runs: "list[RunData] | None
         lines.append("_No axes in common._")
     
     lines.append("")
+    lines += _run_counters_section(base, cand)
 
     counts = flag_counts(comparison.level_deltas)
     lines += [
@@ -443,10 +520,11 @@ def render_markdown(comparison: RunComparison, trend_runs: "list[RunData] | None
              "p95 A (ms)", "p95 B (ms)", "Δ%", "Verdict", "Flag"], rows)
         lines.append("")
 
-    if trend_runs and len(trend_runs) > 2:
+    if trend_runs:
         lines += [f"## Trend — {metric} across {len(trend_runs)} runs", ""]
         
-        if not any(metric in row for run in trend_runs for row in run.levels):
+        if not any(_dig(row, _metric_path(metric)) is not None
+                   for run in trend_runs for row in run.levels):
             lines += [f"_metric {metric!r} not found in any run's level rows — "
                       f"check --metric_", ""]
         
@@ -455,6 +533,35 @@ def render_markdown(comparison: RunComparison, trend_runs: "list[RunData] | None
             lines += markdown_table(headers, rows)
             lines.append("")
     return "\n".join(lines) + "\n"
+
+
+def _run_counters_section(base: RunData, cand: RunData) -> list[str]:
+    """
+    The two runs' whole-run Postgres and db-container counters, when either has them.
+    """
+    a = _dig(base.summary, ("db_counters", "run")) or {}
+    b = _dig(cand.summary, ("db_counters", "run")) or {}
+
+    if not a and not b:
+        return []
+
+    rows = []
+    for key in RUN_COUNTERS:
+        va, vb = a.get(key), b.get(key)
+
+        if va is None and vb is None:
+            continue
+
+        numbers = all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                      for v in (va, vb))
+        pct = round((vb - va) / va * 100.0, 1) if numbers and va else None
+        rows.append([key, va, vb, _pct(pct)])
+
+    return (["## Postgres over the whole run", "",
+             "_Diagnostic, not flagged. `reset` (Postgres's statistics were reset during "
+             "the run) or `unreadable` (Postgres could not be read at its start or end): "
+             "Postgres's counters are unknown and only the container's remain._", ""]
+            + markdown_table(["Counter", "Baseline", "Candidate", "Δ%"], rows) + [""])
 
 
 def render_csv(comparison: RunComparison) -> str:
@@ -495,8 +602,11 @@ def main(argv: "list[str] | None" = None) -> int:
                     "3+ runs add a trend section)")
     ap.add_argument("runs", nargs="+",
                     help="run ids or run directories, oldest first")
-    ap.add_argument("--metric", default="makespan_median_s",
-                    help="level-row metric for the trend table")
+    ap.add_argument("--metric", default=None,
+                    help="level-row metric for the trend table (default "
+                         "makespan_median_s); a dotted path reaches nested values, e.g. "
+                         "peak_write_bytes.db or db_counters.workload.num_requested. "
+                         "Given explicitly, the trend table also renders for two runs")
     ap.add_argument("--regress-pct", type=float, default=DeltaPolicy.regress_pct,
                     help="relative change (%%) required to flag a metric")
     ap.add_argument("--makespan-floor", type=float, default=DeltaPolicy.makespan_floor_s,
@@ -508,6 +618,7 @@ def main(argv: "list[str] | None" = None) -> int:
     ap.add_argument("--fail-on-regression", action="store_true",
                     help="exit 1 if any level regresses, a breaking point moves down, "
                          "or the runs are not comparable")
+
     args = ap.parse_args(argv)
     if len(args.runs) < 2:
         ap.error("need at least two runs (baseline and candidate)")
@@ -522,8 +633,9 @@ def main(argv: "list[str] | None" = None) -> int:
     policy = DeltaPolicy(args.regress_pct, args.makespan_floor, args.latency_floor)
     comparison = compare_runs(baseline, candidate, policy)
 
-    markdown = render_markdown(comparison, trend_runs=runs if len(runs) > 2 else None,
-                               metric=args.metric)
+    trend = len(runs) > 2 or args.metric is not None
+    markdown = render_markdown(comparison, trend_runs=runs if trend else None,
+                               metric=args.metric or "makespan_median_s")
     
     out_dir = (Path(args.out) if args.out else
                default_results_root() / "comparisons"

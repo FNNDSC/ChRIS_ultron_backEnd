@@ -62,9 +62,13 @@ version of each installed — runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2
 - **Clean-stack discipline.** Isolation runs are preceded by a recovery so a prior failure
   can't contaminate them (we saw spurious failures otherwise). A light reset is a service
   restart; a full reset (wipes the DB) is
-  `just bench-compose '--profile cube --profile bench down -v'` then `just bench-start`.
+  `just bench-compose '--profile cube --profile bench down -v'`, then removing the plugin-job
+  containers (`docker ps -aq --filter label=org.chrisproject.miniChRIS=plugininstance | xargs -r
+  docker rm -f`), then `just bench-start`.
   The `--profile` flags are required — without them the profile-scoped `chris`/workers are
-  *not* torn down, leaving an old `chris` against a fresh DB (chrisomatic then fails).
+  *not* torn down, leaving an old `chris` against a fresh DB (chrisomatic then fails). A fresh
+  DB numbers plugin instances from 1 again, so job containers a previous stack left behind
+  would collide with the new jobs' names (`chris-jid-<id>`) in pfcon.
 - **Poll interval** is a service env var; changing it needs a recreate:
   `CUBE_CELERY_POLL_INTERVAL=N just bench-compose 'up -d --force-recreate chris worker-mains worker-periodic celery-scheduler'`.
 
@@ -232,6 +236,38 @@ checked-out connection) and `pool_after_u400.txt` (three minutes of probes after
 step); `howto/` is the issue's single 100-user step followed by three minutes of probes;
 `aeb4b94/` is the same 100- and 400-user steps on the pre-upgrade commit built with the June
 package versions (`versions.txt`), which does not recover after 400 users either.
+
+## PostgreSQL configuration — 2026-10-14
+
+The before and after runs of issue 1 ([#150](https://github.com/FNNDSC/HARBOR-planning/issues/150),
+REPORT.md § 15): `postgres/cube.conf` for both compose stacks and migration `core.0004`. Before =
+8ea010b (the stock configuration, with the harness that records Postgres settings, limits and
+most counters); after = 2d52608 (the configuration, which also adds `wal_init_bytes` and the
+per-statement temp and WAL columns of `pg_stats.json`). Every run started on a fresh stack:
+`down -v`, plugin-job containers removed, `just bench-start`. diamond · layers = 8 ran twice each
+way, alternating, because its run-to-run variance (about 10%) is enough to move a single pair's
+result. All eight used `pl-topologicalcopy` 1.0.13 from the `chrisomatic.yml` committed at
+those commits; on a later commit, apply the edit in [`../envelope.md`](../envelope.md)
+§ "Pinned workload plugin versions" first.
+
+| Run | Commit | Command (`just bench-run --tier ...`) | Result |
+|---|---|---|---|
+| `2026-10-13T233911Z` | 8ea010b | `smoke` | PASS, 10 levels |
+| `2026-10-14T022103Z` | 2d52608 | `smoke` | PASS, 10 levels; no level flagged against 233911Z |
+| `2026-10-13T234257Z` | 8ea010b | `full --topology linear --axis file_count --cap 100000 --repeat 1 --restart-on-fail` | PASS; 100k 1,719 s; temp files 166.2 MB at 100k (227.7 MB in the run) |
+| `2026-10-14T022450Z` | 2d52608 | same | PASS; 100k 1,724 s; **no temp files** |
+| `2026-10-14T001854Z` | 8ea010b | `full --topology diamond --axis layers --cap 8 --repeat 1 --restart-on-fail` | PASS; 8 layers 2,893 s; `db` wrote 30.47 GB; 19 checkpoints requested (18 by WAL size in the `db` log) |
+| `2026-10-14T030059Z` | 2d52608 | same | PASS; 8 layers 2,856 s; `db` wrote **18.91 GB**; **no requested checkpoints** |
+| `2026-10-14T040048Z` | 8ea010b | same | PASS; 8 layers 2,902 s; `db` wrote 32.34 GB; 21 checkpoints requested |
+| `2026-10-14T045928Z` | 2d52608 | same | PASS; 8 layers 2,866 s; `db` wrote **18.80 GB**; **no requested checkpoints** |
+
+All eight record the Postgres settings, the container limits and the counters described in
+[`../envelope.md`](../envelope.md) § "What each run records about Postgres" (the before runs
+without `wal_init_bytes` and the per-statement temp and WAL columns), which earlier runs lack:
+`bench-compare` reports `postgres` and `limits` as "not recorded" against them, and
+`--metric peak_write_bytes.db` trends what `db` wrote back to them. The after runs are the
+baselines for these three commands from here on. The `db` container logs of these runs, with
+every checkpoint and its cause, are kept on the benchmark box.
 
 ## Regenerating the archive
 

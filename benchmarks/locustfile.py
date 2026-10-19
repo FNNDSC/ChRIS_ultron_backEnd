@@ -1,12 +1,12 @@
 """
-Locust control-plane load test for CUBE — the deferred Layer-1 (control plane / RED)
-from STRATEGY §4, built on the ``chris_api`` Collection+JSON seam.
+Locust control-plane load test for CUBE — the Layer-1 (control plane / RED) from
+STRATEGY §4 built on the ``chris_api`` Collection+JSON seam.
 
 The data-plane harness (``run_bench``) measures orchestration (makespan, DAG execution).
 This complements it by driving *concurrent API clients* against the control-plane
 endpoints (list feeds/instances/files, plugin search, create instance) and reporting RED
 metrics — Rate, Errors, Duration percentiles — via Locust's own statistics. It is the
-right tool to find the API saturation knee, error onset, and DB connection-pool
+right tool to find the API saturation knee, error onset and DB connection-pool
 exhaustion under client concurrency, which the data plane does not exercise.
 
 Run headless via ``just bench-locust``, e.g.::
@@ -17,9 +17,10 @@ Run headless via ``just bench-locust``, e.g.::
 needed. Pure Collection+JSON helpers are reused from ``chris_api`` (the shared seam).
 
 Each step also records whether the API was healthy when it started and whether it
-recovered once the load stopped (``recovery.api_recovery``), in
-``<csv prefix>_recovery.json``, and exits non-zero otherwise: a step that ran on, or
-left behind, a broken stack does not measure CUBE under load.
+recovered once the load stopped (``recovery.api_recovery``) in
+``<csv prefix>_recovery.json`` and exits non-zero otherwise: a step that ran on or
+left behind a broken stack does not measure CUBE under load. That file also records the
+envelope knobs and the Postgres server's effective settings.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from locust.runners import WorkerRunner
 
 from benchmarks.chris_api import CJ, _items, _template
 from benchmarks.docker_client import DockerClient
-from benchmarks.environment import ENVELOPE_KEYS
+from benchmarks.environment import ENVELOPE_KEYS, postgres_settings
 from benchmarks.recovery import all_ok, api_recovery, probe_api
 
 
@@ -154,6 +155,18 @@ def _checks_step_health(environment) -> bool:
     return RECOVERY_S > 0 and not isinstance(environment.runner, WorkerRunner)
 
 
+def _postgres_settings(docker) -> dict:
+    """
+    The Postgres server's effective settings; ``{}`` when they cannot be read, which
+    must not decide whether the step recovered.
+    """
+    try:
+        return postgres_settings(docker) if docker is not None else {}
+    except Exception:                              # noqa: BLE001 - instrumentation only
+        logging.exception("could not read the Postgres settings")
+        return {}
+
+
 def _api_url(environment) -> str:
     # --host replaces CubeUser.host when the runner starts, after test_start has fired
     return environment.host or CubeUser.host
@@ -176,6 +189,7 @@ def _record_recovery(environment, **_kwargs) -> None:
         environment.runner.stop()
 
     result = {"healthy_at_start": _step.get("healthy_at_start")}
+    docker = None
 
     try:
         docker = DockerClient(project=os.environ.get("COMPOSE_PROJECT_NAME") or None,
@@ -189,6 +203,7 @@ def _record_recovery(environment, **_kwargs) -> None:
         result.update({"recovered": False, "seconds": None, "error": repr(exc)})
 
     result["envelope"] = {k: os.environ.get(k) for k in ENVELOPE_KEYS}
+    result["postgres"] = _postgres_settings(docker)
     prefix = getattr(environment.parsed_options, "csv_prefix", None)
 
     if prefix:

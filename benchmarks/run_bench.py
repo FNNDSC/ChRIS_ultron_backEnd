@@ -11,6 +11,7 @@ Run inside the benchmark container:  ``python -m benchmarks.run_bench --tier smo
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import statistics
 import time
@@ -22,7 +23,8 @@ from .broker import BrokerClient
 from .chris_api import ChrisApi
 from .config import Tier, load_tier, step_for, tier_fingerprint
 from .docker_client import DockerClient
-from .pg_stats import PgStatStatements
+from .pg_stats import (SERVER_START_KEY, PgStatStatements, counter_delta, counter_windows,
+                       max_deltas, server_counters, server_counters_error)
 from .executor import build_feeds
 from .metrics import MetricSink
 from .models import (BreakingPoint, Classification, LevelResult, PluginRole,
@@ -39,6 +41,10 @@ PLUGIN_NAMES = {PluginRole.FS: "dbg-bigfiles",
                 PluginRole.TS: "pl-topologicalcopy"}
 
 STATS_INTERVAL_S = 2.0
+
+#: idle Postgres backends publish their statistics within ~10 s, so the run's last counter
+#: snapshot waits this long to include them
+RUN_STATS_SETTLE_S = 11.0
 
 RESTART_SERVICES = ("chris", "worker-mains", "worker-periodic", "celery-scheduler")
 
@@ -96,6 +102,7 @@ class BenchmarkRunner:
         before_counts = self._global_counts()
         poll_every = effective_poll_cadence(self.tier.poll_every_s, params.feeds)
         self.pg_stats.reset()                          # per-scenario query attribution
+        db_start = self._db_snapshot()
         started = time.time()
 
         with StatsSampler(self.docker, self._sink, interval=STATS_INTERVAL_S,
@@ -113,6 +120,7 @@ class BenchmarkRunner:
                 progress_probe=ProgressProbe(self.docker))
 
         ended = time.time()
+        db_workload_end = self._db_snapshot()          # the resource samples' window
         db_deltas = self._db_deltas(before_counts, feeds)   # before cleanup deletes them
         red = metrics.red_rollup(self._sink.requests())
         resources = metrics.resource_rollup(self._sink.resources())
@@ -127,9 +135,13 @@ class BenchmarkRunner:
             db_deltas=db_deltas, started_at=started, ended_at=ended, queues=queues,
             notes=build_errors)
 
+        db_cleanup_end = None
         if self.cleanup:
             self._cleanup_and_quiesce(feeds, before_counts, result.notes)
-        
+            db_cleanup_end = self._db_snapshot()
+
+        result.db_counters = counter_windows(db_start, db_workload_end, db_cleanup_end)
+
         # persist after cleanup so delete/quiesce traffic reaches api_requests.jsonl
         # and cleanup anomalies land in the scenario's notes
         self._persist_scenario(result, poll_every)
@@ -150,7 +162,7 @@ class BenchmarkRunner:
             "resources": result.resources, "phases": phases,
             "db_deltas": result.db_deltas,
             "feeds": [f.feed_id for f in result.feeds], "notes": result.notes,
-            "queues": result.queues,
+            "queues": result.queues, "db_counters": result.db_counters,
             "observer": {            # the harness's own measurement traffic, made visible
                 "poll_requests": sum(1 for r in requests if r.endpoint_class == "poll"),
                 "poll_every_s": poll_every,
@@ -220,6 +232,34 @@ class BenchmarkRunner:
             notes.append(
                 f"quiesce_incomplete_after_{self.tier.thresholds.quiesce_timeout_s}s")
 
+    def _db_snapshot(self) -> dict:
+        """
+        The Postgres server's cumulative counters plus the db container's cgroup counters
+        (bytes written, swap, OOM kills), so a window's delta also covers the writes
+        Postgres makes after its statements end (checkpoints, background writes). Each
+        half is read on its own, even when the other fails (the container's counters
+        while Postgres is in crash recovery, say), and a failure only leaves its keys
+        out: instrumentation must never end a scenario or lose a run's summary.
+        """
+        snapshot: dict = {}
+
+        with contextlib.suppress(Exception):
+            snapshot.update(server_counters(self.docker))
+
+        with contextlib.suppress(Exception):
+            snapshot.update(self.docker.cgroup_counters("db"))
+        return snapshot
+
+    def _counters_error(self) -> str:
+        """
+        Why the Postgres counters cannot be read, from psql itself. The query runs
+        again for this, so a failure that has cleared since reads "they read empty".
+        """
+        try:
+            return server_counters_error(self.docker) or "they read empty"
+        except Exception as exc:                       # noqa: BLE001 - best effort
+            return repr(exc)
+
     def _global_counts(self) -> dict:
         return {"feeds": self.api.feed_count(), "instances": self.api.instance_count(),
                 "files": self.api.file_count()}
@@ -252,6 +292,10 @@ class BenchmarkRunner:
     def run(self) -> dict:
         env = environment.collect_environment(self.docker)
         self._sink = MetricSink()  # keep noise-floor probes out of scenarios
+
+        if not env.get("postgres"):
+            print("[bench] WARNING: could not read the Postgres settings; this run's "
+                  "environment.json records none", flush=True)
         
         env["noise_floor"] = environment.measure_noise_floor(self.api)
         
@@ -275,6 +319,13 @@ class BenchmarkRunner:
         env["workload_plugins"] = build_workload_manifest(self.plugins)
         env["workload_plugins_ambiguous"] = ambiguous_plugins(self.plugins)
 
+        # Postgres counters around the whole run, which the per-scenario windows add up
+        # to but for a few seconds of statistics at their edges
+        db_start = self._db_snapshot()
+        env["attribution"]["db_counters"] = (
+            True if SERVER_START_KEY in db_start
+            else f"Postgres counters unreadable: {self._counters_error()}")
+
         self.store.write_json("environment.json", env)
 
         levels, breaking = escalation.run(
@@ -282,11 +333,17 @@ class BenchmarkRunner:
             self.make_params, on_level=self._on_level, on_fail=self._on_fail,
             step_for=step_for)
 
+        if db_start:
+            time.sleep(RUN_STATS_SETTLE_S)
+        db_end = self._db_snapshot()
+
         summary = {
             "run_id": self.store.run_id, "tier": self.tier.name,
             "environment": env, "levels_run": len(levels),
             "breaking_points": [_bp_row(bp) for bp in breaking],
             "verdict_counts": dict(Counter(lv.verdict.value for lv in levels)),
+            "db_counters": {"run": counter_delta(db_start, db_end),
+                            "snapshots": {"start": db_start, "end": db_end}},
         }
 
         self.store.write_json("summary.json", summary)
@@ -381,7 +438,24 @@ def _level_row(level: LevelResult) -> dict:
         "peak_queue_depth": peak_queue,
         "registered_output_bytes": max(
             (r.db_deltas.get("registered_output_bytes", 0) for r in reps), default=0),
+        "db_counters": _db_counters_rollup(reps),
     }
+
+
+def _db_counters_rollup(reps) -> dict:
+    """
+    Per window (workload, cleanup), each counter's largest delta across the level's
+    repeats, like the other peaks (``pg_stats.max_deltas``).
+    """
+    out = {}
+
+    for window in ("workload", "cleanup"):
+        deltas = [r.db_counters[window] for r in reps
+                  if r.db_counters.get(window) is not None]
+
+        if deltas:
+            out[window] = max_deltas(deltas)
+    return out
 
 
 def _worst_p95(red: dict) -> float:
