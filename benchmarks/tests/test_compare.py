@@ -146,13 +146,21 @@ def test_unrecorded_limits_give_a_single_caution():
     assert fields == ["limits"]  # nosec B101 - pytest assertion
 
 
-def test_db_image_difference_is_informational():
-    c = check_comparability(_env(images={"db": {"image_id": "sha256:a"}}),
-                            _env(images={"db": {"image_id": "sha256:b"}}))
+def test_db_and_broker_image_differences_are_informational():
+    for service in ("db", "dragonflydb"):
+        c = check_comparability(_env(images={service: {"image_id": "sha256:a"}}),
+                                _env(images={service: {"image_id": "sha256:b"}}))
+
+        assert c.status == "comparable"  # nosec B101 - pytest assertion
+        severities = [d.severity for d in c.diffs if d.field == f"images.{service}"]
+        assert severities == ["info"]  # nosec B101 - pytest assertion
+
+
+def test_broker_image_missing_from_an_older_run_is_informational():
+    c = check_comparability(_env(), _env(images={"dragonflydb": {"image_id": "sha256:b"}}))
 
     assert c.status == "comparable"  # nosec B101 - pytest assertion
-    severities = [d.severity for d in c.diffs if d.field == "images.db"]
-    assert severities == ["info"]  # nosec B101 - pytest assertion
+    assert [(d.field, d.severity) for d in c.diffs] == [("images.dragonflydb", "info")]  # nosec B101 - pytest assertion
 
 
 # -- delta classification ------------------------------------------------------------------

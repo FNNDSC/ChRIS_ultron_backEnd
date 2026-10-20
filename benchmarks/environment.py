@@ -54,8 +54,8 @@ def postgres_settings(docker: DockerClient) -> dict:
 
 
 def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
-                        image_services: tuple[str, ...] = ("chris", "pfcon",
-                                                           "db")) -> dict:
+                        image_services: tuple[str, ...] = ("chris", "pfcon", "db",
+                                                           "dragonflydb")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()
     version = docker.version()

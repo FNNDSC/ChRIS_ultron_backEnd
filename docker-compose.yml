@@ -60,7 +60,7 @@ services:
       db:
         condition: service_healthy
       dragonflydb:
-        condition: service_started
+        condition: service_healthy
       nats:
         condition: service_started
       cube-nonroot-user-volume-fix:
@@ -149,12 +149,24 @@ services:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
+  # the service name is hard-coded in chris_backend/config/settings/local.py, in oxidicom's
+  # OXIDICOM_CELERY_BROKER and in docker-compose.benchmark.yml's BENCH_BROKER
   dragonflydb:
-    image: ghcr.io/dragonflydb/dragonfly:v1.38.0
+    image: ${DRAGONFLY_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
+    # no daily call to version.dragonflydb.io, which also reports deployment details
+    command: ["--version_check=false"]
     ulimits:
       memlock: -1
     volumes:
       - dragonflydata:/data
+    # The image's own HEALTHCHECK only opens a TCP connection and Podman ignores it. PING
+    # answers once Dragonfly has loaded its snapshot.
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
     networks:
       local:
 

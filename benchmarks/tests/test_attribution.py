@@ -497,12 +497,13 @@ class ManifestDocker(JsonDocker):
                        "shm_size": 1073741824}}
 
 
-def test_collect_environment_records_postgres_settings_limits_and_db_image():
+def test_collect_environment_records_postgres_settings_limits_and_images():
     env = collect_environment(ManifestDocker(SETTINGS_DOC),
                               env={"CUBE_DB_SYNCHRONOUS_COMMIT": "on"})
 
     assert env["postgres"]["settings"]["max_wal_size"] == "8GB"  # nosec B101 - pytest assertion
     assert env["images"]["db"]["image_id"] == "sha256:db"  # nosec B101 - pytest assertion
+    assert env["images"]["dragonflydb"]["image_id"] == "sha256:dragonflydb"  # nosec B101 - pytest assertion
     assert env["limits"]["db"]["shm_size"] == 1073741824  # nosec B101 - pytest assertion
     assert env["envelope"]["CUBE_DB_SYNCHRONOUS_COMMIT"] == "on"  # nosec B101 - pytest assertion
     assert set(env["envelope"]) == set(ENVELOPE_KEYS)  # nosec B101 - pytest assertion

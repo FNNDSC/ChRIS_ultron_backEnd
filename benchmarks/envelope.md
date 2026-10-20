@@ -52,6 +52,14 @@ as a baseline: `bench-compare` flags `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` and
 seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
 recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
+**The broker:** Dragonfly (`dragonflydb`) runs with no CPU or memory limit, so its thread
+count and `maxmemory` follow the host. Its image is recorded under `images` in
+`environment.json`; `bench-compare` lists a different image, or none in a run that predates
+the record (`—`), as information. `DRAGONFLY_IMAGE` replaces the image, for example for an
+A/B of two Dragonfly versions. Export it for `just bench-start` and `just bench-run` alike:
+`bench-run`'s `compose run` recreates a dependency whose configuration differs, so a
+variable set for one recipe only silently brings the default image back.
+
 **Why the 2.0 s floor for the Celery poll interval:** the periodic tasks are guarded by `skip_if_running`
 (`plugininstances/tasks.py`), which spends ~1 s in a broker-wide `inspect().active()`
 broadcast on every invocation. At a cadence ≤ ~1 s consecutive invocations overlap and
