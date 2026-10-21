@@ -23,6 +23,8 @@ Key findings:
 
 **PostgreSQL configuration (2026-10-14).** Both compose stacks now run `db` on a committed `postgres/cube.conf` sized for the benchmark's 4 GiB `db`. On the layered diamond it removes every size-triggered checkpoint and cuts what `db` writes by 40%. §15 has the before and after runs; the after runs are the baselines from here on.
 
+**Shared cache, Dragonfly v2.0.2 and their envelope (2026-10-21).** CUBE has a shared cache on a Dragonfly of its own, both Dragonflies run v2.0.2, and the benchmark pins their CPUs and memory and those of the periodic worker and beat. A/B runs of the Dragonfly version and of the new limits move no makespan beyond run-to-run variation; §16 has them, and the runs with the limits are the baselines from here on.
+
 ### 1.1 Recommendations
 
 Grouped by implementation cost; each cites the section with the supporting measurement and analysis.
@@ -404,3 +406,56 @@ Most of the saving is buffer evictions. With 128 MB of `shared_buffers`, registe
 - The after runs are the baselines for these three commands from here on; the epic's baseline table ([#148](https://github.com/FNNDSC/HARBOR-planning/issues/148)) is to be updated to point at them. Other commands get their own baseline run on this configuration when an issue needs one.
 - `bench-compare` against any earlier run reports three cautions it did not before: `postgres` and `limits` "not recorded", and `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` (shown as `—`, though those runs had PostgreSQL's default `on`). Against a run of this configuration, a differing setting is a caution of its own.
 - The development stack runs on the same file, and CUBE's tests run on it (Tests above).
+
+## 16. Shared cache, Dragonfly v2.0.2 and their envelope (2026-10-21)
+
+Issue 1b ([#151](https://github.com/FNNDSC/HARBOR-planning/issues/151)) gives CUBE a shared cache: Django's `RedisCache` on a Dragonfly of its own, `dragonfly-cache` (`--cache_mode`, no snapshot), apart from the Celery broker `dragonflydb`, and the helpers that the queue, event-driven, failure-handling, control-plane and token-cache issues build on (`core/cache.py`: locks, once-per-window markers and a bounded counter of expiring leases, all of which fail open when the cache does not answer). It also moves the broker to Dragonfly v2.0.2, which the cache's Dragonfly runs too, and pins, in the benchmark envelope, the CPUs and memory of both Dragonflies and of `worker-periodic` and `celery-scheduler` ([envelope.md](envelope.md) § "Knobs (env vars, with defaults)"). Nothing in CUBE calls the helpers yet, so the runs below check that none of this changes what the harness measures; the issues that use the cache measure what it buys.
+
+**Why a second Dragonfly.** One Dragonfly has one memory limit and one eviction policy for all its logical databases. On a v2.0.2 instance capped at 256 MB, filling a cache database made the server refuse the broker's `LPUSH` in database 0 with `Out of memory`, and the eviction mode a cache wants (`--cache_mode`) would evict Celery's queues instead. With the cache apart, the broker never evicts and keeps its snapshot, while the cache evicts when full and starts empty after a restart. The cache can then be stopped while the broker, and every task, keeps running (below), as the issue's criterion asks; with one shared server, stopping the cache would stop the broker too.
+
+**Protocol.** All runs were made on the benchmark box from 2026-10-20 22:07 to 2026-10-21 04:23 UTC, in three steps of one commit each, and each started on a fresh stack except the smoke run with the cache stopped (`2026-10-21T032008Z`), which followed the cache's smoke run (`031631Z`) on its stack. At 5bc2e49 (the broker's image recorded in `environment.json`), an A/B of Dragonfly v1.38.0 against v2.0.2 through `DRAGONFLY_IMAGE`. At 1e94ddd (the cache), a smoke run and the outage checks. At 0c9223b (the envelope), an A/B with the eight new limits at `0` (none) against their defaults. In each A/B every command ran once per arm, linear · depth = 16 twice, and successive pairs alternated which arm went first. All runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13 from 2d52608's `chrisomatic.yml`, the one uncommitted file ([history/README.md](history/README.md) lists every run).
+
+| Command (`just bench-run --tier ...`) | v1.38.0 | v2.0.2 | no new limits | new limits |
+|---|---|---|---|---|
+| `smoke` | `2026-10-20T220727Z` | `221116Z` | `2026-10-21T032810Z` | `033213Z` |
+| `full --topology linear --axis depth --cap 16 --repeat 1 --restart-on-fail` | `221843Z`, `225330Z` | `221502Z`, `225711Z` | `034001Z`, `041603Z` | `033616Z`, `041947Z` |
+| `full --topology linear --axis feeds --cap 128 --repeat 1 --restart-on-fail` | `222226Z` | `223431Z` | `034345Z` | `035538Z` |
+| `full --topology fanout_fanin --axis feeds --cap 64 --repeat 1 --restart-on-fail` | `224923Z` | `224055Z` | `041159Z` | `040756Z` |
+
+**Results.**
+
+| | v1.38.0 | v2.0.2 | no new limits | new limits |
+|---|---|---|---|---|
+| `smoke` | 10 PASS | 10 PASS, none flagged | 10 PASS | 10 PASS, none flagged against the cache's smoke run `2026-10-21T031631Z` |
+| linear · depth = 16, 16 deep | 67.69, 67.79 s | 67.74, 67.69 s | 67.81, 68.78 s | 67.56, 66.47 s |
+| linear · feeds = 128 | PASS; 128 feeds 308.0 s | FAIL at 64 | PASS; 128 feeds 312.1 s | FAIL at 128; 326.4 s |
+| fanout_fanin · feeds = 64 | FAIL at 32 | FAIL at 64 | FAIL at 32 | FAIL at 32 |
+| Duplicate submissions in pfcon's log (feeds, fanout) | 5, 2 | 5, 4 | 6, 2 | 8, 2 |
+| Broker, highest CPU and memory over the arm's runs | 13.4%, 57 MiB | 14.4%, 48 MiB | 14.7%, 44 MiB | 7.0%, 28 MiB |
+
+Every failure, in either arm of either A/B, is a `cancelled:inst-*` criterion in a run whose pfcon log has duplicate submissions: the race of the queue issue ([#152](https://github.com/FNNDSC/HARBOR-planning/issues/152)), which decides where the feeds walls land from run to run (as in §13). `bench-compare` flags the levels whose verdict that race flipped by their verdict, with makespans within 5%, and a makespan at one level only, linear · feeds = 16, which the v1.38.0 run took 47.9 s against 22.6–24.3 s in the other three runs of that command. Its p95 flags go both ways (five improved, four regressed over the ten pairs): eight are on levels of 8 to 30 measured requests, and the ninth, an improvement (266 to 160 ms), is that same level with the new limits, 86 requests. At the other levels both arms passed, the largest makespan move is 4.9 s (fanout_fanin at 16 feeds, 27.8 s without the new limits and 32.7 s with them, +18%, under `bench-compare`'s 20%). One run per arm cannot tell that from noise: the level's other two runs took 27.3 s (v2.0.2) and 30.9 s (v1.38.0), and the three repeats of `2026-09-17T113103Z` spanned 28.8–33.4 s. The `main2` queue peaks are close where they are large (at 64 feeds without and with the limits, 432 and 462; at 16 fanout_fanin feeds, 158 and 150, then 139 and 142) and vary where they are small (at 32 feeds, 49 and 74). The v1.38.0 smoke run is flagged on no level against the last baseline, `2026-10-14T022103Z`.
+
+**The envelope.** Dragonfly runs one thread per CPU it is given and keeps 80% of its memory limit as its `maxmemory`; unconstrained, the broker ran 16 threads with a `maxmemory` of about 92 GiB, and with the limits 2 threads with a `maxmemory` of 819 MiB. Under the limits nothing came near them:
+
+| Service | Limit | Highest CPU (one CPU = 100%) | Highest memory |
+|---|---|---|---|
+| `dragonflydb` | 2 CPUs, 1 GiB | 7.0% | 28 MiB |
+| `dragonfly-cache` | 1 CPU, 512 MiB | 4.2% | 14 MiB |
+| `worker-periodic` | 1 CPU, 1 GiB | 23.0% | 256 MiB |
+| `celery-scheduler` | 0.5 CPU, 512 MiB | 2.9% | 113 MiB |
+
+The broker uses less with 2 threads than with 16 (7.0% against 14.7% of a CPU, 28 against 44 MiB): idle, before each run, it held 24 MiB of resident memory with 2 threads and 40 MiB with 16. The headroom is for what the next issues add: markers per status check (#152), a lease per pfcon call ([#158](https://github.com/FNNDSC/HARBOR-planning/issues/158)), token and count lookups per API request ([#159](https://github.com/FNNDSC/HARBOR-planning/issues/159), [#161](https://github.com/FNNDSC/HARBOR-planning/issues/161)) and the event streams on the broker ([#153](https://github.com/FNNDSC/HARBOR-planning/issues/153)); their runs should read `dragonfly-cache`'s and the broker's use against these limits.
+
+**Without the cache.** On the benchmark stack at 1e94ddd, with a probe process in `chris` calling the helpers every 0.5 s:
+
+- `dragonfly-cache` stopped: 50 token-authenticated GETs of the API root all returned 200 (p50 6.6 ms, 6.8 ms with the cache up); a smoke run passed all 10 levels, and the workers kept running with unchanged start times. The probe went ahead without the cache (410 of its 499 rounds were degraded while it was stopped, 461 across the three outages) and logged one WARNING when it failed and one INFO when it answered again, 207.3 s later, counting the 1,271 calls that went ahead without it. This smoke run was started with `just bench-compose '--profile cube --profile bench run --rm --no-deps benchmark python -m benchmarks.run_bench --tier smoke'`, since `just bench-run` would have started the cache again.
+- Paused (a hung server): the API's p50 stayed at 6.4 ms; the probe's slowest call took 0.502 s, the 0.5 s socket timeout, after which the helpers skipped the cache for 5 s at a time, with one WARNING and one INFO 27.0 s later.
+- CUBE's services restarted while the cache was stopped: all started and the API answered. Each uvicorn worker and each Celery service logged one start-up line, `CUBE shared cache: dragonfly-cache:6379/0 does not answer (…); starting without it, …`: four from `chris`, one from each Celery service (beat's in the scripted count; the two workers' in a recheck 20 s after a restart, as the script had counted before they logged).
+- A cache URL that names the broker's database stops start-up with `ImproperlyConfigured`.
+
+**Tests.** At 1e94ddd on the benchmark box, on Docker: `just lock-check`; `just bench-test` (264 passed, 1 skipped); `just openapi` and its split variant with nothing on stderr that CI's check matches; `core.tests.test_cache` and `test_testrunner` (54 tests, 9.3 s), during which a session on the development database survived; `just test-unit` (1,422 tests, 17 skipped, 1 expected failure) and `just test-integration` (77 tests, 34 skipped). The same two jobs as CI's podman job runs them, under rootless Podman 5.7 on Ubuntu 26.04 with the branch merged into `master`, pass with the same counts. 0c9223b changes only the benchmark override and envelope.md; its runs are above.
+
+**Consequences.**
+
+- The "new limits" runs are the baselines for these four commands from here on: `smoke` `2026-10-21T033213Z`, linear · depth = 16 `033616Z` and `041947Z`, linear · feeds = 128 `035538Z` and fanout_fanin · feeds = 64 `040756Z`. Other commands get theirs when an issue needs one.
+- Against a run from before this issue (2026-10-14 and earlier) `bench-compare` lists `images.dragonflydb` and `images.dragonfly-cache` as information and reports `envelope.CUBE_CACHE_URL`, each new limit (`limits.dragonflydb.cpus` and so on) and the cache's other `limits.dragonfly-cache.*` rows as cautions; against the 2026-10-14 runs also `host.mem_total_bytes` (12 KiB less memory on the box). Against the runs of this section it reports only what differs.

@@ -60,8 +60,8 @@ recovery check reads (`0` disables them). It is instrumentation and is not recor
 **The broker and the cache:** Dragonfly runs twice, as the Celery broker (`dragonflydb`) and
 as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
 given and keeps 80% of its memory limit as its `maxmemory`, so without the limits above both
-would follow the host (16 threads and about 96 GiB on the benchmark box). The 2026-10-20 runs
-peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
+would follow the host (16 threads and about 92 GiB on the benchmark box). The 2026-10-20 runs on
+v2.0.2 peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
 `worker-periodic`, so the limits leave room for what later issues add. Runs from before these
 limits have none of them, and `bench-compare` reports each as a caution against them; `0`
 removes a limit, for a run without it. Their images are recorded under `images`

@@ -269,6 +269,72 @@ without `wal_init_bytes` and the per-statement temp and WAL columns), which earl
 baselines for these three commands from here on. The `db` container logs of these runs, with
 every checkpoint and its cause, are kept on the benchmark box.
 
+## Shared cache, Dragonfly v2.0.2 and their envelope — 2026-10-20/21
+
+The runs of issue 1b ([#151](https://github.com/FNNDSC/HARBOR-planning/issues/151),
+REPORT.md § 16), in three steps, each measured on its own:
+
+- **Dragonfly v1.38.0 → v2.0.2** at 5bc2e49, which also records the broker's image: arm A ran
+  `DRAGONFLY_IMAGE=ghcr.io/dragonflydb/dragonfly:v1.38.0`, arm B the default v2.0.2.
+- **The cache** at 1e94ddd, which gives it a Dragonfly of its own (`dragonfly-cache`): a smoke
+  run, then one with `dragonfly-cache` stopped.
+- **The envelope** at 0c9223b, which pins the CPUs and memory of both Dragonflies,
+  `worker-periodic` and `celery-scheduler`: arm A with the eight new knobs at `0` (no limit),
+  arm B with their defaults.
+
+Every run but `032008Z` started on a fresh stack (`down -v`, plugin-job containers removed,
+`just bench-start`), with the knobs of its arm exported for `bench-start` and `bench-run` alike.
+`032008Z` ran on `031631Z`'s stack right after it, with `dragonfly-cache` stopped and a probe of
+the helpers running in `chris`, started with `just bench-compose '--profile cube --profile bench
+run --rm --no-deps benchmark python -m benchmarks.run_bench --tier smoke'` because `just
+bench-run` would have started the cache again.
+In each A/B every command ran once per arm, the order alternating which arm went first, and
+linear · depth = 16 twice. The plugin pin was 2d52608's `chrisomatic.yml` (sha256 `a73940e8…`),
+the only uncommitted file, so every run records `git.dirty` true; `workload_plugins` reads
+`dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13, one match each.
+Host: kernel 7.0.0-38, Docker 29.9.1 (the 2026-10-14 runs had 29.9.0), Compose 5.6.0. Dragonfly
+image ids: v1.38.0 `sha256:fb2fdde7…` (index `243bf004…`), v2.0.2 `sha256:e2b39549…` (index
+`061f00b2…`). "Duplicates" counts pfcon's `container name … is already in use` errors, the
+duplicate-submission race of the queue issue
+([#152](https://github.com/FNNDSC/HARBOR-planning/issues/152)).
+
+| Run | Commit | Arm | Command (`just bench-run --tier ...`) | Result |
+|---|---|---|---|---|
+| `2026-10-20T220727Z` | 5bc2e49 | A v1.38.0 | `smoke` | PASS, 10 levels; no level flagged against `2026-10-14T022103Z` |
+| `2026-10-20T221116Z` | 5bc2e49 | B v2.0.2 | `smoke` | PASS, 10 levels; no level flagged against 220727Z |
+| `2026-10-20T221502Z` | 5bc2e49 | B v2.0.2 | `full --topology linear --axis depth --cap 16 --repeat 1 --restart-on-fail` | PASS; 16 deep 67.74 s |
+| `2026-10-20T221843Z` | 5bc2e49 | A v1.38.0 | same | PASS; 16 deep 67.69 s |
+| `2026-10-20T222226Z` | 5bc2e49 | A v1.38.0 | `full --topology linear --axis feeds --cap 128 --repeat 1 --restart-on-fail` | PASS; 128 feeds 308.0 s, `main2` peak 2,374; 5 duplicates |
+| `2026-10-20T223431Z` | 5bc2e49 | B v2.0.2 | same | FAIL at 64 (`cancelled:inst-634`); 5 duplicates |
+| `2026-10-20T224055Z` | 5bc2e49 | B v2.0.2 | `full --topology fanout_fanin --axis feeds --cap 64 --repeat 1 --restart-on-fail` | FAIL at 64 (`cancelled:inst-725`); 4 duplicates |
+| `2026-10-20T224923Z` | 5bc2e49 | A v1.38.0 | same | FAIL at 32 (`cancelled:inst-331`, `-357`); 2 duplicates |
+| `2026-10-20T225330Z` | 5bc2e49 | A v1.38.0 | linear · depth = 16, as above | PASS; 16 deep 67.79 s |
+| `2026-10-20T225711Z` | 5bc2e49 | B v2.0.2 | same | PASS; 16 deep 67.69 s |
+| `2026-10-21T031631Z` | 1e94ddd | — | `smoke` | PASS, 10 levels; no level flagged against 221116Z |
+| `2026-10-21T032008Z` | 1e94ddd | — | `smoke`, with `dragonfly-cache` stopped (fault injection, not a baseline) | PASS, 10 levels |
+| `2026-10-21T032810Z` | 0c9223b | A no new limits | `smoke` | PASS, 10 levels |
+| `2026-10-21T033213Z` | 0c9223b | B new limits | `smoke` | PASS, 10 levels |
+| `2026-10-21T033616Z` | 0c9223b | B new limits | linear · depth = 16 | PASS; 16 deep 67.56 s |
+| `2026-10-21T034001Z` | 0c9223b | A no new limits | same | PASS; 16 deep 67.81 s |
+| `2026-10-21T034345Z` | 0c9223b | A no new limits | linear · feeds = 128 | PASS; 128 feeds 312.1 s, `main2` peak 2,377; 6 duplicates |
+| `2026-10-21T035538Z` | 0c9223b | B new limits | same | FAIL at 128 (`cancelled:inst-1001`, `-1137`); 326.4 s, `main2` peak 2,559; 8 duplicates |
+| `2026-10-21T040756Z` | 0c9223b | B new limits | fanout_fanin · feeds = 64 | FAIL at 32 (`cancelled:inst-341`); 2 duplicates |
+| `2026-10-21T041159Z` | 0c9223b | A no new limits | same | FAIL at 32 (`cancelled:inst-374`); 2 duplicates |
+| `2026-10-21T041603Z` | 0c9223b | A no new limits | linear · depth = 16 | PASS; 16 deep 68.78 s |
+| `2026-10-21T041947Z` | 0c9223b | B new limits | same | PASS; 16 deep 66.47 s |
+
+`bench-compare` flags no makespan in any pair, apart from levels whose verdict the race flipped
+and linear · feeds = 16 of the version A/B, which the v1.38.0 run (`222226Z`) took 47.9 s against
+22.6–24.3 s in the other three runs; its p95 flags go both ways, eight of the nine on levels of 8
+to 30 measured requests. Every failure is a
+`cancelled:inst-*` criterion in a run whose pfcon log has duplicates, and both arms of each A/B
+fail that way. The B runs at 0c9223b are the baselines for these four commands from here on.
+Against runs from before 2026-10-20 `bench-compare` lists `images.dragonflydb` and
+`images.dragonfly-cache` as information, and `envelope.CUBE_CACHE_URL` and each new limit
+(`limits.dragonflydb.cpus` and so on) as cautions, plus `host.mem_total_bytes` against the
+2026-10-14 runs; against the runs above it reports only what differs. The per-run logs (Dragonfly's, pfcon's, the probes) are kept on the benchmark
+box.
+
 ## Regenerating the archive
 
 ```bash

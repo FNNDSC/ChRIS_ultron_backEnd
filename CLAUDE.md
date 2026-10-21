@@ -65,8 +65,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   `celery_app.conf.update(task_routes=None)`, so tasks land on the default `celery` queue, which
   is reserved for tests (see `core/celery.py`). `core/testrunner.py` terminates leftover DB
   connections so the test database can be dropped (only when the run created one).
-- `core/tests/test_cache.py` runs against the stack's Dragonfly, in the database 2 a running dev
-  stack also uses: its tests use names of their own and short TTLs, and never call
+- `core/tests/test_cache.py` runs against the stack's cache Dragonfly (`dragonfly-cache`, database
+  0), which a running dev stack also uses: its tests use names of their own and short TTLs, and never call
   `cache.clear()`. Its `CacheProxy` takes the server away mid-test (stopped or hung).
 - `core.storage.helpers.mock_storage(target_settings)` swaps the storage backend for a temp
   directory. `core/tests/test_swiftmanager.py` and `test_s3manager.py` need the matching
