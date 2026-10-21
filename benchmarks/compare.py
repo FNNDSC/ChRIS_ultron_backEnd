@@ -148,8 +148,9 @@ _SCALAR_FIELDS = (
     ("images.chris", ("images", "chris", "image_id"), INFO),
     ("images.pfcon", ("images", "pfcon", "image_id"), INFO),
     ("images.db", ("images", "db", "image_id"), INFO),
-    # the Celery broker
+    # the Celery broker and the shared cache
     ("images.dragonflydb", ("images", "dragonflydb", "image_id"), INFO),
+    ("images.dragonfly-cache", ("images", "dragonfly-cache", "image_id"), INFO),
 )
 
 _NOISE_FLOOR_RATIO = 3.0

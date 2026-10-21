@@ -29,6 +29,7 @@ artificial dev cap.
 | `PFCON_CPUS` / `PFCON_MEM_LIMIT` | `2` / `2g` | `pfcon` CPU and memory |
 | `CUBE_CELERY_POLL_INTERVAL` | `2.0` | Celery-beat scheduling/status poll cadence (s) — sweep `{2, 4, 8}` |
 | `CUBE_DEBUG` | `false` | Django `DEBUG` on `chris` and the Celery services (see below) |
+| `CUBE_CACHE_URL` | `redis://dragonfly-cache:6379/0` | the shared cache (`CACHES['default']`) of `chris` and the Celery services; earlier runs did not record it, so `bench-compare` reports it as a caution against them |
 
 **Why `DEBUG` is off:** production runs with `DEBUG = False`, and `DEBUG` changes what is
 measured: every SQL statement goes through Django's query recorder, the debug toolbar's
@@ -52,11 +53,12 @@ as a baseline: `bench-compare` flags `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` and
 seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
 recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
-**The broker:** Dragonfly (`dragonflydb`) runs with no CPU or memory limit, so its thread
-count and `maxmemory` follow the host. Its image is recorded under `images` in
-`environment.json`; `bench-compare` lists a different image, or none in a run that predates
-the record (`—`), as information. `DRAGONFLY_IMAGE` replaces the image, for example for an
-A/B of two Dragonfly versions. Export it for `just bench-start` and `just bench-run` alike:
+**The broker and the cache:** Dragonfly runs twice, as the Celery broker (`dragonflydb`) and
+as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`), with no CPU or memory limit, so
+their thread counts and `maxmemory` follow the host. Their images are recorded under `images`
+in `environment.json`; `bench-compare` lists a different image, or none in a run that predates
+the record (`—`), as information. `DRAGONFLY_IMAGE` replaces the image of both, for example
+for an A/B of two Dragonfly versions. Export it for `just bench-start` and `just bench-run` alike:
 `bench-run`'s `compose run` recreates a dependency whose configuration differs, so a
 variable set for one recipe only silently brings the default image back.
 

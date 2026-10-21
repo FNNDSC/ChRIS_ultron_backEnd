@@ -61,6 +61,8 @@ services:
         condition: service_healthy
       dragonflydb:
         condition: service_healthy
+      dragonfly-cache:
+        condition: service_healthy
       nats:
         condition: service_started
       cube-nonroot-user-volume-fix:
@@ -149,8 +151,9 @@ services:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
-  # the service name is hard-coded in chris_backend/config/settings/local.py, in oxidicom's
-  # OXIDICOM_CELERY_BROKER and in docker-compose.benchmark.yml's BENCH_BROKER
+  # The Celery broker (logical database 0; 1 is for event streams). The service name is
+  # hard-coded in chris_backend/config/settings/local.py, in oxidicom's
+  # OXIDICOM_CELERY_BROKER and in docker-compose.benchmark.yml's BENCH_BROKER.
   dragonflydb:
     image: ${DRAGONFLY_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
     # no daily call to version.dragonflydb.io, which also reports deployment details
@@ -161,6 +164,25 @@ services:
       - dragonflydata:/data
     # The image's own HEALTHCHECK only opens a TCP connection and Podman ignores it. PING
     # answers once Dragonfly has loaded its snapshot.
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    networks:
+      local:
+
+  # The shared cache, CACHES['default'] (see chris_backend/core/cache.py), kept apart from
+  # the broker so that it can evict when full and start empty without touching the Celery
+  # queues. The service name is hard-coded in chris_backend/config/settings/local.py and
+  # docker-compose.benchmark.yml's CUBE_CACHE_URL.
+  dragonfly-cache:
+    image: ${DRAGONFLY_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
+    # --cache_mode: evict when full instead of refusing writes; --dbfilename=: no snapshot
+    command: ["--version_check=false", "--cache_mode=true", "--dbfilename="]
+    ulimits:
+      memlock: -1
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 2s

@@ -447,6 +447,7 @@ dependencies = [
     { name = "python-pfconclient" },
     { name = "python-swiftclient" },
     { name = "pyyaml" },
+    { name = "redis" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "whitenoise", extra = ["brotli"] },
 ]
@@ -485,6 +486,7 @@ requires-dist = [
     { name = "python-pfconclient", specifier = ">=4.0" },
     { name = "python-swiftclient", specifier = ">=4.11" },
     { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "redis", specifier = ">=6.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52" },
     { name = "whitenoise", extras = ["brotli"], specifier = ">=6.12" },
 ]

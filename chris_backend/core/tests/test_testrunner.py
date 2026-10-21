@@ -20,13 +20,21 @@ class TerminateConnectionsTestRunnerTests(SimpleTestCase):
         connection.cursor.assert_not_called()
         teardown.assert_called_once_with([])
 
-    def test_terminates_the_other_sessions_on_the_test_database(self, connection,
-                                                               teardown):
+    def test_terminates_the_other_sessions_on_the_test_database_before_dropping_it(
+            self, connection, teardown):
         connection.settings_dict = {'NAME': 'test_chris_dev'}
         old_config = [(mock.Mock(), 'chris_dev', True)]
+        cursor = connection.cursor.return_value.__enter__.return_value
+        order = []
+        cursor.execute.side_effect = lambda *args: order.append('terminate')
+        teardown.side_effect = lambda *args, **kwargs: order.append('drop')
 
         TerminateConnectionsTestRunner().teardown_databases(old_config)
 
-        cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.execute.assert_called_once_with(mock.ANY, ['test_chris_dev'])
+        sql, params = cursor.execute.call_args.args
+        self.assertRegex(' '.join(sql.split()),
+                         r'pg_terminate_backend\(pid\) FROM pg_stat_activity '
+                         r'WHERE datname = %s AND pid <> pg_backend_pid\(\)$')
+        self.assertEqual(params, ['test_chris_dev'])
+        self.assertEqual(order, ['terminate', 'drop'])
         teardown.assert_called_once_with(old_config)

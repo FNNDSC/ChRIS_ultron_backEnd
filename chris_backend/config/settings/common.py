@@ -127,6 +127,26 @@ DATABASES = {
     }
 }
 
+# Cache
+# https://docs.djangoproject.com/en/6.0/topics/cache/
+# Django's RedisCache on a Dragonfly of its own, apart from the Celery broker's; the
+# environment-specific settings set LOCATION and run the start-up check. core/cache.py has
+# the coordination helpers built on it.
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'KEY_PREFIX': 'cube',
+        'OPTIONS': {
+            # redis-py waits forever by default, so a hung server would hang every cache
+            # call. No retries: a SET NX retried after a lost reply can find its own key, and
+            # the pool already replaces a connection the server has closed.
+            'socket_connect_timeout': 0.5,
+            'socket_timeout': 0.5,
+        },
+    }
+}
+
 # Seconds between the log lines that report each ASGI worker's database connection pool
 # counters (core.utils.start_db_pool_stats_logger, started by config/asgi.py); 0 is off.
 DB_POOL_STATS_INTERVAL = 0

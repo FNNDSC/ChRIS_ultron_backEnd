@@ -146,8 +146,8 @@ def test_unrecorded_limits_give_a_single_caution():
     assert fields == ["limits"]  # nosec B101 - pytest assertion
 
 
-def test_db_and_broker_image_differences_are_informational():
-    for service in ("db", "dragonflydb"):
+def test_db_broker_and_cache_image_differences_are_informational():
+    for service in ("db", "dragonflydb", "dragonfly-cache"):
         c = check_comparability(_env(images={service: {"image_id": "sha256:a"}}),
                                 _env(images={service: {"image_id": "sha256:b"}}))
 

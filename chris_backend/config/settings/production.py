@@ -9,6 +9,7 @@ from django_auth_ldap.config import LDAPSearch, GroupOfNamesType
 from .common import *  # noqa
 from environs import Env, EnvError
 from core.storage import verify_storage_connection
+from core.cache import verify_cache_connection
 
 # Normally you should not import ANYTHING from Django directly
 # into your settings, but ImproperlyConfigured is an exception.
@@ -198,6 +199,15 @@ CELERY_TASK_SERIALIZER = 'json'
 # messages to prefetch at a time multiplied by the number of concurrent processes
 # default is 4 (four messages for each process)
 CELERYD_PREFETCH_MULTIPLIER = 2
+
+
+# CACHE SETTINGS (see common.py)
+# ------------------------------------------------------------------------------
+# A Redis-protocol server for the cache, apart from the Celery broker, and its logical
+# database, for example redis://dragonfly-cache:6379/0. Timeouts and TLS options can go in
+# its query string, retry options cannot (the start-up check refuses them).
+CACHES['default']['LOCATION'] = get_secret('CACHE_URL')
+verify_cache_connection(CACHES['default'], CELERY_BROKER_URL)
 
 
 # REVERSE PROXY

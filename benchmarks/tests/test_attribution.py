@@ -15,7 +15,8 @@ import pytest
 from benchmarks.broker import BrokerClient, encode_command, parse_reply
 from benchmarks.docker_client import (CGROUP_COUNTERS_CMD, CONTAINER_START_KEY, DockerClient,
                                       parse_cgroup_counters)
-from benchmarks.environment import ENVELOPE_KEYS, POSTGRES_SETTINGS, collect_environment
+from benchmarks.environment import (ENVELOPE_KEYS, POSTGRES_SETTINGS, collect_environment,
+                                    envelope)
 from benchmarks.metrics import MetricSink, queue_rollup
 from benchmarks.models import QueueSample
 from benchmarks.pg_stats import (COUNTERS_SQL, SETTINGS_SQL, STATEMENT_COLUMNS,
@@ -499,14 +500,26 @@ class ManifestDocker(JsonDocker):
 
 def test_collect_environment_records_postgres_settings_limits_and_images():
     env = collect_environment(ManifestDocker(SETTINGS_DOC),
-                              env={"CUBE_DB_SYNCHRONOUS_COMMIT": "on"})
+                              env={"CUBE_DB_SYNCHRONOUS_COMMIT": "on",
+                                   "CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
 
     assert env["postgres"]["settings"]["max_wal_size"] == "8GB"  # nosec B101 - pytest assertion
     assert env["images"]["db"]["image_id"] == "sha256:db"  # nosec B101 - pytest assertion
     assert env["images"]["dragonflydb"]["image_id"] == "sha256:dragonflydb"  # nosec B101 - pytest assertion
+    assert env["images"]["dragonfly-cache"]["image_id"] == "sha256:dragonfly-cache"  # nosec B101 - pytest assertion
     assert env["limits"]["db"]["shm_size"] == 1073741824  # nosec B101 - pytest assertion
     assert env["envelope"]["CUBE_DB_SYNCHRONOUS_COMMIT"] == "on"  # nosec B101 - pytest assertion
+    assert env["envelope"]["CUBE_CACHE_URL"] == "redis://dragonfly-cache:6379/0"  # nosec B101 - pytest assertion
     assert set(env["envelope"]) == set(ENVELOPE_KEYS)  # nosec B101 - pytest assertion
+
+
+def test_the_envelope_masks_a_password_in_a_url():
+    knobs = envelope({"CUBE_CACHE_URL": "redis://user:s3cret@cache:6379/0",
+                      "CUBE_DEBUG": "false"})
+
+    assert knobs["CUBE_CACHE_URL"] == "redis://user:***@cache:6379/0"  # nosec B101 - pytest assertion
+    assert knobs["CUBE_DEBUG"] == "false"  # nosec B101 - pytest assertion
+    assert knobs["CUBE_UVICORN_WORKERS"] is None  # nosec B101 - pytest assertion
 
 
 # -- against the stack's own Postgres --------------------------------------------------------

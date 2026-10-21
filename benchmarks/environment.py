@@ -14,6 +14,7 @@ import contextlib
 import os
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlsplit, urlunsplit
 
 from .chris_api import ChrisApi
 from .docker_client import DockerClient
@@ -26,7 +27,7 @@ ENVELOPE_KEYS = (
     "CUBE_CELERY_POLL_INTERVAL", "CUBE_UVICORN_WORKERS", "CUBE_DB_POOL_MIN_SIZE",
     "CUBE_DB_POOL_MAX_SIZE", "CUBE_DB_POOL_TIMEOUT", "CUBE_DB_MAX_CONNECTIONS",
     "CUBE_DB_SYNCHRONOUS_COMMIT", "CUBE_WORKER_MAINS_CONCURRENCY", "PFCON_WORKERS",
-    "STORAGE_ENV", "CUBE_DEBUG",
+    "STORAGE_ENV", "CUBE_DEBUG", "CUBE_CACHE_URL",
 )
 
 #: Postgres settings recorded with every run whatever their source: the server version
@@ -46,6 +47,22 @@ POSTGRES_SETTINGS = (
 )
 
 
+def envelope(env: os._Environ | dict) -> dict:
+    """
+    The envelope knobs as the environment sets them, with any password in a URL masked: the
+    manifests are archived in the repository.
+    """
+    return {k: _without_password(env.get(k)) for k in ENVELOPE_KEYS}
+
+
+def _without_password(value):
+    parts = urlsplit(value) if value and "://" in value else None
+    if parts is None or parts.password is None:
+        return value
+    netloc = parts.netloc.replace(f":{parts.password}@", ":***@", 1)
+    return urlunsplit(parts._replace(netloc=netloc))
+
+
 def postgres_settings(docker: DockerClient) -> dict:
     """
     The Postgres server's effective settings (see ``pg_stats.server_settings``).
@@ -55,7 +72,8 @@ def postgres_settings(docker: DockerClient) -> dict:
 
 def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
                         image_services: tuple[str, ...] = ("chris", "pfcon", "db",
-                                                           "dragonflydb")) -> dict:
+                                                           "dragonflydb",
+                                                           "dragonfly-cache")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()
     version = docker.version()
@@ -87,7 +105,7 @@ def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None 
         "images": images,
         "git": {"commit": env.get("GIT_COMMIT"), "dirty": env.get("GIT_DIRTY")},
         "storage_mode": env.get("STORAGE_ENV", "fslink"),
-        "envelope": {k: env.get(k) for k in ENVELOPE_KEYS},
+        "envelope": envelope(env),
         # the CPU/memory knobs as the engine applied them, not as the env vars asked
         "limits": docker.service_limits(),
         "postgres": postgres_settings(docker),

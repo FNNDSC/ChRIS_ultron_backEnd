@@ -274,7 +274,7 @@ bench-compose +command:
 # Start the benchmark stack (fslink + uvicorn envelope), migrate, and register plugins.
 [group('(6) benchmarks')]
 bench-start: check-builder
-    just bench-compose 'up -d --build db dragonflydb nats pfcon cube-nonroot-user-volume-fix'
+    just bench-compose 'up -d --build db dragonflydb dragonfly-cache nats pfcon cube-nonroot-user-volume-fix'
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
     just bench-compose '--profile cube run --rm chrisomatic chrisomatic'
