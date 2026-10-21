@@ -27,6 +27,10 @@ artificial dev cap.
 | `CUBE_DB_CPUS` / `CUBE_DB_MEM_LIMIT` | `2` / `4g` | `db` CPU and memory |
 | `PFCON_WORKERS` | `8` | `gunicorn -w` on `pfcon` (compute-side request parallelism) |
 | `PFCON_CPUS` / `PFCON_MEM_LIMIT` | `2` / `2g` | `pfcon` CPU and memory |
+| `CUBE_WORKER_PERIODIC_CPUS` / `CUBE_WORKER_PERIODIC_MEM_LIMIT` | `1` / `1g` | `worker-periodic` (the beat tasks) CPU and memory |
+| `CUBE_SCHEDULER_CPUS` / `CUBE_SCHEDULER_MEM_LIMIT` | `0.5` / `512m` | `celery-scheduler` (beat) CPU and memory |
+| `CUBE_BROKER_CPUS` / `CUBE_BROKER_MEM_LIMIT` | `2` / `1g` | `dragonflydb` (the Celery broker) CPU and memory |
+| `CUBE_CACHE_CPUS` / `CUBE_CACHE_MEM_LIMIT` | `1` / `512m` | `dragonfly-cache` (the shared cache) CPU and memory |
 | `CUBE_CELERY_POLL_INTERVAL` | `2.0` | Celery-beat scheduling/status poll cadence (s) — sweep `{2, 4, 8}` |
 | `CUBE_DEBUG` | `false` | Django `DEBUG` on `chris` and the Celery services (see below) |
 | `CUBE_CACHE_URL` | `redis://dragonfly-cache:6379/0` | the shared cache (`CACHES['default']`) of `chris` and the Celery services; earlier runs did not record it, so `bench-compare` reports it as a caution against them |
@@ -54,8 +58,13 @@ seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, whic
 recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
 **The broker and the cache:** Dragonfly runs twice, as the Celery broker (`dragonflydb`) and
-as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`), with no CPU or memory limit, so
-their thread counts and `maxmemory` follow the host. Their images are recorded under `images`
+as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
+given and keeps 80% of its memory limit as its `maxmemory`, so without the limits above both
+would follow the host (16 threads and about 96 GiB on the benchmark box). The 2026-10-20 runs
+peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
+`worker-periodic`, so the limits leave room for what later issues add. Runs from before these
+limits have none of them, and `bench-compare` reports each as a caution against them; `0`
+removes a limit, for a run without it. Their images are recorded under `images`
 in `environment.json`; `bench-compare` lists a different image, or none in a run that predates
 the record (`—`), as information. `DRAGONFLY_IMAGE` replaces the image of both, for example
 for an A/B of two Dragonfly versions. Export it for `just bench-start` and `just bench-run` alike:

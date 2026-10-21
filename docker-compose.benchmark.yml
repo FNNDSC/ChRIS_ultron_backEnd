@@ -12,7 +12,8 @@
 # Tunable via the env vars below. The envelope knobs are recorded in each run's environment
 # manifest (the CPU and memory limits as the containers got them); the harness settings
 # (BENCH_*, credentials, CUBE_DB_POOL_STATS_INTERVAL) are not. See benchmarks/envelope.md.
-# Set them identically for `just bench-start` and `just bench-run`.
+# Set them identically for `just bench-start` and `just bench-run`; 0 removes a CPU or memory
+# limit.
 
 services:
 
@@ -45,6 +46,8 @@ services:
       CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
 
   worker-periodic:
+    cpus: ${CUBE_WORKER_PERIODIC_CPUS:-1}
+    mem_limit: ${CUBE_WORKER_PERIODIC_MEM_LIMIT:-1g}
     environment:
       DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
       CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
@@ -55,6 +58,8 @@ services:
       CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
 
   celery-scheduler:
+    cpus: ${CUBE_SCHEDULER_CPUS:-0.5}
+    mem_limit: ${CUBE_SCHEDULER_MEM_LIMIT:-512m}
     environment:
       DJANGO_SETTINGS_MODULE: "config.settings.benchmark"
       CUBE_CELERY_POLL_INTERVAL: "${CUBE_CELERY_POLL_INTERVAL:-2.0}"
@@ -74,6 +79,16 @@ services:
       -c synchronous_commit=${CUBE_DB_SYNCHRONOUS_COMMIT:-on}
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
+
+  # Dragonfly runs one thread per CPU it is given and keeps 80% of its memory limit as its
+  # maxmemory; without limits both follow the host.
+  dragonflydb:
+    cpus: ${CUBE_BROKER_CPUS:-2}
+    mem_limit: ${CUBE_BROKER_MEM_LIMIT:-1g}
+
+  dragonfly-cache:
+    cpus: ${CUBE_CACHE_CPUS:-1}
+    mem_limit: ${CUBE_CACHE_MEM_LIMIT:-512m}
 
   pfcon:
     command: gunicorn -b 0.0.0.0:30005 -w ${PFCON_WORKERS:-8} -t 120 pfcon.wsgi:application
