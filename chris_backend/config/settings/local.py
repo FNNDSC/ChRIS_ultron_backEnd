@@ -211,7 +211,8 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 
 # Cache settings (see common.py)
 # The benchmark stack records CUBE_CACHE_URL in each run's environment manifest.
-CACHES['default']['LOCATION'] = os.getenv('CUBE_CACHE_URL', 'redis://dragonfly-cache:6379/0')
+CACHES['default']['LOCATION'] = os.getenv('CUBE_CACHE_URL',
+                                          'redis://dragonfly-cache:6379/0')
 verify_cache_connection(CACHES['default'], CELERY_BROKER_URL)
 
 

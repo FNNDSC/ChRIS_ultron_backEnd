@@ -12,7 +12,7 @@ from django.test.runner import DiscoverRunner
 class TerminateConnectionsTestRunner(DiscoverRunner):
 
     def teardown_databases(self, old_config, **kwargs):
-        # Terminate all other connections to the test database before dropping it,
+        # Terminate all other connections to the test database before dropping it
         # so that Celery worker connections don't block the DROP DATABASE command.
         # old_config is empty when no selected test needed a database: no test database
         # was created but the connection still names the development database whose

@@ -1,7 +1,7 @@
 """
-Tests for the shared cache's helpers (core/cache.py), against the stack's cache Dragonfly.
+Tests for the shared cache's helpers (core/cache.py) against the stack's cache Dragonfly.
 
-They share it with a running dev stack, so every test uses names of its own, every key
+They share it with a running dev stack so every test uses names of its own, every key
 expires, and nothing calls cache.clear(), which is FLUSHDB of the whole database.
 """
 
@@ -31,7 +31,7 @@ from core.cache import (MAX_TTL, acquire_lock, acquire_slot, clear_mark, mark_on
 
 class CacheProxy:
     """
-    A TCP proxy between the cache client and Dragonfly, so that a test can take the server
+    A TCP proxy between the cache client and Dragonfly so that a test can take the server
     away mid-test.
 
     ``stop()`` closes the listener and resets every live connection, as a killed server does

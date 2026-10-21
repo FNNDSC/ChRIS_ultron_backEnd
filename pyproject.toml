@@ -21,8 +21,6 @@ dependencies = [
     "django-storages[s3]>=1.14.6",
     "boto3>=1.43",
     "celery[redis]>=5.6.3",
-    # imported by core/cache.py. kombu 5.6 allows redis <6.5; redis 7 would move the lock
-    # to a kombu pre-release.
     "redis>=6.4",
     # 2.9.0 caps Django below 6.1 and cron-descriptor below 2.0, which is why the lock
     # moves cron-descriptor backwards. It is also the one dependency standing between

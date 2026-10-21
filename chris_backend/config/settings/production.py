@@ -203,9 +203,9 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 
 # CACHE SETTINGS (see common.py)
 # ------------------------------------------------------------------------------
-# A Redis-protocol server for the cache, apart from the Celery broker, and its logical
-# database, for example redis://dragonfly-cache:6379/0. Timeouts and TLS options can go in
-# its query string, retry options cannot (the start-up check refuses them).
+# A Redis-protocol server for the cache, apart from the Celery broker and its logical
+# database. For example redis://dragonfly-cache:6379/0. Timeouts and TLS options can go
+# in its query string, retry options cannot (the start-up check refuses them).
 CACHES['default']['LOCATION'] = get_secret('CACHE_URL')
 verify_cache_connection(CACHES['default'], CELERY_BROKER_URL)
 
