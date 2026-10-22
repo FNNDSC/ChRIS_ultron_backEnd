@@ -208,6 +208,15 @@ check-builder:
       fi;                                                                                        \
     fi
 
+# chrisomatic sees benchmarks/chrisomatic/ only (docker-compose.benchmark.yml), so a pin is a
+# file name there.
+#
+# Fail unless a benchmark pin names a file in benchmarks/chrisomatic/.
+[group('helper function')]
+check-pins pins:
+    @case '{{ pins }}' in ''|*/*) >&2 echo "a pin is a file name in benchmarks/chrisomatic/, not '{{ pins }}'"; exit 1;; esac
+    @test -f 'benchmarks/chrisomatic/{{ pins }}' || { >&2 echo "no such pin: benchmarks/chrisomatic/{{ pins }}"; exit 1; }
+
 # Get the docker daemon socket path.
 [group('helper function')]
 get-socket:
@@ -271,13 +280,43 @@ bench-compose +command:
         GIT_DIRTY="$(git diff --quiet HEAD 2>/dev/null && echo false || echo true)" \
         $(just get-engine) compose -f docker-compose.yml -f docker-compose.benchmark.yml {{ command }}
 
-# Start the benchmark stack (fslink + uvicorn envelope), migrate, and register plugins.
+# The pin is a file in benchmarks/chrisomatic/: the committed benchmark.yml unless named,
+# e.g. an arm64 laptop's own file (see benchmarks/envelope.md § "Pinned workload plugin
+# versions"); `just bench-run --plugins` names the same file. chrisomatic fails when the
+# database already holds another registration of a pinned version, e.g. from a dev `just`:
+# the two stacks share their volumes.
+#
+# Start the benchmark stack (fslink + uvicorn envelope), migrate, and register the pinned workload plugins.
 [group('(6) benchmarks')]
-bench-start: check-builder
+bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
     just bench-compose 'up -d --build db dragonflydb dragonfly-cache nats pfcon cube-nonroot-user-volume-fix'
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
-    just bench-compose '--profile cube run --rm chrisomatic chrisomatic'
+    just bench-compose '--profile cube run --rm chrisomatic chrisomatic /etc/chrisomatic-benchmark/{{ pins }}' \
+        || { >&2 echo "[bench] chrisomatic failed. If a dev 'just' ran on these volumes, reset them with 'just bench-nuke' (it deletes the dev stack's data too) and run 'just bench-start' again."; exit 1; }
+
+# chrisomatic 1.0.0 cannot pull an image by digest (it splits the reference at its colon) but
+# registers one that is present, so pull what the pin names first. A reference that is
+# present is never pulled again, so a local build stays as it is. A short name is pulled
+# from docker.io explicitly, so Podman need not resolve it. A pin keeps each `dock_image:`
+# on a line of its own (chrisomatic's YAML forbids flow style).
+#
+# Pull the workload plugin images a benchmark pin names, unless present.
+[group('(6) benchmarks')]
+bench-pull-plugins pins='benchmark.yml': (check-pins pins)
+    @for ref in $(sed -n 's/^[ -]*dock_image: *//p' 'benchmarks/chrisomatic/{{ pins }}' | tr -d "\"'"); do \
+      $(just get-engine) image inspect "$ref" > /dev/null 2>&1 && continue; \
+      case "${ref%%/*}" in *.*|*:*|localhost) src="$ref";; *) src="docker.io/$ref";; esac; \
+      $(just get-engine) pull "$src" || exit 1; \
+    done
+
+# The dev and benchmark stacks are one compose project, so this deletes the dev stack's data
+# too (database, files, lldap, Orthanc, pfdcm). Stopping the stack first means no plugin-job
+# container is created after `nuke` reaps them.
+#
+# Stop the benchmark stack, then remove all its data and plugin-job containers.
+[group('(6) benchmarks')]
+bench-nuke: bench-down nuke
 
 # Run the benchmark harness, e.g. `just bench-run --tier smoke` or `just bench-run --tier full`.
 [group('(6) benchmarks')]

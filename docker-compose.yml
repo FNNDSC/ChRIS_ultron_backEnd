@@ -72,7 +72,7 @@ services:
     networks:
       local:
         aliases:
-          - chrisdev.local  # hard-coded in chrisomatic/*.yml
+          - chrisdev.local  # hard-coded in chrisomatic/*.yml and benchmarks/chrisomatic/*.yml
     healthcheck:
       test: [ "CMD-SHELL", "echo curl -f http://localhost:8000/api/v1/users/ || exit 1" ]
       interval: 10s
@@ -216,7 +216,7 @@ services:
     networks:
       local:
         aliases:
-          - pfcon.remote  # hard-coded in chris_backend/config/settings/local.py
+          - pfcon.remote  # hard-coded in chris_backend/config/settings/local.py, chrisomatic/*.yml and benchmarks/chrisomatic/*.yml
     userns_mode: "host"
     labels:
       org.chrisproject.role: "pfcon"

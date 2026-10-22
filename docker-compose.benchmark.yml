@@ -1,5 +1,5 @@
 # Benchmark override for docker-compose.yml. Layered on top of the base dev stack by the
-# `just bench-*` recipes (never used by normal `just`). It does two things:
+# `just bench-*` recipes (never used by normal `just`). It does three things:
 #   1. swaps CUBE from the dev `runserver` to a production-like uvicorn with N workers,
 #      Django `DEBUG` off as in production (`CUBE_DEBUG=false`, on `chris` and the Celery
 #      services), a larger DB pool, and a higher Postgres max_connections — a pinned,
@@ -7,7 +7,10 @@
 #      the dev stack's postgres/cube.conf; this file only adds max_connections and
 #      synchronous_commit to its command line;
 #   2. adds a `benchmark` service (profile `bench`) that runs the harness as an external
-#      API client, with the Docker socket mounted for stats/logs/reaping.
+#      API client, with the Docker socket mounted for stats/logs/reaping;
+#   3. shows chrisomatic the benchmark's own files in benchmarks/chrisomatic/, the pinned
+#      workload plugins `just bench-start` registers (which file is that recipe's argument,
+#      not an env var; see envelope.md § "Pinned workload plugin versions").
 #
 # Tunable via the env vars below. The envelope knobs are recorded in each run's environment
 # manifest (the CPU and memory limits as the containers got them); the harness settings
@@ -94,6 +97,12 @@ services:
     command: gunicorn -b 0.0.0.0:30005 -w ${PFCON_WORKERS:-8} -t 120 pfcon.wsgi:application
     cpus: ${PFCON_CPUS:-2}
     mem_limit: ${PFCON_MEM_LIMIT:-2g}
+
+  chrisomatic:
+    volumes:
+      # beside the dev stack's read-only /etc/chrisomatic rather than inside it, where the
+      # mountpoint cannot be created
+      - "./benchmarks/chrisomatic:/etc/chrisomatic-benchmark:ro"
 
   benchmark:
     image: ${BENCH_IMAGE:-localhost/fnndsc/cube-benchmark:dev}
