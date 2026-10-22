@@ -337,6 +337,39 @@ Against runs from before 2026-10-20 `bench-compare` lists `images.dragonflydb` a
 2026-10-14 runs; against the runs above it reports only what differs. The per-run logs (Dragonfly's, pfcon's, the probes) are kept on the benchmark
 box.
 
+## Committed workload-plugin pin — 2026-10-22
+
+The runs of the committed pin (REPORT.md § 17): `just bench-start` registers the workload
+plugins from `chrisomatic/benchmark.yml`, by the index digests of the images the earlier runs
+ran under untagged references, and the harness refuses to start unless CUBE holds exactly those
+registrations ([`../envelope.md`](../envelope.md) § "Pinned workload plugin versions"). All five
+ran at 0677a9c on a clean tree (`git.dirty` false), each on a fresh stack (`just bench-nuke`,
+`just bench-start`) with every envelope knob at its default; `just bench-start` pulled nothing,
+and every run records one version of each plugin on the images `1c451a28…` (`dbg-bigfiles`
+1.0.0), `5f2bf3a1…` (`pl-simpledsapp` 2.1.5) and `332956a3…` (`pl-topologicalcopy` 1.0.13), and
+the pin `chrisomatic/benchmark.yml` (sha256 `3ec92f12…`). Host as on 2026-10-21: kernel
+7.0.0-38, Docker 29.9.1, Compose 5.6.0. "Duplicates" counts pfcon's `container name … is already
+in use` errors, as above.
+
+| Run | Commit | Command (`just bench-run --tier ...`) | Result |
+|---|---|---|---|
+| `2026-10-22T124103Z` | 0677a9c | `smoke` | PASS, 10 levels |
+| `2026-10-22T124505Z` | 0677a9c | `full --topology linear --axis depth --cap 16 --repeat 1 --restart-on-fail` | PASS; 16 deep 68.65 s |
+| `2026-10-22T124848Z` | 0677a9c | `full --topology linear --axis feeds --cap 128 --repeat 1 --restart-on-fail` | FAIL at 64 (`cancelled:inst-614`); 109.0 s, `main2` peak 438; 3 duplicates |
+| `2026-10-22T125517Z` | 0677a9c | `full --topology fanout_fanin --axis feeds --cap 64 --repeat 1 --restart-on-fail` | FAIL at 32 (`cancelled:inst-300`, `-308`, `-364`); 69.7 s, `main2` peak 1,048; 4 duplicates |
+| `2026-10-22T125917Z` | 0677a9c | linear · depth = 16, as above | PASS; 16 deep 68.69 s |
+
+Against their 2026-10-21 baselines (`033213Z`, `033616Z` and `041947Z`, `035538Z`, `040756Z`)
+`bench-compare` calls every pair a caution for `workload_plugins.image` alone (those runs
+recorded no image) and flags no makespan apart from linear · feeds = 64, whose verdict the
+duplicate-submission race flipped; its p95 flags go both ways (seven regressed, two improved),
+six of them on levels of 25 to 52 measured requests. Every failure is a `cancelled:inst-*`
+criterion in a run whose pfcon log has duplicates. These runs are the baselines for these four
+commands from here on. Earlier runs, provisioned by an edited `chrisomatic.yml`, record untagged
+`dock_image`s and no image; against them `bench-compare` reports `workload_plugins.image` as a
+caution and the references and the pin as information. The per-run logs (Dragonfly's, pfcon's)
+are kept on the benchmark box.
+
 ## Regenerating the archive
 
 ```bash
