@@ -55,9 +55,11 @@ pins at the 10 s pool timeout) and the clean write-path run. Raw CSVs alongside 
 ## How these results were generated
 
 All runs used the pinned envelope (`envelope.md`), `fslink` storage, on the dedicated Linux
-box. The harness binds each workload plugin by name to the first match, so keep exactly one
-version of each installed — runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and
-`pl-topologicalcopy` 1.0.13. Two conventions matter for reproducing them faithfully:
+box, and `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. Since the
+committed pin (`chrisomatic/benchmark.yml`, `envelope.md` § "Pinned workload plugin versions")
+`just bench-start` registers those versions and the harness refuses to start against any other
+registration; earlier campaigns used an edited `chrisomatic.yml`, noted with each below. Two
+conventions matter for reproducing them faithfully:
 
 - **Clean-stack discipline.** Isolation runs are preceded by a recovery so a prior failure
   can't contaminate them (we saw spurious failures otherwise). A light reset is a service
@@ -129,9 +131,9 @@ Host and stack differences from June: Docker 27.3 → 29.8, kernel 7.0.0-22 → 
 `chrisomatic/chrisomatic.yml`; that edit is deliberately not committed, because the dev environment
 should not be stuck at the benchmark's plugin versions. The ChRIS store now serves
 `pl-topologicalcopy` 2.0.0 — a no-op image — under the name the harness resolves, so reproducing
-these runs needs the recipe in [`../envelope.md`](../envelope.md) § "Pinned workload plugin
-versions". `bench-compare` does not check plugin versions: read `workload_plugins` in
-`environment.json` before comparing.
+these runs needed that edit. Since the committed pin ([`../envelope.md`](../envelope.md)
+§ "Pinned workload plugin versions") `just bench-start` registers the same versions, and
+`bench-compare` compares `workload_plugins`, which it did not when these runs were made.
 
 ### Per-command baselines
 
@@ -247,8 +249,8 @@ per-statement temp and WAL columns of `pg_stats.json`). Every run started on a f
 `down -v`, plugin-job containers removed, `just bench-start`. diamond · layers = 8 ran twice each
 way, alternating, because its run-to-run variance (about 10%) is enough to move a single pair's
 result. All eight used `pl-topologicalcopy` 1.0.13 from the `chrisomatic.yml` committed at
-those commits; on a later commit, apply the edit in [`../envelope.md`](../envelope.md)
-§ "Pinned workload plugin versions" first.
+those commits; on a later commit `just bench-start` registers the same versions from the
+committed pin ([`../envelope.md`](../envelope.md) § "Pinned workload plugin versions").
 
 | Run | Commit | Command (`just bench-run --tier ...`) | Result |
 |---|---|---|---|

@@ -21,7 +21,7 @@ commands used to generate each result.
 ## Quick start
 
 ```bash
-just bench-start                 # bring up the fslink stack with the uvicorn envelope + plugins
+just bench-start                 # bring up the fslink stack with the uvicorn envelope + pinned plugins
 just bench-run --tier smoke      # ~2 min sanity sweep
 just bench-run --tier default    # ~15-30 min directional sweep (laptop)
 just bench-run --tier full       # overnight breaking-point sweep on a dedicated Linux box
@@ -31,6 +31,7 @@ just bench-archive <run_id>      # keep a run's small artifacts in version contr
 just bench-test                  # run the harness unit tests in-container
 just bench-locust '-u 100 -t 3m' # control-plane RED load test (Locust); CSVs -> results/locust/
 just bench-down                  # stop the stack
+just bench-nuke                  # stop it and remove all its data (the dev stack's too: shared volumes)
 just bench-bash                  # shell in the benchmark container (debugging)
 just bench-compose <args>        # low-level compose helper the other bench-* recipes wrap
 ```
@@ -79,8 +80,8 @@ Between scenarios the runner deletes the created feeds and then **waits for quie
 asynchronous, and without the gate its churn would contaminate the next level's numbers.
 
 Three topologies (`linear`, `fanout_fanin`, `diamond`) are built from `dbg-bigfiles` (fs
-root), `pl-simpledsapp` (ds), and `pl-topologicalcopy` (ts merge) — all installed by
-chrisomatic.
+root), `pl-simpledsapp` (ds), and `pl-topologicalcopy` (ts merge) — all registered by
+`just bench-start` from the committed pin, `chrisomatic/benchmark.yml`.
 
 ## Reading the results
 
@@ -90,7 +91,7 @@ Each run writes `benchmarks/results/<run_id>/`:
 report.md            # ticket-ready: environment, breaking-point table, approach-to-failure curves
 summary.json         # machine-readable run summary (+ Postgres counters over the whole run)
 levels.jsonl/.csv    # one row per (topology, axis, level): the approach-to-failure curve
-environment.json     # host hardware, image ids (CUBE, pfcon, Postgres, Dragonfly), envelope knobs, container limits, Postgres settings, workload plugin versions, noise floor, attribution availability
+environment.json     # host hardware, image ids (CUBE, pfcon, Postgres, Dragonfly), envelope knobs, container limits, Postgres settings, workload plugin versions and images, the pin they were checked against, noise floor, attribution availability
 api_requests.jsonl   # every measured API call (latency, status, endpoint class)
 status_samples.jsonl # per-instance status timelines (client-observed phase timing)
 docker_stats.jsonl   # service + job container CPU/mem/blkio samples
@@ -194,9 +195,10 @@ just bench-compare A B --fail-on-regression       # CI gate: exit 1 on any regre
 
 Run ids resolve against `results/` and the committed `history/` archive alike. The
 output (`results/comparisons/<a>_vs_<b>/compare.{md,csv}`) leads with a
-**comparability verdict**: workload-fingerprint / storage / auth mismatches are
-*blockers* (the diff is still rendered, loudly labelled), envelope / host / threshold
-differences are *cautions*, and commit or image differences are the point of comparing.
+**comparability verdict**: workload-fingerprint / workload-plugin version / storage / auth
+mismatches are *blockers* (the diff is still rendered, loudly labelled), envelope / host /
+threshold / workload-plugin image differences are *cautions*, and commit or service image
+differences are the point of comparing.
 
 A level is flagged **REGRESSED**/**IMPROVED** only when the change exceeds *both* the
 relative threshold (`--regress-pct`, default 20%) and the metric's absolute floor
@@ -248,11 +250,12 @@ a stack you can `just nuke` afterwards.
   periodic scheduler tasks mutually skip at sub-2 s cadences (see `envelope.md`).
 - **Run authoritative sweeps on a dedicated Linux box.** On Docker Desktop the VM's own
   limits dominate the per-container envelope, so laptop numbers are directional only.
-- **Pin the workload plugin versions.** Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp`
-  2.1.5, `pl-topologicalcopy` 1.0.13. The harness resolves each plugin by name and uses the
-  first match (CUBE's `-version` order), so install **exactly one version of each** — with
-  several present it warns and binds to the lexicographically-highest version string, not the
-  pinned one. Each run records what it resolved under `workload_plugins` in `environment.json`
-  (see STRATEGY.md § Workload Plugins). The committed `chrisomatic.yml` is not pinned, and the
-  ChRIS store now serves a no-op `pl-topologicalcopy` 2.0.0 under the same name: `envelope.md`
-  § "Pinned workload plugin versions" has the local edit that gets you 1.0.13.
+- **The workload plugins are pinned.** `just bench-start` registers `dbg-bigfiles` 1.0.0,
+  `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13 by image digest from
+  `chrisomatic/benchmark.yml`, not from the dev stack's `chrisomatic.yml` (which takes
+  `pl-topologicalcopy` from the ChRIS store, now a no-op 2.0.0). The harness refuses to start
+  unless CUBE holds exactly those registrations, one version each, and records them, their
+  images and the pin under `workload_plugins` in `environment.json`. The dev and benchmark
+  stacks share their volumes, so after a dev `just` run `just bench-nuke` (it deletes the dev
+  data too) before `just bench-start`; an arm64 laptop needs a pin of its own. `envelope.md`
+  § "Pinned workload plugin versions" has the details (STRATEGY.md § Workload Plugins).

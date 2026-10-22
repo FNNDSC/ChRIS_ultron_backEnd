@@ -230,25 +230,68 @@ the Compose envelope; note the plugin-job defaults separately if you change them
 
 ## Pinned workload plugin versions
 
-Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13
-(provisioned by a local edit to `chrisomatic.yml`, below). The harness resolves each plugin **by name** and uses the
-first match (CUBE orders by `-version`), so **install exactly one version of each** — otherwise
-it warns and binds to the lexicographically-highest version string, not necessarily the pinned
-one. Each run now records the resolved versions (and how many matched) under `workload_plugins` in `environment.json`/`summary.json`; the pin is still what keeps a run reproducible, since the harness resolves by name.
+Runs use `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13, which
+`just bench-start` registers from the committed `benchmarks/chrisomatic/benchmark.yml` — not from
+the dev stack's `chrisomatic/chrisomatic.yml` — with the ChRIS store lookup disabled (an empty
+`public_store:`). Each is pinned by the index digest of the image the archived baselines ran:
 
-**Reproducing those versions.** The committed `chrisomatic/chrisomatic.yml` registers
-`pl-topologicalcopy` by name from the public ChRIS store, and the store now serves 2.0.0 — a no-op
-image — under that name, so a stock `just` can bind the harness to a plugin that does no work, and
-a run against it reads as a large speed-up rather than a failure. Before provisioning a benchmark
-stack, edit `chrisomatic.yml` locally: replace `- name: pl-topologicalcopy` with
-`- dock_image: fnndsc/pl-topologicalcopy:1.0.13` (Docker Hub carries the 1.0.x tags; the store's
-2.0.0 is not there), or add an empty `public_store:` under `on:` to disable the store lookup
-altogether. The second option also needs every `- name:` entry turned into a pinned
-`- dock_image:`: without a store, chrisomatic cannot resolve a plugin from its name alone, so
-those plugins fail to register and `just bench-start` fails. Keep that edit out of commits — the dev environment is deliberately not pinned to the
-benchmark's versions. If another version is already registered, remove it first (or `just nuke`),
-then confirm `workload_plugins` in the run's `environment.json` reads `pl-topologicalcopy` 1.0.13,
-`pl-simpledsapp` 2.1.5 and `dbg-bigfiles` 1.0.0, each with `"matches": 1`.
+| Plugin | Pinned image | Which build |
+|---|---|---|
+| `dbg-bigfiles` 1.0.0 | `fnndsc/dbg-bigfiles@sha256:b956e35e…` | the 1.0.0 tag's image (also `latest`); multi-arch |
+| `pl-simpledsapp` 2.1.5 | `fnndsc/pl-simpledsapp@sha256:c4e87262…` | `latest` since 2026-02-25: 2.1.5 plus a README-only commit (the 2.1.5 tag is a separate build of the same code); amd64 only |
+| `pl-topologicalcopy` 1.0.13 | `fnndsc/pl-topologicalcopy@sha256:35cb5798…` | `latest`, the master build of the 1.0.13 commit (the 1.0.13 tag is the tag's own build of it); multi-arch |
+
+**Why digests.** The dev file registers `pl-topologicalcopy` by name from the public ChRIS store,
+which serves 2.0.0 under that name — a no-op image (`backplane/true`) with the same parameters —
+and does not hold 1.0.13; a run against 2.0.0 reads as a speed-up rather than a failure. A
+plugin's `latest` moves with every master commit, docs-only ones included, and a version tag is a
+build of its own. A digest is immutable: a pinned run executes exactly the image the pin names.
+
+**What the harness checks.** chrisomatic does not verify versions (CUBE records the version the
+image reports), so the harness reads the same file and refuses to start, with one error that
+lists every problem, unless each workload plugin has exactly one registered version, the pinned
+one under the pinned `dock_image`, and, where the harness can read the Docker daemon, its image
+is present (pfcon would otherwise pull it inside the first measured scenario). Exactly one,
+rather than the pinned one among several, because CUBE itself resolves `pl-topologicalcopy` by
+name. `just bench-run --plugins <path>` checks against another pin.
+
+**Fresh volumes.** chrisomatic never removes a plugin, and CUBE refuses to register a version
+again under another image reference, so `just bench-start` fails, with a hint, on volumes that
+hold other registrations of these plugins: after a dev `just`, for one, since the dev and
+benchmark stacks are one compose project and share their volumes. `just bench-nuke` resets them
+(stack down, plugin-job containers reaped, volumes removed); it deletes the dev stack's data too
+(database, files, lldap, Orthanc, pfdcm).
+
+**Pulling.** chrisomatic 1.0.0 cannot pull an image by digest, so `just bench-start` first pulls
+each image the pin names that is not present (`just bench-pull-plugins`); an image that is
+present is never pulled again.
+
+**Changing a pin.** Look up the index digest (`docker buildx imagetools inspect
+fnndsc/<plugin>:<tag>`), edit the entry's `version` and `dock_image`, and commit the file with
+the runs it produced. Keep each entry in block style with `dock_image:` on a line of its own:
+chrisomatic's YAML forbids flow style, and `bench-pull-plugins` reads the references line by line.
+
+**On an arm64 laptop.** `pl-simpledsapp` 2.1.4 and later have no arm64 image, so the committed
+pin stops at `bench-pull-plugins`. Write the laptop a pin of its own,
+`benchmarks/chrisomatic/<name>.local.yml` (git-ignored), naming its local builds, and pass it to
+both recipes: `just bench-start <name>.local.yml`, then `just bench-run --plugins
+benchmarks/chrisomatic/<name>.local.yml …`. When its entries name exactly the references a local
+edit of `chrisomatic.yml` registers for development, with `name` and `version` but no
+`public_repo`, chrisomatic finds either file's registrations and the two stacks share one database
+without a reset. Laptop runs are directional only.
+
+**What each run records.** `workload_plugins` in `environment.json`/`summary.json` holds each
+role's name, version, `dock_image`, match count and `image` (the local image's id, digests and
+architecture; `null` when the harness cannot read the Docker daemon), and `workload_plugins_pin`
+the pin's path and sha256. `bench-compare` reports another name or version as a blocker, other
+image digests as a caution, and another `dock_image` or pin as information; against a run from
+before the image records it reports `workload_plugins.image` as one caution.
+
+**Earlier runs.** Runs archived before the committed pin were provisioned by an edited
+`chrisomatic.yml` that registered the same plugins under untagged references (`latest`), which on
+the benchmark box are the images the pin names; from 2026-10-07 `dbg-bigfiles` was registered as
+`localhost/dbg-bigfiles`, a second tag on the same image. [history/README.md](history/README.md)
+notes the file each campaign used.
 
 ## Manual hardware fields
 

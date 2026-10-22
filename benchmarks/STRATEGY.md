@@ -80,7 +80,7 @@ Both planes share `chris_api.py` (the Collection+JSON adapter): the data-plane e
 
 ## 5. Workload Plugins
 
-All three are installed by `chrisomatic` in the default dev environment (`chrisomatic/chrisomatic.yml`), so the benchmark needs no extra provisioning.
+`just bench-start` registers all three through `chrisomatic` from the benchmark's own committed pin, `benchmarks/chrisomatic/benchmark.yml`, not from the dev environment's `chrisomatic/chrisomatic.yml`, which is not pinned and takes `pl-topologicalcopy` from the public ChRIS store (now a no-op 2.0.0 under that name).
 
 | **Plugin** | **Type** | **Role** | **Key parameters** |
 |---|---|---|---|
@@ -88,7 +88,7 @@ All three are installed by `chrisomatic` in the default dev environment (`chriso
 | **`pl-simpledsapp`** | `ds` | Downstream: streams input→output (8 MiB chunks) | `--sleepLength`, `--prefix` |
 | **`pl-topologicalcopy`** | `ts` | Fan-in/merge: copies filtered parent output | `--plugininstances`, `--filter`, `--groupByInstance` |
 
-**Versions (pinned).** Runs used `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. The harness resolves each plugin **by name** (`get_plugin` → `plugins/search/?name_exact=`, taking the first match in CUBE's `('meta', '-version')` order) and never pins a version, so **reproducible runs require exactly one version of each installed.** With more than one present it warns at startup and binds to the lexicographically-highest version *string* (`version` is a `CharField`, so `1.0.9` sorts above `1.0.13`), not necessarily the intended one — and `chrisomatic.yml` provisions these images untagged, so verify the installed versions there. Each run records what it resolved (name, version, id, match count) under `workload_plugins` in `environment.json`.
+**Versions (pinned).** Runs use `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13, each pinned by the index digest of the image the archived baselines ran: a digest is immutable, while a plugin's `latest` moves with every master commit and a version tag is a separate build. chrisomatic only registers what an image reports, so the harness reads the same pin and verifies it: it resolves each plugin **by name** (`get_plugin` → `plugins/search/?name_exact=`) and refuses to start unless each has **exactly one** registered version — the pinned one, under the pinned `dock_image`, with its image present where Docker can tell. Exactly one, rather than the pinned one among several, because CUBE orders versions as strings (`version` is a `CharField`, so `1.0.9` sorts above `1.0.13`) and itself resolves `pl-topologicalcopy` by name. Each run records the registrations (name, version, id, `dock_image`, match count), each image's id and digests, and the pin's path and sha256 (`workload_plugins`, `workload_plugins_pin` in `environment.json`); `bench-compare` treats another version as a blocker and other image digests as a caution. `envelope.md` § "Pinned workload plugin versions" covers changing a pin, the shared dev/benchmark volumes, and a laptop's own pin.
 
 **Note:** `--sleepLength` produces two workload classes — storage/registration pressure at `0`, scheduling/long-active-job pressure at `>0`.
 
@@ -310,7 +310,7 @@ Authoritative `full`-tier runs are performed on a **dedicated bare-metal Linux b
 
 The runner auto-collects what it can and leaves explicit manual placeholders.
 
-- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon/db image ids, git commit + dirty status, storage mode, the full envelope knob set, each service container's applied CPU/memory/swap/`/dev/shm` limits, the Postgres server's settings, API auth mode, the resolved workload-plugin versions, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`, Postgres counters), and a measured idle noise floor.
+- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon/db image ids, git commit + dirty status, storage mode, the full envelope knob set, each service container's applied CPU/memory/swap/`/dev/shm` limits, the Postgres server's settings, API auth mode, the workload-plugin registrations, their images and the pin they were checked against, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`, Postgres counters), and a measured idle noise floor.
 - **Manual (in the report):** storage device type/throughput, power/thermal mode, and other significant workloads running during the benchmark.
 
 ## 14. Implementation Phases
@@ -344,7 +344,7 @@ All phases (1–7) are implemented.
 - `chris_backend/plugininstances/enums.py` — plugin-instance status set.
 - `chris_backend/plugininstances/serializers.py:279` — `ts` `plugininstances` parent validation.
 - `docker-compose.yml` — worker `-c`, pfcon `-w`, `runserver`, `fslink`, `JOB_LABELS`.
-- `chrisomatic/chrisomatic.yml` — workload plugin registration.
+- `benchmarks/chrisomatic/benchmark.yml` — the pinned workload plugin registration (`just bench-start`); `chrisomatic/chrisomatic.yml` is the dev environment's.
 
 **Docker Compose resource controls:**
 
