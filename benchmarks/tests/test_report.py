@@ -81,16 +81,35 @@ def test_markdown_table_shape_dashes_and_escaping():
 
 
 def test_render_workload_plugins_table():
+    digest = "sha256:b956e35ee69c249677489b2bf1815a578c129c478bbdc4bff8c4c75535cd3e7f"
     summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
                "environment": {"workload_plugins": {
                    "fs": {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
-                          "dock_image": "localhost/dbg-bigfiles", "matches": 1},
+                          "dock_image": f"fnndsc/dbg-bigfiles@{digest}", "matches": 1,
+                          "image": {"image_id": "sha256:1c45", "architecture": "amd64",
+                                    "repo_digests": [f"fnndsc/dbg-bigfiles@{digest}"]}},
                    "ts": {"name": "pl-topologicalcopy", "version": "1.0.13", "id": 6,
-                          "dock_image": "fnndsc/pl-topologicalcopy", "matches": 1}}}}
+                          "dock_image": "fnndsc/pl-topologicalcopy", "matches": 1}},
+                   "workload_plugins_pin": {"path": "benchmarks/chrisomatic/benchmark.yml",
+                                            "sha256": "a73940e8bad12144d6b4"}}}
     md = render(summary, [])
-    assert "### Workload plugins" in md
-    assert "pl-topologicalcopy" in md and "1.0.13" in md   # resolved version in the report
-    assert "Installed versions" in md                       # ambiguity (matches) column
+
+    assert "### Workload plugins" in md  # nosec B101 - pytest assertion
+    assert (f"| fs | dbg-bigfiles | 1.0.0 | fnndsc/dbg-bigfiles@{digest} "  # nosec B101 - pytest assertion
+            "| sha256:b956e35ee69c | 1 |") in md
+    # a run from before the image records: an em dash
+    assert "| ts | pl-topologicalcopy | 1.0.13 | fnndsc/pl-topologicalcopy | — | 1 |" in md  # nosec B101 - pytest assertion
+    assert ("Pinned by `benchmarks/chrisomatic/benchmark.yml` "  # nosec B101 - pytest assertion
+            "(sha256 a73940e8bad1).") in md
+
+
+def test_render_workload_plugins_of_a_run_before_the_pin():
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {"workload_plugins": {
+                   "fs": {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
+                          "dock_image": "localhost/dbg-bigfiles", "matches": 1}}}}
+
+    assert "Not pinned: resolved by name." in render(summary, [])  # nosec B101 - pytest assertion
 
 
 def test_render_omits_workload_plugins_when_absent():

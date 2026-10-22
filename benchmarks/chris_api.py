@@ -221,8 +221,9 @@ class ChrisApi:
         Searches ``plugins/search/?name_exact=`` and selects the first match — CUBE
         orders plugins by ``('meta', '-version')``, so this is the highest-sorting
         version *string* for the name. ``matches`` is how many versions the name
-        resolved to; ``> 1`` means the selection is ambiguous (the recorded
-        provenance and the run's warning both key off it).
+        resolved to and ``installed_versions`` which: the runner starts only when each
+        workload plugin has exactly one, since CUBE itself resolves
+        ``pl-topologicalcopy`` by name too.
         """
         r = self._call("list", "GET", self.base + "plugins/search/",
                        params={"name_exact": name})
@@ -234,7 +235,8 @@ class ChrisApi:
         sel = r.items[0]
         return {"id": int(sel["id"]), "name": sel.get("name", name),
                 "version": sel.get("version"), "dock_image": sel.get("dock_image"),
-                "matches": len(r.items)}
+                "matches": len(r.items),
+                "installed_versions": [item.get("version") for item in r.items]}
 
     def get_plugin_id(self, name: str) -> int:
         return self.get_plugin(name)["id"]

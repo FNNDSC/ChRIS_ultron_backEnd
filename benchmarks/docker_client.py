@@ -210,6 +210,30 @@ class DockerClient:
         except Exception:                              # noqa: BLE001
             return {}
 
+    def image_info(self, ref: Optional[str]) -> Optional[dict]:
+        """
+        The local image an image reference resolves to (``image_record``), or ``None``
+        when it is not present, cannot be read, or Docker is unavailable.
+        """
+        if not self._docker or not ref:
+            return None
+        try:
+            return image_record(self._docker.images.get(ref))
+        except Exception:                              # noqa: BLE001 - absent or unreadable
+            return None
+
+
+def image_record(image) -> dict:
+    """
+    What identifies a local image: its id, the digests it is known by (sorted) and its
+    architecture. The id of one image differs between image stores (overlay2,
+    containerd); the digest of a pulled image does not. On overlay2 only a pulled image
+    has digests; on containerd a local build has one of its own.
+    """
+    attrs = getattr(image, "attrs", None) or {}
+    return {"image_id": image.id, "repo_digests": sorted(attrs.get("RepoDigests") or []),
+            "architecture": attrs.get("Architecture")}
+
 
 def _cpu_pct(stats: dict) -> float:
     cpu = stats.get("cpu_stats", {})

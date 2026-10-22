@@ -203,6 +203,18 @@ def _human_bytes(n: int) -> str:
     return f"{size:.1f} TiB"
 
 
+def _short_digests(image: dict | None) -> str | None:
+    """
+    An image record's digests, shortened (``None`` for an unrecorded image, so the table
+    shows an em dash; "none" for an image without any, a local build on overlay2).
+    """
+    if not image:
+        return None
+
+    digests = sorted({d.rpartition("@")[2] for d in image.get("repo_digests") or []})
+    return ", ".join(d[:19] for d in digests) or "none"
+
+
 def _environment_section(env: dict) -> list[str]:
     host = env.get("host", {})
     envelope = env.get("envelope", {})
@@ -233,9 +245,13 @@ def _environment_section(env: dict) -> list[str]:
         out.append("")
         out += ["### Workload plugins", ""]
         out += markdown_table(
-            ["Role", "Plugin", "Version", "Installed versions"],
-            [[role, p.get("name"), p.get("version"), p.get("matches")]
+            ["Role", "Plugin", "Version", "Image", "Digest", "Installed versions"],
+            [[role, p.get("name"), p.get("version"), p.get("dock_image"),
+              _short_digests(p.get("image")), p.get("matches")]
              for role, p in plugins.items()])
+        pin = env.get("workload_plugins_pin")
+        out += ["", f"Pinned by `{pin['path']}` (sha256 {pin['sha256'][:12]})." if pin
+                else "Not pinned: resolved by name."]
 
     out.append("")
     out += ["### Manual fields (fill in)", ""]

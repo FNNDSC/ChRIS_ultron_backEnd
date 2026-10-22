@@ -21,7 +21,7 @@ from dataclasses import replace
 from . import classifier, environment, escalation, metrics, report, topologies
 from .broker import BrokerClient
 from .chris_api import ChrisApi
-from .config import Tier, load_tier, step_for, tier_fingerprint
+from .config import PluginPins, Tier, load_pins, load_tier, step_for, tier_fingerprint
 from .docker_client import DockerClient
 from .pg_stats import (SERVER_START_KEY, PgStatStatements, counter_delta, counter_windows,
                        max_deltas, server_counters, server_counters_error)
@@ -51,7 +51,7 @@ RESTART_SERVICES = ("chris", "worker-mains", "worker-periodic", "celery-schedule
 
 class BenchmarkRunner:
     def __init__(self, *, url: str, username: str, password: str, tier: Tier,
-                 store: ResultsStore, cube_poll_interval: float,
+                 pins: PluginPins, store: ResultsStore, cube_poll_interval: float,
                  project: str | None = None, cleanup: bool = True,
                  restart_on_fail: bool = False, api_timeout: float = 30.0,
                  startup_health_timeout: float = 60.0):
@@ -78,13 +78,18 @@ class BenchmarkRunner:
         self.broker = BrokerClient(broker_host, int(broker_port or 6379))
         self.pg_stats = PgStatStatements(self.docker)
         
+        self.pins = pins
         self.plugins = {role: self.api.get_plugin(name)
                         for role, name in PLUGIN_NAMES.items()}
         self.plugin_ids = {role: p["id"] for role, p in self.plugins.items()}
+        self.plugin_images = {role: self.docker.image_info(p["dock_image"])
+                              for role, p in self.plugins.items()}
 
-        warning = plugin_ambiguity_warning(self.plugins)
-        if warning:
-            print(warning, flush=True)
+        # a run against anything but the pinned registrations measures another workload
+        problems = pin_mismatches(self.plugins, pins, self.plugin_images,
+                                  docker_available=self.docker.available)
+        if problems:
+            raise RuntimeError(pin_mismatch_message(pins, problems))
 
     def _record_request(self, record) -> None:
         self._sink.record_request(record)
@@ -314,10 +319,10 @@ class BenchmarkRunner:
             else self.pg_stats.unavailable_reason,
         }
 
-        # exact workload-plugin versions the run resolved to (the harness picks by
-        # name, so without this there is no record of which version actually ran)
-        env["workload_plugins"] = build_workload_manifest(self.plugins)
-        env["workload_plugins_ambiguous"] = ambiguous_plugins(self.plugins)
+        # the workload plugins the run used, the images they resolved to, and the pin they
+        # were checked against
+        env["workload_plugins"] = build_workload_manifest(self.plugins, self.plugin_images)
+        env["workload_plugins_pin"] = self.pins.record()
 
         # Postgres counters around the whole run, which the per-scenario windows add up
         # to but for a few seconds of statistics at their edges
@@ -468,39 +473,67 @@ def _bp_row(bp: BreakingPoint) -> dict:
             "criteria": list(bp.criteria)}
 
 
-def build_workload_manifest(plugins: dict) -> dict:
+def build_workload_manifest(plugins: dict, images: dict) -> dict:
     """
     Per-role workload-plugin provenance for the environment manifest:
-    ``{role.value: {name, version, id, dock_image, matches}}``. ``matches`` is how
-    many installed versions the name resolved to (>1 = the selection was ambiguous).
+    ``{role.value: {name, version, id, dock_image, matches, image}}``. ``matches`` is how
+    many installed versions the name resolved to (a run starts only with one), and
+    ``image`` the local image the reference resolved to (``docker_client.image_record``;
+    ``None`` when Docker could not tell).
     """
     return {role.value: {"name": p["name"], "version": p["version"],
                          "id": p["id"], "dock_image": p["dock_image"],
-                         "matches": p["matches"]}
+                         "matches": p["matches"], "image": images.get(role)}
             for role, p in plugins.items()}
 
 
-def ambiguous_plugins(plugins: dict) -> list[str]:
+def pin_mismatches(plugins: dict, pins: PluginPins, images: dict, *,
+                   docker_available: bool) -> list[str]:
     """
-    Names that resolved to more than one installed version — the harness then runs
-    CUBE's first match, which may not be the intended version.
+    How CUBE's workload-plugin registrations differ from the pin, one line per problem.
+    Empty when each plugin has exactly one version, the pinned one under the pinned
+    image, and (where Docker can tell) that image is present: otherwise pfcon would pull
+    it inside the first measured scenario.
     """
-    return [p["name"] for p in plugins.values() if p.get("matches", 1) > 1]
+    problems = []
+
+    for role, p in plugins.items():
+        name = p["name"]
+        pin = pins.plugins.get(name)
+
+        if pin is None:
+            problems.append(f"{name} is not pinned in {pins.path}")
+            continue
+
+        if p.get("matches", 1) != 1:
+            versions = ", ".join(str(v) for v in p.get("installed_versions") or [])
+            problems.append(f"{name} has {p['matches']} versions registered ({versions}), "
+                            f"not only the pinned {pin.version}")
+            continue
+
+        if p.get("version") != pin.version:
+            problems.append(f"{name} {p.get('version')} is registered, {pin.version} "
+                            f"is pinned")
+
+        if p.get("dock_image") != pin.dock_image:
+            problems.append(f"{name} is registered as {p.get('dock_image')}, pinned as "
+                            f"{pin.dock_image}")
+        elif docker_available and images.get(role) is None:
+            problems.append(f"{name}'s image {pin.dock_image} is not present")
+    return problems
 
 
-def plugin_ambiguity_warning(plugins: dict) -> str | None:
+def pin_mismatch_message(pins: PluginPins, problems: list[str]) -> str:
     """
-    Operator warning when any workload plugin resolved to more than one installed
-    version (the harness then runs CUBE's first match, which may not be the intended
-    one), else ``None``.
+    Why the runner refuses to start, and what puts the pinned registrations back.
     """
-    names = ambiguous_plugins(plugins)
-
-    if not names:
-        return None
-    return (f"[bench] WARNING: multiple installed versions for {', '.join(names)}; "
-            f"running CUBE's first match (highest -version). Runs may not be "
-            f"reproducible — keep one version per workload plugin (see chrisomatic.yml).")
+    lines = "\n".join(f"  - {problem}" for problem in problems)
+    return (f"[bench] the workload plugins in CUBE are not the ones {pins.path} pins:\n"
+            f"{lines}\n"
+            f"Register the pin on fresh volumes: 'just bench-nuke' (it deletes the dev "
+            f"stack's data too: the two stacks share their volumes), then 'just bench-start' "
+            f"(naming the same pin file, if not the default). A missing image alone: "
+            f"'just bench-pull-plugins'.")
 
 
 # -- CLI -------------------------------------------------------------------------------
@@ -523,6 +556,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="matrix tier: smoke | default | full | "
                         "aging-grow | aging-probe")
     p.add_argument("--matrix", default=None, help="path to matrix.yml")
+    p.add_argument("--plugins", default=None,
+                   help="the chrisomatic pin `just bench-start` registered the workload "
+                        "plugins from (default: benchmarks/chrisomatic/benchmark.yml)")
     p.add_argument("--topology", default=None,
                    help="restrict to one topology (linear|fanout_fanin|diamond)")
     p.add_argument("--axis", default=None, help="restrict to one escalation axis")
@@ -604,11 +640,12 @@ def main(argv: list[str] | None = None) -> int:
     tier = _filter_tier(load_tier(args.tier, args.matrix), args.topology, args.axis,
                         args.cap, args.repeat)
     tier = _override_baseline(tier, args.file_size, args.sleep_length, args.file_count)
+    pins = load_pins(args.plugins)
     store = ResultsStore(args.results_dir)
     
     runner = BenchmarkRunner(
         url=args.url, username=args.username, password=args.password, tier=tier,
-        store=store, cube_poll_interval=args.poll_interval,
+        pins=pins, store=store, cube_poll_interval=args.poll_interval,
         project=os.environ.get("COMPOSE_PROJECT_NAME"),
         cleanup=not args.no_cleanup, restart_on_fail=args.restart_on_fail)
 

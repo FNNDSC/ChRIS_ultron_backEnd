@@ -7,15 +7,15 @@ from types import SimpleNamespace
 import pytest
 
 from benchmarks import run_bench
-from benchmarks.config import load_tier
+from benchmarks.config import PluginPin, PluginPins, load_pins, load_tier
 from benchmarks.models import (Classification, LevelResult, PluginRole, PollResult,
                                ScenarioParams, ScenarioResult, StatusTimeline, Verdict)
 from benchmarks.results import ResultsStore
 from benchmarks.run_bench import (RUN_STATS_SETTLE_S, BenchmarkRunner, _filter_tier,
-                                  _level_row, _override_baseline, ambiguous_plugins,
-                                  apply_build_errors, build_workload_manifest,
-                                  effective_poll_cadence, make_scenario_params,
-                                  plugin_ambiguity_warning)
+                                  _level_row, _override_baseline, apply_build_errors,
+                                  build_workload_manifest, effective_poll_cadence,
+                                  make_scenario_params, pin_mismatch_message,
+                                  pin_mismatches)
 
 
 # -- scenario params -------------------------------------------------------------------
@@ -301,6 +301,8 @@ def _run_runner(monkeypatch, tmp_path, snapshots, sleeps):
     runner.pg_stats = SimpleNamespace(available=False,
                                       unavailable_reason="psql: connection refused")
     runner.plugins = {}
+    runner.plugin_images = {}
+    runner.pins = load_pins()
     runner.docker = None
     runner._db_snapshot = lambda: snapshots.pop(0)
     monkeypatch.setattr(run_bench, "server_counters_error",
@@ -338,35 +340,125 @@ def test_run_without_readable_counters_skips_the_wait_and_says_why(monkeypatch, 
 
 # -- workload plugins ------------------------------------------------------------------
 
-def test_build_workload_manifest_carries_versions_keyed_by_role():
-    plugins = {
-        PluginRole.FS: {"id": 1, "name": "dbg-bigfiles", "version": "1.0.0",
-                        "dock_image": "localhost/dbg-bigfiles", "matches": 1},
-        PluginRole.TS: {"id": 9, "name": "pl-topologicalcopy", "version": "1.0.13",
-                        "dock_image": "fnndsc/pl-topologicalcopy", "matches": 1},
-    }
-    m = build_workload_manifest(plugins)
-    assert m["fs"] == {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
-                       "dock_image": "localhost/dbg-bigfiles", "matches": 1}
-    assert m["ts"]["version"] == "1.0.13"
+PINS = PluginPins(path="benchmarks/chrisomatic/benchmark.yml", sha256="ab12", plugins={
+    "dbg-bigfiles": PluginPin("dbg-bigfiles", "1.0.0", "fnndsc/dbg-bigfiles@sha256:b956"),
+    "pl-topologicalcopy": PluginPin("pl-topologicalcopy", "1.0.13",
+                                    "fnndsc/pl-topologicalcopy@sha256:35cb"),
+})
+
+IMAGE = {"image_id": "sha256:1c45", "repo_digests": ["fnndsc/dbg-bigfiles@sha256:b956"],
+         "architecture": "amd64"}
 
 
-def test_ambiguous_plugins_flags_multiversion_only():
-    plugins = {
-        PluginRole.DS: {"id": 2, "name": "pl-simpledsapp", "version": "2.1.5",
-                        "dock_image": "fnndsc/pl-simpledsapp", "matches": 2},
-        PluginRole.FS: {"id": 1, "name": "dbg-bigfiles", "version": "1.0.0",
-                        "dock_image": "localhost/dbg-bigfiles", "matches": 1},
-    }
-    assert ambiguous_plugins(plugins) == ["pl-simpledsapp"]
-    plugins[PluginRole.DS]["matches"] = 1
-    assert ambiguous_plugins(plugins) == []
+def _registered(name, version, dock_image, matches=1, installed=None):
+    return {"id": 1, "name": name, "version": version, "dock_image": dock_image,
+            "matches": matches, "installed_versions": installed or [version]}
 
 
-def test_plugin_ambiguity_warning_message():
-    assert plugin_ambiguity_warning(
-        {PluginRole.FS: {"name": "dbg-bigfiles", "matches": 1}}) is None
-    msg = plugin_ambiguity_warning(
-        {PluginRole.TS: {"name": "pl-topologicalcopy", "matches": 2},
-         PluginRole.FS: {"name": "dbg-bigfiles", "matches": 1}})
-    assert msg and "pl-topologicalcopy" in msg and "first match" in msg
+def _pinned_registrations(pins=PINS):
+    roles = {"dbg-bigfiles": PluginRole.FS, "pl-simpledsapp": PluginRole.DS,
+             "pl-topologicalcopy": PluginRole.TS}
+    return {roles[p.name]: _registered(p.name, p.version, p.dock_image)
+            for p in pins.plugins.values()}
+
+
+def test_build_workload_manifest_carries_versions_and_images_keyed_by_role():
+    m = build_workload_manifest(_pinned_registrations(), {PluginRole.FS: IMAGE})
+
+    assert m["fs"] == {  # nosec B101 - pytest assertion
+        "name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
+        "dock_image": "fnndsc/dbg-bigfiles@sha256:b956", "matches": 1, "image": IMAGE}
+    # Docker could not tell
+    assert m["ts"]["image"] is None  # nosec B101 - pytest assertion
+
+
+def test_the_pinned_registrations_with_their_images_present_match():
+    images = dict.fromkeys(_pinned_registrations(), IMAGE)
+
+    assert pin_mismatches(_pinned_registrations(), PINS, images,  # nosec B101 - pytest assertion
+                          docker_available=True) == []
+
+
+def test_another_registered_version_is_a_mismatch_naming_both():
+    # e.g. the ChRIS store's no-op 2.0.0, registered by a dev `just` on the same volumes
+    plugins = _pinned_registrations()
+    plugins[PluginRole.TS] = _registered("pl-topologicalcopy", "2.0.0", "docker.io/backplane/true",
+                                         matches=2, installed=["2.0.0", "1.0.13"])
+
+    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
+        "pl-topologicalcopy has 2 versions registered (2.0.0, 1.0.13), not only the pinned "
+        "1.0.13"]
+
+
+def test_another_version_or_image_reference_is_a_mismatch():
+    plugins = _pinned_registrations()
+    plugins[PluginRole.FS] = _registered("dbg-bigfiles", "1.0.1", "localhost/dbg-bigfiles")
+
+    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
+        "dbg-bigfiles 1.0.1 is registered, 1.0.0 is pinned",
+        "dbg-bigfiles is registered as localhost/dbg-bigfiles, pinned as "
+        "fnndsc/dbg-bigfiles@sha256:b956"]
+
+
+def test_an_absent_image_is_a_mismatch_only_when_docker_can_tell():
+    plugins = _pinned_registrations()
+    images = {PluginRole.FS: IMAGE}                      # the ts image is not present
+
+    assert pin_mismatches(plugins, PINS, images, docker_available=True) == [  # nosec B101 - pytest assertion
+        "pl-topologicalcopy's image fnndsc/pl-topologicalcopy@sha256:35cb is not present"]
+    assert pin_mismatches(plugins, PINS, images,  # nosec B101 - pytest assertion
+                          docker_available=False) == []
+
+
+def test_an_unpinned_workload_plugin_is_a_mismatch():
+    plugins = _pinned_registrations()
+    plugins[PluginRole.DS] = _registered("pl-simpledsapp", "2.1.5", "fnndsc/pl-simpledsapp")
+
+    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
+        "pl-simpledsapp is not pinned in benchmarks/chrisomatic/benchmark.yml"]
+
+
+def test_pin_mismatch_message_lists_the_problems_and_the_remedy():
+    msg = pin_mismatch_message(PINS, ["one", "two"])
+
+    assert "benchmarks/chrisomatic/benchmark.yml pins:\n  - one\n  - two\n" in msg  # nosec B101 - pytest assertion
+    assert "just bench-nuke" in msg and "just bench-start" in msg  # nosec B101 - pytest assertion
+
+
+def test_committed_pin_pins_every_workload_plugin():
+    assert set(run_bench.PLUGIN_NAMES.values()) <= set(load_pins().plugins)  # nosec B101 - pytest assertion
+
+
+def _connect(monkeypatch, registered, tmp_path):
+    """
+    A runner over fakes of everything __init__ connects to, with ``registered`` (name ->
+    get_plugin result) as CUBE's workload plugins and Docker unavailable.
+    """
+    api = SimpleNamespace(get_plugin=registered.__getitem__)
+    monkeypatch.setattr(run_bench, "ChrisApi", lambda *a, **k: api)
+    monkeypatch.setattr(run_bench, "wait_for_health", lambda api, timeout: True)
+    monkeypatch.setattr(run_bench, "DockerClient", lambda **k: SimpleNamespace(
+        available=False, image_info=lambda ref: None))
+    monkeypatch.setattr(run_bench, "BrokerClient", lambda host, port: None)
+    monkeypatch.setattr(run_bench, "PgStatStatements", lambda docker: None)
+
+    return BenchmarkRunner(url="http://chris:8000/api/v1/", username="chris",
+                           password="chris1234", tier=load_tier("smoke"), pins=load_pins(),
+                           store=ResultsStore(tmp_path), cube_poll_interval=2.0)
+
+
+def test_runner_starts_on_the_pinned_registrations(monkeypatch, tmp_path):
+    registered = {p["name"]: p for p in _pinned_registrations(load_pins()).values()}
+    runner = _connect(monkeypatch, registered, tmp_path)
+
+    assert set(runner.plugin_ids) == set(PluginRole)  # nosec B101 - pytest assertion
+    assert runner.plugin_images == dict.fromkeys(PluginRole)  # nosec B101 - pytest assertion
+
+
+def test_runner_refuses_to_start_on_other_registrations(monkeypatch, tmp_path):
+    registered = {p["name"]: p for p in _pinned_registrations(load_pins()).values()}
+    registered["pl-topologicalcopy"] = _registered(
+        "pl-topologicalcopy", "2.0.0", "docker.io/backplane/true")
+
+    with pytest.raises(RuntimeError, match="pl-topologicalcopy 2.0.0 is registered"):
+        _connect(monkeypatch, registered, tmp_path)

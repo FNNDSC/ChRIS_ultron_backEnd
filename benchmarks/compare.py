@@ -3,10 +3,11 @@ Compare benchmark runs over time (pure logic + rendering + CLI).
 
 Answers two questions about a *baseline* and a *candidate* run:
 
-1. **Are they comparable at all?** Mismatched workload fingerprint, storage mode or
-   auth mode are *blockers*; envelope, container-limit, Postgres-settings, host and
-   threshold differences are *cautions*; commit and image differences are the point of
-   comparing. The comparison never refuses — a loudly-labelled report beats an error.
+1. **Are they comparable at all?** Mismatched workload fingerprint, workload plugin
+   versions, storage mode or auth mode are *blockers*; envelope, container-limit,
+   Postgres-settings, host, threshold and workload-plugin image differences are
+   *cautions*; commit and service image differences are the point of comparing. The
+   comparison never refuses — a loudly-labelled report beats an error.
 2. **What changed?** Per (topology, axis, level): makespan and worst-p95 deltas
    flagged REGRESSED/IMPROVED only when they exceed BOTH a relative threshold and the
    metric's absolute floor (makespan is quantized by the poll cadence; latency has a
@@ -178,6 +179,11 @@ def check_comparability(base_env: dict, cand_env: dict) -> Comparability:
     elif a != b:
         diffs.append(FieldDiff("matrix.workload_sha256", a, b, BLOCKER))
 
+    diffs += _workload_plugin_diffs(base_env.get("workload_plugins") or {},
+                                    cand_env.get("workload_plugins") or {})
+    diffs += _block_diffs("workload_plugins_pin", base_env.get("workload_plugins_pin") or {},
+                          cand_env.get("workload_plugins_pin") or {}, INFO)
+
     for label, path, severity in _SCALAR_FIELDS:
         a, b = _dig(base_env, path), _dig(cand_env, path)
         if a != b:
@@ -228,6 +234,43 @@ def _unrecorded(label: str, base: dict, cand: dict) -> Optional[list[FieldDiff]]
         return [FieldDiff(label, "recorded" if base else "not recorded",
                           "recorded" if cand else "not recorded", WARNING)]
     return None
+
+
+def _workload_plugin_diffs(base: dict, cand: dict) -> list[FieldDiff]:
+    """
+    Differences in the workload plugins, per role: another name or version is another
+    workload (a blocker, like the matrix fingerprint); another image reference is
+    information, and other image digests a caution (the same version rebuilt, or a local
+    build). Only a digest's hex part counts: a RepoDigest can carry another repository's
+    name for the same image.
+    """
+    unrecorded = _unrecorded("workload_plugins", base, cand)
+
+    if unrecorded is not None:
+        return unrecorded
+
+    def flat(plugins: dict, *fields: str) -> dict:
+        return {f"{role}.{name}": (p or {}).get(name)
+                for role, p in plugins.items() for name in fields}
+
+    def digests(plugins: dict) -> dict:
+        # on overlay2 a local build has none
+        return {f"{role}.digests": " ".join(sorted(
+                    {d.rpartition("@")[2] for d in p["image"].get("repo_digests") or []}))
+                or "none"
+                for role, p in plugins.items() if (p or {}).get("image")}
+
+    diffs = _block_diffs("workload_plugins", flat(base, "name", "version"),
+                         flat(cand, "name", "version"), BLOCKER)
+    diffs += _block_diffs("workload_plugins", flat(base, "dock_image"),
+                          flat(cand, "dock_image"), INFO)
+
+    base_digests, cand_digests = digests(base), digests(cand)
+    unrecorded = _unrecorded("workload_plugins.image", base_digests, cand_digests)
+
+    if unrecorded is not None:
+        return diffs + unrecorded
+    return diffs + _block_diffs("workload_plugins", base_digests, cand_digests, WARNING)
 
 
 def _limits_diffs(base: dict, cand: dict) -> list[FieldDiff]:
