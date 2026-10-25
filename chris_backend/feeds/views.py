@@ -7,6 +7,7 @@ from rest_framework.reverse import reverse
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from collectionjson import services
+from plugininstances.models import PluginInstance
 from plugininstances.serializers import PartialPluginInstanceSerializer
 
 from .models import (Feed, FeedFilter, FeedGroupPermission, FeedGroupPermissionFilter,
@@ -758,4 +759,5 @@ class FeedPluginInstanceList(generics.ListAPIView):
         Custom method to get the actual plugin instances queryset.
         """
         feed = self.get_object()
-        return self.filter_queryset(feed.plugin_instances.all())
+        return self.filter_queryset(
+            PluginInstance.add_serializer_relations(feed.plugin_instances.all()))

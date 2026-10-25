@@ -5,7 +5,9 @@ import time
 import warnings
 from unittest import mock
 
+from django.db import connection
 from django.test import TestCase, TransactionTestCase, tag
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.contrib.auth.models import User, Group
 from django.conf import settings
@@ -269,6 +271,27 @@ class FeedListViewTests(ViewTests):
         response = self.client.get(self.list_url)
         self.assertContains(response, "Feed1")
         self.assertContains(response, "Feed2")
+
+    def test_feed_list_query_count_does_not_grow_with_feeds(self):
+        # the owner and folder the serializer reads for every feed are fetched in the
+        # list query itself, so more feeds must not mean more queries
+        self.client.login(username=self.username, password=self.password)
+
+        with CaptureQueriesContext(connection) as before:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        user = User.objects.get(username=self.username)
+        for i in range(3):
+            PluginInstance.objects.create(
+                plugin=plugin, owner=user, title=f'Feed{i + 3}',
+                compute_resource=plugin.compute_resources.all()[0])
+
+        with CaptureQueriesContext(connection) as after:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(len(after), len(before))
 
     def test_feed_list_success_chris_user_lists_all_users_feeds(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
@@ -1328,6 +1351,28 @@ class FeedPluginInstanceListViewTests(ViewTests):
         # it shows all the plugin instances associated to the feed
         self.assertContains(response, "test")
         self.assertContains(response, "test1")
+
+    def test_feed_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance are fetched in
+        # the list query itself, so a bigger feed must not mean more queries
+        self.client.login(username=self.username, password=self.password)
+
+        with CaptureQueriesContext(connection) as before:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+
+        plg_inst = PluginInstance.objects.get(title='test')
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+        for i in range(3):
+            PluginInstance.objects.create(
+                plugin=plugin, owner=user, previous=plg_inst, title=f'more{i}',
+                compute_resource=plugin.compute_resources.all()[0])
+
+        with CaptureQueriesContext(connection) as after:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(len(after), len(before))
 
     def test_feed_plugin_instance_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

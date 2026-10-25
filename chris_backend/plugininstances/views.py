@@ -115,7 +115,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         user = self.request.user
         plugin = self.get_object()
-        return plugin.instances.filter(owner=user)
+        return PluginInstance.add_serializer_relations(plugin.instances.filter(owner=user))
 
 
 @extend_schema_view(
@@ -151,14 +151,14 @@ class AllPluginInstanceList(generics.ListAPIView):
         user = self.request.user
 
         if not user.is_authenticated:
-            return PluginInstance.objects.filter(feed__public=True)
-
-        if user.username == 'chris':
-            return PluginInstance.objects.all()
-
-        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
-        return PluginInstance.objects.filter(lookup)
+            qs = PluginInstance.objects.filter(feed__public=True)
+        elif user.username == 'chris':
+            qs = PluginInstance.objects.all()
+        else:
+            lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
+                feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
+            qs = PluginInstance.objects.filter(lookup)
+        return PluginInstance.add_serializer_relations(qs)
 
 
 class AllPluginInstanceListQuerySearch(generics.ListAPIView):
@@ -180,14 +180,14 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
         user = self.request.user
 
         if not user.is_authenticated:
-            return PluginInstance.objects.filter(feed__public=True)
-
-        if user.username == 'chris':
-            return PluginInstance.objects.all()
-
-        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
-        return PluginInstance.objects.filter(lookup)
+            qs = PluginInstance.objects.filter(feed__public=True)
+        elif user.username == 'chris':
+            qs = PluginInstance.objects.all()
+        else:
+            lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
+                feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
+            qs = PluginInstance.objects.filter(lookup)
+        return PluginInstance.add_serializer_relations(qs)
 
         
 class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -196,7 +196,7 @@ class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
+    queryset = PluginInstance.add_serializer_relations(PluginInstance.objects.all())
     permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance,)
 

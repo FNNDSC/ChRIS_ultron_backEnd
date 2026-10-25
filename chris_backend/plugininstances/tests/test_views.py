@@ -6,7 +6,9 @@ import io
 import os
 from unittest import mock, skip
 
+from django.db import connection
 from django.test import TestCase, TransactionTestCase, tag
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -1080,6 +1082,30 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         self.assertContains(response, 'finishedSuccessfully')
         self.assertEqual(len(response.data['results']), 2)
         self.assertNotContains(response, 'created')
+
+    def test_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance are fetched in
+        # the list query itself, so more instances must not mean more queries
+        self.client.login(username=self.username, password=self.password)
+        list_url = reverse("allplugininstance-list")
+
+        with CaptureQueriesContext(connection) as before:
+            response = self.client.get(list_url)
+        self.assertEqual(len(response.data['results']), 3)
+
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        previous = PluginInstance.objects.get(plugin=plugin, owner=user)
+        plugin_ds = Plugin.objects.get(meta__name="mri_convert")
+        for i in range(3):
+            PluginInstance.objects.create(
+                plugin=plugin_ds, owner=user, previous=previous, title=f'more{i}',
+                compute_resource=plugin_ds.compute_resources.all()[0])
+
+        with CaptureQueriesContext(connection) as after:
+            response = self.client.get(list_url)
+        self.assertEqual(len(response.data['results']), 6)
+        self.assertEqual(len(after), len(before))
 
     def test_plugin_instance_query_search_list_success_but_empty_unauthenticated(self):
         response = self.client.get(self.list_url)

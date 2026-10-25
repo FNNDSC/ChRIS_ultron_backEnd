@@ -84,6 +84,19 @@ class PluginInstance(AsyncDeletableModel):
     def __str__(self):
         return self.title
 
+    @staticmethod
+    def add_serializer_relations(plg_inst_qs):
+        """
+        Custom static method to fetch in the same query the related objects that the
+        serializers read for every plugin instance in a queryset (plugin and its meta,
+        previous instance, feed, output folder, owner, compute resource and workflow
+        with its pipeline). Without it every serialized instance costs one extra query
+        per relation.
+        """
+        return plg_inst_qs.select_related('plugin__meta', 'previous', 'feed',
+                                          'output_folder', 'owner', 'compute_resource',
+                                          'workflow__pipeline')
+
     def save(self, *args, **kwargs):
         """
         Overriden to save a new output folder to the DB the first time the instance
