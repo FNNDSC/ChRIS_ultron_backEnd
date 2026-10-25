@@ -1,24 +1,25 @@
 """
 The shared cache and the coordination helpers built on it.
 
-``CACHES['default']`` is Django's ``RedisCache`` on a Dragonfly instance of its own 
-(``dragonfly-cache`` in the compose stacks) apart from the Celery broker's: it evicts 
-when it is full and starts empty after a restart so whatever it holds may go missing at 
-any time. Every key the helpers write expires and ``cache.clear()`` is ``FLUSHDB`` of 
-the cache's whole logical database, whatever the key prefix.
+``CACHES['default']`` is Django's ``RedisCache`` on a Dragonfly instance of its own
+(``dragonfly-cache`` in the compose stacks) apart from the Celery broker's: it evicts
+when it is full and starts empty after a restart so whatever it holds may go missing at
+any time. All coordination keys created by these helpers expire automatically. Do not 
+call cache.clear(): it deletes every key in this cache’s Redis logical database, not just
+keys with this application’s prefix (Redis/Dragonfly FLUSHDB).
 
 The helpers, all safe to call from any thread or process:
 
 - ``acquire_lock`` / ``release_lock``: a lock held until released or for ``ttl`` seconds
 - ``mark_once`` / ``clear_mark``: true for the first caller in a window of ``ttl`` seconds
-- ``acquire_slot`` / ``release_slot``: a bounded counter at most ``ceiling`` leases of
-``ttl`` seconds each so a lease its holder never releases frees itself
+- ``acquire_slot`` / ``release_slot``: a bounded counter, at most ``ceiling`` leases of
+  ``ttl`` seconds each, so a lease its holder never releases frees itself
 
-They fail open. When the cache does not answer they go ahead as if it had log the degraded
-mode once and stop trying for a few seconds so whatever a lock or marker guards must stay
-correct when it runs twice. A release or a clear that cannot reach the cache is kept and
-the process's next helper call after the cache answers again replays it; a process that
-makes no further call leaves it to its TTL.
+They fail open. When the cache does not answer they go ahead as if it had, log the
+degraded mode once and stop trying for a few seconds, so whatever a lock or marker guards
+must stay correct when it runs twice. A release or a clear that cannot reach the cache is
+kept and the process's next helper call after the cache answers again replays it; a
+process that makes no further call leaves it to its TTL.
 """
 
 import logging
@@ -46,6 +47,10 @@ logger = logging.getLogger(__name__)
 
 #: the longest lease, lock or marker the helpers accept, in seconds
 MAX_TTL = 7 * 24 * 3600
+
+#: the longest socket timeout the start-up check accepts in a cache URL, in seconds (the
+#: settings set 0.5 s; a query string overrides them)
+MAX_SOCKET_TIMEOUT = 5.0
 
 # The scripts return integers only, and stay within Lua 5.1 (real Redis) as well as the
 # 5.4 that Dragonfly runs. Dragonfly runs a script only on the keys it declares.
@@ -85,8 +90,8 @@ class Lease:
     """
     A lock or slot this process acquired.
 
-    ``degraded`` is true when the cache did not answer the acquire so the caller goes 
-    ahead without the guarantee. ``token`` is None when the acquire sent nothing, the 
+    ``degraded`` is true when the cache did not answer the acquire so the caller goes
+    ahead without the guarantee. ``token`` is None when the acquire sent nothing, the
     helpers being in their pause after a failure; otherwise the release removes the lease
     by its token, which also covers a write the server applied after its reply timed out.
     """
@@ -136,7 +141,7 @@ def clear_mark(key):
     """
     Let the next ``mark_once`` for ``key`` return true.
 
-    A clear that an outage kept for later is replayed without a token so it can end a 
+    A clear that an outage kept for later is replayed without a token so it can end a
     window that another caller opened once the cache answered again: that caller's work
     then runs twice at worst.
     """
@@ -178,21 +183,32 @@ def verify_cache_connection(cache_settings, broker_url=None):
     storage.
 
     Raises ``ImproperlyConfigured`` when the configuration is wrong: another backend than
-    Django's ``RedisCache``, a URL redis-py cannot parse, no logical database in it,
-    retries turned on in its query string, the Celery broker's own database, a refused 
-    password or certificate, or a database the server does not have. Only logs a warning
-    when the server does not answer so that CUBE starts while it is down; the helpers then
-    fail open. Says nothing when the cache answers.
+    Django's ``RedisCache``, no server or a URL redis-py cannot parse, no logical
+    database in it, retries or an unbounded socket timeout in its query string, the
+    Celery broker's server, a refused password, certificate or TLS handshake, or a
+    database the server does not have. Only logs a warning when the server does not
+    answer so that CUBE starts while it is down; the helpers then fail open. Says nothing
+    when the cache answers.
     """
     backend = cache_settings.get('BACKEND', '')
-    if not issubclass(import_string(backend), RedisCache):
+    try:
+        backend_class = import_string(backend)
+    except ImportError as e:
+        raise ImproperlyConfigured(f"CACHES['default'] BACKEND {backend!r}: {e}")
+
+    if not (isinstance(backend_class, type) and issubclass(backend_class, RedisCache)):
         raise ImproperlyConfigured(f"CACHES['default'] BACKEND is {backend}: core.cache "
                                    f"needs django.core.cache.backends.redis.RedisCache")
 
     location = cache_settings.get('LOCATION', '')
+
     # split as RedisCache does; the helpers write to the first server
-    servers = location if isinstance(location, (list, tuple)) else re.split('[;,]',
-                                                                            location)
+    servers = (location if isinstance(location, (list, tuple))
+               else re.split('[;,]', location))
+
+    if not servers:
+        raise ImproperlyConfigured("CACHES['default'] LOCATION names no server")
+
     try:
         params = redis.connection.parse_url(servers[0])
     except ValueError as e:
@@ -211,16 +227,25 @@ def verify_cache_connection(cache_settings, broker_url=None):
             f"after its reply was lost finds its own key, and the helpers would wait out "
             f"a TTL")
 
+    # a query string overrides the settings' bounded timeouts
+    for name in ('socket_timeout', 'socket_connect_timeout'):
+        if name in params and not 0 < params[name] <= MAX_SOCKET_TIMEOUT:
+            raise ImproperlyConfigured(
+                f"CACHES['default'] LOCATION ({where}) sets {name}={params[name]}: the "
+                f"helpers need a timeout above 0 and at most {MAX_SOCKET_TIMEOUT} s")
+
     if broker_url and broker_url.startswith(('redis://', 'rediss://', 'unix://')):
         try:
             broker = redis.connection.parse_url(broker_url)
         except ValueError:
             broker = None  # Celery reports its own URL
 
-        if broker is not None and _server_db(params) == _server_db(broker):
+        if broker is not None and _server(params) == _server(broker):
             raise ImproperlyConfigured(
-                f"CACHES['default'] LOCATION ({where}) is the Celery broker's database: "
-                f"clearing the cache would delete the broker's queues")
+                f"CACHES['default'] LOCATION ({where}) is on the Celery broker's "
+                f"server: one Dragonfly has one memory limit and eviction policy, so a "
+                f"full cache would refuse the broker's writes, evicting would drop its "
+                f"queues, and clearing its database would delete them")
 
     client = RedisCacheClient(servers, **cache_settings.get('OPTIONS', {}))
     connection = client.get_client(write=True)
@@ -231,8 +256,11 @@ def verify_cache_connection(cache_settings, broker_url=None):
         # AuthenticationError is a ConnectionError, so it goes first
         raise ImproperlyConfigured(f"CACHES['default'] ({where}): {e}")
     except _UNREACHABLE as e:
-        if isinstance(e.__context__, ssl.SSLCertVerificationError):
+        # a refused certificate, or TLS against a server that does not speak it: no retry
+        # mends either
+        if _tls_failure(e):
             raise ImproperlyConfigured(f"CACHES['default'] ({where}): {e}")
+
         # logged before LOGGING is configured, so the message says what it is about
         logger.warning('CUBE shared cache: %s does not answer (%s); starting without it, '
                        'and the helpers in core.cache go ahead without it until it does',
@@ -327,7 +355,7 @@ class _CacheHealth:
 
     def replay(self, client):
         """
-        Apply the releases and clears that could not reach the cache, oldest first, 
+        Apply the releases and clears that could not reach the cache, oldest first,
         before the call that found the cache answering again. Raises when the cache
         stops answering again, keeping the rest for later.
         """
@@ -340,6 +368,9 @@ class _CacheHealth:
             try:
                 _apply(client, *release)
             except _UNREACHABLE:
+                # back at the front, so the order holds; were the queue full meanwhile
+                # this would drop its newest entry rather than its oldest, a release that
+                # the TTLs bound all the same
                 self._pending.appendleft(release)
                 raise
             except redis.exceptions.RedisError as e:
@@ -359,8 +390,8 @@ def _reset_on_new_cache_settings(setting, **kwargs):
 
 
 def _cache():
-    # looked up on every call: Django keeps a cache per thread and replaces them all when
-    # the settings change
+    # looked up on every call: Django keeps a cache per asgiref context (per thread, and
+    # per request under ASGI) and replaces them all when the settings change
     return caches['default']
 
 
@@ -416,7 +447,10 @@ def _apply(client, kind, key, token):
     if kind == 'slot':
         return client.zrem(key, token) == 1
 
-    return client.delete(key) == 1
+    if kind == 'mark':
+        return client.delete(key) == 1
+
+    raise ValueError(f'unknown release kind {kind!r}')
 
 
 def _lease(kind, key, token, reply):
@@ -464,12 +498,28 @@ def _describe(params):
     """
     Where a parsed Redis URL points, without its credentials.
     """
-    server = params.get('path') or f"{params.get('host',
-                                                 'localhost')}:{params.get('port', 6379)}"
+    host, port = params.get('host', 'localhost'), params.get('port', 6379)
+    server = params.get('path') or f'{host}:{port}'
     return f"{server}/{params['db']}" if 'db' in params else server
 
 
-def _server_db(params):
-    server = params.get('path') or (params.get('host', 'localhost').lower(),
-                                    int(params.get('port', 6379)))
-    return server, int(params.get('db', 0))
+def _server(params):
+    """
+    The server a parsed Redis URL names: its socket path, or its host, as DNS compares
+    names, and its port.
+    """
+    return params.get('path') or (params.get('host', 'localhost').lower().rstrip('.'),
+                                  int(params.get('port', 6379)))
+
+
+def _tls_failure(error):
+    """
+    Whether a connection failed in TLS: anywhere in the chain of exceptions it was raised
+    from.
+    """
+    while error is not None:
+        if isinstance(error, ssl.SSLError):
+            return True
+
+        error = error.__cause__ or error.__context__
+    return False

@@ -306,11 +306,11 @@ chris_backend/config/settings/benchmark.py
 
 ## 13. Test Environment
 
-Authoritative `full`-tier runs are performed on a **dedicated bare-metal Linux box** (no Docker Desktop VM layer, so Compose `cpus`/`mem_limit` are honored directly). The box's full hardware is captured in each report header. Quick `smoke`/`default` tiers may run on a developer laptop and are treated as **directional only** — on Docker Desktop the VM's own CPU/mem/disk limits dominate per-container limits.
+Authoritative `full`-tier runs are performed on a **dedicated bare-metal Linux box** (no Docker Desktop VM layer so Compose `cpus`/`mem_limit` are honored directly). The box's full hardware is captured in each report header. Quick `smoke`/`default` tiers may run on a developer laptop and are treated as **directional only** — on Docker Desktop the VM's own CPU/mem/disk limits dominate per-container limits.
 
 The runner auto-collects what it can and leaves explicit manual placeholders.
 
-- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon/db image ids, git commit + dirty status, storage mode, the full envelope knob set, each service container's applied CPU/memory/swap/`/dev/shm` limits, the Postgres server's settings, API auth mode, the workload-plugin registrations, their images and the pin they were checked against, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`, Postgres counters), and a measured idle noise floor.
+- **Automatic (`environment.json`):** host OS, kernel, architecture, logical CPU count, total memory, Docker engine/API versions and data root, CUBE/pfcon/db/broker/cache image ids, git commit + dirty status, storage mode, the full envelope knob set, each service container's applied CPU/memory/swap/`/dev/shm` limits, the Postgres server's settings, API auth mode, the workload-plugin registrations, their images and the pin they were checked against, the workload fingerprint, attribution availability (queue sampling, `pg_stat_statements`, Postgres counters), and a measured idle noise floor.
 - **Manual (in the report):** storage device type/throughput, power/thermal mode, and other significant workloads running during the benchmark.
 
 ## 14. Implementation Phases

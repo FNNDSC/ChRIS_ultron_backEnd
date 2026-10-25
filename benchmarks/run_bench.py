@@ -17,10 +17,11 @@ import statistics
 import time
 from collections import Counter
 from dataclasses import replace
+from pathlib import Path
 
 from . import classifier, environment, escalation, metrics, report, topologies
 from .broker import BrokerClient
-from .chris_api import ChrisApi
+from .chris_api import ChrisApi, ChrisApiError
 from .config import PluginPins, Tier, load_pins, load_tier, step_for, tier_fingerprint
 from .docker_client import DockerClient
 from .pg_stats import (SERVER_START_KEY, PgStatStatements, counter_delta, counter_windows,
@@ -79,9 +80,8 @@ class BenchmarkRunner:
         self.pg_stats = PgStatStatements(self.docker)
         
         self.pins = pins
-        self.plugins = {role: self.api.get_plugin(name)
+        self.plugins = {role: resolve_plugin(self.api, name)
                         for role, name in PLUGIN_NAMES.items()}
-        self.plugin_ids = {role: p["id"] for role, p in self.plugins.items()}
         self.plugin_images = {role: self.docker.image_info(p["dock_image"])
                               for role, p in self.plugins.items()}
 
@@ -90,6 +90,8 @@ class BenchmarkRunner:
                                   docker_available=self.docker.available)
         if problems:
             raise RuntimeError(pin_mismatch_message(pins, problems))
+
+        self.plugin_ids = {role: p["id"] for role, p in self.plugins.items()}
 
     def _record_request(self, record) -> None:
         self._sink.record_request(record)
@@ -487,6 +489,20 @@ def build_workload_manifest(plugins: dict, images: dict) -> dict:
             for role, p in plugins.items()}
 
 
+def resolve_plugin(api: ChrisApi, name: str) -> dict:
+    """
+    ``api.get_plugin(name)``, or a record of no match when CUBE has no plugin of that
+    name, so that ``pin_mismatches`` reports it with the other problems.
+    """
+    try:
+        return api.get_plugin(name)
+    except ChrisApiError as exc:
+        if exc.result.status_code != 404:
+            raise
+        return {"id": None, "name": name, "version": None, "dock_image": None,
+                "matches": 0, "installed_versions": []}
+
+
 def pin_mismatches(plugins: dict, pins: PluginPins, images: dict, *,
                    docker_available: bool) -> list[str]:
     """
@@ -505,6 +521,10 @@ def pin_mismatches(plugins: dict, pins: PluginPins, images: dict, *,
             problems.append(f"{name} is not pinned in {pins.path}")
             continue
 
+        if p.get("matches", 1) == 0:
+            problems.append(f"{name} is not registered")
+            continue
+
         if p.get("matches", 1) != 1:
             versions = ", ".join(str(v) for v in p.get("installed_versions") or [])
             problems.append(f"{name} has {p['matches']} versions registered ({versions}), "
@@ -515,25 +535,33 @@ def pin_mismatches(plugins: dict, pins: PluginPins, images: dict, *,
             problems.append(f"{name} {p.get('version')} is registered, {pin.version} "
                             f"is pinned")
 
+        image = images.get(role)
+
         if p.get("dock_image") != pin.dock_image:
             problems.append(f"{name} is registered as {p.get('dock_image')}, pinned as "
                             f"{pin.dock_image}")
-        elif docker_available and images.get(role) is None:
+        elif docker_available and image is None:
             problems.append(f"{name}'s image {pin.dock_image} is not present")
+        elif image and "error" in image:
+            problems.append(f"{name}'s image {pin.dock_image} could not be read: "
+                            f"{image['error']}")
     return problems
 
 
 def pin_mismatch_message(pins: PluginPins, problems: list[str]) -> str:
     """
-    Why the runner refuses to start, and what puts the pinned registrations back.
+    Why the runner refuses to start and what puts the pinned registrations back: the
+    pin ``just bench-start`` registered when it was another one, else fresh volumes.
     """
     lines = "\n".join(f"  - {problem}" for problem in problems)
+    pin = Path(pins.path).name
     return (f"[bench] the workload plugins in CUBE are not the ones {pins.path} pins:\n"
             f"{lines}\n"
-            f"Register the pin on fresh volumes: 'just bench-nuke' (it deletes the dev "
-            f"stack's data too: the two stacks share their volumes), then 'just bench-start' "
-            f"(naming the same pin file, if not the default). A missing image alone: "
-            f"'just bench-pull-plugins'.")
+            f"If 'just bench-start' was given another pin, check against the same one: "
+            f"'just bench-run --plugins <its file name> ...'. Otherwise register this one "
+            f"on fresh volumes: 'just bench-nuke' (it deletes the dev stack's data too: the "
+            f"two stacks share their volumes), then 'just bench-start {pin}'. A missing "
+            f"image alone: 'just bench-pull-plugins {pin}'.")
 
 
 # -- CLI -------------------------------------------------------------------------------
@@ -558,7 +586,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--matrix", default=None, help="path to matrix.yml")
     p.add_argument("--plugins", default=None,
                    help="the chrisomatic pin `just bench-start` registered the workload "
-                        "plugins from (default: benchmarks/chrisomatic/benchmark.yml)")
+                        "plugins from: a file name in benchmarks/chrisomatic/ (as for "
+                        "bench-start) or a path; default benchmark.yml")
     p.add_argument("--topology", default=None,
                    help="restrict to one topology (linear|fanout_fanin|diamond)")
     p.add_argument("--axis", default=None, help="restrict to one escalation axis")

@@ -219,10 +219,10 @@ class ChrisApi:
         Resolve a plugin by name and return the selected version's provenance.
 
         Searches ``plugins/search/?name_exact=`` and selects the first match — CUBE
-        orders plugins by ``('meta', '-version')``, so this is the highest-sorting
+        orders plugins by ``('meta', '-version')`` so this is the highest-sorting
         version *string* for the name. ``matches`` is how many versions the name
-        resolved to and ``installed_versions`` which: the runner starts only when each
-        workload plugin has exactly one, since CUBE itself resolves
+        resolved to and ``installed_versions`` lists them: the runner starts only when
+        each workload plugin has exactly one since CUBE itself resolves
         ``pl-topologicalcopy`` by name too.
         """
         r = self._call("list", "GET", self.base + "plugins/search/",

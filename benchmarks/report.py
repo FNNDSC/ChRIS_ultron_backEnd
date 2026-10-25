@@ -203,6 +203,15 @@ def _human_bytes(n: int) -> str:
     return f"{size:.1f} TiB"
 
 
+def record_digests(record: dict | None) -> list[str]:
+    """
+    The digests of an image record (``docker_client.image_record``), their ``sha256:…``
+    parts only and sorted: on overlay2 a RepoDigest can carry another repository's name for
+    the same image.
+    """
+    return sorted({d.rpartition("@")[2] for d in (record or {}).get("repo_digests") or []})
+
+
 def _short_digests(image: dict | None) -> str | None:
     """
     An image record's digests, shortened (``None`` for an unrecorded image, so the table
@@ -210,9 +219,7 @@ def _short_digests(image: dict | None) -> str | None:
     """
     if not image:
         return None
-
-    digests = sorted({d.rpartition("@")[2] for d in image.get("repo_digests") or []})
-    return ", ".join(d[:19] for d in digests) or "none"
+    return ", ".join(d[:19] for d in record_digests(image)) or "none"
 
 
 def _environment_section(env: dict) -> list[str]:

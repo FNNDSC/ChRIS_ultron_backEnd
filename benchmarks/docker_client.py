@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import contextlib
 import time
-from typing import Optional
+
+import docker
+from docker.errors import ImageNotFound
 
 from .models import ResourceSample
 
@@ -42,16 +44,15 @@ class DockerClient:
     the harness still runs — resource sampling and recovery are best-effort by design.
     """
 
-    def __init__(self, project: Optional[str] = None, *, job_label: str = JOB_LABEL,
+    def __init__(self, project: str | None = None, *, job_label: str = JOB_LABEL,
                  exclude_services: tuple[str, ...] = ()):
         self.project = project
         self.job_label = job_label
         self.exclude_services = exclude_services
         self._docker = None
-        self.unavailable_reason: Optional[str] = None
+        self.unavailable_reason: str | None = None
 
         try:
-            import docker  # imported lazily so pure modules never need the SDK
             client = docker.from_env()
             client.ping()
             self._docker = client
@@ -82,7 +83,7 @@ class DockerClient:
         return self._docker.containers.list(all=all_states,
                                             filters={"label": self.job_label})
 
-    def find_service(self, service: str) -> Optional[object]:
+    def find_service(self, service: str) -> object | None:
         for c in self.service_containers():
             if c.labels.get("com.docker.compose.service") == service:
                 return c
@@ -110,7 +111,7 @@ class DockerClient:
 
     # -- ops -------------------------------------------------------------------------
 
-    def logs(self, container, tail: int | str = 200, since: Optional[float] = None) -> str:
+    def logs(self, container, tail: int | str = 200, since: float | None = None) -> str:
         """
         The container's last ``tail`` log lines (``"all"`` for every one), only those
         written after the epoch time ``since`` when given.
@@ -210,17 +211,21 @@ class DockerClient:
         except Exception:                              # noqa: BLE001
             return {}
 
-    def image_info(self, ref: Optional[str]) -> Optional[dict]:
+    def image_info(self, ref: str | None) -> dict | None:
         """
-        The local image an image reference resolves to (``image_record``), or ``None``
-        when it is not present, cannot be read, or Docker is unavailable.
+        The local image an image reference resolves to (``image_record``); ``None`` when
+        it is not present or Docker is unavailable, ``{"error": ...}`` when Docker
+        could not tell.
         """
         if not self._docker or not ref:
             return None
+
         try:
             return image_record(self._docker.images.get(ref))
-        except Exception:                              # noqa: BLE001 - absent or unreadable
+        except ImageNotFound:
             return None
+        except Exception as exc:                       # noqa: BLE001 - reported, not raised
+            return {"error": str(exc)}
 
 
 def image_record(image) -> dict:
@@ -260,7 +265,7 @@ def _exec(container, cmd: list) -> tuple[int, str]:
         return -1, str(exc)
 
 
-def _cpus(host: dict) -> Optional[float]:
+def _cpus(host: dict) -> float | None:
     """
     A container's CPU limit: Docker sets ``NanoCpus``, while Podman can report the
     same limit as a CFS quota over its period.

@@ -472,6 +472,13 @@ class ValidationTests(CacheTestCase):
             with self.subTest(ceiling=ceiling), self.assertRaises(ValueError):
                 acquire_slot(_name(), ceiling, 5)
 
+    def test_an_unknown_release_kind_raises_rather_than_deleting(self):
+        client = mock.Mock()
+
+        with self.assertRaises(ValueError):
+            core_cache._apply(client, 'slots', _key('slots', _name()), 1)
+        client.delete.assert_not_called()
+
     def test_a_release_takes_a_lease_of_its_own_kind(self):
         lock = acquire_lock(_name(), 5)
         slot = acquire_slot(_name(), 1, 5)
@@ -518,6 +525,29 @@ class RefusalTests(CacheTestCase):
             release_lock(lease)
 
         self.assertEqual([r.levelname for r in logs.records], ['ERROR', 'ERROR'])
+
+    def test_a_refusal_logs_again_after_the_interval(self):
+        name = _name()
+        _raw().set(_key('slots', name), 'not a sorted set', px=30000)
+
+        with mock.patch.object(core_cache._health, 'REFUSAL_LOG_INTERVAL', 0), \
+                self.assertLogs('core.cache', 'INFO') as logs:
+            acquire_slot(name, 1, 30)
+            acquire_slot(name, 1, 30)
+
+        self.assertEqual([r.levelname for r in logs.records], ['ERROR', 'ERROR'])
+
+    def test_an_authentication_error_counts_as_an_outage(self):
+        # redis-py raises NOAUTH and WRONGPASS (and LOADING) as ConnectionErrors
+        def refuse(client):
+            raise redis.exceptions.AuthenticationError('invalid username-password pair')
+
+        with self.assertLogs('core.cache', 'INFO') as logs:
+            reply = core_cache._call('acquire_lock', refuse)
+
+        self.assertIs(reply, core_cache._FAILED)
+        self.assertFalse(core_cache._health.available())
+        self.assertEqual([r.levelname for r in logs.records], ['WARNING'])
 
 
 class CacheHealthTests(CacheTestCase):
@@ -742,6 +772,27 @@ class DegradedModeTests(ProxiedCacheTestCase):
         self.assertIsNotNone(again)
         release_lock(again)
 
+    def test_a_slot_the_server_took_after_its_reply_timed_out_is_released(self):
+        name = _name()
+        acquire_lock(_name(), 5)  # a pooled connection for the command to wait on
+        self.proxy.pause()
+        with self.assertLogs('core.cache', 'WARNING'):
+            lease = acquire_slot(name, 1, 30)
+        self.assertTrue(lease.degraded)
+
+        self.proxy.resume()  # the script sent meanwhile now reaches Dragonfly
+        deadline = time.monotonic() + 3
+        while _raw().zscore(lease.key, lease.token) is None:
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.02)
+        self.wait_for_retry()
+
+        with self.assertLogs('core.cache', 'INFO'):
+            self.assertTrue(release_slot(lease))
+        again = acquire_slot(name, 1, 30)
+        self.assertIsNotNone(again)
+        release_slot(again)
+
     def test_callers_in_many_threads_survive_the_cache_stopping(self):
         done = threading.Event()
 
@@ -849,11 +900,19 @@ class StartupCheckTests(CacheTestCase):
                 (f'redis://{host}:6379', f'\\({host}:6379\\) names no logical database'),
                 (f'redis://{host}:6379/abc', 'names no logical database'),
                 (f'redis://{host}:6379/0?retry_on_timeout=true', 'turns on retries'),
-                (broker, "the Celery broker's database"),
-                # the same server spelt another way: host case, default port
-                (f'redis://{b.hostname.upper()}{b.path}', "the Celery broker's database"),
+                (f'redis://{host}:6379/0?socket_timeout=0', 'socket_timeout=0.0'),
+                (f'redis://{host}:6379/0?socket_connect_timeout=3600',
+                 'socket_connect_timeout=3600.0'),
+                (broker, "the Celery broker's server"),
+                # the same server spelt another way: host case, a trailing dot, default port
+                (f'redis://{b.hostname.upper()}{b.path}', "the Celery broker's server"),
+                (f'redis://{b.hostname}.{b.path}', "the Celery broker's server"),
+                # another database of the broker's server
+                (f'redis://{b.hostname}:{b.port or 6379}/7', "the Celery broker's server"),
                 (f'redis://{host}:6379/99', 'DB index'),
-                (f'redis://nobody:wrong@{host}:6379/0', '')):
+                (f'redis://nobody:wrong@{host}:6379/0', ''),
+                # TLS against the cache, which speaks plain text
+                (f'rediss://{host}:6379/0', '')):
             with self.subTest(location=location), \
                     self.assertRaisesRegex(ImproperlyConfigured, reason):
                 verify_cache_connection(self.conf(location), broker)
@@ -864,6 +923,19 @@ class StartupCheckTests(CacheTestCase):
 
         with self.assertRaisesRegex(ImproperlyConfigured, 'RedisCache'):
             verify_cache_connection(conf, settings.CELERY_BROKER_URL)
+
+    def test_a_backend_that_does_not_import_stops_start_up(self):
+        for backend in ('', 'no.such.Backend', 'django.core.cache.caches'):
+            conf = {**self.conf(settings.CACHES['default']['LOCATION']), 'BACKEND': backend}
+            with self.subTest(backend=backend), \
+                    self.assertRaisesRegex(ImproperlyConfigured, 'BACKEND'):
+                verify_cache_connection(conf, settings.CELERY_BROKER_URL)
+
+    def test_no_server_stops_start_up(self):
+        for location in ([], ()):
+            with self.subTest(location=location), \
+                    self.assertRaisesRegex(ImproperlyConfigured, 'names no server'):
+                verify_cache_connection(self.conf(location), settings.CELERY_BROKER_URL)
 
     def test_a_refused_certificate_stops_start_up(self):
         def ping():
@@ -932,7 +1004,8 @@ class CacheSettingsTests(SimpleTestCase):
         self.assertEqual(conf['BACKEND'], 'django.core.cache.backends.redis.RedisCache')
         self.assertEqual(conf['KEY_PREFIX'], 'cube')
         self.assertIn('db', cache)
-        self.assertNotEqual((cache['host'], cache.get('port')), (broker['host'], broker.get('port')))
+        self.assertNotEqual((cache['host'], cache.get('port')),
+                            (broker['host'], broker.get('port')))
         # the effective values, which a query string in the URL would override
         kwargs = caches['default']._cache.get_client().connection_pool.connection_kwargs
         self.assertEqual(kwargs['socket_connect_timeout'], 0.5)

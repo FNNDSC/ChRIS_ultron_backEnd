@@ -54,12 +54,12 @@ pins at the 10 s pool timeout) and the clean write-path run. Raw CSVs alongside 
 
 ## How these results were generated
 
-All runs used the pinned envelope (`envelope.md`), `fslink` storage, on the dedicated Linux
-box, and `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. Since the
-committed pin (`chrisomatic/benchmark.yml`, `envelope.md` § "Pinned workload plugin versions")
-`just bench-start` registers those versions and the harness refuses to start against any other
-registration; earlier campaigns used an edited `chrisomatic.yml`, noted with each below. Two
-conventions matter for reproducing them faithfully:
+All runs used the pinned envelope (`envelope.md`), `fslink` storage, on the dedicated Linux box,
+and `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. Since the
+committed pin (`benchmarks/chrisomatic/benchmark.yml`, `envelope.md` § "Pinned workload plugin
+versions") `just bench-start` registers those versions and the harness refuses to start against
+any other registration; earlier campaigns used an edited `chrisomatic.yml`, noted with each
+below. Two conventions matter for reproducing them faithfully:
 
 - **Clean-stack discipline.** Isolation runs are preceded by a recovery so a prior failure
   can't contaminate them (we saw spurious failures otherwise). A light reset is a service
@@ -332,24 +332,26 @@ to 30 measured requests. Every failure is a
 `cancelled:inst-*` criterion in a run whose pfcon log has duplicates, and both arms of each A/B
 fail that way. The B runs at 0c9223b are the baselines for these four commands from here on.
 Against runs from before 2026-10-20 `bench-compare` lists `images.dragonflydb` and
-`images.dragonfly-cache` as information, and `envelope.CUBE_CACHE_URL` and each new limit
-(`limits.dragonflydb.cpus` and so on) as cautions, plus `host.mem_total_bytes` against the
-2026-10-14 runs; against the runs above it reports only what differs. The per-run logs (Dragonfly's, pfcon's, the probes) are kept on the benchmark
-box.
+`images.dragonfly-cache` as information and `envelope.CUBE_CACHE_URL` as a caution; against the
+2026-10-13/14 runs, which recorded container limits, also each new limit
+(`limits.dragonflydb.cpus` and so on), and against earlier runs `limits` once as not recorded.
+`host.mem_total_bytes` differs against every earlier campaign (a few KiB each time). Against the
+runs above it reports only what differs. The per-run logs (Dragonfly's, pfcon's, the probes)
+are kept on the benchmark box.
 
 ## Committed workload-plugin pin — 2026-10-22
 
 The runs of the committed pin (REPORT.md § 17): `just bench-start` registers the workload
-plugins from `chrisomatic/benchmark.yml`, by the index digests of the images the earlier runs
-ran under untagged references, and the harness refuses to start unless CUBE holds exactly those
-registrations ([`../envelope.md`](../envelope.md) § "Pinned workload plugin versions"). All five
-ran at 0677a9c on a clean tree (`git.dirty` false), each on a fresh stack (`just bench-nuke`,
-`just bench-start`) with every envelope knob at its default; `just bench-start` pulled nothing,
-and every run records one version of each plugin on the images `1c451a28…` (`dbg-bigfiles`
-1.0.0), `5f2bf3a1…` (`pl-simpledsapp` 2.1.5) and `332956a3…` (`pl-topologicalcopy` 1.0.13), and
-the pin `chrisomatic/benchmark.yml` (sha256 `3ec92f12…`). Host as on 2026-10-21: kernel
-7.0.0-38, Docker 29.9.1, Compose 5.6.0. "Duplicates" counts pfcon's `container name … is already
-in use` errors, as above.
+plugins from `benchmarks/chrisomatic/benchmark.yml`, by the index digests of the images the
+earlier runs ran under untagged references, and the harness refuses to start unless CUBE holds
+exactly those registrations ([`../envelope.md`](../envelope.md) § "Pinned workload plugin
+versions"). All five ran at 0677a9c on a clean tree (`git.dirty` false), each on a fresh stack
+(`just bench-nuke`, `just bench-start`) with every envelope knob at its default; `just
+bench-start` pulled nothing, and every run records one version of each plugin on the images
+`1c451a28…` (`dbg-bigfiles` 1.0.0), `5f2bf3a1…` (`pl-simpledsapp` 2.1.5) and `332956a3…`
+(`pl-topologicalcopy` 1.0.13), and the pin `benchmarks/chrisomatic/benchmark.yml` (sha256
+`3ec92f12…`). Host as on 2026-10-21: kernel 7.0.0-38, Docker 29.9.1, Compose 5.6.0. "Duplicates"
+counts pfcon's `container name … is already in use` errors, as above.
 
 | Run | Commit | Command (`just bench-run --tier ...`) | Result |
 |---|---|---|---|
@@ -363,7 +365,7 @@ Against their 2026-10-21 baselines (`033213Z`, `033616Z` and `041947Z`, `035538Z
 `bench-compare` calls every pair a caution for `workload_plugins.image` alone (those runs
 recorded no image) and flags no makespan apart from linear · feeds = 64, whose verdict the
 duplicate-submission race flipped; its p95 flags go both ways (seven regressed, two improved),
-six of them on levels of 25 to 52 measured requests. Every failure is a `cancelled:inst-*`
+six of them on levels of 8 to 18 measured requests. Every failure is a `cancelled:inst-*`
 criterion in a run whose pfcon log has duplicates. These runs are the baselines for these four
 commands from here on. Earlier runs, provisioned by an edited `chrisomatic.yml`, record untagged
 `dock_image`s and no image; against them `bench-compare` reports `workload_plugins.image` as a

@@ -21,7 +21,7 @@ commands used to generate each result.
 ## Quick start
 
 ```bash
-just bench-start                 # bring up the fslink stack with the uvicorn envelope + pinned plugins
+just bench-start                 # bring up the fslink compose stack, uvicorn envelope + pinned plugins
 just bench-run --tier smoke      # ~2 min sanity sweep
 just bench-run --tier default    # ~15-30 min directional sweep (laptop)
 just bench-run --tier full       # overnight breaking-point sweep on a dedicated Linux box
@@ -31,7 +31,7 @@ just bench-archive <run_id>      # keep a run's small artifacts in version contr
 just bench-test                  # run the harness unit tests in-container
 just bench-locust '-u 100 -t 3m' # control-plane RED load test (Locust); CSVs -> results/locust/
 just bench-down                  # stop the stack
-just bench-nuke                  # stop it and remove all its data (the dev stack's too: shared volumes)
+just bench-nuke                  # stop it and remove its data (the dev stack's too: shared)
 just bench-bash                  # shell in the benchmark container (debugging)
 just bench-compose <args>        # low-level compose helper the other bench-* recipes wrap
 ```
@@ -81,7 +81,7 @@ asynchronous, and without the gate its churn would contaminate the next level's 
 
 Three topologies (`linear`, `fanout_fanin`, `diamond`) are built from `dbg-bigfiles` (fs
 root), `pl-simpledsapp` (ds), and `pl-topologicalcopy` (ts merge) — all registered by
-`just bench-start` from the committed pin, `chrisomatic/benchmark.yml`.
+`just bench-start` from the committed pin, `benchmarks/chrisomatic/benchmark.yml`.
 
 ## Reading the results
 
@@ -252,7 +252,7 @@ a stack you can `just nuke` afterwards.
   limits dominate the per-container envelope, so laptop numbers are directional only.
 - **The workload plugins are pinned.** `just bench-start` registers `dbg-bigfiles` 1.0.0,
   `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13 by image digest from
-  `chrisomatic/benchmark.yml`, not from the dev stack's `chrisomatic.yml` (which takes
+  `benchmarks/chrisomatic/benchmark.yml`, not from the dev stack's `chrisomatic.yml` (which takes
   `pl-topologicalcopy` from the ChRIS store, now a no-op 2.0.0). The harness refuses to start
   unless CUBE holds exactly those registrations, one version each, and records them, their
   images and the pin under `workload_plugins` in `environment.json`. The dev and benchmark

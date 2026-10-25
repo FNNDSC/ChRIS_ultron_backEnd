@@ -4,6 +4,7 @@ workload-plugin pin.
 """
 
 import hashlib
+import re
 from dataclasses import replace
 
 import pytest
@@ -130,22 +131,45 @@ def test_committed_pin_names_the_workload_plugins_by_digest():
                for p in pins.plugins.values())
 
 
+def _pulled_refs(text):
+    """
+    The references `just bench-pull-plugins` reads from a pin, as its sed and tr do: each
+    line without its comment and trailing space, what follows `dock_image:`, unquoted.
+    """
+    refs = []
+
+    for line in text.splitlines():
+        line = re.sub(r"\s*#.*$", "", line).rstrip()
+        match = re.match(r"^[ -]*dock_image:\s*(.*)$", line)
+        if match:
+            refs.append(match.group(1).replace('"', "").replace("'", ""))
+    return refs
+
+
+def test_the_pull_recipe_reads_a_reference_past_comments_quotes_and_crlf():
+    text = ("    # dock_image: commented/out\n"
+            "      dock_image: fnndsc/x@sha256:abc   # 1.0.0\r\n"
+            '    - dock_image: "alpine:3.20"\n')
+    expected = ["fnndsc/x@sha256:abc", "alpine:3.20"]
+
+    assert _pulled_refs(text) == expected  # nosec B101 - pytest assertion
+
+
 def test_committed_pin_keeps_to_what_chrisomatic_and_the_pull_recipe_read():
     # BaseLoader reads more than chrisomatic's StrictYAML does (flow style, anchors, any
-    # key), and `just bench-pull-plugins` takes each dock_image from a line of its own
+    # key), and `just bench-pull-plugins` reads the references line by line
     text = DEFAULT_PINS.read_text()
     code = [line.split("#", 1)[0] for line in text.splitlines()]
-    doc = yaml.load(text, Loader=yaml.BaseLoader)
+    doc = yaml.load(text, Loader=yaml.BaseLoader)  # nosec B506 - BaseLoader: strings only
     allowed = {"name", "version", "dock_image", "public_repo", "compute_resource"}
-    images = [line.split("dock_image:", 1)[1].strip() for line in code
-              if "dock_image:" in line]
+    pinned = [p.dock_image for p in load_pins().plugins.values()]
+    flow = [line for line in code if set(line) & set("{}[]&*")]
 
-    assert not [line for line in code if set(line) & set("{}[]&*")]  # nosec B101 - pytest assertion
+    assert flow == []  # nosec B101 - pytest assertion
     assert all(set(entry) <= allowed  # nosec B101 - pytest assertion
                for entry in doc["cube"]["plugins"])
     assert doc["on"]["public_store"] == ""  # nosec B101 - pytest assertion
-    assert images == [p.dock_image  # nosec B101 - pytest assertion
-                      for p in load_pins().plugins.values()]
+    assert _pulled_refs(text) == pinned  # nosec B101 - pytest assertion
 
 
 def test_load_pins_keeps_versions_as_strings_and_skips_bare_entries(tmp_path):
@@ -157,10 +181,16 @@ def test_load_pins_keeps_versions_as_strings_and_skips_bare_entries(tmp_path):
 
     assert pins.plugins == {  # nosec B101 - pytest assertion
         "pl-x": PluginPin("pl-x", "1.10", "fnndsc/pl-x:1.10")}
+    digest = hashlib.sha256(p.read_bytes()).hexdigest()
+
     # outside the repository, the path reads as given
     assert pins.path == str(p)  # nosec B101 - pytest assertion
-    assert pins.sha256 == hashlib.sha256(p.read_bytes()).hexdigest()  # nosec B101 - pytest assertion
-    assert pins.record() == {"path": str(p), "sha256": pins.sha256}  # nosec B101 - pytest assertion
+    assert pins.sha256 == digest  # nosec B101 - pytest assertion
+    assert pins.record() == {"path": str(p), "sha256": digest}  # nosec B101 - pytest assertion
+
+
+def test_load_pins_takes_a_file_name_in_the_pin_directory_as_bench_start_does():
+    assert load_pins("benchmark.yml") == load_pins()  # nosec B101 - pytest assertion
 
 
 def test_load_pins_rejects_incomplete_and_duplicate_entries(tmp_path):
@@ -176,3 +206,12 @@ def test_load_pins_rejects_incomplete_and_duplicate_entries(tmp_path):
 
     with pytest.raises(ValueError, match="pinned twice"):
         load_pins(p)
+
+
+def test_load_pins_rejects_a_file_that_is_not_a_chrisomatic_spec(tmp_path):
+    p = tmp_path / "pin.yml"
+
+    for text in ("- a list\n", "cube: plugins\n", "cube:\n  plugins: dbg-bigfiles\n", ""):
+        p.write_text(text)
+        with pytest.raises(ValueError, match="no cube.plugins list"):
+            load_pins(p)

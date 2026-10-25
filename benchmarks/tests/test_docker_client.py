@@ -4,6 +4,8 @@ Tests for benchmarks.docker_client — the image record of a workload plugin.
 
 from types import SimpleNamespace
 
+from docker.errors import APIError, ImageNotFound
+
 from benchmarks.docker_client import DockerClient, image_record
 
 
@@ -13,8 +15,14 @@ def _client(docker):
     return client
 
 
-def _missing(ref):
-    raise LookupError(ref)                               # what images.get does, roughly
+def _images(get):
+    return _client(SimpleNamespace(images=SimpleNamespace(get=get)))
+
+
+def _raise(error):
+    def get(ref):
+        raise error
+    return get
 
 
 def test_image_record_sorts_the_digests_and_keeps_the_architecture():
@@ -37,15 +45,23 @@ def test_image_record_of_an_image_without_digests():
 
 
 def test_image_info_is_none_without_docker_a_reference_or_the_image():
-    client = _client(SimpleNamespace(images=SimpleNamespace(get=_missing)))
+    client = _images(_raise(ImageNotFound("no such image")))
 
     assert _client(None).image_info("fnndsc/x") is None  # nosec B101 - pytest assertion
     assert client.image_info(None) is None  # nosec B101 - pytest assertion
     assert client.image_info("fnndsc/x") is None  # nosec B101 - pytest assertion
 
 
+def test_image_info_reports_an_error_rather_than_an_absent_image():
+    # a Docker API failure is not "not present": the caller says what went wrong
+    info = _images(_raise(APIError("500 Server Error"))).image_info("fnndsc/x")
+
+    assert "500 Server Error" in info["error"]  # nosec B101 - pytest assertion
+
+
 def test_image_info_records_the_image_a_reference_resolves_to():
     image = SimpleNamespace(id="sha256:3329", attrs={"RepoDigests": ["fnndsc/x@sha256:35"]})
-    client = _client(SimpleNamespace(images=SimpleNamespace(get={"fnndsc/x@sha256:35": image}.get)))
+    client = _images({"fnndsc/x@sha256:35": image}.get)
+    record = client.image_info("fnndsc/x@sha256:35")
 
-    assert client.image_info("fnndsc/x@sha256:35")["image_id"] == "sha256:3329"  # nosec B101 - pytest assertion
+    assert record["image_id"] == "sha256:3329"  # nosec B101 - pytest assertion

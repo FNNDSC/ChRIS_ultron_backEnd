@@ -24,12 +24,12 @@ Run via ``just bench-compare <run> <run> [...]``; run ids resolve against both
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
 from .models import RunData
-from .report import csv_cell, markdown_table
+from .report import csv_cell, markdown_table, record_digests
 from .results import default_results_root, load_run, resolve_run
 
 
@@ -240,12 +240,10 @@ def _workload_plugin_diffs(base: dict, cand: dict) -> list[FieldDiff]:
     """
     Differences in the workload plugins, per role: another name or version is another
     workload (a blocker, like the matrix fingerprint); another image reference is
-    information, and other image digests a caution (the same version rebuilt, or a local
-    build). Only a digest's hex part counts: a RepoDigest can carry another repository's
-    name for the same image.
+    information, unless both name digests that differ, and other image digests a caution
+    (the same version rebuilt, or a local build).
     """
     unrecorded = _unrecorded("workload_plugins", base, cand)
-
     if unrecorded is not None:
         return unrecorded
 
@@ -255,15 +253,14 @@ def _workload_plugin_diffs(base: dict, cand: dict) -> list[FieldDiff]:
 
     def digests(plugins: dict) -> dict:
         # on overlay2 a local build has none
-        return {f"{role}.digests": " ".join(sorted(
-                    {d.rpartition("@")[2] for d in p["image"].get("repo_digests") or []}))
-                or "none"
+        return {f"{role}.digests": " ".join(record_digests(p["image"])) or "none"
                 for role, p in plugins.items() if (p or {}).get("image")}
 
     diffs = _block_diffs("workload_plugins", flat(base, "name", "version"),
                          flat(cand, "name", "version"), BLOCKER)
-    diffs += _block_diffs("workload_plugins", flat(base, "dock_image"),
-                          flat(cand, "dock_image"), INFO)
+    diffs += [replace(d, severity=WARNING) if _other_digests(d.baseline, d.candidate) else d
+              for d in _block_diffs("workload_plugins", flat(base, "dock_image"),
+                                    flat(cand, "dock_image"), INFO)]
 
     base_digests, cand_digests = digests(base), digests(cand)
     unrecorded = _unrecorded("workload_plugins.image", base_digests, cand_digests)
@@ -271,6 +268,16 @@ def _workload_plugin_diffs(base: dict, cand: dict) -> list[FieldDiff]:
     if unrecorded is not None:
         return diffs + unrecorded
     return diffs + _block_diffs("workload_plugins", base_digests, cand_digests, WARNING)
+
+
+def _other_digests(a, b) -> bool:
+    """
+    Return ``True`` when both image references include SHA-256 digests and those digests
+    differ; otherwise return ``False``.
+    """
+    a, b = (ref.rpartition("@")[2] if isinstance(ref, str) and "@sha256:" in ref else None
+            for ref in (a, b))
+    return a is not None and b is not None and a != b
 
 
 def _limits_diffs(base: dict, cand: dict) -> list[FieldDiff]:

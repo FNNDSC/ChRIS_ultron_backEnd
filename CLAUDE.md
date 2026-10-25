@@ -48,7 +48,7 @@ just prefer docker|podman          # persist engine choice (.preference)
 just dev-uvicorn          # serve via ASGI on :8000 (runserver is WSGI and cannot serve WebSockets)
 
 just bench-start / bench-run --tier smoke / bench-test / bench-down   # benchmarks/ harness (pytest)
-just bench-nuke           # bench-down, then reap jobs and remove volumes (the dev stack's too: shared)
+just bench-nuke           # bench-down, reap jobs, remove volumes (the dev stack's too)
 ```
 
 The dev API is at http://localhost:8000/api/v1/ (superuser `chris`/`chris1234`, user
@@ -65,10 +65,11 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   `celery.contrib.testing.worker.start_worker(celery_app)` after setting
   `celery_app.conf.update(task_routes=None)`, so tasks land on the default `celery` queue, which
   is reserved for tests (see `core/celery.py`). `core/testrunner.py` terminates leftover DB
-  connections so the test database can be dropped (only when the run created one).
-- `core/tests/test_cache.py` runs against the stack's cache Dragonfly (`dragonfly-cache`, database
-  0), which a running dev stack also uses: its tests use names of their own and short TTLs, and never call
-  `cache.clear()`. Its `CacheProxy` takes the server away mid-test (stopped or hung).
+  connections so the test database can be dropped (only when the run set up a test database).
+- `core/tests/test_cache.py` runs against the stack's cache Dragonfly (`dragonfly-cache`,
+  database 0), which a running dev stack also uses: its tests use names of their own and short
+  TTLs, and never call `cache.clear()`. Its `CacheProxy` takes the server away mid-test (stopped
+  or hung).
 - `core.storage.helpers.mock_storage(target_settings)` swaps the storage backend for a temp
   directory. `core/tests/test_swiftmanager.py` and `test_s3manager.py` need the matching
   `just set-storage` environment.
@@ -82,10 +83,10 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   hard-coded service hostnames that match compose network aliases: `chris_dev_db`,
   `pfcon.remote`, `nats`, `dragonflydb`, `dragonfly-cache`, `lldap`), `production.py`
   (everything via `get_secret` from env; missing vars raise `ImproperlyConfigured`),
-  `benchmark.py` (local + env-driven DB
-  pool). Both `local` and `production` verify the storage connection at import time, and the
-  cache's with `core.cache.verify_cache_connection`, which raises only for a wrong
-  configuration and only warns when Dragonfly does not answer, so CUBE starts without it.
+  `benchmark.py` (local + env-driven DB pool). Both `local` and `production` verify the storage
+  connection at import time, and the cache's with `core.cache.verify_cache_connection`, which
+  raises only for a wrong configuration and only warns when Dragonfly does not answer, so CUBE
+  starts without it.
 - `manage.py` and `core/celery.py` default to `config.settings.local`; `config/asgi.py`
   defaults to `production`. The ASGI app routes HTTP to Django and WebSockets through
   `core/websockets/` (token-in-query-string auth).
@@ -124,11 +125,12 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
 
 ### Shared cache (`core/cache.py`)
 - `CACHES['default']` is Django's `RedisCache` on a Dragonfly of its own, `dragonfly-cache`,
-  apart from the broker `dragonflydb` (database 0 Celery, 1 the event streams): `KEY_PREFIX`
-  `cube`, 0.5 s socket timeouts, no retries. It runs with `--cache_mode` (evicts when full)
-  and no snapshot (starts empty), so anything in it may vanish. `LOCATION` comes from
+  apart from the broker `dragonflydb` (database 0 Celery, 1 reserved for event streams):
+  `KEY_PREFIX` `cube`, 0.5 s socket timeouts, no retries. It runs with `--cache_mode` (evicts
+  when full) and no snapshot (starts empty), so anything in it may vanish. `LOCATION` comes from
   `CUBE_CACHE_URL` (local and benchmark, default `redis://dragonfly-cache:6379/0`) or
-  `CACHE_URL` (production, required); the start-up check refuses the broker's database.
+  `CACHE_URL` (production, required); the start-up check refuses the broker's server (whatever
+  the database), socket timeouts in the URL outside (0, 5] s, and a failed TLS handshake.
 - Coordinate processes through its helpers rather than a Redis client of your own:
   `acquire_lock`/`release_lock` (the release checks the owner's token), `mark_once`/
   `clear_mark`, and `acquire_slot`/`release_slot`, a bounded counter of expiring leases (a
@@ -137,7 +139,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   and `mark_once` returns true, so what they guard must be safe to run twice. Each process
   then skips the cache for 5 s, logs one WARNING per outage and one INFO when it answers again,
   and replays the releases and clears it could not send. An error reply (out of memory, a key
-  of the wrong type) is logged at ERROR and does not count as an outage.
+  of the wrong type) is logged at ERROR and does not count as an outage; the ones redis-py
+  raises as connection errors (authentication, loading, too many clients) do.
 - Django's `RedisCache` builds a new connection pool, and so a new connection, for each request
   of the API (Django ticket #35651); Celery workers keep one per process.
 
@@ -170,7 +173,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   chrisomatic (`chrisomatic/chrisomatic.yml`) registers the `host` compute resource, users, and
   the plugin list on every `just`. `chrisomatic/postscript.yml` is an optional larger set.
   `just bench-start` registers the benchmark's workload plugins instead from the committed,
-  digest-pinned `benchmarks/chrisomatic/benchmark.yml` (or a named `*.local.yml` beside it), and
+  digest-pinned `benchmarks/chrisomatic/benchmark.yml` (or another file there it is given, such
+  as a git-ignored `*.local.yml`), and
   the harness refuses to run unless CUBE holds exactly those registrations
   (`benchmarks/envelope.md` § "Pinned workload plugin versions").
 - `Pipeline` = template graph of `PluginPiping`s with default piping parameters; a `Workflow`
@@ -209,8 +213,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
 - The `README.md` "Documentation" section (Sphinx under `docs/`) is marked outdated upstream; the
   OpenAPI schema generated by `just openapi` is the current API reference.
 - `docker-compose.yml` comments flag hostnames and ports that are hard-coded in
-  `config/settings/local.py`, `chrisomatic/*.yml` and `benchmarks/chrisomatic/*.yml`; change them
-  together.
+  `config/settings/local.py`, `chrisomatic/*.yml`, `benchmarks/chrisomatic/*.yml` and, for the
+  two Dragonfly services, the benchmark harness; change them together.
 - Both Dockerfiles bind-mount `pyproject.toml`/`uv.lock` (`RUN --mount=type=bind`), so
   Podman must be 5.4 or above: `just check-builder` (a dependency of `build` and the
   `bench-*` recipes that build) refuses older Podman, and its comment says why. CI runs on

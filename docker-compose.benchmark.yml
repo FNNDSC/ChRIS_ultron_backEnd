@@ -16,7 +16,7 @@
 # manifest (the CPU and memory limits as the containers got them); the harness settings
 # (BENCH_*, credentials, CUBE_DB_POOL_STATS_INTERVAL) are not. See benchmarks/envelope.md.
 # Set them identically for `just bench-start` and `just bench-run`; 0 removes a CPU or memory
-# limit.
+# limit (a Dragonfly's CPUs only together with enough memory, see below).
 
 services:
 
@@ -84,7 +84,9 @@ services:
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
 
   # Dragonfly runs one thread per CPU it is given and keeps 80% of its memory limit as its
-  # maxmemory; without limits both follow the host.
+  # maxmemory; without limits both follow the host. It exits when that maxmemory is under
+  # 256 MiB per thread, so give each at least 320 MiB of memory per CPU (with 0 CPUs, per
+  # host CPU): 2 CPUs with 512m stop it and so do 0 CPUs with the default memory.
   dragonflydb:
     cpus: ${CUBE_BROKER_CPUS:-2}
     mem_limit: ${CUBE_BROKER_MEM_LIMIT:-1g}

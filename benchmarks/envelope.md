@@ -60,7 +60,11 @@ recovery check reads (`0` disables them). It is instrumentation and is not recor
 **The broker and the cache:** Dragonfly runs twice, as the Celery broker (`dragonflydb`) and
 as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
 given and keeps 80% of its memory limit as its `maxmemory`, so without the limits above both
-would follow the host (16 threads and about 92 GiB on the benchmark box). The 2026-10-20 runs on
+would follow the host (16 threads and about 92 GiB on the benchmark box). It exits at start-up
+when that `maxmemory` is under 256 MiB per thread, so change a Dragonfly's CPUs together with
+its memory, at least 320 MiB per CPU: 2 CPUs with `512m` stop it, and so do `0` CPUs (one
+thread per host CPU) with the default memory. A Dragonfly that exits stops `just bench-start`
+at its migrate step, since every CUBE service waits for both to be healthy. The 2026-10-20 runs on
 v2.0.2 peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
 `worker-periodic`, so the limits leave room for what later issues add. Runs from before these
 limits have none of them, and `bench-compare` reports each as a caution against them; `0`
@@ -241,11 +245,12 @@ the dev stack's `chrisomatic/chrisomatic.yml` — with the ChRIS store lookup di
 | `pl-simpledsapp` 2.1.5 | `fnndsc/pl-simpledsapp@sha256:c4e87262…` | `latest` since 2026-02-25: 2.1.5 plus a README-only commit (the 2.1.5 tag is a separate build of the same code); amd64 only |
 | `pl-topologicalcopy` 1.0.13 | `fnndsc/pl-topologicalcopy@sha256:35cb5798…` | `latest`, the master build of the 1.0.13 commit (the 1.0.13 tag is the tag's own build of it); multi-arch |
 
-**Why digests.** The dev file registers `pl-topologicalcopy` by name from the public ChRIS store,
-which serves 2.0.0 under that name — a no-op image (`backplane/true`) with the same parameters —
-and does not hold 1.0.13; a run against 2.0.0 reads as a speed-up rather than a failure. A
-plugin's `latest` moves with every master commit, docs-only ones included, and a version tag is a
-build of its own. A digest is immutable: a pinned run executes exactly the image the pin names.
+**Why digests.** The dev file registers `pl-topologicalcopy` by name from the public ChRIS
+store, which serves 2.0.0 under that name — a no-op image (`backplane/true`) declaring the
+parameters the harness passes — and does not hold 1.0.13; a run against 2.0.0 reads as a
+speed-up rather than a failure. A plugin's `latest` moves with every master commit, docs-only
+ones included, and a version tag is a build of its own. A digest is immutable: a pinned run
+executes exactly the image the pin names.
 
 **What the harness checks.** chrisomatic does not verify versions (CUBE records the version the
 image reports), so the harness reads the same file and refuses to start, with one error that
@@ -253,14 +258,17 @@ lists every problem, unless each workload plugin has exactly one registered vers
 one under the pinned `dock_image`, and, where the harness can read the Docker daemon, its image
 is present (pfcon would otherwise pull it inside the first measured scenario). Exactly one,
 rather than the pinned one among several, because CUBE itself resolves `pl-topologicalcopy` by
-name. `just bench-run --plugins <path>` checks against another pin.
+name. `just bench-run --plugins <file name>` checks against another pin in
+`benchmarks/chrisomatic/` (or one at a path).
 
 **Fresh volumes.** chrisomatic never removes a plugin, and CUBE refuses to register a version
-again under another image reference, so `just bench-start` fails, with a hint, on volumes that
-hold other registrations of these plugins: after a dev `just`, for one, since the dev and
-benchmark stacks are one compose project and share their volumes. `just bench-nuke` resets them
-(stack down, plugin-job containers reaped, volumes removed); it deletes the dev stack's data too
-(database, files, lldap, Orthanc, pfdcm).
+again under another image reference, or an image reference again: so `just bench-start` fails,
+with a hint, on volumes that already hold a pinned version or image under another registration,
+after a dev `just` for one (the dev and benchmark stacks are one compose project and share their
+volumes). Another version of a plugin, such as the store's 2.0.0, registers next to the pin, and
+the harness then refuses to start. `just bench-nuke` resets the volumes (stack down, plugin-job
+containers reaped, volumes removed); it deletes the dev stack's data too (database, files,
+lldap, Orthanc, pfdcm).
 
 **Pulling.** chrisomatic 1.0.0 cannot pull an image by digest, so `just bench-start` first pulls
 each image the pin names that is not present (`just bench-pull-plugins`); an image that is
@@ -274,8 +282,8 @@ chrisomatic's YAML forbids flow style, and `bench-pull-plugins` reads the refere
 **On an arm64 laptop.** `pl-simpledsapp` 2.1.4 and later have no arm64 image, so the committed
 pin stops at `bench-pull-plugins`. Write the laptop a pin of its own,
 `benchmarks/chrisomatic/<name>.local.yml` (git-ignored), naming its local builds, and pass it to
-both recipes: `just bench-start <name>.local.yml`, then `just bench-run --plugins
-benchmarks/chrisomatic/<name>.local.yml …`. When its entries name exactly the references a local
+both recipes, by its file name: `just bench-start <name>.local.yml`, then `just bench-run
+--plugins <name>.local.yml …`. When its entries name exactly the references a local
 edit of `chrisomatic.yml` registers for development, with `name` and `version` but no
 `public_repo`, chrisomatic finds either file's registrations and the two stacks share one database
 without a reset. Laptop runs are directional only.

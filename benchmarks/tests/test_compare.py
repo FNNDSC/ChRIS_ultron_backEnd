@@ -159,8 +159,10 @@ def test_db_broker_and_cache_image_differences_are_informational():
 def test_broker_image_missing_from_an_older_run_is_informational():
     c = check_comparability(_env(), _env(images={"dragonflydb": {"image_id": "sha256:b"}}))
 
+    diffs = [(d.field, d.severity) for d in c.diffs]
+
     assert c.status == "comparable"  # nosec B101 - pytest assertion
-    assert [(d.field, d.severity) for d in c.diffs] == [("images.dragonflydb", "info")]  # nosec B101 - pytest assertion
+    assert diffs == [("images.dragonflydb", "info")]  # nosec B101 - pytest assertion
 
 
 # -- delta classification ------------------------------------------------------------------
@@ -470,51 +472,86 @@ def test_render_markdown_echoes_policy_thresholds():
 
 # -- workload plugins --------------------------------------------------------------------
 
-def _plugins(version="1.0.13", dock_image="fnndsc/pl-topologicalcopy@sha256:35cb",
-             digests=("fnndsc/pl-topologicalcopy@sha256:35cb",)):
+DIGEST_REF = "fnndsc/pl-topologicalcopy@sha256:35cb"
+REFERENCE, DIGESTS = "workload_plugins.ts.dock_image", "workload_plugins.ts.digests"
+
+
+def _plugins(version="1.0.13", dock_image=DIGEST_REF, digests=(DIGEST_REF,),
+             name="pl-topologicalcopy"):
     image = (None if digests is None
              else {"image_id": "sha256:3329", "repo_digests": list(digests),
                    "architecture": "amd64"})
-    return {"ts": {"name": "pl-topologicalcopy", "version": version, "id": 3,
+    return {"ts": {"name": name, "version": version, "id": 3,
                    "dock_image": dock_image, "matches": 1, "image": image}}
 
 
-def _severities(c):
-    return {d.field: d.severity for d in c.diffs}
+def _severities(base, cand, **cand_env):
+    c = check_comparability(_env(workload_plugins=base),
+                            _env(workload_plugins=cand, **cand_env))
+    return c.status, {d.field: d.severity for d in c.diffs}
 
 
 def test_identical_workload_plugins_are_comparable():
-    c = check_comparability(_env(workload_plugins=_plugins()),
-                            _env(workload_plugins=_plugins()))
+    status, severities = _severities(_plugins(), _plugins())
 
-    assert c.status == "comparable" and c.diffs == ()  # nosec B101 - pytest assertion
+    assert (status, severities) == ("comparable", {})  # nosec B101 - pytest assertion
 
 
-def test_another_workload_plugin_version_is_a_blocker():
-    c = check_comparability(_env(workload_plugins=_plugins()),
-                            _env(workload_plugins=_plugins(version="2.0.0")))
+def test_another_workload_plugin_name_or_version_is_a_blocker():
+    for other, field in ((_plugins(version="2.0.0"), "workload_plugins.ts.version"),
+                         (_plugins(name="pl-other"), "workload_plugins.ts.name")):
+        status, severities = _severities(_plugins(), other)
 
-    assert c.status == "not_comparable"  # nosec B101 - pytest assertion
-    assert _severities(c) == {"workload_plugins.ts.version": "blocker"}  # nosec B101 - pytest assertion
+        assert status == "not_comparable"  # nosec B101 - pytest assertion
+        assert severities == {field: "blocker"}  # nosec B101 - pytest assertion
 
 
 def test_another_reference_to_the_same_image_is_information():
     # on overlay2 a RepoDigest can carry another repository's name for the same image
     other = _plugins(dock_image="localhost/pl-topologicalcopy",
                      digests=("localhost/pl-topologicalcopy@sha256:35cb",))
-    c = check_comparability(_env(workload_plugins=_plugins()), _env(workload_plugins=other))
+    status, severities = _severities(_plugins(), other)
 
-    assert c.status == "comparable"  # nosec B101 - pytest assertion
-    assert _severities(c) == {"workload_plugins.ts.dock_image": "info"}  # nosec B101 - pytest assertion
+    assert status == "comparable"  # nosec B101 - pytest assertion
+    assert severities == {REFERENCE: "info"}  # nosec B101 - pytest assertion
 
 
 def test_other_image_digests_or_a_local_build_are_a_caution():
     for digests in (("fnndsc/pl-topologicalcopy@sha256:2e1b",), ()):
-        c = check_comparability(_env(workload_plugins=_plugins()),
-                                _env(workload_plugins=_plugins(digests=digests)))
+        status, severities = _severities(_plugins(), _plugins(digests=digests))
 
-        assert c.status == "caution"  # nosec B101 - pytest assertion
-        assert _severities(c) == {"workload_plugins.ts.digests": "warning"}  # nosec B101 - pytest assertion
+        assert status == "caution"  # nosec B101 - pytest assertion
+        assert severities == {DIGESTS: "warning"}  # nosec B101 - pytest assertion
+
+
+def test_two_references_to_other_digests_are_a_caution_without_image_records():
+    # neither run could read Docker, but two digests name two images
+    other = _plugins(dock_image="fnndsc/pl-topologicalcopy@sha256:2e1b", digests=None)
+    status, severities = _severities(_plugins(digests=None), other)
+
+    assert status == "caution"  # nosec B101 - pytest assertion
+    assert severities == {REFERENCE: "warning"}  # nosec B101 - pytest assertion
+
+
+def test_images_recorded_for_some_roles_only_are_a_caution():
+    base = {**_plugins(), "fs": {**_plugins()["ts"], "name": "dbg-bigfiles"}}
+    cand = {**base, "fs": {**base["fs"], "image": None}}
+    status, severities = _severities(base, cand)
+
+    assert status == "caution"  # nosec B101 - pytest assertion
+    assert severities == {"workload_plugins.fs.digests": "warning"}  # nosec B101 - pytest assertion
+
+
+def test_another_pin_with_the_same_plugins_is_information():
+    pin = {"path": "benchmarks/chrisomatic/benchmark.yml", "sha256": "ab12"}
+    other = {"path": "benchmarks/chrisomatic/laptop.local.yml", "sha256": "cd34"}
+    c = check_comparability(_env(workload_plugins=_plugins(), workload_plugins_pin=pin),
+                            _env(workload_plugins=_plugins(), workload_plugins_pin=other))
+    severities = {d.field: d.severity for d in c.diffs}
+    expected = {"workload_plugins_pin.path": "info", "workload_plugins_pin.sha256": "info"}
+
+    assert c.status == "comparable"  # nosec B101 - pytest assertion
+    assert severities == expected  # nosec B101 - pytest assertion
 
 
 def test_a_baseline_without_image_records_gives_a_single_caution():
@@ -522,17 +559,17 @@ def test_a_baseline_without_image_records_gives_a_single_caution():
     baseline = _plugins(dock_image="fnndsc/pl-topologicalcopy", digests=None)
     del baseline["ts"]["image"]
     pin = {"path": "benchmarks/chrisomatic/benchmark.yml", "sha256": "ab12"}
-    c = check_comparability(_env(workload_plugins=baseline),
-                            _env(workload_plugins=_plugins(), workload_plugins_pin=pin))
+    status, severities = _severities(baseline, _plugins(), workload_plugins_pin=pin)
+    expected = {"workload_plugins.ts.dock_image": "info", "workload_plugins.image": "warning",
+                "workload_plugins_pin.path": "info", "workload_plugins_pin.sha256": "info"}
 
-    assert c.status == "caution"  # nosec B101 - pytest assertion
-    assert _severities(c) == {  # nosec B101 - pytest assertion
-        "workload_plugins.ts.dock_image": "info", "workload_plugins.image": "warning",
-        "workload_plugins_pin.path": "info", "workload_plugins_pin.sha256": "info"}
+    assert status == "caution"  # nosec B101 - pytest assertion
+    assert severities == expected  # nosec B101 - pytest assertion
 
 
 def test_a_run_before_workload_plugins_were_recorded_gives_a_single_caution():
     c = check_comparability(_env(), _env(workload_plugins=_plugins()))
+    diffs = [(d.field, d.baseline, d.candidate) for d in c.diffs]
+    expected = [("workload_plugins", "not recorded", "recorded")]
 
-    assert [(d.field, d.baseline, d.candidate) for d in c.diffs] == [  # nosec B101 - pytest assertion
-        ("workload_plugins", "not recorded", "recorded")]
+    assert diffs == expected  # nosec B101 - pytest assertion

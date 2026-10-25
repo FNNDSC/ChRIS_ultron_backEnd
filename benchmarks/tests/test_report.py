@@ -93,14 +93,32 @@ def test_render_workload_plugins_table():
                    "workload_plugins_pin": {"path": "benchmarks/chrisomatic/benchmark.yml",
                                             "sha256": "a73940e8bad12144d6b4"}}}
     md = render(summary, [])
+    fs_row = (f"| fs | dbg-bigfiles | 1.0.0 | fnndsc/dbg-bigfiles@{digest} "
+              "| sha256:b956e35ee69c | 1 |")
+    # a run from before the image records: an em dash
+    ts_row = "| ts | pl-topologicalcopy | 1.0.13 | fnndsc/pl-topologicalcopy | — | 1 |"
+    pin = "Pinned by `benchmarks/chrisomatic/benchmark.yml` (sha256 a73940e8bad1)."
 
     assert "### Workload plugins" in md  # nosec B101 - pytest assertion
-    assert (f"| fs | dbg-bigfiles | 1.0.0 | fnndsc/dbg-bigfiles@{digest} "  # nosec B101 - pytest assertion
-            "| sha256:b956e35ee69c | 1 |") in md
-    # a run from before the image records: an em dash
-    assert "| ts | pl-topologicalcopy | 1.0.13 | fnndsc/pl-topologicalcopy | — | 1 |" in md  # nosec B101 - pytest assertion
-    assert ("Pinned by `benchmarks/chrisomatic/benchmark.yml` "  # nosec B101 - pytest assertion
-            "(sha256 a73940e8bad1).") in md
+    assert fs_row in md  # nosec B101 - pytest assertion
+    assert ts_row in md  # nosec B101 - pytest assertion
+    assert pin in md  # nosec B101 - pytest assertion
+
+
+def test_render_shortens_each_digest_and_names_an_image_without_any():
+    def plugin(digests):
+        return {"name": "pl-x", "version": "1", "id": 1, "dock_image": "pl-x", "matches": 1,
+                "image": {"image_id": "sha256:aa", "repo_digests": digests}}
+
+    two = ["a/pl-x@sha256:" + "1" * 64, "b/pl-x@sha256:" + "0" * 64]
+    summary = {"run_id": "R", "tier": "smoke", "levels_run": 0, "breaking_points": [],
+               "environment": {"workload_plugins": {"fs": plugin(two), "ds": plugin([])}}}
+    md = render(summary, [])
+    digests = "sha256:000000000000, sha256:111111111111"
+
+    assert f"| pl-x | {digests} | 1 |" in md  # nosec B101 - pytest assertion
+    # a local build on overlay2
+    assert "| pl-x | none | 1 |" in md  # nosec B101 - pytest assertion
 
 
 def test_render_workload_plugins_of_a_run_before_the_pin():

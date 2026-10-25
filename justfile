@@ -21,7 +21,7 @@ storage := `if [ -f '.storage' ]; then cat .storage; else echo fslink; fi`
 # image build. Force it off with `just tty=false ...`.
 tty := `if [ -t 0 ]; then echo true; else echo false; fi`
 
-# Start the ChRIS backend in development mode, and attach to the live-reloading server.
+# Start the ChRIS backend in development mode and then attach to the live-reloading server.
 [group('(1) start-up')]
 dev: chrisomatic attach
 
@@ -40,9 +40,9 @@ attach: (docker-compose '--profile=cube attach chris | grep -Fv "\"GET /api/v1/u
 # `runserver` is WSGI here — channels is wired up in config/asgi.py, not INSTALLED_APPS —
 # so it cannot serve WebSockets at all, and `channels.testing` exercises the consumers
 # in-process. Neither reaches the uvicorn protocol stack production uses
-# (websockets-sansio since uvicorn 0.50); this recipe does, on the dev stack and dev
-# settings. `just bench-start` also runs uvicorn, but under the benchmark envelope.
-# Publishes host port 8000, so stop the dev server (`just down`) before running it.
+# (websockets-sansio since uvicorn 0.50); this recipe does on the dev stack and dev
+# settings. `just bench-start` also runs uvicorn but under the benchmark envelope.
+# Publishes host port 8000 therefore stop the dev server (`just down`) before running it.
 #
 # Serve CUBE with uvicorn (ASGI) on port 8000 instead of the dev `runserver`.
 [group('(3) development')]
@@ -167,8 +167,8 @@ get-engine:
       echo docker;                           \
     fi                                       \
 
-# This is every `user: ${UID}:${GID}` in the compose files, and pfcon's CONTAINER_USER for
-# plugin jobs. Under rootless Podman a container's root *is* the invoking user, and any
+# This is every `user: ${UID}:${GID}` in the compose files and pfcon's CONTAINER_USER for
+# plugin jobs. Under rootless Podman a container's root *is* the invoking user and any
 # other uid maps to a subordinate uid that cannot write into the working tree (`just lock`,
 # `just makemigrations`, coverage), so there it is root. Everywhere else it is the invoking
 # user.
@@ -184,9 +184,9 @@ get-user:
     fi
 
 # Podman must be 5.4 or above (the Dockerfiles, README, CLAUDE.md and ci.yml point
-# here): both Dockerfiles bind-mount pyproject.toml and uv.lock, and Buildah before 1.39
-# (the one in Podman before 5.4) leaves bind-mounted content out of its layer cache key, so
-# a rebuild after a lock change reuses the old layer and silently keeps the old
+# here): both Dockerfiles bind-mount pyproject.toml and uv.lock but Buildah before 1.39
+# (the one in Podman before 5.4) leaves bind-mounted content out of its layer cache key,
+# so a rebuild after a lock change reuses the old layer and silently keeps the old
 # dependencies (containers/buildah#5400). `podman info` reports the Buildah that builds,
 # the server's when Podman is remote. The recipes that rebuild an image depend on this.
 # `run` and `up` only build a missing image; on older Podman that build can still reuse a
@@ -208,8 +208,8 @@ check-builder:
       fi;                                                                                        \
     fi
 
-# chrisomatic sees benchmarks/chrisomatic/ only (docker-compose.benchmark.yml), so a pin is a
-# file name there.
+# chrisomatic sees benchmarks/chrisomatic/ only (docker-compose.benchmark.yml) so a pin
+# is a file name there.
 #
 # Fail unless a benchmark pin names a file in benchmarks/chrisomatic/.
 [group('helper function')]
@@ -295,22 +295,26 @@ bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
     just bench-compose '--profile cube run --rm chrisomatic chrisomatic /etc/chrisomatic-benchmark/{{ pins }}' \
         || { >&2 echo "[bench] chrisomatic failed. If a dev 'just' ran on these volumes, reset them with 'just bench-nuke' (it deletes the dev stack's data too) and run 'just bench-start' again."; exit 1; }
 
-# chrisomatic 1.0.0 cannot pull an image by digest (it splits the reference at its colon) but
-# registers one that is present, so pull what the pin names first. A reference that is
-# present is never pulled again, so a local build stays as it is. A short name is pulled
-# from docker.io explicitly, so Podman need not resolve it. A pin keeps each `dock_image:`
-# on a line of its own (chrisomatic's YAML forbids flow style).
+# chrisomatic 1.0.0 cannot pull an image by digest but registers one that is present, so
+# pull what the pin names first. A reference that is present is never pulled again.
+# A name without a registry is pulled from docker.io explicitly (docker.io/library/ for a 
+# one-part name), so Podman need not resolve it. A pin keeps each `dock_image:` on a line
+# of its own (chrisomatic's YAML forbids flow style); a comment after it is ignored.
 #
-# Pull the workload plugin images a benchmark pin names, unless present.
+# Pull the workload plugin images a benchmark pin names unless present.
 [group('(6) benchmarks')]
 bench-pull-plugins pins='benchmark.yml': (check-pins pins)
-    @for ref in $(sed -n 's/^[ -]*dock_image: *//p' 'benchmarks/chrisomatic/{{ pins }}' | tr -d "\"'"); do \
+    @for ref in $(sed -n -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' \
+        -e 's/^[ -]*dock_image:[[:space:]]*//p' 'benchmarks/chrisomatic/{{ pins }}' | tr -d "\"'"); do \
       $(just get-engine) image inspect "$ref" > /dev/null 2>&1 && continue; \
-      case "${ref%%/*}" in *.*|*:*|localhost) src="$ref";; *) src="docker.io/$ref";; esac; \
+      case "$ref" in */*) first="${ref%%/*}";; *) first="";; esac; \
+      case "$first" in \
+        *.*|*:*|localhost) src="$ref";; '') src="docker.io/library/$ref";; *) src="docker.io/$ref";; \
+      esac; \
       $(just get-engine) pull "$src" || exit 1; \
     done
 
-# The dev and benchmark stacks are one compose project, so this deletes the dev stack's data
+# The dev and benchmark stacks are one compose project so this deletes the dev stack's data
 # too (database, files, lldap, Orthanc, pfdcm). Stopping the stack first means no plugin-job
 # container is created after `nuke` reaps them.
 #

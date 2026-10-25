@@ -499,27 +499,43 @@ class ManifestDocker(JsonDocker):
 
 
 def test_collect_environment_records_postgres_settings_limits_and_images():
+    cache_url = "redis://dragonfly-cache:6379/0"
     env = collect_environment(ManifestDocker(SETTINGS_DOC),
                               env={"CUBE_DB_SYNCHRONOUS_COMMIT": "on",
-                                   "CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
+                                   "CUBE_CACHE_URL": cache_url})
+    ids = {service: image["image_id"] for service, image in env["images"].items()}
+    knobs = env["envelope"]
 
     assert env["postgres"]["settings"]["max_wal_size"] == "8GB"  # nosec B101 - pytest assertion
-    assert env["images"]["db"]["image_id"] == "sha256:db"  # nosec B101 - pytest assertion
-    assert env["images"]["dragonflydb"]["image_id"] == "sha256:dragonflydb"  # nosec B101 - pytest assertion
-    assert env["images"]["dragonfly-cache"]["image_id"] == "sha256:dragonfly-cache"  # nosec B101 - pytest assertion
+    assert ids["db"] == "sha256:db"  # nosec B101 - pytest assertion
+    assert ids["dragonflydb"] == "sha256:dragonflydb"  # nosec B101 - pytest assertion
+    assert ids["dragonfly-cache"] == "sha256:dragonfly-cache"  # nosec B101 - pytest assertion
     assert env["limits"]["db"]["shm_size"] == 1073741824  # nosec B101 - pytest assertion
-    assert env["envelope"]["CUBE_DB_SYNCHRONOUS_COMMIT"] == "on"  # nosec B101 - pytest assertion
-    assert env["envelope"]["CUBE_CACHE_URL"] == "redis://dragonfly-cache:6379/0"  # nosec B101 - pytest assertion
-    assert set(env["envelope"]) == set(ENVELOPE_KEYS)  # nosec B101 - pytest assertion
+    assert knobs["CUBE_DB_SYNCHRONOUS_COMMIT"] == "on"  # nosec B101 - pytest assertion
+    assert knobs["CUBE_CACHE_URL"] == cache_url  # nosec B101 - pytest assertion
+    assert set(knobs) == set(ENVELOPE_KEYS)  # nosec B101 - pytest assertion
 
 
 def test_the_envelope_masks_a_password_in_a_url():
     knobs = envelope({"CUBE_CACHE_URL": "redis://user:s3cret@cache:6379/0",
                       "CUBE_DEBUG": "false"})
+    masked = knobs["CUBE_CACHE_URL"]
 
-    assert knobs["CUBE_CACHE_URL"] == "redis://user:***@cache:6379/0"  # nosec B101 - pytest assertion
+    assert masked == "redis://user:***@cache:6379/0"  # nosec B101 - pytest assertion
     assert knobs["CUBE_DEBUG"] == "false"  # nosec B101 - pytest assertion
     assert knobs["CUBE_UVICORN_WORKERS"] is None  # nosec B101 - pytest assertion
+
+
+def test_the_envelope_masks_the_passwords_redis_py_reads_from_the_url():
+    for url, expected in (
+            ("redis://:s3cret@cache:6379/0", "redis://:***@cache:6379/0"),
+            ("redis://cache:6379/0?password=s3cret&socket_timeout=1",
+             "redis://cache:6379/0?password=***&socket_timeout=1"),
+            ("rediss://cache:6379/0?ssl_password=k3y", "rediss://cache:6379/0?ssl_password=***"),
+            ("redis://cache:6379/0?db=0", "redis://cache:6379/0?db=0")):
+        masked = envelope({"CUBE_CACHE_URL": url})["CUBE_CACHE_URL"]
+
+        assert masked == expected  # nosec B101 - pytest assertion
 
 
 # -- against the stack's own Postgres --------------------------------------------------------

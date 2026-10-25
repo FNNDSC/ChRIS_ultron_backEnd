@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
@@ -57,10 +58,19 @@ def envelope(env: os._Environ | dict) -> dict:
 
 def _without_password(value):
     parts = urlsplit(value) if value and "://" in value else None
-    if parts is None or parts.password is None:
+    if parts is None:
         return value
-    netloc = parts.netloc.replace(f":{parts.password}@", ":***@", 1)
-    return urlunsplit(parts._replace(netloc=netloc))
+
+    netloc = parts.netloc
+    if parts.password is not None:
+        netloc = netloc.replace(f":{parts.password}@", ":***@", 1)
+
+    # redis-py also takes the password, and the TLS key's, from the query string
+    query = re.sub(r"(^|&)((?:ssl_)?password)=[^&]*", r"\1\2=***", parts.query)
+
+    if (netloc, query) == (parts.netloc, parts.query):
+        return value
+    return urlunsplit(parts._replace(netloc=netloc, query=query))
 
 
 def postgres_settings(docker: DockerClient) -> dict:

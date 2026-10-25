@@ -186,18 +186,29 @@ def load_pins(path: "str | Path | None" = None) -> PluginPins:
     """
     Load the pinned workload plugins from a chrisomatic file: the entries of its
     ``cube.plugins`` that are mappings, each with a name, version and dock_image (a bare
-    image or name pins nothing).
+    image or name pins nothing). ``path`` is a file name in ``benchmarks/chrisomatic/``,
+    as ``just bench-start`` takes it, or a path.
 
     chrisomatic reads the file as StrictYAML, where every value is a string; so does this,
     since PyYAML's ``safe_load`` would read the ``on:`` key as ``True`` and a version like
     ``1.10`` as the float ``1.1``.
     """
     path = Path(path) if path else DEFAULT_PINS
+
+    if not path.is_absolute() and len(path.parts) == 1:
+        path = DEFAULT_PINS.parent / path
+
     raw = path.read_bytes()
-    doc = yaml.load(raw, Loader=yaml.BaseLoader) or {}
+    doc = yaml.load(raw, Loader=yaml.BaseLoader)  # nosec B506 - BaseLoader: strings only
+    cube = doc.get("cube") if isinstance(doc, dict) else None
+    entries = cube.get("plugins") if isinstance(cube, dict) else None
+
+    if not isinstance(entries, list):
+        raise ValueError(f"{path}: no cube.plugins list, so not a chrisomatic file")
+
     plugins: dict[str, PluginPin] = {}
 
-    for entry in (doc.get("cube") or {}).get("plugins") or []:
+    for entry in entries:
         if not isinstance(entry, dict):
             continue
 

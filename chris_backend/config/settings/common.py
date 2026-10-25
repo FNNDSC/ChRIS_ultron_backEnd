@@ -138,9 +138,12 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'KEY_PREFIX': 'cube',
         'OPTIONS': {
-            # redis-py waits forever by default so a hung server would hang every cache
-            # call. No retries: a SET NX retried after a lost reply can find its own key
-            # and the pool already replaces a connection the server has closed.
+            # redis-py waits forever by default (without a timeout) so a hung server
+            # would hang every cache call. 
+            # Automatic Redis-command retries are disabled. If a lock request 
+            # succeeds but its reply is lost, a retry would find the lock it already 
+            # created and appear to fail. The connection pool automatically opens a new 
+            # connection when Redis closes the old one.
             'socket_connect_timeout': 0.5,
             'socket_timeout': 0.5,
         },

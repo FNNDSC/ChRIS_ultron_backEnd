@@ -11,11 +11,12 @@ from benchmarks.config import PluginPin, PluginPins, load_pins, load_tier
 from benchmarks.models import (Classification, LevelResult, PluginRole, PollResult,
                                ScenarioParams, ScenarioResult, StatusTimeline, Verdict)
 from benchmarks.results import ResultsStore
+from benchmarks.chris_api import ChrisApiError, HttpResult
 from benchmarks.run_bench import (RUN_STATS_SETTLE_S, BenchmarkRunner, _filter_tier,
                                   _level_row, _override_baseline, apply_build_errors,
                                   build_workload_manifest, effective_poll_cadence,
                                   make_scenario_params, pin_mismatch_message,
-                                  pin_mismatches)
+                                  pin_mismatches, resolve_plugin)
 
 
 # -- scenario params -------------------------------------------------------------------
@@ -362,103 +363,205 @@ def _pinned_registrations(pins=PINS):
             for p in pins.plugins.values()}
 
 
+def _mismatches(plugins, images=None, docker_available=False):
+    return pin_mismatches(plugins, PINS, images or {}, docker_available=docker_available)
+
+
 def test_build_workload_manifest_carries_versions_and_images_keyed_by_role():
     m = build_workload_manifest(_pinned_registrations(), {PluginRole.FS: IMAGE})
+    expected = {"name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
+                "dock_image": "fnndsc/dbg-bigfiles@sha256:b956", "matches": 1,
+                "image": IMAGE}
 
-    assert m["fs"] == {  # nosec B101 - pytest assertion
-        "name": "dbg-bigfiles", "version": "1.0.0", "id": 1,
-        "dock_image": "fnndsc/dbg-bigfiles@sha256:b956", "matches": 1, "image": IMAGE}
+    assert m["fs"] == expected  # nosec B101 - pytest assertion
     # Docker could not tell
     assert m["ts"]["image"] is None  # nosec B101 - pytest assertion
 
 
 def test_the_pinned_registrations_with_their_images_present_match():
     images = dict.fromkeys(_pinned_registrations(), IMAGE)
+    problems = _mismatches(_pinned_registrations(), images, docker_available=True)
 
-    assert pin_mismatches(_pinned_registrations(), PINS, images,  # nosec B101 - pytest assertion
-                          docker_available=True) == []
+    assert problems == []  # nosec B101 - pytest assertion
 
 
 def test_another_registered_version_is_a_mismatch_naming_both():
     # e.g. the ChRIS store's no-op 2.0.0, registered by a dev `just` on the same volumes
     plugins = _pinned_registrations()
-    plugins[PluginRole.TS] = _registered("pl-topologicalcopy", "2.0.0", "docker.io/backplane/true",
+    plugins[PluginRole.TS] = _registered("pl-topologicalcopy", "2.0.0",
+                                         "docker.io/backplane/true",
                                          matches=2, installed=["2.0.0", "1.0.13"])
+    expected = ["pl-topologicalcopy has 2 versions registered (2.0.0, 1.0.13), "
+                "not only the pinned 1.0.13"]
 
-    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
-        "pl-topologicalcopy has 2 versions registered (2.0.0, 1.0.13), not only the pinned "
-        "1.0.13"]
+    assert _mismatches(plugins) == expected  # nosec B101 - pytest assertion
 
 
 def test_another_version_or_image_reference_is_a_mismatch():
     plugins = _pinned_registrations()
     plugins[PluginRole.FS] = _registered("dbg-bigfiles", "1.0.1", "localhost/dbg-bigfiles")
+    expected = ["dbg-bigfiles 1.0.1 is registered, 1.0.0 is pinned",
+                "dbg-bigfiles is registered as localhost/dbg-bigfiles, pinned as "
+                "fnndsc/dbg-bigfiles@sha256:b956"]
 
-    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
-        "dbg-bigfiles 1.0.1 is registered, 1.0.0 is pinned",
-        "dbg-bigfiles is registered as localhost/dbg-bigfiles, pinned as "
-        "fnndsc/dbg-bigfiles@sha256:b956"]
+    assert _mismatches(plugins) == expected  # nosec B101 - pytest assertion
 
 
 def test_an_absent_image_is_a_mismatch_only_when_docker_can_tell():
     plugins = _pinned_registrations()
     images = {PluginRole.FS: IMAGE}                      # the ts image is not present
+    expected = ["pl-topologicalcopy's image fnndsc/pl-topologicalcopy@sha256:35cb is "
+                "not present"]
 
-    assert pin_mismatches(plugins, PINS, images, docker_available=True) == [  # nosec B101 - pytest assertion
-        "pl-topologicalcopy's image fnndsc/pl-topologicalcopy@sha256:35cb is not present"]
-    assert pin_mismatches(plugins, PINS, images,  # nosec B101 - pytest assertion
-                          docker_available=False) == []
+    assert _mismatches(plugins, images, True) == expected  # nosec B101 - pytest assertion
+    assert _mismatches(plugins, images, False) == []  # nosec B101 - pytest assertion
 
 
-def test_an_unpinned_workload_plugin_is_a_mismatch():
+def test_an_image_docker_could_not_read_is_a_mismatch_with_its_error():
+    images = {PluginRole.FS: IMAGE, PluginRole.TS: {"error": "500 Server Error"}}
+    problems = _mismatches(_pinned_registrations(), images, docker_available=True)
+
+    assert len(problems) == 1  # nosec B101 - pytest assertion
+    assert "could not be read: 500 Server Error" in problems[0]  # nosec B101 - pytest assertion
+
+
+def test_an_unpinned_or_unregistered_workload_plugin_is_a_mismatch():
     plugins = _pinned_registrations()
     plugins[PluginRole.DS] = _registered("pl-simpledsapp", "2.1.5", "fnndsc/pl-simpledsapp")
+    plugins[PluginRole.FS] = _registered("dbg-bigfiles", None, None, matches=0)
+    expected = ["dbg-bigfiles is not registered",
+                "pl-simpledsapp is not pinned in benchmarks/chrisomatic/benchmark.yml"]
 
-    assert pin_mismatches(plugins, PINS, {}, docker_available=False) == [  # nosec B101 - pytest assertion
-        "pl-simpledsapp is not pinned in benchmarks/chrisomatic/benchmark.yml"]
+    assert sorted(_mismatches(plugins)) == expected  # nosec B101 - pytest assertion
 
 
-def test_pin_mismatch_message_lists_the_problems_and_the_remedy():
+def test_pin_mismatch_message_lists_the_problems_and_each_remedy():
     msg = pin_mismatch_message(PINS, ["one", "two"])
+    listed = "benchmarks/chrisomatic/benchmark.yml pins:\n  - one\n  - two\n"
 
-    assert "benchmarks/chrisomatic/benchmark.yml pins:\n  - one\n  - two\n" in msg  # nosec B101 - pytest assertion
-    assert "just bench-nuke" in msg and "just bench-start" in msg  # nosec B101 - pytest assertion
+    assert listed in msg  # nosec B101 - pytest assertion
+    # the pin bench-start was given comes first: a reset would delete the dev data
+    assert msg.index("--plugins") < msg.index("bench-nuke")  # nosec B101 - pytest assertion
+    assert "'just bench-start benchmark.yml'" in msg  # nosec B101 - pytest assertion
+    assert "'just bench-pull-plugins benchmark.yml'" in msg  # nosec B101 - pytest assertion
+
+
+def test_resolve_plugin_records_a_plugin_cube_does_not_have():
+    def missing(name):
+        raise ChrisApiError(HttpResult(False, 404, 1.0, None, [], f"not found: {name}"))
+
+    record = resolve_plugin(SimpleNamespace(get_plugin=missing), "dbg-bigfiles")
+
+    assert record["matches"] == 0 and record["id"] is None  # nosec B101 - pytest assertion
+
+
+def test_resolve_plugin_raises_other_api_errors():
+    def broken(name):
+        raise ChrisApiError(HttpResult(False, 500, 1.0, None, [], "server error"))
+
+    with pytest.raises(ChrisApiError):
+        resolve_plugin(SimpleNamespace(get_plugin=broken), "dbg-bigfiles")
 
 
 def test_committed_pin_pins_every_workload_plugin():
-    assert set(run_bench.PLUGIN_NAMES.values()) <= set(load_pins().plugins)  # nosec B101 - pytest assertion
+    names = set(run_bench.PLUGIN_NAMES.values())
+
+    assert names <= set(load_pins().plugins)  # nosec B101 - pytest assertion
 
 
-def _connect(monkeypatch, registered, tmp_path):
+def _connect(monkeypatch, tmp_path, registered, images=None):
     """
-    A runner over fakes of everything __init__ connects to, with ``registered`` (name ->
-    get_plugin result) as CUBE's workload plugins and Docker unavailable.
+    A runner over fakes of everything __init__ connects to: ``registered`` (name ->
+    get_plugin result; a missing name is a plugin CUBE does not have) as CUBE's workload
+    plugins, and ``images`` (reference -> image_info result) as what Docker has, or Docker
+    unavailable when None.
     """
-    api = SimpleNamespace(get_plugin=registered.__getitem__)
-    monkeypatch.setattr(run_bench, "ChrisApi", lambda *a, **k: api)
+    def get_plugin(name):
+        if name not in registered:
+            raise ChrisApiError(HttpResult(False, 404, 1.0, None, [], "not found"))
+        return registered[name]
+
+    docker = SimpleNamespace(available=images is not None,
+                             image_info=lambda ref: (images or {}).get(ref))
+    monkeypatch.setattr(run_bench, "ChrisApi",
+                        lambda *a, **k: SimpleNamespace(get_plugin=get_plugin))
     monkeypatch.setattr(run_bench, "wait_for_health", lambda api, timeout: True)
-    monkeypatch.setattr(run_bench, "DockerClient", lambda **k: SimpleNamespace(
-        available=False, image_info=lambda ref: None))
+    monkeypatch.setattr(run_bench, "DockerClient", lambda **k: docker)
     monkeypatch.setattr(run_bench, "BrokerClient", lambda host, port: None)
     monkeypatch.setattr(run_bench, "PgStatStatements", lambda docker: None)
 
     return BenchmarkRunner(url="http://chris:8000/api/v1/", username="chris",
-                           password="chris1234", tier=load_tier("smoke"), pins=load_pins(),
+                           password="chris1234",  # nosec B106 - the dev stack's test user
+                           tier=load_tier("smoke"), pins=load_pins(),
                            store=ResultsStore(tmp_path), cube_poll_interval=2.0)
 
 
+def _pinned_by_name():
+    return {p["name"]: p for p in _pinned_registrations(load_pins()).values()}
+
+
 def test_runner_starts_on_the_pinned_registrations(monkeypatch, tmp_path):
-    registered = {p["name"]: p for p in _pinned_registrations(load_pins()).values()}
-    runner = _connect(monkeypatch, registered, tmp_path)
+    registered = _pinned_by_name()
+    images = {p["dock_image"]: IMAGE for p in registered.values()}
+    runner = _connect(monkeypatch, tmp_path, registered, images)
+    expected = dict.fromkeys(PluginRole, IMAGE)
 
     assert set(runner.plugin_ids) == set(PluginRole)  # nosec B101 - pytest assertion
-    assert runner.plugin_images == dict.fromkeys(PluginRole)  # nosec B101 - pytest assertion
+    assert runner.plugin_images == expected  # nosec B101 - pytest assertion
 
 
 def test_runner_refuses_to_start_on_other_registrations(monkeypatch, tmp_path):
-    registered = {p["name"]: p for p in _pinned_registrations(load_pins()).values()}
+    registered = _pinned_by_name()
     registered["pl-topologicalcopy"] = _registered(
         "pl-topologicalcopy", "2.0.0", "docker.io/backplane/true")
 
     with pytest.raises(RuntimeError, match="pl-topologicalcopy 2.0.0 is registered"):
-        _connect(monkeypatch, registered, tmp_path)
+        _connect(monkeypatch, tmp_path, registered)
+
+
+def test_runner_refuses_to_start_when_a_pinned_image_is_absent(monkeypatch, tmp_path):
+    with pytest.raises(RuntimeError, match="is not present"):
+        _connect(monkeypatch, tmp_path, _pinned_by_name(), images={})
+
+
+def test_runner_lists_a_plugin_cube_does_not_have_with_the_other_problems(monkeypatch,
+                                                                         tmp_path):
+    registered = _pinned_by_name()
+    del registered["dbg-bigfiles"]
+    registered["pl-simpledsapp"] = _registered("pl-simpledsapp", "2.1.4", "x")
+
+    with pytest.raises(RuntimeError) as refused:
+        _connect(monkeypatch, tmp_path, registered)
+    message = str(refused.value)
+
+    assert "dbg-bigfiles is not registered" in message  # nosec B101 - pytest assertion
+    assert "pl-simpledsapp 2.1.4 is registered" in message  # nosec B101 - pytest assertion
+
+
+def test_run_records_the_plugins_images_and_the_pin(monkeypatch, tmp_path):
+    runner = _run_runner(monkeypatch, tmp_path, [{}, {}], [])
+    runner.plugins = _pinned_registrations()
+    runner.plugin_images = {PluginRole.FS: IMAGE}
+    env = runner.run()["environment"]
+
+    assert env["workload_plugins"]["fs"]["image"] == IMAGE  # nosec B101 - pytest assertion
+    assert env["workload_plugins_pin"] == runner.pins.record()  # nosec B101 - pytest assertion
+
+
+def test_main_checks_against_the_pin_it_is_given(monkeypatch, tmp_path):
+    seen = {}
+
+    class Runner:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+        def run(self):
+            return {"levels_run": 0, "breaking_points": []}
+
+    pin = tmp_path / "other.yml"
+    pin.write_text("cube:\n  plugins:\n"
+                   "    - name: pl-x\n      version: '1'\n      dock_image: fnndsc/pl-x\n")
+    monkeypatch.setattr(run_bench, "BenchmarkRunner", Runner)
+    run_bench.main(["--plugins", str(pin), "--results-dir", str(tmp_path / "results")])
+
+    assert seen["pins"] == load_pins(pin)  # nosec B101 - pytest assertion
