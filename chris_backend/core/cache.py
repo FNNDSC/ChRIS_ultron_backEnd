@@ -1,12 +1,12 @@
 """
 The shared cache and the coordination helpers built on it.
 
-``CACHES['default']`` is Django's ``RedisCache`` on a Dragonfly instance of its own
-(``dragonfly-cache`` in the compose stacks) apart from the Celery broker's: it evicts
-when it is full and starts empty after a restart so whatever it holds may go missing at
-any time. All coordination keys created by these helpers expire automatically. Do not 
-call cache.clear(): it deletes every key in this cache’s Redis logical database, not just
-keys with this application’s prefix (Redis/Dragonfly FLUSHDB).
+``CACHES['default']`` is Django's ``RedisCache`` on a Redis-protocol server of its own
+(``chris-cache`` in the compose stacks, a Dragonfly) apart from the Celery broker's: it
+evicts when it is full and starts empty after a restart so whatever it holds may go
+missing at any time. All coordination keys created by these helpers expire automatically.
+Do not call cache.clear(): it deletes every key in this cache’s Redis logical database,
+not just keys with this application’s prefix (Redis/Dragonfly FLUSHDB).
 
 The helpers, all safe to call from any thread or process:
 
@@ -34,7 +34,9 @@ from collections import deque
 from dataclasses import dataclass
 
 import redis
+from redis.backoff import NoBackoff
 from redis.commands.core import Script
+from redis.retry import Retry
 from django.core.cache import caches
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
 from django.core.exceptions import ImproperlyConfigured
@@ -185,10 +187,11 @@ def verify_cache_connection(cache_settings, broker_url=None):
     Raises ``ImproperlyConfigured`` when the configuration is wrong: another backend than
     Django's ``RedisCache``, no server or a URL redis-py cannot parse, no logical
     database in it, retries or an unbounded socket timeout in its query string, the
-    Celery broker's server, a refused password, certificate or TLS handshake, or a
-    database the server does not have. Only logs a warning when the server does not
-    answer so that CUBE starts while it is down; the helpers then fail open. Says nothing
-    when the cache answers.
+    Celery broker's server, a refused password, certificate or TLS handshake, a TLS URL
+    for a server that speaks plain text, a database the server does not have, or a
+    server that refuses the helpers' scripts. Only logs a warning when the server does
+    not answer, so that CUBE starts while it is down (the helpers then fail open), or
+    refuses the scripts because it is full. Says nothing otherwise.
     """
     backend = cache_settings.get('BACKEND', '')
     try:
@@ -219,7 +222,7 @@ def verify_cache_connection(cache_settings, broker_url=None):
     if 'db' not in params:
         raise ImproperlyConfigured(
             f"CACHES['default'] LOCATION ({where}) names no logical database, e.g. "
-            f"redis://dragonfly-cache:6379/0")
+            f"redis://chris-cache:6379/0")
 
     if params.get('retry_on_timeout') or params.get('retry_on_error'):
         raise ImproperlyConfigured(
@@ -243,15 +246,21 @@ def verify_cache_connection(cache_settings, broker_url=None):
         if broker is not None and _server(params) == _server(broker):
             raise ImproperlyConfigured(
                 f"CACHES['default'] LOCATION ({where}) is on the Celery broker's "
-                f"server: one Dragonfly has one memory limit and eviction policy, so a "
+                f"server: one server has one memory limit and eviction policy, so a "
                 f"full cache would refuse the broker's writes, evicting would drop its "
                 f"queues, and clearing its database would delete them")
 
-    client = RedisCacheClient(servers, **cache_settings.get('OPTIONS', {}))
+    options = cache_settings.get('OPTIONS', {})
+    client = RedisCacheClient(servers, **options)
     connection = client.get_client(write=True)
+    # KEY_PREFIX, VERSION and KEY_FUNCTION make the check's keys as they make the helpers'
+    make_key = backend_class(location, cache_settings).make_key
 
+    answered = False
     try:
         connection.ping()
+        answered = True
+        _check_scripts(connection, make_key, where)
     except (redis.exceptions.AuthenticationError, redis.exceptions.ResponseError) as e:
         # AuthenticationError is a ConnectionError, so it goes first
         raise ImproperlyConfigured(f"CACHES['default'] ({where}): {e}")
@@ -261,6 +270,13 @@ def verify_cache_connection(cache_settings, broker_url=None):
         if _tls_failure(e):
             raise ImproperlyConfigured(f"CACHES['default'] ({where}): {e}")
 
+        # Redis leaves a TLS handshake waiting where Dragonfly closes the connection, so a
+        # handshake that timed out is a mistake too when the server answers plain text
+        if not answered and _answers_without_tls(params, options):
+            raise ImproperlyConfigured(
+                f"CACHES['default'] LOCATION ({where}) asks for TLS (rediss://), but the "
+                f"server answers in plain text")
+
         # logged before LOGGING is configured, so the message says what it is about
         logger.warning('CUBE shared cache: %s does not answer (%s); starting without it, '
                        'and the helpers in core.cache go ahead without it until it does',
@@ -268,6 +284,44 @@ def verify_cache_connection(cache_settings, broker_url=None):
     finally:
         # no socket for a forked worker to inherit
         connection.connection_pool.disconnect()
+
+
+def _check_scripts(client, make_key, where):
+    """
+    Run both scripts once, as the helpers would, on keys of the check's own that expire
+    within a second and sit among the helpers' keys: a server that refuses them (an ACL
+    without EVALSHA, TIME or the helpers' keys, a provider that blocks scripts) stops
+    start-up here rather than leaving every helper to fail open later. A Dragonfly that
+    is full refuses them too, and only warns: it may evict, or empty, by the time the
+    helpers need it. Redis and Valkey run them even when full, since a script that has
+    written may go on writing and the first write here only deletes.
+    """
+    key = make_key(f'core.cache:start-up-check:{_new_token()}')
+    token = _new_token()
+
+    try:
+        _ACQUIRE_SLOT(keys=[key], args=[1, 1000, token], client=client)
+        _RELEASE_LOCK(keys=[f'{key}:lock'], args=[token], client=client)
+        client.zrem(key, token)
+    except redis.exceptions.ResponseError as e:
+        if not _out_of_memory(e):
+            raise ImproperlyConfigured(
+                f"CACHES['default'] ({where}) refuses the scripts the helpers in "
+                f"core.cache run: {e}")
+
+        logger.warning('CUBE shared cache: %s is full (%s); starting all the same, and '
+                       'the helpers go ahead without it while it refuses writes',
+                       where, e)
+
+
+def _out_of_memory(error):
+    """
+    Whether an error reply refused a write for want of memory: Dragonfly answers
+    ``-ERR Out of memory``, a plain ``ResponseError`` (inside the script's error when a
+    script ran the write); redis-py raises Redis's ``-OOM`` as ``OutOfMemoryError``.
+    """
+    return (isinstance(error, redis.exceptions.OutOfMemoryError)
+            or 'out of memory' in str(error).lower())
 
 
 class _CacheHealth:
@@ -510,6 +564,34 @@ def _server(params):
     """
     return params.get('path') or (params.get('host', 'localhost').lower().rstrip('.'),
                                   int(params.get('port', 6379)))
+
+
+def _answers_without_tls(params, options):
+    """
+    Whether the server a ``rediss://`` URL names answers a bare PING in plain text: any
+    reply shows it speaks no TLS (an authentication error included), except one about
+    TLS, which a server that speaks only TLS sends before it closes the connection.
+    """
+    if params.get('connection_class') is not redis.connection.SSLConnection:
+        return False
+
+    timeouts = {name: params.get(name, options.get(name, 0.5))
+                for name in ('socket_timeout', 'socket_connect_timeout')}
+    probe = redis.Redis(host=params.get('host', 'localhost'),
+                        port=int(params.get('port', 6379)),
+                        retry=Retry(NoBackoff(), 0), lib_name=None, lib_version=None,
+                        **timeouts)
+    try:
+        probe.ping()
+        return True
+    except redis.exceptions.AuthenticationError:
+        return True
+    except redis.exceptions.ResponseError as e:
+        return 'tls' not in str(e).lower()
+    except redis.exceptions.RedisError:
+        return False
+    finally:
+        probe.connection_pool.disconnect()
 
 
 def _tls_failure(error):

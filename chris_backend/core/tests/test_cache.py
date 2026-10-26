@@ -1,5 +1,5 @@
 """
-Tests for the shared cache's helpers (core/cache.py) against the stack's cache Dragonfly.
+Tests for the shared cache's helpers (core/cache.py) against the stack's cache server.
 
 They share it with a running dev stack so every test uses names of its own, every key
 expires, and nothing calls cache.clear(), which is FLUSHDB of the whole database.
@@ -31,7 +31,7 @@ from core.cache import (MAX_TTL, acquire_lock, acquire_slot, clear_mark, mark_on
 
 class CacheProxy:
     """
-    A TCP proxy between the cache client and Dragonfly so that a test can take the server
+    A TCP proxy between the cache client and its server so that a test can take the server
     away mid-test.
 
     ``stop()`` closes the listener and resets every live connection, as a killed server does
@@ -111,6 +111,92 @@ class CacheProxy:
             if reset:  # RST instead of FIN, as from a killed server
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
             s.close()
+
+
+class FakeServer:
+    """
+    A server that speaks the Redis protocol and finishes no TLS handshake: a connection
+    that opens with one gets no reply at all (as from Redis, which speaks plain text and
+    waits for a line end that never comes, where Dragonfly closes the connection), any
+    other one ``+PONG`` to a PING and ``+OK`` to anything else. With ``answers=False`` it
+    replies to nothing, as a hung server does; with ``tls_only=True`` it meets plain text
+    as Dragonfly started with ``--tls`` does, with an error about TLS before it closes the
+    connection, and stands for a TLS server too busy to finish a handshake; with
+    ``password=True`` it answers every command ``-NOAUTH``, as a server with a password
+    answers a client that sent none.
+    """
+
+    BAD_TLS = b'-ERR Bad TLS header, double check if you enabled TLS for your client.\r\n'
+    NOAUTH = b'-NOAUTH Authentication required.\r\n'
+
+    def __init__(self, answers=True, tls_only=False, password=False):
+        self.answers = answers
+        self.tls_only = tls_only
+        self.password = password
+        self._listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self._listener.getsockname()[1]
+        self._running = True
+        self._thread = threading.Thread(target=self._serve, name='plain-text-server',
+                                        daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        self._thread.join(5)
+
+    def _serve(self):
+        buffers = {}
+        with selectors.DefaultSelector() as selector:
+            selector.register(self._listener, selectors.EVENT_READ)
+            while self._running:
+                for key, _ in selector.select(0.01):
+                    sock = key.fileobj
+                    if sock is self._listener:
+                        conn, _ = sock.accept()
+                        buffers[conn] = b''
+                        selector.register(conn, selectors.EVENT_READ)
+                        continue
+                    data = sock.recv(65536)
+                    if not data:
+                        self._drop(selector, buffers, sock)
+                        continue
+                    buffers[sock] += data
+                    # 0x16 starts a TLS handshake record
+                    if not self.answers or buffers[sock].startswith(b'\x16'):
+                        continue
+                    if self.tls_only:
+                        sock.sendall(self.BAD_TLS)
+                        self._drop(selector, buffers, sock)
+                    else:
+                        buffers[sock] = self._reply(sock, buffers[sock])
+        for sock in buffers:
+            sock.close()
+        self._listener.close()
+
+    @staticmethod
+    def _drop(selector, buffers, sock):
+        selector.unregister(sock)
+        buffers.pop(sock)
+        sock.close()
+
+    def _reply(self, sock, buffer):
+        """
+        Reply to each complete command (a RESP array of bulk strings) at the head of
+        ``buffer``; returns what is left of it.
+        """
+        while buffer.startswith(b'*') and b'\r\n' in buffer:
+            head, rest = buffer.split(b'\r\n', 1)
+            args = []
+            for _ in range(int(head[1:])):
+                size, _, after = rest.partition(b'\r\n')
+                if not after or len(after) < int(size[1:]) + 2:
+                    return buffer  # incomplete: wait for more
+                args.append(after[:int(size[1:])])
+                rest = after[int(size[1:]) + 2:]
+            sock.sendall(self.NOAUTH if self.password else
+                         b'+PONG\r\n' if args[:1] == [b'PING'] else b'+OK\r\n')
+            buffer = rest
+        return buffer
 
 
 def _name():
@@ -225,8 +311,8 @@ class CacheTestCase(SimpleTestCase):
 
 class ProxiedCacheTestCase(CacheTestCase):
     """
-    Tests whose cache goes through a ``CacheProxy`` in front of Dragonfly, with a 0.2 s socket
-    timeout.
+    Tests whose cache goes through a ``CacheProxy`` in front of its server, with a 0.2 s
+    socket timeout.
     """
 
     @classmethod
@@ -759,7 +845,7 @@ class DegradedModeTests(ProxiedCacheTestCase):
             lease = acquire_lock(name, 30)
         self.assertTrue(lease.degraded)
 
-        self.proxy.resume()  # the SET NX sent meanwhile now reaches Dragonfly
+        self.proxy.resume()  # the SET NX sent meanwhile now reaches the server
         deadline = time.monotonic() + 3
         while _raw().get(lease.key) != str(lease.token).encode():
             self.assertLess(time.monotonic(), deadline)
@@ -780,7 +866,7 @@ class DegradedModeTests(ProxiedCacheTestCase):
             lease = acquire_slot(name, 1, 30)
         self.assertTrue(lease.degraded)
 
-        self.proxy.resume()  # the script sent meanwhile now reaches Dragonfly
+        self.proxy.resume()  # the script sent meanwhile now reaches the server
         deadline = time.monotonic() + 3
         while _raw().zscore(lease.key, lease.token) is None:
             self.assertLess(time.monotonic(), deadline)
@@ -868,6 +954,18 @@ class StartupCheckTests(CacheTestCase):
     def host(self):
         return urlsplit(settings.CACHES['default']['LOCATION']).hostname
 
+    def acl_user(self, keys):
+        """
+        The cache's URL for a user of its own whom its ACL limits to the keys ``keys``.
+        """
+        user, password = _name(), _name()
+        _raw().acl_setuser(user, enabled=True, passwords=[f'+{password}'], keys=[keys],
+                           categories=['+@all'])
+        self.addCleanup(_raw().acl_deluser, user)
+        url = urlsplit(settings.CACHES['default']['LOCATION'])
+        return url._replace(
+            netloc=f'{user}:{password}@{url.hostname}:{url.port or 6379}').geturl()
+
     def test_a_cache_that_answers_passes_silently(self):
         with self.assertNoLogs('core.cache', 'DEBUG'):
             verify_cache_connection(settings.CACHES['default'], settings.CELERY_BROKER_URL)
@@ -936,6 +1034,104 @@ class StartupCheckTests(CacheTestCase):
             with self.subTest(location=location), \
                     self.assertRaisesRegex(ImproperlyConfigured, 'names no server'):
                 verify_cache_connection(self.conf(location), settings.CELERY_BROKER_URL)
+
+    def test_a_tls_url_for_a_server_that_answers_in_plain_text_stops_start_up(self):
+        # the handshake waits until it times out, as with Redis, rather than failing; an
+        # authentication error is an answer in plain text too
+        for server in (FakeServer(), FakeServer(password=True)):
+            self.addCleanup(server.stop)
+            with self.subTest(password=server.password), \
+                    self.assertRaisesRegex(ImproperlyConfigured, 'answers in plain text'):
+                verify_cache_connection(self.conf(f'rediss://127.0.0.1:{server.port}/0'))
+
+    def test_a_tls_url_for_a_hung_server_only_warns_within_its_timeouts(self):
+        timeouts = 'socket_timeout=0.2&socket_connect_timeout=0.2'
+        for server in (FakeServer(answers=False), FakeServer(tls_only=True)):
+            self.addCleanup(server.stop)
+            location = f'rediss://127.0.0.1:{server.port}/0?{timeouts}'
+            with self.subTest(tls_only=server.tls_only):
+                started = time.monotonic()
+                with self.assertLogs('core.cache', 'WARNING') as logs:
+                    verify_cache_connection(self.conf(location))
+
+                # the handshake and the probe each wait one timeout, and neither retries
+                self.assertLess(time.monotonic() - started, 1.0)
+                self.assertIn('does not answer', logs.output[0])
+
+    def test_a_plain_text_url_that_timed_out_sends_no_plain_text_probe(self):
+        # the server answers now, which says nothing about TLS
+        server = FakeServer()
+        self.addCleanup(server.stop)
+        client = mock.Mock()
+        client.get_client.return_value.ping.side_effect = redis.TimeoutError('Timeout')
+
+        with mock.patch.object(core_cache, 'RedisCacheClient', return_value=client), \
+                self.assertLogs('core.cache', 'WARNING') as logs:
+            verify_cache_connection(self.conf(f'redis://127.0.0.1:{server.port}/0'))
+
+        self.assertIn('does not answer', logs.output[0])
+
+    def test_a_timeout_after_the_ping_answered_sends_no_plain_text_probe(self):
+        late = redis.exceptions.TimeoutError('Timeout reading from socket')
+
+        with mock.patch.object(core_cache, '_ACQUIRE_SLOT', side_effect=late), \
+                mock.patch.object(core_cache, '_answers_without_tls') as probe, \
+                self.assertLogs('core.cache', 'WARNING'):
+            verify_cache_connection(settings.CACHES['default'], settings.CELERY_BROKER_URL)
+
+        probe.assert_not_called()
+
+    def test_the_check_runs_both_scripts_and_leaves_no_key_behind(self):
+        conf, broker = settings.CACHES['default'], settings.CELERY_BROKER_URL
+        with mock.patch.object(core_cache, '_ACQUIRE_SLOT',
+                               wraps=core_cache._ACQUIRE_SLOT) as slot, \
+                mock.patch.object(core_cache, '_RELEASE_LOCK',
+                                  wraps=core_cache._RELEASE_LOCK) as release, \
+                self.assertNoLogs('core.cache', 'DEBUG'):
+            verify_cache_connection(conf, broker)
+
+        key = slot.call_args.kwargs['keys'][0]
+        self.assertEqual((slot.call_count, release.call_count), (1, 1))
+        self.assertTrue(key.startswith(_key('core.cache', 'start-up-check:')))
+        self.assertEqual(_raw().exists(key, f'{key}:lock'), 0)
+
+    def test_a_user_the_acl_limits_to_the_helpers_keys_passes(self):
+        # KEY_PREFIX:VERSION:*, as make_key makes them
+        location = self.acl_user(caches['default'].make_key('*'))
+
+        with self.assertNoLogs('core.cache', 'DEBUG'):
+            verify_cache_connection(self.conf(location))
+
+    def test_a_user_the_acl_keeps_from_the_helpers_keys_stops_start_up(self):
+        location = self.acl_user('elsewhere:*')
+
+        with self.assertRaisesRegex(ImproperlyConfigured, 'refuses the scripts'):
+            verify_cache_connection(self.conf(location))
+
+    def test_a_server_that_refuses_the_scripts_stops_start_up(self):
+        # e.g. an ACL without EVALSHA, or a provider that blocks scripts
+        refusal = redis.exceptions.NoPermissionError(
+            "this user has no permissions to run the 'evalsha' command")
+
+        with mock.patch.object(core_cache, '_ACQUIRE_SLOT', side_effect=refusal), \
+                self.assertRaisesRegex(ImproperlyConfigured, 'refuses the scripts'):
+            verify_cache_connection(settings.CACHES['default'], settings.CELERY_BROKER_URL)
+
+    def test_a_cache_full_at_start_up_only_warns(self):
+        # Dragonfly's -ERR inside the script's error, and the -OOM that redis-py raises as
+        # OutOfMemoryError (Redis and Valkey run these scripts even when full)
+        for full in (redis.exceptions.ResponseError(
+                         'Error running script (call to f_0123): @user_script:9: '
+                         '-ERR Out of memory'),
+                     redis.exceptions.OutOfMemoryError(
+                         "command not allowed when used memory > 'maxmemory'.")):
+            with self.subTest(full=full), \
+                    mock.patch.object(core_cache, '_ACQUIRE_SLOT', side_effect=full):
+                with self.assertLogs('core.cache', 'WARNING') as logs:
+                    verify_cache_connection(settings.CACHES['default'],
+                                            settings.CELERY_BROKER_URL)
+
+                self.assertIn('is full', logs.output[0])
 
     def test_a_refused_certificate_stops_start_up(self):
         def ping():
