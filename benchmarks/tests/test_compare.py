@@ -147,7 +147,7 @@ def test_unrecorded_limits_give_a_single_caution():
 
 
 def test_db_broker_and_cache_image_differences_are_informational():
-    for service in ("db", "dragonflydb", "dragonfly-cache"):
+    for service in ("db", "chris-broker", "chris-cache"):
         c = check_comparability(_env(images={service: {"image_id": "sha256:a"}}),
                                 _env(images={service: {"image_id": "sha256:b"}}))
 
@@ -157,12 +157,70 @@ def test_db_broker_and_cache_image_differences_are_informational():
 
 
 def test_broker_image_missing_from_an_older_run_is_informational():
-    c = check_comparability(_env(), _env(images={"dragonflydb": {"image_id": "sha256:b"}}))
+    c = check_comparability(_env(), _env(images={"chris-broker": {"image_id": "sha256:b"}}))
 
     diffs = [(d.field, d.severity) for d in c.diffs]
 
     assert c.status == "comparable"  # nosec B101 - pytest assertion
-    assert diffs == [("images.dragonflydb", "info")]  # nosec B101 - pytest assertion
+    assert diffs == [("images.chris-broker", "info")]  # nosec B101 - pytest assertion
+
+
+def test_a_run_from_before_the_rename_compares_under_the_current_names():
+    # runs archived before 2026-10-25 recorded the broker and the cache as dragonflydb and
+    # dragonfly-cache
+    limits = {"cpus": 2.0, "mem_limit": 1073741824, "memswap_limit": None, "shm_size": None}
+    old = _env(images={"dragonflydb": {"image_id": "sha256:a"},
+                       "dragonfly-cache": {"image_id": "sha256:c"}},
+               limits={"dragonflydb": limits, "dragonfly-cache": limits},
+               envelope={"CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
+    new = _env(images={"chris-broker": {"image_id": "sha256:a"},
+                       "chris-cache": {"image_id": "sha256:d"}},
+               limits={"chris-broker": limits, "chris-cache": {**limits, "cpus": 1.0}},
+               envelope={"CUBE_CACHE_URL": "redis://chris-cache:6379/0"})
+    c = check_comparability(old, new)
+    diffs = {d.field: (d.baseline, d.candidate, d.severity) for d in c.diffs}
+    expected = {"images.chris-cache": ("sha256:c", "sha256:d", "info"),
+                "limits.chris-cache.cpus": (2.0, 1.0, "warning")}
+
+    assert diffs == expected  # nosec B101 - pytest assertion
+
+    # in either order: a run made later from an older checkout records the old names too
+    mirrored = {d.field: (d.candidate, d.baseline, d.severity)
+                for d in check_comparability(new, old).diffs}
+    assert mirrored == expected  # nosec B101 - pytest assertion
+
+
+def test_a_later_run_that_records_an_old_name_shows_it():
+    # a container left over from before the rename ran beside the renamed ones, and CUBE
+    # was pointed at it
+    limits = {"cpus": 2.0, "mem_limit": 1073741824}
+    new = _env(images={"chris-broker": {"image_id": "sha256:a"}},
+               limits={"chris-broker": limits},
+               envelope={"CUBE_CACHE_URL": "redis://chris-cache:6379/0"})
+    leftover = _env(images=new["images"], limits={**new["limits"], "dragonflydb": limits},
+                    envelope={"CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
+    fields = sorted(d.field for d in check_comparability(new, leftover).diffs)
+
+    assert fields == ["envelope.CUBE_CACHE_URL",  # nosec B101 - pytest assertion
+                      "limits.dragonflydb.cpus", "limits.dragonflydb.mem_limit"]
+
+
+def test_a_url_naming_a_renamed_service_compares_under_the_current_name():
+    def cache_url_diffs(old_url, new_url):
+        old, new = (_env(envelope={"CUBE_CACHE_URL": url}) for url in (old_url, new_url))
+        return [(d.baseline, d.candidate) for d in check_comparability(old, new).diffs]
+
+    assert not cache_url_diffs(  # nosec B101 - pytest assertion
+        "rediss://:***@dragonfly-cache:6380/1?ssl_password=***",
+        "rediss://:***@chris-cache:6380/1?ssl_password=***")
+
+    # a different server, or another database on it, is still a difference, the old run's
+    # URL read under the current name as its images and limits are
+    assert cache_url_diffs(  # nosec B101 - pytest assertion
+        "redis://dragonfly-cache:6379/0", "redis://chris-cache:6379/1") == [
+        ("redis://chris-cache:6379/0", "redis://chris-cache:6379/1")]
+    assert cache_url_diffs(  # nosec B101 - pytest assertion
+        "redis://dragonflydb:6379/0", "redis://chris-cache:6379/0")
 
 
 # -- delta classification ------------------------------------------------------------------
@@ -331,6 +389,18 @@ def test_trend_tables_follow_a_dotted_metric_into_nested_values():
     assert rows[0] == [8, 300, 200, 100]  # nosec B101 - pytest assertion
 
 
+def test_trend_tables_find_a_renamed_service_under_its_old_name_in_older_runs_only():
+    later = _env(images={"chris-broker": {"image_id": "sha256:a"}})
+    runs = [_run("A", [dict(_lvl(level=8), peak_cpu_pct={"dragonflydb": 7.5})]),
+            # a zero peak, and those of a container left over from before the rename
+            _run("B", [dict(_lvl(level=8), peak_cpu_pct={"chris-broker": 0.0,
+                                                         "dragonflydb": 9.9})], env=later),
+            _run("C", [dict(_lvl(level=8), peak_cpu_pct={"dragonflydb": 9.9})], env=later)]
+    (_, _, rows), = trend_tables(runs, "peak_cpu_pct.chris-broker")
+
+    assert rows[0] == [8, 7.5, 0.0, None]  # nosec B101 - pytest assertion
+
+
 # -- CLI ---------------------------------------------------------------------------------
 
 def _write_run(root, run_id, levels, breaking_points=(), env=None):
@@ -401,6 +471,18 @@ def test_trend_tables_reach_per_process_type_counters_and_tolerate_scalars():
     # a path through a scalar finds nothing rather than failing
     (_, _, rows), = trend_tables(runs, "makespan_median_s.x")
     assert rows[0] == [1, None, None]  # nosec B101 - pytest assertion
+
+
+def test_main_finds_a_renamed_services_metric_in_older_runs(tmp_path):
+    paths = [_write_run(tmp_path, rid, [dict(_lvl(), peak_cpu_pct={"dragonflydb": cpu})])
+             for rid, cpu in (("A", 7.5), ("B", 5.2))]
+    out = tmp_path / "cmp"
+
+    assert main([str(p) for p in paths]  # nosec B101 - pytest assertion
+                + ["--out", str(out), "--metric", "peak_cpu_pct.chris-broker"]) == 0
+    md = (out / "compare.md").read_text()
+    assert "| 1 | 7.5 | 5.2 |" in md  # nosec B101 - pytest assertion
+    assert "not found" not in md  # nosec B101 - pytest assertion
 
 
 def test_main_renders_a_two_run_trend_for_an_explicit_metric(tmp_path):

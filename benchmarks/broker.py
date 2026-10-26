@@ -51,7 +51,7 @@ class BrokerClient:
     Best-effort LLEN sampler for the Celery queues.
     """
 
-    def __init__(self, host: str = "dragonflydb", port: int = 6379, *,
+    def __init__(self, host: str = "chris-broker", port: int = 6379, *,
                  queues: tuple[str, ...] = CELERY_QUEUES, timeout: float = 2.0):
         self.host = host
         self.port = port

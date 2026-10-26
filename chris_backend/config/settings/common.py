@@ -129,8 +129,9 @@ DATABASES = {
 
 # Cache
 # https://docs.djangoproject.com/en/6.0/topics/cache/
-# Django's RedisCache on a Dragonfly instance of its own, apart from the Celery broker's;
-# the environment-specific settings set LOCATION and run the start-up check. core/cache.py
+# Django's RedisCache on a Redis-protocol server of its own (chris-cache in the compose
+# stacks, a Dragonfly), apart from the Celery broker's; the environment-specific settings
+# set LOCATION and run the start-up check. core/cache.py
 # has the coordination helpers built on it.
 
 CACHES = {
@@ -139,10 +140,10 @@ CACHES = {
         'KEY_PREFIX': 'cube',
         'OPTIONS': {
             # redis-py waits forever by default (without a timeout) so a hung server
-            # would hang every cache call. 
-            # Automatic Redis-command retries are disabled. If a lock request 
-            # succeeds but its reply is lost, a retry would find the lock it already 
-            # created and appear to fail. The connection pool automatically opens a new 
+            # would hang every cache call.
+            # Automatic Redis-command retries are disabled. If a lock request
+            # succeeds but its reply is lost, a retry would find the lock it already
+            # created and appear to fail. The connection pool automatically opens a new
             # connection when Redis closes the old one.
             'socket_connect_timeout': 0.5,
             'socket_timeout': 0.5,

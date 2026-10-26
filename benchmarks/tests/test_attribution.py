@@ -499,7 +499,7 @@ class ManifestDocker(JsonDocker):
 
 
 def test_collect_environment_records_postgres_settings_limits_and_images():
-    cache_url = "redis://dragonfly-cache:6379/0"
+    cache_url = "redis://chris-cache:6379/0"
     env = collect_environment(ManifestDocker(SETTINGS_DOC),
                               env={"CUBE_DB_SYNCHRONOUS_COMMIT": "on",
                                    "CUBE_CACHE_URL": cache_url})
@@ -508,8 +508,8 @@ def test_collect_environment_records_postgres_settings_limits_and_images():
 
     assert env["postgres"]["settings"]["max_wal_size"] == "8GB"  # nosec B101 - pytest assertion
     assert ids["db"] == "sha256:db"  # nosec B101 - pytest assertion
-    assert ids["dragonflydb"] == "sha256:dragonflydb"  # nosec B101 - pytest assertion
-    assert ids["dragonfly-cache"] == "sha256:dragonfly-cache"  # nosec B101 - pytest assertion
+    assert ids["chris-broker"] == "sha256:chris-broker"  # nosec B101 - pytest assertion
+    assert ids["chris-cache"] == "sha256:chris-cache"  # nosec B101 - pytest assertion
     assert env["limits"]["db"]["shm_size"] == 1073741824  # nosec B101 - pytest assertion
     assert knobs["CUBE_DB_SYNCHRONOUS_COMMIT"] == "on"  # nosec B101 - pytest assertion
     assert knobs["CUBE_CACHE_URL"] == cache_url  # nosec B101 - pytest assertion
@@ -532,7 +532,12 @@ def test_the_envelope_masks_the_passwords_redis_py_reads_from_the_url():
             ("redis://cache:6379/0?password=s3cret&socket_timeout=1",
              "redis://cache:6379/0?password=***&socket_timeout=1"),
             ("rediss://cache:6379/0?ssl_password=k3y", "rediss://cache:6379/0?ssl_password=***"),
-            ("redis://cache:6379/0?db=0", "redis://cache:6379/0?db=0")):
+            ("redis://cache:6379/0?db=0", "redis://cache:6379/0?db=0"),
+            # several servers, as RedisCache splits them
+            ("redis://:pw1@cache:6379/0,redis://:pw2@replica:6379/0",
+             "redis://:***@cache:6379/0,redis://:***@replica:6379/0"),
+            ("redis://cache:6379/0?password=a;redis://replica:6379/0?password=b",
+             "redis://cache:6379/0?password=***;redis://replica:6379/0?password=***")):
         masked = envelope({"CUBE_CACHE_URL": url})["CUBE_CACHE_URL"]
 
         assert masked == expected  # nosec B101 - pytest assertion

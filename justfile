@@ -289,7 +289,7 @@ bench-compose +command:
 # Start the benchmark stack (fslink + uvicorn envelope), migrate, and register the pinned workload plugins.
 [group('(6) benchmarks')]
 bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
-    just bench-compose 'up -d --build db dragonflydb dragonfly-cache nats pfcon cube-nonroot-user-volume-fix'
+    just bench-compose 'up -d --build db chris-broker chris-cache nats pfcon cube-nonroot-user-volume-fix'
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
     just bench-compose '--profile cube run --rm chrisomatic chrisomatic /etc/chrisomatic-benchmark/{{ pins }}' \
@@ -297,7 +297,7 @@ bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
 
 # chrisomatic 1.0.0 cannot pull an image by digest but registers one that is present, so
 # pull what the pin names first. A reference that is present is never pulled again.
-# A name without a registry is pulled from docker.io explicitly (docker.io/library/ for a 
+# A name without a registry is pulled from docker.io explicitly (docker.io/library/ for a
 # one-part name), so Podman need not resolve it. A pin keeps each `dock_image:` on a line
 # of its own (chrisomatic's YAML forbids flow style); a comment after it is ignored.
 #

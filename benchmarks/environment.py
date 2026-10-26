@@ -57,7 +57,14 @@ def envelope(env: os._Environ | dict) -> dict:
 
 
 def _without_password(value):
-    parts = urlsplit(value) if value and "://" in value else None
+    # RedisCache reads several servers from one LOCATION, split at ; and ,
+    if not value or "://" not in value:
+        return value
+    return "".join(_url_without_password(part) for part in re.split(r"([;,])", value))
+
+
+def _url_without_password(value):
+    parts = urlsplit(value) if "://" in value else None
     if parts is None:
         return value
 
@@ -82,8 +89,8 @@ def postgres_settings(docker: DockerClient) -> dict:
 
 def collect_environment(docker: DockerClient, *, env: os._Environ | dict | None = None,
                         image_services: tuple[str, ...] = ("chris", "pfcon", "db",
-                                                           "dragonflydb",
-                                                           "dragonfly-cache")) -> dict:
+                                                           "chris-broker",
+                                                           "chris-cache")) -> dict:
     env = os.environ if env is None else env
     info = docker.info()
     version = docker.version()

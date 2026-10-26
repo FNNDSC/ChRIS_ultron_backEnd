@@ -27,6 +27,7 @@ import argparse
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from .models import RunData
 from .report import csv_cell, markdown_table, record_digests
@@ -150,11 +151,64 @@ _SCALAR_FIELDS = (
     ("images.pfcon", ("images", "pfcon", "image_id"), INFO),
     ("images.db", ("images", "db", "image_id"), INFO),
     # the Celery broker and the shared cache
-    ("images.dragonflydb", ("images", "dragonflydb", "image_id"), INFO),
-    ("images.dragonfly-cache", ("images", "dragonfly-cache", "image_id"), INFO),
+    ("images.chris-broker", ("images", "chris-broker", "image_id"), INFO),
+    ("images.chris-cache", ("images", "chris-cache", "image_id"), INFO),
 )
 
+#: compose services renamed since runs were archived (2026-10-25): in a run from before, their
+#: images, limits, URLs and peaks read under the current names, so a rename is no difference
+RENAMED_SERVICES = {"dragonflydb": "chris-broker", "dragonfly-cache": "chris-cache"}
+
 _NOISE_FLOOR_RATIO = 3.0
+
+
+def _predates_rename(env: dict) -> bool:
+    """
+    Whether a run was recorded before the services were renamed: its images and limits
+    name none of them by its current name. A later run that records an old name too ran
+    beside containers left over from before, and shows them as they are.
+    """
+    current = set(RENAMED_SERVICES.values())
+    return not any(service in current
+                   for key in ("images", "limits") if isinstance(env.get(key), dict)
+                   for service in env[key])
+
+
+def _current_names(env: dict) -> dict:
+    """
+    A run from before the rename with its services under their current names, in the
+    images and limits recorded per service and in the host of an envelope URL
+    (``CUBE_CACHE_URL``); a later run as it is.
+    """
+    if not _predates_rename(env):
+        return env
+
+    def renamed(block):
+        return {RENAMED_SERVICES.get(service, service): value
+                for service, value in block.items()}
+
+    current = {**env, **{key: renamed(env[key]) for key in ("images", "limits")
+                         if isinstance(env.get(key), dict)}}
+    if isinstance(env.get("envelope"), dict):
+        current["envelope"] = {knob: _renamed_host(value)
+                               for knob, value in env["envelope"].items()}
+    return current
+
+
+def _renamed_host(value: object) -> object:
+    """
+    A URL whose host is a renamed service, with the current name in its place; any other
+    value as it is.
+    """
+    parts = urlsplit(value) if isinstance(value, str) and "://" in value else None
+    if parts is None or parts.hostname not in RENAMED_SERVICES:
+        return value
+
+    # the masked password, if any, stays in front of the host
+    userinfo, at, hostport = parts.netloc.rpartition("@")
+    host = RENAMED_SERVICES[parts.hostname]
+    return urlunsplit(parts._replace(
+        netloc=f"{userinfo}{at}{host}{hostport[len(parts.hostname):]}"))
 
 
 def _dig(env: dict, path: tuple) -> object:
@@ -166,6 +220,7 @@ def _dig(env: dict, path: tuple) -> object:
 
 
 def check_comparability(base_env: dict, cand_env: dict) -> Comparability:
+    base_env, cand_env = _current_names(base_env), _current_names(cand_env)
     diffs: list[FieldDiff] = []
 
     # workload identity: unknown (pre-fingerprint run) is a warning, mismatch a blocker
@@ -458,13 +513,25 @@ def _metric_path(metric: str) -> tuple:
     return tuple(metric.split("."))
 
 
+def _recorded_path(run: RunData, path: tuple) -> tuple:
+    """
+    ``path`` as ``run`` recorded it: a run from before the rename keeps its per-service
+    peaks under the old names (``peak_cpu_pct.dragonflydb``).
+    """
+    if not _predates_rename(run.environment or {}):
+        return path
+
+    old_names = {current: old for old, current in RENAMED_SERVICES.items()}
+    return tuple(old_names.get(key, key) for key in path)
+
+
 def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, list]]:
     """
     Per (topology, axis): ((topology, axis), headers, rows) tracking ``metric`` (a
     dotted path for nested values) across all runs (chronological = argument order);
     last row is the breaking point.
     """
-    path = _metric_path(metric)
+    paths = [_recorded_path(run, _metric_path(metric)) for run in runs]
     indexes = [_index(r.levels) for r in runs]
 
     axes = sorted({(r.get("topology"), r.get("axis"))
@@ -482,7 +549,8 @@ def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, li
         
         headers = ["Level"] + [run.run_id for run in runs]
 
-        rows = [[lvl] + [_dig(idx.get((*axis_key, lvl), {}), path) for idx in indexes]
+        rows = [[lvl] + [_dig(idx.get((*axis_key, lvl), {}), path)
+                         for idx, path in zip(indexes, paths)]
                 for lvl in levels]
         
         rows.append(["breaking point"] + [bps.get(axis_key) for bps in bp_maps])
@@ -576,7 +644,7 @@ def render_markdown(comparison: RunComparison, trend_runs: "list[RunData] | None
     if trend_runs:
         lines += [f"## Trend — {metric} across {len(trend_runs)} runs", ""]
         
-        if not any(_dig(row, _metric_path(metric)) is not None
+        if not any(_dig(row, _recorded_path(run, _metric_path(metric))) is not None
                    for run in trend_runs for row in run.levels):
             lines += [f"_metric {metric!r} not found in any run's level rows — "
                       f"check --metric_", ""]

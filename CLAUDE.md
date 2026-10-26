@@ -66,8 +66,8 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   `celery_app.conf.update(task_routes=None)`, so tasks land on the default `celery` queue, which
   is reserved for tests (see `core/celery.py`). `core/testrunner.py` terminates leftover DB
   connections so the test database can be dropped (only when the run set up a test database).
-- `core/tests/test_cache.py` runs against the stack's cache Dragonfly (`dragonfly-cache`,
-  database 0), which a running dev stack also uses: its tests use names of their own and short
+- `core/tests/test_cache.py` runs against the stack's cache server (`chris-cache`, database
+  0), which a running dev stack also uses: its tests use names of their own and short
   TTLs, and never call `cache.clear()`. Its `CacheProxy` takes the server away mid-test (stopped
   or hung).
 - `core.storage.helpers.mock_storage(target_settings)` swaps the storage backend for a temp
@@ -81,12 +81,12 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
 ### Settings and entry points
 - `config/settings/common.py` holds app/DRF/spectacular config; `local.py` (dev, `DEBUG=True`,
   hard-coded service hostnames that match compose network aliases: `chris_dev_db`,
-  `pfcon.remote`, `nats`, `dragonflydb`, `dragonfly-cache`, `lldap`), `production.py`
+  `pfcon.remote`, `nats`, `chris-broker`, `chris-cache`, `lldap`), `production.py`
   (everything via `get_secret` from env; missing vars raise `ImproperlyConfigured`),
   `benchmark.py` (local + env-driven DB pool). Both `local` and `production` verify the storage
   connection at import time, and the cache's with `core.cache.verify_cache_connection`, which
-  raises only for a wrong configuration and only warns when Dragonfly does not answer, so CUBE
-  starts without it.
+  raises only for a wrong configuration and only warns when the cache server does not answer
+  or is full, so CUBE starts without it.
 - `manage.py` and `core/celery.py` default to `config.settings.local`; `config/asgi.py`
   defaults to `production`. The ASGI app routes HTTP to Django and WebSockets through
   `core/websockets/` (token-in-query-string auth).
@@ -124,18 +124,23 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   `STORAGE_ENV`; get one with `connect_storage(settings)`. Files are immutable (WORM).
 
 ### Shared cache (`core/cache.py`)
-- `CACHES['default']` is Django's `RedisCache` on a Dragonfly of its own, `dragonfly-cache`,
-  apart from the broker `dragonflydb` (database 0 Celery, 1 reserved for event streams):
+- `CACHES['default']` is Django's `RedisCache` on a Dragonfly of its own, `chris-cache`,
+  apart from the broker `chris-broker` (database 0 Celery, 1 reserved for event streams):
   `KEY_PREFIX` `cube`, 0.5 s socket timeouts, no retries. It runs with `--cache_mode` (evicts
   when full) and no snapshot (starts empty), so anything in it may vanish. `LOCATION` comes from
-  `CUBE_CACHE_URL` (local and benchmark, default `redis://dragonfly-cache:6379/0`) or
-  `CACHE_URL` (production, required); the start-up check refuses the broker's server (whatever
-  the database), socket timeouts in the URL outside (0, 5] s, and a failed TLS handshake.
+  `CUBE_CACHE_URL` (local and benchmark, default `redis://chris-cache:6379/0`) or
+  `CACHE_URL` (production, required); the start-up check refuses, among the mistakes its
+  docstring lists, the broker's server (whatever the database), socket timeouts in the URL
+  outside (0, 5] s, a failed TLS handshake or a TLS URL for a plain-text server, and a server
+  that refuses the helpers' two scripts (it runs each once on keys of the helpers' namespace).
+  The code speaks only the Redis protocol: Redis 7+ and Valkey 8 pass
+  `core.tests.test_cache` too; for them, the compose service needs `--maxmemory`, an
+  `allkeys-*` policy and no persistence (see the comment on `chris-cache`).
 - Coordinate processes through its helpers rather than a Redis client of your own:
   `acquire_lock`/`release_lock` (the release checks the owner's token), `mark_once`/
   `clear_mark`, and `acquire_slot`/`release_slot`, a bounded counter of expiring leases (a
   Lua script on a sorted set). TTLs are seconds, applied in milliseconds.
-- The helpers fail open: when Dragonfly does not answer, an acquire returns a degraded `Lease`
+- The helpers fail open: when the cache does not answer, an acquire returns a degraded `Lease`
   and `mark_once` returns true, so what they guard must be safe to run twice. Each process
   then skips the cache for 5 s, logs one WARNING per outage and one INFO when it answers again,
   and replays the releases and clears it could not send. An error reply (out of memory, a key
@@ -200,11 +205,21 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   would keep dead connections). `work_mem` there is why `db` needs `shm_size`.
 - Keep the broker and the cache apart: one Dragonfly has one memory limit and one eviction
   policy for all its logical databases, so a full cache in the broker's server would refuse
-  Celery's writes, and `--cache_mode` there would evict Celery queues. The broker `dragonflydb`
-  never evicts and snapshots to the `dragonflydata` volume when it stops (queues survive
-  restarts); `dragonfly-cache` evicts and keeps nothing. `cache.clear()` flushes the cache's
+  Celery's writes, and `--cache_mode` there would evict Celery queues. The broker `chris-broker`
+  never evicts and snapshots to the `chris_broker_data` volume when it stops (queues survive
+  restarts); `chris-cache` evicts and keeps nothing. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE`
+  replace their images; the command lines are Dragonfly's. `cache.clear()` flushes the cache's
   whole database whatever the key prefix. Dragonfly's Lua scripts may only touch the keys they
   declare.
+- The broker and the cache were the services `dragonflydb` and `dragonfly-cache` until
+  2026-10-25, and the broker's volume was `dragonflydata`. Containers started under the old
+  names keep running after a checkout across the rename, and `just down`/`just bench-down`
+  leave them (and so the network) in place: stop the stack before such a checkout, or after it
+  run `just docker-compose '--profile=cube --profile=tools down --remove-orphans'` (`just
+  bench-compose '--profile cube --profile bench down --remove-orphans'` for the benchmark
+  stack). The old volume, and the tasks queued in it, stay behind: no recipe removes it, as
+  `down -v` (`just nuke`) removes only the volumes the compose file declares, so remove
+  `<project>_dragonflydata` with `docker volume rm` (or `podman volume rm`) by hand.
 - `pyproject.toml` constraints are lower bounds; `uv.lock` is the source of truth. Django is
   capped `<6.1` because django-celery-beat 2.9 requires it. After any pyproject change run
   `just lock` and commit the lockfile, otherwise CI and the image build fail.

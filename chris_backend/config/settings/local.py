@@ -196,7 +196,7 @@ PFDCM_ADDRESS = 'http://pfdcm:4005'
 
 # Celery settings
 
-CELERY_BROKER_URL = 'redis://dragonflydb:6379/0'
+CELERY_BROKER_URL = 'redis://chris-broker:6379/0'
 
 #: Only add pickle to this list if your broker is secured
 #: from unwanted access (see userguide/security.html)
@@ -212,7 +212,7 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 # Cache settings (see common.py)
 # The benchmark stack records CUBE_CACHE_URL in each run's environment manifest.
 CACHES['default']['LOCATION'] = os.getenv('CUBE_CACHE_URL',  # noqa: F405
-                                          'redis://dragonfly-cache:6379/0')
+                                          'redis://chris-cache:6379/0')
 verify_cache_connection(CACHES['default'], CELERY_BROKER_URL)  # noqa: F405
 
 

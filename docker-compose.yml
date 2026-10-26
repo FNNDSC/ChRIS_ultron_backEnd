@@ -59,9 +59,9 @@ services:
     depends_on: &CHRIS_DEPENDS
       db:
         condition: service_healthy
-      dragonflydb:
+      chris-broker:
         condition: service_healthy
-      dragonfly-cache:
+      chris-cache:
         condition: service_healthy
       nats:
         condition: service_started
@@ -151,18 +151,20 @@ services:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
-  # The Celery broker (logical database 0; 1 is reserved for event streams). The service
-  # name is hard-coded in chris_backend/config/settings/local.py, oxidicom's
-  # OXIDICOM_CELERY_BROKER, docker-compose.benchmark.yml's BENCH_BROKER and the
-  # benchmark harness (benchmarks/broker.py, run_bench.py, environment.py, compare.py).
-  dragonflydb:
-    image: ${DRAGONFLY_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
+  # The Celery broker (logical database 0; 1 is reserved for event streams), a Dragonfly.
+  # The service name is hard-coded in chris_backend/config/settings/local.py, oxidicom's
+  # OXIDICOM_CELERY_BROKER, docker-compose.benchmark.yml (its service of that name and
+  # BENCH_BROKER), the justfile's bench-start and the benchmark harness (benchmarks/broker.py,
+  # run_bench.py, environment.py, compare.py). CUBE_BROKER_IMAGE replaces the image; the
+  # command line and memlock are Dragonfly's, so another server needs its own.
+  chris-broker:
+    image: ${CUBE_BROKER_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
     # no daily call to version.dragonflydb.io, which also reports deployment details
     command: ["--version_check=false"]
     ulimits:
       memlock: -1
     volumes:
-      - dragonflydata:/data
+      - chris_broker_data:/data
     # The image's own HEALTHCHECK only opens a TCP connection and Podman ignores it. PING
     # answers once Dragonfly has loaded its snapshot.
     healthcheck:
@@ -174,13 +176,17 @@ services:
     networks:
       local:
 
-  # The shared cache, CACHES['default'] (see chris_backend/core/cache.py), kept apart from
-  # the broker so that it can evict when full and start empty without touching the Celery
-  # queues. The service name is hard-coded in chris_backend/config/settings/local.py,
-  # docker-compose.benchmark.yml's CUBE_CACHE_URL and the benchmark harness
-  # (benchmarks/environment.py, compare.py).
-  dragonfly-cache:
-    image: ${DRAGONFLY_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
+  # The shared cache, CACHES['default'] (see chris_backend/core/cache.py), a Dragonfly kept
+  # apart from the broker so that it can evict when full and start empty without touching
+  # the Celery queues. The service name is hard-coded in the local settings
+  # (chris_backend/config/settings/local.py), docker-compose.benchmark.yml (its service of
+  # that name and CUBE_CACHE_URL), the justfile's bench-start and the benchmark harness
+  # (benchmarks/environment.py, compare.py). CUBE_CACHE_IMAGE replaces the image; the
+  # command line and memlock are Dragonfly's, so another server needs its own: for Redis or
+  # Valkey, a maxmemory, an allkeys-* eviction policy and no persistence:
+  # --maxmemory 256mb --maxmemory-policy allkeys-lru --save '' --appendonly no
+  chris-cache:
+    image: ${CUBE_CACHE_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
     # --cache_mode: evict when full instead of refusing writes; --dbfilename=: no snapshot
     command: ["--version_check=false", "--cache_mode=true", "--dbfilename="]
     ulimits:
@@ -311,7 +317,7 @@ services:
     environment:
       # https://chrisproject.org/docs/oxidicom/deployment#environment-variables
       OXIDICOM_FILES_ROOT: /data
-      OXIDICOM_CELERY_BROKER: redis://dragonflydb:6379/0
+      OXIDICOM_CELERY_BROKER: redis://chris-broker:6379/0
       OXIDICOM_NATS_ADDRESS: nats:4222
       OXIDICOM_SCP_AET: ChRIS
       OXIDICOM_SCP_PROMISCUOUS: "true"
@@ -329,7 +335,7 @@ services:
     user: ${UID}:${GID}
     stop_signal: SIGKILL
     depends_on:
-      dragonflydb:
+      chris-broker:
         condition: service_started
       nats:
         condition: service_started
@@ -341,7 +347,7 @@ volumes:
   chris_files:
   db:
   lldap:
-  dragonflydata:
+  chris_broker_data:
   orthanc:
   pfdcm:
 

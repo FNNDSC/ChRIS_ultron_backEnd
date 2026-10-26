@@ -74,7 +74,7 @@ class BenchmarkRunner:
         self.docker = DockerClient(project=project, exclude_services=("benchmark",))
         
         broker_host, _, broker_port = os.environ.get(
-            "BENCH_BROKER", "dragonflydb:6379").partition(":")
+            "BENCH_BROKER", "chris-broker:6379").partition(":")
         
         self.broker = BrokerClient(broker_host, int(broker_port or 6379))
         self.pg_stats = PgStatStatements(self.docker)

@@ -466,6 +466,8 @@ The broker uses less with 2 threads than with 16 (7.0% against 14.7% of a CPU, 2
 
   Compared with the runs of this section, it reports only real differences.
 
+  **Note (2026-10-25):** the services are now `chris-broker` and `chris-cache`, and `bench-compare` prints these rows under those names (`images.chris-broker`, `limits.chris-cache.cpus` and so on) for the runs above too, which recorded the old names, and reads a recorded `redis://dragonfly-cache:6379/0` as `redis://chris-cache:6379/0`, so the rename alone adds no `envelope.CUBE_CACHE_URL` row.
+
 ## 17. Committed workload-plugin pin (2026-10-22)
 
 Every campaign up to § 16 registered the workload plugins from an edited `chrisomatic/chrisomatic.yml`, uncommitted but for § 15's runs (the edit was on `master` between #739 and #744), because the committed file takes `pl-topologicalcopy` by name from the ChRIS store, which now serves 2.0.0 under that name — a no-op image, `docker.io/backplane/true`, declaring the three parameters the harness passes (1.0.13 also declares `pftelDB`) — and does not hold 1.0.13. `just bench-start` now registers them from the committed `benchmarks/chrisomatic/benchmark.yml`, and the harness refuses to start unless CUBE holds exactly those registrations ([envelope.md](envelope.md) § "Pinned workload plugin versions"). The runs below check that the pin changes nothing the harness measures, and give the four commands of § 16 baselines that record what ran.

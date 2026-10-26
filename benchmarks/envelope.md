@@ -29,11 +29,11 @@ artificial dev cap.
 | `PFCON_CPUS` / `PFCON_MEM_LIMIT` | `2` / `2g` | `pfcon` CPU and memory |
 | `CUBE_WORKER_PERIODIC_CPUS` / `CUBE_WORKER_PERIODIC_MEM_LIMIT` | `1` / `1g` | `worker-periodic` (the beat tasks) CPU and memory |
 | `CUBE_SCHEDULER_CPUS` / `CUBE_SCHEDULER_MEM_LIMIT` | `0.5` / `512m` | `celery-scheduler` (beat) CPU and memory |
-| `CUBE_BROKER_CPUS` / `CUBE_BROKER_MEM_LIMIT` | `2` / `1g` | `dragonflydb` (the Celery broker) CPU and memory |
-| `CUBE_CACHE_CPUS` / `CUBE_CACHE_MEM_LIMIT` | `1` / `512m` | `dragonfly-cache` (the shared cache) CPU and memory |
+| `CUBE_BROKER_CPUS` / `CUBE_BROKER_MEM_LIMIT` | `2` / `1g` | `chris-broker` (the Celery broker) CPU and memory |
+| `CUBE_CACHE_CPUS` / `CUBE_CACHE_MEM_LIMIT` | `1` / `512m` | `chris-cache` (the shared cache) CPU and memory |
 | `CUBE_CELERY_POLL_INTERVAL` | `2.0` | Celery-beat scheduling/status poll cadence (s) — sweep `{2, 4, 8}` |
 | `CUBE_DEBUG` | `false` | Django `DEBUG` on `chris` and the Celery services (see below) |
-| `CUBE_CACHE_URL` | `redis://dragonfly-cache:6379/0` | the shared cache (`CACHES['default']`) of `chris` and the Celery services; earlier runs did not record it, so `bench-compare` reports it as a caution against them |
+| `CUBE_CACHE_URL` | `redis://chris-cache:6379/0` | the shared cache (`CACHES['default']`) of `chris` and the Celery services; earlier runs did not record it, so `bench-compare` reports it as a caution against them |
 
 **Why `DEBUG` is off:** production runs with `DEBUG = False`, and `DEBUG` changes what is
 measured: every SQL statement goes through Django's query recorder, the debug toolbar's
@@ -57,8 +57,8 @@ as a baseline: `bench-compare` flags `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` and
 seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
 recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
-**The broker and the cache:** Dragonfly runs twice, as the Celery broker (`dragonflydb`) and
-as the shared cache (`dragonfly-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
+**The broker and the cache:** Dragonfly runs twice, as the Celery broker (`chris-broker`) and
+as the shared cache (`chris-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
 given and keeps 80% of its memory limit as its `maxmemory`, so without the limits above both
 would follow the host (16 threads and about 92 GiB on the benchmark box). It exits at start-up
 when that `maxmemory` is under 256 MiB per thread, so change a Dragonfly's CPUs together with
@@ -68,12 +68,25 @@ at its migrate step, since every CUBE service waits for both to be healthy. The 
 v2.0.2 peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
 `worker-periodic`, so the limits leave room for what later issues add. Runs from before these
 limits have none of them, and `bench-compare` reports each as a caution against them; `0`
-removes a limit, for a run without it. Their images are recorded under `images`
-in `environment.json`; `bench-compare` lists a different image, or none in a run that predates
-the record (`—`), as information. `DRAGONFLY_IMAGE` replaces the image of both, for example
-for an A/B of two Dragonfly versions. Export it for `just bench-start` and `just bench-run` alike:
-`bench-run`'s `compose run` recreates a dependency whose configuration differs, so a
-variable set for one recipe only silently brings the default image back.
+removes a limit, for a run without it. Their images are recorded under `images` in
+`environment.json`; `bench-compare` lists a different image, or none in a run that predates the
+record (`—`), as information. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE` replace the image of each
+(they replaced `DRAGONFLY_IMAGE`, which set both), for example for an A/B of two Dragonfly
+versions. Export them for `just bench-start` and `just bench-run` alike: `bench-run`'s
+`compose run` recreates a dependency whose configuration differs, so a variable set for one recipe
+only silently brings the default image back. Another server than Dragonfly needs its own command
+line in `docker-compose.yml` as well (Redis and Valkey take no memory limit from the container, so
+they need `--maxmemory`).
+
+**The rename of 2026-10-25:** runs archived before it name the broker and the cache `dragonflydb`
+and `dragonfly-cache`, which `bench-compare` reads as the current names in their images and limits,
+in the host of `CUBE_CACHE_URL` and in a trend's `--metric` (`peak_cpu_pct.chris-broker`). A later
+run that records an old name ran beside a container left over from before, and `bench-compare` shows
+it as it is. A box that ran the stack under the old names keeps those containers after the checkout,
+and `just bench-down` leaves them: stop the stack before the checkout, or after it run
+`just bench-compose '--profile cube --profile bench down --remove-orphans'` (`just bench-nuke`
+removes them too, with every volume). The broker's volume, `dragonflydata`, is now
+`chris_broker_data`; no recipe removes the old one, which `docker volume rm` does by hand.
 
 **Why the 2.0 s floor for the Celery poll interval:** the periodic tasks are guarded by `skip_if_running`
 (`plugininstances/tasks.py`), which spends ~1 s in a broker-wide `inspect().active()`

@@ -338,6 +338,11 @@ Against runs from before 2026-10-20 `bench-compare` lists `images.dragonflydb` a
 `host.mem_total_bytes` differs against every earlier campaign (a few KiB each time). Against the
 runs above it reports only what differs. The per-run logs (Dragonfly's, pfcon's, the probes)
 are kept on the benchmark box.
+Since 2026-10-25 the two services are `chris-broker` and `chris-cache`, and `bench-compare`
+prints these rows under those names (`images.chris-broker`, `limits.chris-cache.cpus` and so on)
+for the runs above too, which recorded the old names, and reads a recorded
+`redis://dragonfly-cache:6379/0` as `redis://chris-cache:6379/0`, so the rename alone adds no
+`envelope.CUBE_CACHE_URL` row.
 
 ## Committed workload-plugin pin — 2026-10-22
 

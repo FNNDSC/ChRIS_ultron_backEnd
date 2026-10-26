@@ -31,7 +31,7 @@ services:
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
-      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
+      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://chris-cache:6379/0}"
       # one db_pool_stats log line per uvicorn worker every N seconds (0 disables)
       CUBE_DB_POOL_STATS_INTERVAL: "${CUBE_DB_POOL_STATS_INTERVAL:-5}"
 
@@ -46,7 +46,7 @@ services:
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
-      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
+      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://chris-cache:6379/0}"
 
   worker-periodic:
     cpus: ${CUBE_WORKER_PERIODIC_CPUS:-1}
@@ -58,7 +58,7 @@ services:
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
-      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
+      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://chris-cache:6379/0}"
 
   celery-scheduler:
     cpus: ${CUBE_SCHEDULER_CPUS:-0.5}
@@ -70,7 +70,7 @@ services:
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
-      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
+      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://chris-cache:6379/0}"
 
   db:
     # docker-compose.yml's command line (postgres/cube.conf) plus the envelope's
@@ -83,15 +83,17 @@ services:
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
 
-  # Dragonfly runs one thread per CPU it is given and keeps 80% of its memory limit as its
-  # maxmemory; without limits both follow the host. It exits when that maxmemory is under
-  # 256 MiB per thread, so give each at least 320 MiB of memory per CPU (with 0 CPUs, per
-  # host CPU): 2 CPUs with 512m stop it and so do 0 CPUs with the default memory.
-  dragonflydb:
+  # The broker and the cache are Dragonflies, which run one thread per CPU they are given
+  # and keep 80% of their memory limit as their maxmemory; without limits both follow the
+  # host. Dragonfly exits when that maxmemory is under 256 MiB per thread, so give each at
+  # least 320 MiB of memory per CPU (with 0 CPUs, per host CPU): 2 CPUs with 512m stop it
+  # and so do 0 CPUs with the default memory. Redis and Valkey take neither from the
+  # limits: they need --maxmemory below mem_limit, or the kernel kills them when full.
+  chris-broker:
     cpus: ${CUBE_BROKER_CPUS:-2}
     mem_limit: ${CUBE_BROKER_MEM_LIMIT:-1g}
 
-  dragonfly-cache:
+  chris-cache:
     cpus: ${CUBE_CACHE_CPUS:-1}
     mem_limit: ${CUBE_CACHE_MEM_LIMIT:-512m}
 
@@ -116,7 +118,7 @@ services:
       CUBE_URL: "http://chris:8000/api/v1/"
       CUBE_USERNAME: "${CUBE_USERNAME:-chris}"
       CUBE_PASSWORD: "${CUBE_PASSWORD:-chris1234}"
-      BENCH_BROKER: "dragonflydb:6379"
+      BENCH_BROKER: "chris-broker:6379"
       COMPOSE_PROJECT_NAME: "${COMPOSE_PROJECT_NAME:-}"
       BENCH_RESULTS_DIR: "/app/benchmarks/results"
       GIT_COMMIT: "${GIT_COMMIT:-}"
@@ -135,7 +137,7 @@ services:
       CUBE_DB_POOL_MAX_SIZE: "${CUBE_DB_POOL_MAX_SIZE:-10}"
       CUBE_DB_POOL_TIMEOUT: "${CUBE_DB_POOL_TIMEOUT:-10}"
       CUBE_DEBUG: "${CUBE_DEBUG:-false}"
-      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://dragonfly-cache:6379/0}"
+      CUBE_CACHE_URL: "${CUBE_CACHE_URL:-redis://chris-cache:6379/0}"
       CUBE_DB_MAX_CONNECTIONS: "${CUBE_DB_MAX_CONNECTIONS:-300}"
       CUBE_DB_SYNCHRONOUS_COMMIT: "${CUBE_DB_SYNCHRONOUS_COMMIT:-on}"
       CUBE_WORKER_MAINS_CONCURRENCY: "${CUBE_WORKER_MAINS_CONCURRENCY:-4}"

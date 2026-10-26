@@ -205,7 +205,7 @@ CELERYD_PREFETCH_MULTIPLIER = 2
 # ------------------------------------------------------------------------------
 # A Redis-protocol server of the cache's own, apart from the Celery broker's: the start-up
 # check refuses the broker's server, whatever the database. For example
-# redis://dragonfly-cache:6379/0. TLS options and socket timeouts (above 0, at most 5 s)
+# redis://chris-cache:6379/0. TLS options and socket timeouts (above 0, at most 5 s)
 # can go in its query string, retry options cannot.
 CACHES['default']['LOCATION'] = get_secret('CACHE_URL')  # noqa: F405
 verify_cache_connection(CACHES['default'], CELERY_BROKER_URL)  # noqa: F405
