@@ -1085,9 +1085,11 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
 
     def test_plugin_instance_list_query_count_does_not_grow_with_instances(self):
         # the related objects the serializer reads for every instance are fetched in
-        # the list query itself, so more instances must not mean more queries
+        # the list query itself, so more instances must not mean more queries; all
+        # the instances fit in one page (PAGE_SIZE is 10)
         self.client.login(username=self.username, password=self.password)
         list_url = reverse("allplugininstance-list")
+        self.client.get(list_url)  # a first request fills any one-time cache
 
         with CaptureQueriesContext(connection) as before:
             response = self.client.get(list_url)

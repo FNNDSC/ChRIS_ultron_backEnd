@@ -273,9 +273,11 @@ class FeedListViewTests(ViewTests):
         self.assertContains(response, "Feed2")
 
     def test_feed_list_query_count_does_not_grow_with_feeds(self):
-        # the owner and folder the serializer reads for every feed are fetched in the
-        # list query itself, so more feeds must not mean more queries
+        # the owner, folder and note the serializer reads for every feed are fetched in
+        # the list query itself, so more feeds must not mean more queries; all the
+        # feeds fit in one page (PAGE_SIZE is 10)
         self.client.login(username=self.username, password=self.password)
+        self.client.get(self.list_url)  # a first request fills any one-time cache
 
         with CaptureQueriesContext(connection) as before:
             response = self.client.get(self.list_url)
@@ -1354,8 +1356,10 @@ class FeedPluginInstanceListViewTests(ViewTests):
 
     def test_feed_plugin_instance_list_query_count_does_not_grow_with_instances(self):
         # the related objects the serializer reads for every instance are fetched in
-        # the list query itself, so a bigger feed must not mean more queries
+        # the list query itself, so a bigger feed must not mean more queries; all the
+        # instances fit in one page (PAGE_SIZE is 10)
         self.client.login(username=self.username, password=self.password)
+        self.client.get(self.list_url)  # a first request fills any one-time cache
 
         with CaptureQueriesContext(connection) as before:
             response = self.client.get(self.list_url)

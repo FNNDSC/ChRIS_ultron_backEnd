@@ -261,7 +261,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
+    queryset = PluginInstance.add_serializer_relations(PluginInstance.objects.all())
     permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def list(self, request, *args, **kwargs):

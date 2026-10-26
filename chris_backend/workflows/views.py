@@ -283,4 +283,5 @@ class WorkflowPluginInstanceList(generics.ListAPIView):
         the queried workflow.
         """
         workflow = self.get_object()
-        return self.filter_queryset(workflow.plugin_instances.all())
+        return self.filter_queryset(
+            PluginInstance.add_serializer_relations(workflow.plugin_instances.all()))

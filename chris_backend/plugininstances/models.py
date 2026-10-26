@@ -193,7 +193,9 @@ class PluginInstance(AsyncDeletableModel):
         queue = [self]
         while len(queue) > 0:
             visited = queue.pop()
-            queue.extend(list(visited.next.all()))
+            # one query per visited node, but each child arrives with the related
+            # objects the serializer reads instead of costing a query per relation
+            queue.extend(list(PluginInstance.add_serializer_relations(visited.next.all())))
             descendant_instances.append(visited)
         return descendant_instances
 

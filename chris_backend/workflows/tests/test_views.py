@@ -5,7 +5,9 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
@@ -355,6 +357,41 @@ class WorkflowPluginInstanceListViewTests(ViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_workflow_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance, the workflow
+        # and its pipeline among them, are fetched in the list query itself, so a
+        # bigger workflow must not mean more queries; all the instances fit in one
+        # page (PAGE_SIZE is 10)
+        workflow = Workflow.objects.get(title='Workflow4')
+        owner = User.objects.get(username=self.username)
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        root = PluginInstance.objects.create(
+            plugin=plugin_fs, owner=owner, title='root',
+            compute_resource=plugin_fs.compute_resources.all()[0])
+
+        def instances_create(count, prefix):
+            for i in range(count):
+                PluginInstance.objects.create(
+                    plugin=plugin_ds, owner=owner, previous=root, workflow=workflow,
+                    title=f'{prefix}{i}',
+                    compute_resource=plugin_ds.compute_resources.all()[0])
+
+        instances_create(2, 'first')
+        self.client.login(username=self.username, password=self.password)
+        self.client.get(self.list_url)  # a first request fills any one-time cache
+
+        with CaptureQueriesContext(connection) as before:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['pipeline_name'], self.pipeline_name)
+
+        instances_create(3, 'more')
+        with CaptureQueriesContext(connection) as after:
+            response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 5)
+        self.assertEqual(len(after), len(before))
 
     def test_workflow_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)
