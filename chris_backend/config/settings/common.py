@@ -234,7 +234,7 @@ SPECTACULAR_SETTINGS = {
     'VERSION': __version__,
     'LICENSE': {
         'name': 'MIT',
-        'url': 'https://github.com/FNNDSC/ChRIS_ultron_backEnd/blob/master/LICENSE'
+        'url': 'https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/blob/master/LICENSE'
     },
     'EXTERNAL_DOCS': {
         'url': 'https://chrisproject.org/docs'

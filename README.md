@@ -1,7 +1,7 @@
 # ![ChRIS logo](./docs/assets/logo_chris.png) ChRIS\_ultron\_backEnd
 
-[![Build](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/FNNDSC/ChRIS_ultron_backEnd/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/fnndsc/ChRIS_ultron_backEnd.svg)](./LICENSE)
+[![Build](https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/actions/workflows/ci.yml/badge.svg)](https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/HARBOR-Medical-AI/ChRIS_ultron_backEnd.svg)](./LICENSE)
 
 _ChRIS_ is an open-source platform for containerized medical compute.
 
@@ -12,7 +12,7 @@ https://chrisproject.org/
 With [Docker Compose](https://docs.docker.com/compose/) and [just](https://just.systems/) installed, run
 
 ```shell
-git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
+git clone https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd.git
 cd ChRIS_ultron_backEnd
 just
 ```
@@ -74,7 +74,7 @@ just prefer podman  # or
 just prefer docker
 ```
 
-With Podman, DragonflyDB might fail to start. Simply retry the command. See https://github.com/FNNDSC/ChRIS_ultron_backEnd/issues/573
+With Podman, DragonflyDB might fail to start. Simply retry the command. See https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/issues/573
 
 On Ubuntu 26.04, `just down` or `just nuke` can fail with "rootless netns: kill network process: permission denied": the AppArmor profile for `pasta` does not let it receive a signal from Podman ([Debian bug 1100135](https://bugs.debian.org/1100135)). Add the missing rule (running this again changes nothing):
 
@@ -173,6 +173,25 @@ These run uv in a throwaway container, so no local uv installation is required. 
 benchmark harness has its own `benchmarks/pyproject.toml` and `benchmarks/uv.lock`,
 because `docker-compose.benchmark.yml` builds it with `context: ./benchmarks`.
 
+#### Check for Codacy issues before pushing
+
+[Codacy](https://app.codacy.com/gh/HARBOR-Medical-AI/ChRIS_ultron_backEnd/dashboard) fails a
+pull request on any issue its merge-base does not have. `just lint` runs the same Python
+checks in the dev image (Bandit, pyflakes, dodgy and Pylint with Codacy's rules, and
+`uv audit` for the lockfiles) on the files changed since the merge-base with
+`origin/master`, and lists only the new issues:
+
+```shell
+just lint                 # new issues on this branch, uncommitted changes included
+just lint --all           # every issue in the changed files
+just lint-fix             # let Ruff fix new unused imports and f-strings without placeholders
+just lint-fix --unsafe    # ... and unused variables
+```
+
+It finds nearly all of Codacy's issues, but not those of Opengrep (unpinned GitHub
+Actions, a Dockerfile without `USER`), ESLint, ShellCheck, Hadolint or markdownlint.
+Silence a false positive as the code does, e.g. `# nosec B105 - a label, not a password`.
+
 #### Trying HTTP requests from the CLI
 
 For CLI tools, I recommend [xh](https://github.com/ducaale/xh) and [jnv](https://github.com/ynqa/jnv) or [jq](https://jqlang.github.io/jq/). Example:
@@ -247,7 +266,7 @@ And you are ready to run your LSP + text editor.
 Generally, its introspection is capable and accurate, but some special care is necessary to make
 everything work. See:
 
-- https://github.com/FNNDSC/ChRIS_ultron_backEnd/pull/584
+- https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/pull/584
 - https://github.com/tfranzel/drf-spectacular/issues/1303#issuecomment-2387220962
 - https://drf-spectacular.readthedocs.io/en/latest/faq.html#my-get-queryset-depends-on-some-attributes-not-available-at-schema-generation-time
 
@@ -280,7 +299,7 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Run ChRIS backend integration tests
-        uses: FNNDSC/ChRIS_ultron_backEnd@master
+        uses: HARBOR-Medical-AI/ChRIS_ultron_backEnd@master
         # all inputs are optional
         with:
           engine: docker  # or podman
@@ -328,8 +347,8 @@ make html
 
 #### ChRIS REST API design.
 
-Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-REST-API-design).
+Available [here](https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/wiki/ChRIS-REST-API-design).
 
 #### ChRIS backend database design.
 
-Available [here](https://github.com/FNNDSC/ChRIS_ultron_backEnd/wiki/ChRIS-backend-database-design).
+Available [here](https://github.com/HARBOR-Medical-AI/ChRIS_ultron_backEnd/wiki/ChRIS-backend-database-design).

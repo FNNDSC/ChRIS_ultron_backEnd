@@ -106,6 +106,30 @@ test-unit-coverage: start-ancillary
     @just storage={{ storage }} run coverage run manage.py test --force-color --exclude-tag integration
     @just storage={{ storage }} run coverage xml
 
+# Codacy fails a pull request on any issue its merge-base does not have. `lint` runs the
+# checks behind nearly all of Codacy's findings (Bandit, pyflakes, dodgy, Pylint, and
+# `uv audit` for Trivy) on the files changed since the merge-base with origin/master and
+# lists the issues only the working tree has; `--all` lists the older ones too, `--base`
+# names another branch. See scripts/lint.py.
+#
+# List the issues Codacy would report as new on this branch.
+[group('(3) development')]
+lint *args: (lint-run 'check' args)
+
+# Ruff fixes unused imports and f-strings without placeholders, and with `--unsafe` unused
+# variables too, only where `lint` reports them as new.
+#
+# Fix the new issues Ruff can fix, then list what is left.
+[group('(3) development')]
+lint-fix *args: (lint-run 'fix' args)
+
+# Run scripts/lint.py in the dev image with the repository mounted at /w.
+[group('helper function')]
+lint-run command *args:
+    @just storage={{ storage }} docker-compose --profile=cube run --rm --no-deps -T \
+        -v '{{ justfile_directory() }}:/w:z' -w /w -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 \
+        chris python scripts/lint.py {{ command }} {{ args }}
+
 # Start dependency services.
 [group('(1) start-up')]
 start-ancillary: (docker-compose 'up -d')

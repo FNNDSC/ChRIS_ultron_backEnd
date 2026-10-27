@@ -49,7 +49,11 @@ dev = [
     "collection-json>=0.1.1",  # used directly by collectionjson.tests.test_renderers
     "coverage>=7.16",
     "pylint>=4.0.8",
+    "pylint-django>=2.8.0",  # used by `just lint`, as by Codacy's Pylint
     "flake8>=7.3",
+    "bandit>=1.9.4",  # used by `just lint`
+    "dodgy>=0.2.1",  # used by `just lint`, as by Codacy's Prospector
+    "ruff>=0.17.3",  # used by `just lint-fix`
     "daphne>=4.2.3",  # required by (django) channels.testing
 ]
 
