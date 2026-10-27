@@ -92,6 +92,40 @@ def _approach_curves(levels: list[dict]) -> list[str]:
         out += _peak_cpu_note(rows)
         out += _peak_io_note(rows)
         out += _db_counters_note(rows)
+        out += _sampler_note(rows)
+    return out
+
+
+_SAMPLER_TROUBLE = ("late_ticks", "failed_reads", "list_failures", "queue_late_ticks",
+                    "queue_failures")
+
+
+def _sampler_note(rows: list[dict]) -> list[str]:
+    """
+    How the resources and queues were sampled at the highest level reached, and a warning
+    naming every level whose sampling fell behind or failed: the peaks above are only as
+    good as the readings behind them.
+    """
+    last = (rows[-1] if rows else {}).get("sampler") or {}
+
+    if not last:
+        return []
+
+    instances = sum(((rows[-1].get("final_status_counts") or {}).values()))
+    queues = (f"; queues every {last['queue_interval_s']} s, {last.get('queue_ticks')} "
+              f"ticks" if last.get("queue_interval_s") else "; queues not sampled")
+    out = [f"_Sampling at level {rows[-1].get('level')}: every {last.get('interval_s')} s, "
+           f"{last.get('ticks')} ticks ({last.get('late_ticks')} late, slowest "
+           f"{last.get('max_tick_s')} s), {last.get('reads')} reads "
+           f"({last.get('failed_reads')} failed); {last.get('jobs_seen')} plugin-job "
+           f"containers seen for {instances} instances{queues}_", ""]
+
+    behind = [str(r.get("level")) for r in rows
+              if any((r.get("sampler") or {}).get(key) for key in _SAMPLER_TROUBLE)]
+    if behind:
+        out += [f"**Sampling fell behind or failed at level(s) {', '.join(behind)}** "
+                f"(late ticks, failed reads or listings, or failed queue reads in "
+                f"`levels.jsonl`): their peaks may miss readings.", ""]
     return out
 
 
@@ -239,6 +273,8 @@ def _environment_section(env: dict) -> list[str]:
         ["API auth", _auth_cell(env.get("api_auth_mode"))],
         ["Noise floor (health p50/p95 ms)",
          f"{(noise or {}).get('health_p50_ms')} / {(noise or {}).get('health_p95_ms')}"],
+        *([["Resource sampler", _sampler_cell(env["sampler"])]] if env.get("sampler")
+          else []),
     ])
 
     out.append("")
@@ -268,6 +304,12 @@ def _environment_section(env: dict) -> list[str]:
 
     out.append("")
     return out
+
+
+def _sampler_cell(sampler: dict) -> str:
+    queues = (f", queues every {sampler['queue_interval_s']} s"
+              if sampler.get("queue_interval_s") else "")
+    return f"{sampler.get('method')}: every {sampler.get('interval_s')} s{queues}"
 
 
 def _limits_section(limits: dict) -> list[str]:

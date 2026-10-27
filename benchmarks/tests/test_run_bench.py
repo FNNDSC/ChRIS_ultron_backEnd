@@ -2,13 +2,16 @@
 Tests for benchmarks.run_bench — scenario params, tier filtering, level rollup, plugin resolution.
 """
 
+import json
 from types import SimpleNamespace
 
 import pytest
 
 from benchmarks import run_bench
 from benchmarks.config import PluginPin, PluginPins, load_pins, load_tier
+from benchmarks.metrics import MetricSink
 from benchmarks.models import (Classification, LevelResult, PluginRole, PollResult,
+                               QueueSample, ResourceSample, SamplerSummary,
                                ScenarioParams, ScenarioResult, StatusTimeline, Verdict)
 from benchmarks.results import ResultsStore
 from benchmarks.chris_api import ChrisApiError, HttpResult
@@ -17,6 +20,7 @@ from benchmarks.run_bench import (RUN_STATS_SETTLE_S, BenchmarkRunner, _filter_t
                                   build_workload_manifest, effective_poll_cadence,
                                   make_scenario_params, pin_mismatch_message,
                                   pin_mismatches, resolve_plugin)
+from benchmarks.stats_sampler import sampler_record
 
 
 # -- scenario params -------------------------------------------------------------------
@@ -183,6 +187,48 @@ def test_level_row_keeps_the_container_counters_of_a_reset_repeat():
     assert workload == {"reset": True, "cgroup_oom_kill": 1}  # nosec B101 - pytest assertion
 
 
+def _resources_scenario(resources, sampler):
+    p = ScenarioParams("linear", "depth", 1, 1, "1KiB", 1, 1, 1, 1, 1, 0, 1.0, 0)
+    return ScenarioResult(p, Classification(Verdict.PASS), 1.0, [], [],
+                          {"by_class": {}, "errors": 0, "status_5xx": 0}, resources,
+                          {"registered_output_bytes": 0}, 0.0, 1.0, sampler=sampler)
+
+
+def test_level_row_leaves_out_what_was_not_measured_and_rolls_up_the_sampler():
+    first = _resources_scenario(
+        {"db": {"kind": "service", "cpu_pct_peak": None, "blkio_write_bytes": 10,
+                "mem_bytes_peak": 300, "mem_anon_peak": 200, "cpu_throttled_s": 0.5},
+         "chris": {"kind": "service", "cpu_pct_peak": 30.0, "mem_bytes_peak": 100},
+         "chris-jid-1": {"kind": "job", "cpu_pct_peak": None}},
+        SamplerSummary(interval_s=1.0, queue_interval_s=0.5, ticks=10, late_ticks=1,
+                       max_tick_s=0.4, reads=30, jobs_seen=2, queue_ticks=20))
+    second = _resources_scenario(
+        {"chris": {"kind": "service", "cpu_pct_peak": 20.0, "mem_bytes_peak": 150}},
+        SamplerSummary(interval_s=1.0, queue_interval_s=0.5, ticks=5, max_tick_s=0.2,
+                       reads=10, failed_reads=1, queue_ticks=10))
+    row = _level_row(LevelResult("linear", "depth", 1, Verdict.PASS, (), [first, second]))
+
+    # a service with no CPU window has no CPU peak, and no job had one either
+    assert row["peak_cpu_pct"] == {"chris": 30.0}  # nosec B101 - pytest assertion
+    assert row["peak_job_cpu_pct"] is None  # nosec B101 - pytest assertion
+    assert row["peak_mem_bytes"] == {"db": 300, "chris": 150}  # nosec B101 - pytest assertion
+    assert row["peak_mem_anon_bytes"] == {"db": 200}  # nosec B101 - pytest assertion
+    assert row["cpu_throttled_s"] == {"db": 0.5}  # nosec B101 - pytest assertion
+    assert row["peak_write_bytes"] == {"db": 10}  # nosec B101 - pytest assertion
+    assert row["sampler"] == {  # nosec B101 - pytest assertion
+        "interval_s": 1.0, "queue_interval_s": 0.5, "max_tick_s": 0.4, "ticks": 15,
+        "late_ticks": 1, "reads": 40, "failed_reads": 1, "vanished": 0,
+        "list_failures": 0, "jobs_seen": 2, "queue_ticks": 30, "queue_late_ticks": 0,
+        "queue_failures": 0}
+
+
+def test_level_row_of_scenarios_without_a_sampler_summary_has_an_empty_block():
+    row = _level_row(LevelResult("linear", "depth", 1, Verdict.PASS, (),
+                                 [_scenario(Verdict.PASS, 1.0, 10, 5, 1, 0)]))
+
+    assert row["sampler"] == {}  # nosec B101 - pytest assertion
+
+
 def test_level_row_without_db_counters_has_an_empty_block():
     row = _level_row(LevelResult("linear", "depth", 1, Verdict.PASS, (),
                                  [_scenario(Verdict.PASS, 1.0, 10, 5, 1, 0)]))
@@ -192,13 +238,24 @@ def test_level_row_without_db_counters_has_an_empty_block():
 
 # -- Postgres counter windows and run totals ------------------------------------------------
 
+IN_WINDOW = ResourceSample(t=1.0, container="db", kind="service", cpu_pct=40.0,
+                           mem_bytes=1, mem_limit_bytes=2)
+AFTER_WINDOW = ResourceSample(t=9.0, container="chris", kind="service", cpu_pct=90.0,
+                              mem_bytes=1, mem_limit_bytes=2)
+
+
 class _Sampler:
-    """Stands in for StatsSampler, recording when the resource samples start and stop."""
+    """
+    Stands in for StatsSampler, recording when the resource samples start and stop, the
+    Docker client it is given, and one sample, at its exit.
+    """
 
     def __init__(self, events):
         self.events = events
+        self.docker = None
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, docker, sink, *args, **kwargs):
+        self.docker, self.sink = docker, sink
         return self
 
     def __enter__(self):
@@ -206,7 +263,11 @@ class _Sampler:
         return self
 
     def __exit__(self, *exc):
+        self.sink.record_resource(IN_WINDOW)
         self.events.append("samples stop")
+
+    def summary(self):
+        return SamplerSummary(interval_s=1.0, queue_interval_s=0.5, ticks=3)
 
 
 def _scenario_runner(monkeypatch, tmp_path, *, cleanup):
@@ -225,7 +286,8 @@ def _scenario_runner(monkeypatch, tmp_path, *, cleanup):
     poll = PollResult(timelines=[], makespan_s=1.0, terminal=True, hard_failures=(),
                       no_progress=False, timed_out=False, final_status_counts={})
 
-    monkeypatch.setattr(run_bench, "StatsSampler", _Sampler(events))
+    sampler = _Sampler(events)
+    monkeypatch.setattr(run_bench, "StatsSampler", sampler)
     monkeypatch.setattr(run_bench, "build_feeds", lambda *a, **k: [])
     monkeypatch.setattr(run_bench, "poll_to_completion", lambda *a, **k: poll)
     monkeypatch.setattr(run_bench, "ProgressProbe", lambda docker: None)
@@ -235,13 +297,17 @@ def _scenario_runner(monkeypatch, tmp_path, *, cleanup):
     runner.cleanup = cleanup
     runner.store = ResultsStore(tmp_path)
     runner.docker = runner.api = runner.broker = None
+    runner.sampler_docker = SimpleNamespace(name="the sampler's client")
+    runner._sink = MetricSink()
     runner.plugin_ids = {}
     runner.pg_stats = SimpleNamespace(reset=lambda: events.append("pg_stats reset"))
     runner._global_counts = lambda: {}
     runner._db_snapshot = snapshot
     runner._db_deltas = lambda *a: events.append("db deltas") or {}
-    runner._cleanup_and_quiesce = lambda *a: events.append("cleanup")
-    runner._persist_scenario = lambda *a: events.append("persist")
+    runner._cleanup_and_quiesce = lambda *a: (events.append("cleanup"),
+                                              runner._sink.record_resource(AFTER_WINDOW))
+    runner._persist_scenario = lambda *a: events.append("persist") or events.append(a)
+    runner.fake_sampler = sampler
     return runner, events
 
 
@@ -253,10 +319,24 @@ def test_scenario_counter_windows_match_the_resource_samples_and_cleanup(monkeyp
 
     expected = ["pg_stats reset", "snapshot", "samples start", "samples stop",
                 "snapshot", "db deltas", "cleanup", "snapshot", "persist"]
-    assert events == expected  # nosec B101 - pytest assertion
+    assert [e for e in events if isinstance(e, str)] == expected  # nosec B101 - pytest assertion
     workload, cleanup = result.db_counters["workload"], result.db_counters["cleanup"]
     assert workload == {"wal_bytes": 100, "seconds": 5.0}  # nosec B101 - pytest assertion
     assert cleanup == {"wal_bytes": 30, "seconds": 3.0}  # nosec B101 - pytest assertion
+
+
+def test_a_scenario_rolls_up_and_persists_the_samples_of_its_workload_window(monkeypatch,
+                                                                            tmp_path):
+    runner, events = _scenario_runner(monkeypatch, tmp_path, cleanup=True)
+    result = runner.run_scenario(make_scenario_params(runner.tier.baseline, 2.0, "linear",
+                                                      "depth", 1, 0))
+    _, _, resources, queues = events[-1]
+
+    # the cleanup's late sample is in neither the rollup nor the persisted files
+    assert set(result.resources) == {"db"}  # nosec B101 - pytest assertion
+    assert (resources, queues) == ([IN_WINDOW], [])  # nosec B101 - pytest assertion
+    assert result.sampler == runner.fake_sampler.summary()  # nosec B101 - pytest assertion
+    assert runner.fake_sampler.docker is runner.sampler_docker  # nosec B101 - pytest assertion
 
 
 def test_a_scenario_that_keeps_its_feeds_has_no_cleanup_window(monkeypatch, tmp_path):
@@ -305,6 +385,7 @@ def _run_runner(monkeypatch, tmp_path, snapshots, sleeps):
     runner.plugin_images = {}
     runner.pins = load_pins()
     runner.docker = None
+    runner.sampler_docker = SimpleNamespace(available=True)
     runner._db_snapshot = lambda: snapshots.pop(0)
     monkeypatch.setattr(run_bench, "server_counters_error",
                         lambda docker: "psql: FATAL:  sorry, too many clients already")
@@ -536,6 +617,47 @@ def test_runner_lists_a_plugin_cube_does_not_have_with_the_other_problems(monkey
 
     assert "dbg-bigfiles is not registered" in message  # nosec B101 - pytest assertion
     assert "pl-simpledsapp 2.1.4 is registered" in message  # nosec B101 - pytest assertion
+
+
+def test_run_records_how_it_samples(monkeypatch, tmp_path):
+    env = _run_runner(monkeypatch, tmp_path, [{}, {}], []).run()["environment"]
+
+    assert env["sampler"] == sampler_record(  # nosec B101 - pytest assertion
+        run_bench.STATS_INTERVAL_S, run_bench.QUEUE_INTERVAL_S, run_bench.SAMPLER_WORKERS)
+    assert env["attribution"]["resource_sampling"] is True  # nosec B101 - pytest assertion
+
+
+def test_a_scenario_persists_the_samples_its_rollups_used(tmp_path):
+    runner = BenchmarkRunner.__new__(BenchmarkRunner)
+    runner.store = ResultsStore(tmp_path)
+    runner._sink = MetricSink()
+    runner.pg_stats = SimpleNamespace(snapshot=lambda: None)
+    summary = SamplerSummary(interval_s=1.0, queue_interval_s=0.5, ticks=4)
+    result = _resources_scenario({}, summary)
+    sample = ResourceSample(t=1.0, container="db", kind="service", cpu_pct=None,
+                            mem_bytes=1, mem_limit_bytes=2)
+    # a sample recorded after the workload window is not persisted
+    runner._sink.record_resource(AFTER_WINDOW)
+
+    runner._persist_scenario(result, 2.0, [sample], [QueueSample(1.0, "main2", 3)])
+
+    sid = result.params.scenario_id()
+    scenario = json.loads((runner.store.run_dir / f"scenarios/{sid}/scenario.json").read_text())
+    assert scenario["observer"]["sampler"]["ticks"] == 4  # nosec B101 - pytest assertion
+    rows = runner.store.read_jsonl("docker_stats.jsonl")
+    persisted = [(r["container"], r["cpu_pct"]) for r in rows]
+    assert persisted == [("db", None)]  # nosec B101 - pytest assertion
+    assert len(runner.store.read_jsonl("queue_depths.jsonl")) == 1  # nosec B101 - pytest assertion
+
+
+def test_run_records_why_the_resources_were_not_sampled(monkeypatch, tmp_path):
+    runner = _run_runner(monkeypatch, tmp_path, [{}, {}], [])
+    runner.sampler_docker = SimpleNamespace(available=False,
+                                            unavailable_reason="permission denied")
+    env = runner.run()["environment"]
+
+    reason = env["attribution"]["resource_sampling"]
+    assert reason == "permission denied"  # nosec B101 - pytest assertion
 
 
 def test_run_records_the_plugins_images_and_the_pin(monkeypatch, tmp_path):

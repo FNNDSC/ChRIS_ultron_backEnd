@@ -8,6 +8,8 @@ manifest that records the settings.
 import json
 import os
 import re
+import socket
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -50,6 +52,64 @@ def test_broker_unreachable_degrades_to_empty():
     assert client.depths() == {}
 
 
+def test_depths_send_the_llens_together_on_one_connection():
+    """
+    A one-connection-at-a-time RESP server: the PING of the constructor, then one
+    connection carrying the three LLENs.
+    """
+    server = socket.create_server(("127.0.0.1", 0))
+    received = []
+
+    def serve():
+        for reply in (b"+PONG\r\n", b":1\r\n:22\r\n:333\r\n"):
+            conn, _ = server.accept()
+            with conn:
+                data = b""
+                # a PING is 3 lines of RESP, each LLEN 5
+                while data.count(b"\r\n") < (3 if reply == b"+PONG\r\n" else 15):
+                    data += conn.recv(4096)
+                received.append(data)
+                conn.sendall(reply)
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    client = BrokerClient("127.0.0.1", server.getsockname()[1], timeout=2.0)
+    depths = client.depths()
+    thread.join(2)
+    server.close()
+
+    assert depths == {"main1": 1, "main2": 22, "periodic": 333}  # nosec B101 - pytest assertion
+    assert received[1] == b"".join(  # nosec B101 - pytest assertion
+        encode_command("LLEN", q) for q in ("main1", "main2", "periodic"))
+
+
+def _one_reply_server(reply):
+    """
+    A RESP server that answers the constructor's PING, then sends ``reply`` to whatever
+    comes next and closes.
+    """
+    server = socket.create_server(("127.0.0.1", 0))
+
+    def serve():
+        for answer in (b"+PONG\r\n", reply):
+            conn, _ = server.accept()
+            with conn:
+                conn.recv(4096)
+                conn.sendall(answer)
+
+    threading.Thread(target=serve, daemon=True).start()
+    return server
+
+
+def test_depths_of_a_short_or_garbled_reply_are_empty():
+    for reply in (b":1\r\n:22\r\n", b"-ERR unknown command\r\n:1\r\n:2\r\n"):
+        server = _one_reply_server(reply)
+        client = BrokerClient("127.0.0.1", server.getsockname()[1], timeout=2.0)
+
+        assert client.depths() == {}, reply  # nosec B101 - pytest assertion
+        server.close()
+
+
 class FakeBroker:
     available = True
 
@@ -70,7 +130,7 @@ def test_sampler_records_queue_depths():
 
     sink = MetricSink()
     sampler = StatsSampler(NoDocker(), sink, broker=FakeBroker({"main2": 7}))
-    sampler._sample_once()
+    sampler._sample_queues()
     samples = sink.queues()
 
     assert len(samples) == 1

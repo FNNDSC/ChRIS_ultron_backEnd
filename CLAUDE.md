@@ -211,11 +211,11 @@ pylint/flake8 are dev dependencies but there is no config file and no lint step 
   replace their images; the command lines are Dragonfly's. `cache.clear()` flushes the cache's
   whole database whatever the key prefix. Dragonfly's Lua scripts may only touch the keys they
   declare.
-- The broker and the cache were the services `dragonflydb` and `dragonfly-cache` until
-  2026-10-25, and the broker's volume was `dragonflydata`. Containers started under the old
-  names keep running after a checkout across the rename, and `just down`/`just bench-down`
-  leave them (and so the network) in place: stop the stack before such a checkout, or after it
-  run `just docker-compose '--profile=cube --profile=tools down --remove-orphans'` (`just
+- The broker was the service `dragonflydb`, with the volume `dragonflydata`, before the shared
+  cache came. A container started under the old name keeps running after a checkout across the
+  rename, and `just down`/`just bench-down` leave it (and so the network) in place: stop the
+  stack before such a checkout, or after it run
+  `just docker-compose '--profile=cube --profile=tools down --remove-orphans'` (`just
   bench-compose '--profile cube --profile bench down --remove-orphans'` for the benchmark
   stack). The old volume, and the tasks queued in it, stay behind: no recipe removes it, as
   `down -v` (`just nuke`) removes only the volumes the compose file declares, so remove

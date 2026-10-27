@@ -91,17 +91,20 @@ Each run writes `benchmarks/results/<run_id>/`:
 report.md            # ticket-ready: environment, breaking-point table, approach-to-failure curves
 summary.json         # machine-readable run summary (+ Postgres counters over the whole run)
 levels.jsonl/.csv    # one row per (topology, axis, level): the approach-to-failure curve
-environment.json     # host hardware, image ids (CUBE, pfcon, Postgres, Dragonfly), envelope knobs, container limits, Postgres settings, workload plugin versions and images, the pin they were checked against, noise floor, attribution availability
+environment.json     # host hardware, image ids (CUBE, pfcon, Postgres, the broker and the cache), envelope knobs, container limits, Postgres settings, workload plugin versions and images, the pin they were checked against, the resource sampler's settings, noise floor, attribution availability
 api_requests.jsonl   # every measured API call (latency, status, endpoint class)
 status_samples.jsonl # per-instance status timelines (client-observed phase timing)
-docker_stats.jsonl   # service + job container CPU/mem/blkio samples
-queue_depths.jsonl   # Celery queue depths (main1/main2/periodic), sampled every 2 s
-scenarios/<id>/      # scenario.json with db_counters (+ pg_stats.json; failure.json + logs/ on hard failures)
+docker_stats.jsonl   # every service + job container read every 1 s: CPU over the time since its previous reading, or since a container born in the scenario started (null without a window: a service's first reading, one 0.75 s or less after the previous, as the closing reading can be, a job's first 0.25 s or less after its start, one after a restart), memory with and without the page cache, CPU throttling, cumulative blkio and CPU counters
+queue_depths.jsonl   # Celery queue depths (main1/main2/periodic), sampled every 0.5 s
+scenarios/<id>/      # scenario.json with db_counters and the sampler's summary (observer.sampler) (+ pg_stats.json; failure.json + logs/ on hard failures)
 ```
 
 The key artifact is the **approach-to-failure curve** (in `report.md` and `levels.csv`):
-per-level makespan, worst p95, 5xx counts, completions, and peak per-service CPU and disk
-write — so each breaking point comes with a *cause*, not just a pass/fail.
+per-level makespan, worst p95, 5xx counts and completions, with `report.md` adding at each
+axis's highest level the peak per-service CPU, the bytes each service wrote, Postgres and how
+the sampling went — so each breaking point comes with a *cause*, not just a pass/fail.
+`levels.jsonl` has every level's peaks: CPU, memory with and without the page cache, CPU
+throttling, bytes written, queue depths, and the sampler's summary.
 
 Three attribution streams turn resource saturation into named culprits:
 
@@ -197,8 +200,9 @@ Run ids resolve against `results/` and the committed `history/` archive alike. T
 output (`results/comparisons/<a>_vs_<b>/compare.{md,csv}`) leads with a
 **comparability verdict**: workload-fingerprint / workload-plugin version / storage / auth
 mismatches are *blockers* (the diff is still rendered, loudly labelled), envelope / host /
-threshold / workload-plugin image differences are *cautions*, and commit or service image
-differences are the point of comparing.
+threshold / container-limit / Postgres-settings / resource-sampler / workload-plugin image
+differences are *cautions*, and commit or service image differences are the point of
+comparing.
 
 A level is flagged **REGRESSED**/**IMPROVED** only when the change exceeds *both* the
 relative threshold (`--regress-pct`, default 20%) and the metric's absolute floor

@@ -5,9 +5,9 @@ Answers two questions about a *baseline* and a *candidate* run:
 
 1. **Are they comparable at all?** Mismatched workload fingerprint, workload plugin
    versions, storage mode or auth mode are *blockers*; envelope, container-limit,
-   Postgres-settings, host, threshold and workload-plugin image differences are
-   *cautions*; commit and service image differences are the point of comparing. The
-   comparison never refuses — a loudly-labelled report beats an error.
+   Postgres-settings, resource-sampler, host, threshold and workload-plugin image
+   differences are *cautions*; commit and service image differences are the point of
+   comparing. The comparison never refuses — a loudly-labelled report beats an error.
 2. **What changed?** Per (topology, axis, level): makespan and worst-p95 deltas
    flagged REGRESSED/IMPROVED only when they exceed BOTH a relative threshold and the
    metric's absolute floor (makespan is quantized by the poll cadence; latency has a
@@ -27,7 +27,6 @@ import argparse
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit, urlunsplit
 
 from .models import RunData
 from .report import csv_cell, markdown_table, record_digests
@@ -155,9 +154,14 @@ _SCALAR_FIELDS = (
     ("images.chris-cache", ("images", "chris-cache", "image_id"), INFO),
 )
 
-#: compose services renamed since runs were archived (2026-10-25): in a run from before, their
-#: images, limits, URLs and peaks read under the current names, so a rename is no difference
-RENAMED_SERVICES = {"dragonflydb": "chris-broker", "dragonfly-cache": "chris-cache"}
+#: compose services renamed since runs were archived: in a run from before, their limits and
+#: peaks read under the current names, so a rename is no difference
+RENAMED_SERVICES = {"dragonflydb": "chris-broker"}
+
+#: the level-row metrics the resource sampler produces: a trend of one across runs sampled
+#: differently says so
+SAMPLED_METRICS = ("peak_cpu_pct", "peak_job_cpu_pct", "peak_write_bytes", "peak_mem_bytes",
+                   "peak_mem_anon_bytes", "cpu_throttled_s", "peak_queue_depth")
 
 _NOISE_FLOOR_RATIO = 3.0
 
@@ -176,9 +180,8 @@ def _predates_rename(env: dict) -> bool:
 
 def _current_names(env: dict) -> dict:
     """
-    A run from before the rename with its services under their current names, in the
-    images and limits recorded per service and in the host of an envelope URL
-    (``CUBE_CACHE_URL``); a later run as it is.
+    A run from before the rename with its services under their current names in the
+    images and limits recorded per service; a later run as it is.
     """
     if not _predates_rename(env):
         return env
@@ -187,28 +190,8 @@ def _current_names(env: dict) -> dict:
         return {RENAMED_SERVICES.get(service, service): value
                 for service, value in block.items()}
 
-    current = {**env, **{key: renamed(env[key]) for key in ("images", "limits")
-                         if isinstance(env.get(key), dict)}}
-    if isinstance(env.get("envelope"), dict):
-        current["envelope"] = {knob: _renamed_host(value)
-                               for knob, value in env["envelope"].items()}
-    return current
-
-
-def _renamed_host(value: object) -> object:
-    """
-    A URL whose host is a renamed service, with the current name in its place; any other
-    value as it is.
-    """
-    parts = urlsplit(value) if isinstance(value, str) and "://" in value else None
-    if parts is None or parts.hostname not in RENAMED_SERVICES:
-        return value
-
-    # the masked password, if any, stays in front of the host
-    userinfo, at, hostport = parts.netloc.rpartition("@")
-    host = RENAMED_SERVICES[parts.hostname]
-    return urlunsplit(parts._replace(
-        netloc=f"{userinfo}{at}{host}{hostport[len(parts.hostname):]}"))
+    return {**env, **{key: renamed(env[key]) for key in ("images", "limits")
+                      if isinstance(env.get(key), dict)}}
 
 
 def _dig(env: dict, path: tuple) -> object:
@@ -249,6 +232,7 @@ def check_comparability(base_env: dict, cand_env: dict) -> Comparability:
                           cand_env.get("envelope") or {}, WARNING, skip=("STORAGE_ENV",))
 
     diffs += _limits_diffs(base_env.get("limits") or {}, cand_env.get("limits") or {})
+    diffs += _sampler_diffs(base_env.get("sampler") or {}, cand_env.get("sampler") or {})
     diffs += _postgres_diffs(base_env.get("postgres") or {}, cand_env.get("postgres") or {})
 
     a = _dig(base_env, ("noise_floor", "health_p50_ms"))
@@ -349,6 +333,18 @@ def _limits_diffs(base: dict, cand: dict) -> list[FieldDiff]:
                 for name, value in (values or {}).items()}
 
     return _block_diffs("limits", flat(base), flat(cand), WARNING)
+
+
+def _sampler_diffs(base: dict, cand: dict) -> list[FieldDiff]:
+    """
+    Cautions for runs whose resources and queues were sampled differently, the peaks of one
+    taken more sparsely or over other windows than the other's.
+    """
+    unrecorded = _unrecorded("sampler", base, cand)
+
+    if unrecorded is not None:
+        return unrecorded
+    return _block_diffs("sampler", base, cand, WARNING)
 
 
 def _postgres_diffs(base: dict, cand: dict) -> list[FieldDiff]:
@@ -525,6 +521,40 @@ def _recorded_path(run: RunData, path: tuple) -> tuple:
     return tuple(old_names.get(key, key) for key in path)
 
 
+def _sampler_note(runs: list[RunData], metric: str) -> list[str]:
+    """
+    A note when a sampled metric is trended across runs that were sampled differently:
+    a run that records no sampler predates the 1 s sampler and read each container only
+    every ~2 s times the number of containers, so its peaks are lower bounds.
+    """
+    if _metric_path(metric)[0] not in SAMPLED_METRICS:
+        return []
+
+    groups: dict[str, list[str]] = {}
+    for run in runs:
+        groups.setdefault(_sampler_label((run.environment or {}).get("sampler")),
+                          []).append(run.run_id)
+
+    if len(groups) < 2:
+        return []
+
+    parts = "; ".join(f"{', '.join(ids)}: {label}" for label, ids in groups.items())
+    return [f"_The runs were sampled differently — {parts}._", ""]
+
+
+def _sampler_label(sampler: dict | None) -> str:
+    """
+    Every setting of a run's sampler record, so that runs sampled alike share a label.
+    """
+    if not sampler:
+        return "not recorded (the sparse sampler: lower bounds)"
+
+    queues = (f"queues every {sampler['queue_interval_s']} s"
+              if sampler.get("queue_interval_s") else "no queue timer")
+    return (f"{sampler.get('method')}, every {sampler.get('interval_s')} s, {queues}, "
+            f"{sampler.get('workers')} workers")
+
+
 def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, list]]:
     """
     Per (topology, axis): ((topology, axis), headers, rows) tracking ``metric`` (a
@@ -648,6 +678,8 @@ def render_markdown(comparison: RunComparison, trend_runs: "list[RunData] | None
                    for run in trend_runs for row in run.levels):
             lines += [f"_metric {metric!r} not found in any run's level rows — "
                       f"check --metric_", ""]
+
+        lines += _sampler_note(trend_runs, metric)
         
         for axis_key, headers, rows in trend_tables(trend_runs, metric):
             lines += [f"### {axis_key[0]} — {axis_key[1]}", ""]

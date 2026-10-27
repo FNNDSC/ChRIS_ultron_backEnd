@@ -166,61 +166,50 @@ def test_broker_image_missing_from_an_older_run_is_informational():
 
 
 def test_a_run_from_before_the_rename_compares_under_the_current_names():
-    # runs archived before 2026-10-25 recorded the broker and the cache as dragonflydb and
-    # dragonfly-cache
+    # runs archived before the rename recorded the broker's limits under dragonflydb
     limits = {"cpus": 2.0, "mem_limit": 1073741824, "memswap_limit": None, "shm_size": None}
-    old = _env(images={"dragonflydb": {"image_id": "sha256:a"},
-                       "dragonfly-cache": {"image_id": "sha256:c"}},
-               limits={"dragonflydb": limits, "dragonfly-cache": limits},
-               envelope={"CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
-    new = _env(images={"chris-broker": {"image_id": "sha256:a"},
-                       "chris-cache": {"image_id": "sha256:d"}},
-               limits={"chris-broker": limits, "chris-cache": {**limits, "cpus": 1.0}},
-               envelope={"CUBE_CACHE_URL": "redis://chris-cache:6379/0"})
-    c = check_comparability(old, new)
-    diffs = {d.field: (d.baseline, d.candidate, d.severity) for d in c.diffs}
-    expected = {"images.chris-cache": ("sha256:c", "sha256:d", "info"),
-                "limits.chris-cache.cpus": (2.0, 1.0, "warning")}
+    old = _env(limits={"dragonflydb": limits, "db": limits})
+    new = _env(limits={"chris-broker": {**limits, "cpus": 1.0}, "db": limits})
+    diffs = {d.field: (d.baseline, d.candidate, d.severity)
+             for d in check_comparability(old, new).diffs}
+    expected = {"limits.chris-broker.cpus": (2.0, 1.0, "warning")}
 
     assert diffs == expected  # nosec B101 - pytest assertion
 
-    # in either order: a run made later from an older checkout records the old names too
+    # in either order: a run made later from an older checkout records the old name too
     mirrored = {d.field: (d.candidate, d.baseline, d.severity)
                 for d in check_comparability(new, old).diffs}
     assert mirrored == expected  # nosec B101 - pytest assertion
 
 
 def test_a_later_run_that_records_an_old_name_shows_it():
-    # a container left over from before the rename ran beside the renamed ones, and CUBE
-    # was pointed at it
+    # a container left over from before the rename ran beside the renamed one
     limits = {"cpus": 2.0, "mem_limit": 1073741824}
-    new = _env(images={"chris-broker": {"image_id": "sha256:a"}},
-               limits={"chris-broker": limits},
-               envelope={"CUBE_CACHE_URL": "redis://chris-cache:6379/0"})
-    leftover = _env(images=new["images"], limits={**new["limits"], "dragonflydb": limits},
-                    envelope={"CUBE_CACHE_URL": "redis://dragonfly-cache:6379/0"})
+    new = _env(limits={"chris-broker": limits})
+    leftover = _env(limits={"chris-broker": limits, "dragonflydb": limits})
     fields = sorted(d.field for d in check_comparability(new, leftover).diffs)
 
-    assert fields == ["envelope.CUBE_CACHE_URL",  # nosec B101 - pytest assertion
-                      "limits.dragonflydb.cpus", "limits.dragonflydb.mem_limit"]
+    assert fields == ["limits.dragonflydb.cpus",  # nosec B101 - pytest assertion
+                      "limits.dragonflydb.mem_limit"]
 
 
-def test_a_url_naming_a_renamed_service_compares_under_the_current_name():
-    def cache_url_diffs(old_url, new_url):
-        old, new = (_env(envelope={"CUBE_CACHE_URL": url}) for url in (old_url, new_url))
-        return [(d.baseline, d.candidate) for d in check_comparability(old, new).diffs]
+SAMPLER = {"method": "one-shot reads, CPU between consecutive readings", "interval_s": 1.0,
+           "queue_interval_s": 0.5, "workers": 8}
 
-    assert not cache_url_diffs(  # nosec B101 - pytest assertion
-        "rediss://:***@dragonfly-cache:6380/1?ssl_password=***",
-        "rediss://:***@chris-cache:6380/1?ssl_password=***")
 
-    # a different server, or another database on it, is still a difference, the old run's
-    # URL read under the current name as its images and limits are
-    assert cache_url_diffs(  # nosec B101 - pytest assertion
-        "redis://dragonfly-cache:6379/0", "redis://chris-cache:6379/1") == [
-        ("redis://chris-cache:6379/0", "redis://chris-cache:6379/1")]
-    assert cache_url_diffs(  # nosec B101 - pytest assertion
-        "redis://dragonflydb:6379/0", "redis://chris-cache:6379/0")
+def test_runs_sampled_differently_are_a_caution():
+    # an archived run records no sampler: one caution, as for any block it lacks
+    rows = [(d.field, d.baseline, d.candidate, d.severity)
+            for d in check_comparability(_env(), _env(sampler=SAMPLER)).diffs]
+    assert rows == [  # nosec B101 - pytest assertion
+        ("sampler", "not recorded", "recorded", "warning")]
+
+    slower = _env(sampler={**SAMPLER, "interval_s": 2.0})
+    rows = [(d.field, d.baseline, d.candidate, d.severity)
+            for d in check_comparability(_env(sampler=SAMPLER), slower).diffs]
+    assert rows == [("sampler.interval_s", 1.0, 2.0, "warning")]  # nosec B101 - pytest assertion
+    assert not check_comparability(  # nosec B101 - pytest assertion
+        _env(sampler=SAMPLER), _env(sampler=SAMPLER)).diffs
 
 
 # -- delta classification ------------------------------------------------------------------
@@ -471,6 +460,54 @@ def test_trend_tables_reach_per_process_type_counters_and_tolerate_scalars():
     # a path through a scalar finds nothing rather than failing
     (_, _, rows), = trend_tables(runs, "makespan_median_s.x")
     assert rows[0] == [1, None, None]  # nosec B101 - pytest assertion
+
+
+def test_a_trend_of_a_sampled_metric_says_how_each_run_was_sampled(tmp_path):
+    old = _write_run(tmp_path, "A", [dict(_lvl(), peak_cpu_pct={"db": 50.0})])
+    new = _write_run(tmp_path, "B", [dict(_lvl(), peak_cpu_pct={"db": 90.0})],
+                     env=_env(sampler=SAMPLER))
+    out = tmp_path / "cmp"
+
+    assert main([str(old), str(new), "--out", str(out),  # nosec B101 - pytest assertion
+                 "--metric", "peak_cpu_pct.db"]) == 0
+    note = ("_The runs were sampled differently — A: not recorded (the sparse sampler: "
+            "lower bounds); B: one-shot reads, CPU between consecutive readings, every "
+            "1.0 s, queues every 0.5 s, 8 workers._")
+    assert note in (out / "compare.md").read_text()  # nosec B101 - pytest assertion
+
+    # a metric the sampler does not produce gets no note
+    assert main([str(old), str(new), "--out", str(out),  # nosec B101 - pytest assertion
+                 "--metric", "makespan_median_s"]) == 0
+    md = (out / "compare.md").read_text()
+    assert "sampled differently" not in md  # nosec B101 - pytest assertion
+
+
+def _trend_note(tmp_path, envs, metric, row):
+    paths = [_write_run(tmp_path, f"R{i}", [dict(_lvl(), **row)], env=env)
+             for i, env in enumerate(envs)]
+    out = tmp_path / "cmp"
+    main([str(p) for p in paths] + ["--out", str(out), "--metric", metric])
+    return [line for line in (out / "compare.md").read_text().splitlines()
+            if "sampled differently" in line]
+
+
+def test_a_trend_says_so_whatever_part_of_the_sampler_differs(tmp_path):
+    queues = _env(sampler={**SAMPLER, "queue_interval_s": 2.0})
+    workers = _env(sampler={**SAMPLER, "workers": 4})
+    rows = {"peak_queue_depth.main2": {"peak_queue_depth": {"main2": 5}},
+            "peak_mem_bytes.db": {"peak_mem_bytes": {"db": 100}},
+            "peak_job_cpu_pct": {"peak_job_cpu_pct": 50.0}}
+
+    for metric, row in rows.items():
+        for other in (queues, workers):
+            note = _trend_note(tmp_path / metric / str(id(other)),
+                               [_env(sampler=SAMPLER), other], metric, row)
+            assert len(note) == 1, (metric, other["sampler"])  # nosec B101 - pytest assertion
+
+    # runs sampled alike get no note
+    alike = _trend_note(tmp_path / "alike", [_env(sampler=SAMPLER)] * 2,
+                        "peak_queue_depth.main2", rows["peak_queue_depth.main2"])
+    assert alike == []  # nosec B101 - pytest assertion
 
 
 def test_main_finds_a_renamed_services_metric_in_older_runs(tmp_path):

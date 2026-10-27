@@ -273,3 +273,75 @@ def test_render_levels_csv_header_and_rows():
     assert lines[0].startswith("topology,axis,level,verdict")
     assert len(lines) == 3
     assert '"a,b"' in lines[2]                          # criteria with comma is quoted
+
+
+# -- sampling ----------------------------------------------------------------------------
+
+SAMPLER = {"method": "one-shot reads, CPU between consecutive readings", "interval_s": 1.0,
+           "queue_interval_s": 0.5, "workers": 8}
+LEVEL_SAMPLER = {"interval_s": 1.0, "queue_interval_s": 0.5, "ticks": 12, "late_ticks": 0,
+                 "max_tick_s": 0.03, "reads": 60, "failed_reads": 0, "vanished": 1,
+                 "list_failures": 0, "jobs_seen": 2, "queue_ticks": 24,
+                 "queue_late_ticks": 0, "queue_failures": 0}
+
+
+def _summary(env):
+    return {"run_id": "R", "tier": "smoke", "environment": env, "levels_run": 1,
+            "breaking_points": []}
+
+
+def test_render_says_how_each_axis_was_sampled():
+    md = render(_summary({"sampler": SAMPLER}),
+                [_level(sampler=LEVEL_SAMPLER, final_status_counts={"finishedSuccessfully": 2})])
+
+    note = ("_Sampling at level 1: every 1.0 s, 12 ticks (0 late, slowest 0.03 s), 60 reads "
+            "(0 failed); 2 plugin-job containers seen for 2 instances; queues every 0.5 s, "
+            "24 ticks_")
+    row = ("| Resource sampler | one-shot reads, CPU between consecutive readings: every "
+           "1.0 s, queues every 0.5 s |")
+    assert note in md and row in md  # nosec B101 - pytest assertion
+    assert "fell behind" not in md  # nosec B101 - pytest assertion
+
+
+def test_render_names_the_levels_whose_sampling_fell_behind():
+    md = render(_summary({}), [_level(sampler=LEVEL_SAMPLER),
+                               _level(level=2, sampler={**LEVEL_SAMPLER, "late_ticks": 3}),
+                               _level(level=4, sampler={**LEVEL_SAMPLER, "failed_reads": 1})])
+
+    warning = "**Sampling fell behind or failed at level(s) 2, 4**"
+    assert warning in md  # nosec B101 - pytest assertion
+
+
+def test_render_of_a_run_from_before_the_sampler_summary_has_no_sampling_note():
+    md = render(_summary({}), [_level()])
+
+    assert "Sampling at level" not in md  # nosec B101 - pytest assertion
+    assert "Resource sampler" not in md  # nosec B101 - pytest assertion
+
+
+def test_the_sampling_note_describes_the_last_level_of_the_axis():
+    md = render(_summary({}), [_level(sampler=LEVEL_SAMPLER),
+                               _level(level=2, sampler={**LEVEL_SAMPLER, "ticks": 30,
+                                                        "queue_interval_s": None},
+                                      final_status_counts={"cancelled": 1,
+                                                           "finishedSuccessfully": 3})])
+
+    note = ("_Sampling at level 2: every 1.0 s, 30 ticks (0 late, slowest 0.03 s), 60 reads "
+            "(0 failed); 2 plugin-job containers seen for 4 instances; queues not sampled_")
+    assert note in md  # nosec B101 - pytest assertion
+
+
+def test_every_kind_of_sampling_trouble_is_flagged():
+    for key in ("late_ticks", "failed_reads", "list_failures", "queue_late_ticks",
+                "queue_failures"):
+        md = render(_summary({}), [_level(sampler={**LEVEL_SAMPLER, key: 1})])
+
+        warning = "**Sampling fell behind or failed at level(s) 1**"
+        assert warning in md, key  # nosec B101 - pytest assertion
+
+
+def test_the_peak_cpu_note_without_a_plugin_job_peak():
+    md = render(_summary({}), [_level(peak_cpu_pct={"db": 70.0}, peak_job_cpu_pct=None)])
+
+    assert "_Peak CPU at level 1: db 70.0%" in md  # nosec B101 - pytest assertion
+    assert "plugin-jobs" not in md  # nosec B101 - pytest assertion

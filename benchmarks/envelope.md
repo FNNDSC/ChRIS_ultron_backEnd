@@ -57,6 +57,30 @@ as a baseline: `bench-compare` flags `envelope.CUBE_DB_SYNCHRONOUS_COMMIT` and
 seconds between the `db_pool_stats` log lines each `uvicorn` worker writes, which the Locust
 recovery check reads (`0` disables them). It is instrumentation and is not recorded.
 
+**Resource sampling** is instrumentation too, but it is recorded, because it decides what the
+peaks mean. The sampler lists the stack's service and plugin-job containers every 1 s, start to
+start, without inspecting them (a new one is inspected once, for its start time), and reads each
+with a one-shot stats read, a few milliseconds, 8 at a time. Each container's CPU is over the
+second since its previous reading: the ~1 s window of Docker's own figure, short enough not to
+average away the 2 s beat's bursts. A plugin job's first reading gives its CPU since it started. A
+reading has none without a window of its own: a service's first in a scenario, one 0.75 s or less
+after the previous (the closing reading at the end of a scenario can be), a job's first 0.25 s or
+less after its start, and the first after a restart. A read still running after 0.8 s of its tick
+counts as failed and is not sent again until it answers, so an engine that stops answering cannot
+slow the ticks or hold the end of a scenario. The queue depths have a timer of their own, every
+0.5 s, so that they cannot lock onto one phase of the beat. `environment.json` records the
+settings under `sampler`, each level row how the sampling went (`sampler`: ticks, late ticks, the
+slowest tick, failed and vanished reads, failed listings, plugin-job containers seen), and
+`report.md` flags a level whose sampling fell behind or failed. A run without the `sampler` record
+read each container in turn with a call that blocks 1-2 s, so each container was read about every
+2 s times the number of containers (19-21 s on the benchmark box), and short scenarios missed the
+containers listed last: its peaks are lower bounds. `bench-compare` reports runs sampled
+differently, or one without the record, as a caution, and a trend of a sampled metric (`peak_*`,
+`cpu_throttled_s`) says which runs were sampled which way. On the benchmark box a probe of a
+listing and one read per container each second cost the engine (dockerd, containerd and the shims)
+3.2% of a CPU for the stack's 10 services and 16.9% for 70 containers, outside every container
+limit.
+
 **The broker and the cache:** Dragonfly runs twice, as the Celery broker (`chris-broker`) and
 as the shared cache (`chris-cache`, `CUBE_CACHE_URL`). Each runs one thread per CPU it is
 given and keeps 80% of its memory limit as its `maxmemory`, so without the limits above both
@@ -70,22 +94,21 @@ v2.0.2 peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU a
 limits have none of them, and `bench-compare` reports each as a caution against them; `0`
 removes a limit, for a run without it. Their images are recorded under `images` in
 `environment.json`; `bench-compare` lists a different image, or none in a run that predates the
-record (`—`), as information. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE` replace the image of each
-(they replaced `DRAGONFLY_IMAGE`, which set both), for example for an A/B of two Dragonfly
-versions. Export them for `just bench-start` and `just bench-run` alike: `bench-run`'s
-`compose run` recreates a dependency whose configuration differs, so a variable set for one recipe
-only silently brings the default image back. Another server than Dragonfly needs its own command
-line in `docker-compose.yml` as well (Redis and Valkey take no memory limit from the container, so
-they need `--maxmemory`).
+record (`—`), as information. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE` replace the image of
+each, for example for an A/B of two Dragonfly versions. Export them for `just bench-start` and
+`just bench-run` alike: `bench-run`'s `compose run` recreates a dependency whose configuration
+differs, so a variable set for one recipe only silently brings the default image back. Another
+server than Dragonfly needs its own command line in `docker-compose.yml` as well (Redis and Valkey
+take no memory limit from the container, so they need `--maxmemory`).
 
-**The rename of 2026-10-25:** runs archived before it name the broker and the cache `dragonflydb`
-and `dragonfly-cache`, which `bench-compare` reads as the current names in their images and limits,
-in the host of `CUBE_CACHE_URL` and in a trend's `--metric` (`peak_cpu_pct.chris-broker`). A later
-run that records an old name ran beside a container left over from before, and `bench-compare` shows
-it as it is. A box that ran the stack under the old names keeps those containers after the checkout,
-and `just bench-down` leaves them: stop the stack before the checkout, or after it run
+**The broker's rename:** runs archived before the shared cache name the broker `dragonflydb`,
+which `bench-compare` reads as `chris-broker` in their limits and in a trend's `--metric`
+(`peak_cpu_pct.chris-broker`). A later run that records the old name ran beside a container left
+over from before, and `bench-compare` shows it as it is. A box that ran the stack under the old
+name keeps that container after the checkout, and `just bench-down` leaves it: stop the stack
+before the checkout, or after it run
 `just bench-compose '--profile cube --profile bench down --remove-orphans'` (`just bench-nuke`
-removes them too, with every volume). The broker's volume, `dragonflydata`, is now
+removes it too, with every volume). The broker's volume, `dragonflydata`, is now
 `chris_broker_data`; no recipe removes the old one, which `docker volume rm` does by hand.
 
 **Why the 2.0 s floor for the Celery poll interval:** the periodic tasks are guarded by `skip_if_running`
@@ -212,13 +235,15 @@ The harness reads these from the running server and the `db` container.
     the timed checkpoints an idle server skips, so `num_done` is the number written.
   - `db` container: bytes written to disk, pages swapped out and in, OOM kills.
 
-  Each scenario records deltas for two windows. `workload` runs from scenario start to the end
-  of the workload, slightly wider than the 2 s samples behind `peak_write_bytes`, so its
-  `cgroup_write_bytes` is at least `peak_write_bytes.db`. `cleanup` covers feed deletion and
-  quiescence. Both windows go into `scenario.json` (`db_counters`, with the raw snapshots).
-  Each `levels.jsonl` row gets each counter's largest value across the level's repeats, so the
-  counters of one row can come from different repeats. The run's total, taken 11 s after the
-  last level, goes into `summary.json` (`db_counters.run`).
+  Each scenario records deltas for two windows. `workload` runs from scenario start to the end of
+  the workload, slightly wider than the 1 s readings behind `peak_write_bytes` (the sampler takes
+  its last at the end of the workload), so its `cgroup_write_bytes` is at least
+  `peak_write_bytes.db`, and close to it; in runs without the `sampler` record the readings could
+  fall 20 s inside the window or miss the db, so cite `cgroup_write_bytes` for what `db` wrote.
+  `cleanup` covers feed deletion and quiescence. Both windows go into `scenario.json`
+  (`db_counters`, with the raw snapshots). Each `levels.jsonl` row gets each counter's largest
+  value across the level's repeats, so the counters of one row can come from different repeats.
+  The run's total, taken 11 s after the last level, goes into `summary.json` (`db_counters.run`).
 
   Backends publish their statistics up to about 10 s after they go idle, so a few seconds of
   short transactions can land in the next window. The run total holds everything published by

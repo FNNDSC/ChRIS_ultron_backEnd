@@ -71,18 +71,26 @@ class BrokerClient:
 
     def depths(self) -> dict[str, int]:
         """
-        Current depth per queue; {} when the broker is unreachable.
+        Current depth per queue, the LLENs sent together on one connection; {} when the
+        broker is unreachable.
         """
         if not self.available:
             return {}
         try:
-            return {q: int(self._command("LLEN", q)) for q in self.queues}
+            replies = self._pipeline([("LLEN", q) for q in self.queues])
+            return {q: int(reply) for q, reply in zip(self.queues, replies)}
         except (OSError, ValueError):
             return {}
 
     def _command(self, *args: str):
+        return self._pipeline([args])[0]
+
+    def _pipeline(self, commands: list[tuple[str, ...]]) -> list:
+        """
+        Send ``commands`` at once on one connection and read their single-line replies.
+        """
         with socket.create_connection((self.host, self.port),
                                       timeout=self.timeout) as sock:
-            sock.sendall(encode_command(*args))
-            reply = sock.makefile("rb").readline()
-        return parse_reply(reply)
+            sock.sendall(b"".join(encode_command(*args) for args in commands))
+            stream = sock.makefile("rb")
+            return [parse_reply(stream.readline()) for _ in commands]

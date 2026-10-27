@@ -138,15 +138,50 @@ class StatusTimeline:
 
 @dataclass(frozen=True)
 class ResourceSample:
+    """
+    One reading of a container at time ``t``. ``cpu_pct`` is the CPU it used over the
+    ``cpu_window_s`` before ``t`` (100 = one core), ``None`` when the reading has no
+    window of its own (``docker_client.resource_sample`` says when: a service's first
+    reading in a scenario, among others). The blkio counters and ``cpu_total_ns`` count
+    from the container's start, ``started_at``.
+    """
     t: float
     container: str
     kind: str  # "service" | "job"
-    cpu_pct: float
+    cpu_pct: Optional[float]
     mem_bytes: float
     mem_limit_bytes: float
     blkio_read_bytes: float = 0.0
     blkio_write_bytes: float = 0.0
     pids: int = 0
+    cpu_window_s: Optional[float] = None
+    cpu_total_ns: Optional[int] = None
+    cpu_throttled_s: Optional[float] = None    # held back by its CPU limit in the window
+    mem_anon_bytes: Optional[float] = None     # memory without the page cache
+    started_at: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class SamplerSummary:
+    """
+    How a scenario's resource and queue sampling went, so that a sampler that fell behind
+    or failed shows in the report rather than in thinner numbers. A late tick is one
+    skipped because the tick before it overran; a vanished container was removed or had
+    exited between the listing and its read, which job churn does all the time.
+    """
+    interval_s: float
+    queue_interval_s: Optional[float]
+    ticks: int = 0
+    late_ticks: int = 0
+    max_tick_s: float = 0.0
+    reads: int = 0
+    failed_reads: int = 0
+    vanished: int = 0
+    list_failures: int = 0
+    jobs_seen: int = 0
+    queue_ticks: int = 0
+    queue_late_ticks: int = 0
+    queue_failures: int = 0
 
 
 @dataclass(frozen=True)
@@ -225,6 +260,7 @@ class ScenarioResult:
     notes: list[str] = field(default_factory=list)
     # Postgres and db-container counter deltas per window (pg_stats.counter_windows)
     db_counters: dict = field(default_factory=dict)
+    sampler: Optional[SamplerSummary] = None
 
 
 @dataclass
