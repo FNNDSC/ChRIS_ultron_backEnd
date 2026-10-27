@@ -674,7 +674,7 @@ def test_another_pin_with_the_same_plugins_is_information():
 
 
 def test_a_baseline_without_image_records_gives_a_single_caution():
-    # the 2026-10-21 baselines: an untagged reference, no image record and no pin
+    # a baseline from before the pin: an untagged reference, no image record and no pin
     baseline = _plugins(dock_image="fnndsc/pl-topologicalcopy", digests=None)
     del baseline["ts"]["image"]
     pin = {"path": "benchmarks/chrisomatic/benchmark.yml", "sha256": "ab12"}

@@ -73,8 +73,8 @@ settings under `sampler`, each level row how the sampling went (`sampler`: ticks
 slowest tick, failed and vanished reads, failed listings, plugin-job containers seen), and
 `report.md` flags a level whose sampling fell behind or failed. A run without the `sampler` record
 read each container in turn with a call that blocks 1-2 s, so each container was read about every
-2 s times the number of containers (19-21 s on the benchmark box), and short scenarios missed the
-containers listed last: its peaks are lower bounds. `bench-compare` reports runs sampled
+2 s times the number of containers (19.1-19.8 s on the benchmark box), and short scenarios missed
+the containers listed last: its peaks are lower bounds. `bench-compare` reports runs sampled
 differently, or one without the record, as a caution, and a trend of a sampled metric (`peak_*`,
 `cpu_throttled_s`) says which runs were sampled which way. On the benchmark box a probe of a
 listing and one read per container each second cost the engine (dockerd, containerd and the shims)
@@ -88,18 +88,19 @@ would follow the host (16 threads and about 92 GiB on the benchmark box). It exi
 when that `maxmemory` is under 256 MiB per thread, so change a Dragonfly's CPUs together with
 its memory, at least 320 MiB per CPU: 2 CPUs with `512m` stop it, and so do `0` CPUs (one
 thread per host CPU) with the default memory. A Dragonfly that exits stops `just bench-start`
-at its migrate step, since every CUBE service waits for both to be healthy. The 2026-10-20 runs on
-v2.0.2 peaked at 0.14 of a CPU and 48 MiB for the broker, and at 0.29 of a CPU and 258 MiB for
-`worker-periodic`, so the limits leave room for what later issues add. Runs from before these
-limits have none of them, and `bench-compare` reports each as a caution against them; `0`
-removes a limit, for a run without it. Their images are recorded under `images` in
-`environment.json`; `bench-compare` lists a different image, or none in a run that predates the
-record (`—`), as information. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE` replace the image of
-each, for example for an A/B of two Dragonfly versions. Export them for `just bench-start` and
-`just bench-run` alike: `bench-run`'s `compose run` recreates a dependency whose configuration
-differs, so a variable set for one recipe only silently brings the default image back. Another
-server than Dragonfly needs its own command line in `docker-compose.yml` as well (Redis and Valkey
-take no memory limit from the container, so they need `--maxmemory`).
+at its migrate step, since every CUBE service waits for both to be healthy. The 2026-10-27 runs
+(REPORT.md §16) peaked at 0.08 of a CPU and 30 MiB for the broker, 0.04 and 15 MiB for the cache,
+0.30 of a CPU and 256 MiB (247 MiB without the page cache) for `worker-periodic` and 0.04 and 114
+MiB for `celery-scheduler`, none throttled for more than 0.2 s, so the limits leave room for what
+later issues add. Runs from before these limits have none of them, and `bench-compare` reports
+each as a caution against them; `0` removes a limit, for a run without it. Their images are
+recorded under `images` in `environment.json`; `bench-compare` lists a different image, or none in
+a run that predates the record (`—`), as information. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE`
+replace the image of each, for example for an A/B of two Dragonfly versions. Export them for
+`just bench-start` and `just bench-run` alike: `bench-run`'s `compose run` recreates a dependency
+whose configuration differs, so a variable set for one recipe only silently brings the default
+image back. Another server than Dragonfly needs its own command line in `docker-compose.yml` as
+well (Redis and Valkey take no memory limit from the container, so they need `--maxmemory`).
 
 **The broker's rename:** runs archived before the shared cache name the broker `dragonflydb`,
 which `bench-compare` reads as `chris-broker` in their limits and in a trend's `--metric`
