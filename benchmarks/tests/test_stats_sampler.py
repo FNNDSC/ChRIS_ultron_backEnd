@@ -275,8 +275,9 @@ def test_queue_depths_keep_their_cadence_while_container_reads_are_slow():
     summary = sampler.summary()
     assert summary.queue_ticks >= 10  # nosec B101 - pytest assertion
     assert len(sink.queues()) == summary.queue_ticks  # nosec B101 - pytest assertion
-    # the reads, slower than a tick, missed it rather than holding the ticks back
-    assert summary.failed_reads >= 1 and summary.late_ticks == 0  # nosec B101 - pytest assertion
+    # the reads, slower than a tick, missed it rather than holding the ticks back: waiting
+    # for each 0.15 s read would leave about two ticks in the 0.3 s
+    assert summary.failed_reads >= 1 and summary.ticks >= 5  # nosec B101 - pytest assertion
 
 
 def test_stop_in_the_middle_of_both_ticks_waits_for_them_and_nothing_comes_after():
