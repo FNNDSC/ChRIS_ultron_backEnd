@@ -61,6 +61,8 @@ services:
         condition: service_healthy
       chris-broker:
         condition: service_healthy
+      # CUBE starts without its cache, but the tests run against it (core/tests/test_cache.py)
+      # and a stack whose cache failed to start would only warn: better to stop here
       chris-cache:
         condition: service_healthy
       nats:
@@ -159,8 +161,10 @@ services:
   # The command line and memlock are Dragonfly-specific so a different server needs its own.
   chris-broker:
     image: ${CUBE_BROKER_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
-    # no daily call to version.dragonflydb.io, which also reports deployment details
-    command: ["--version_check=false"]
+    # --version_check=false: no daily call to version.dragonflydb.io, which also reports
+    # deployment details; --dbfilename=dump: one snapshot, overwritten at each stop and
+    # loaded at the next start (the default name has a timestamp so they pile up)
+    command: ["--version_check=false", "--dbfilename=dump"]
     ulimits:
       memlock: -1
     volumes:
@@ -191,6 +195,10 @@ services:
     command: ["--version_check=false", "--cache_mode=true", "--dbfilename="]
     ulimits:
       memlock: -1
+    # the image declares VOLUME /data: without this every container gets an anonymous
+    # volume of its own that nothing removes
+    tmpfs:
+      - /data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 2s

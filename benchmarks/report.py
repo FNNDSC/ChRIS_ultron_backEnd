@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import fields
 from pathlib import Path
 from typing import Iterable
+
+from .models import SamplerSummary, describe_sampler
 
 
 def render(summary: dict, levels: list[dict]) -> str:
@@ -96,8 +99,7 @@ def _approach_curves(levels: list[dict]) -> list[str]:
     return out
 
 
-_SAMPLER_TROUBLE = ("late_ticks", "failed_reads", "list_failures", "queue_late_ticks",
-                    "queue_failures")
+_SAMPLER_TROUBLE = tuple(f.name for f in fields(SamplerSummary) if f.metadata.get("trouble"))
 
 
 def _sampler_note(rows: list[dict]) -> list[str]:
@@ -112,19 +114,22 @@ def _sampler_note(rows: list[dict]) -> list[str]:
         return []
 
     instances = sum(((rows[-1].get("final_status_counts") or {}).values()))
+    busy = (f", {last['busy_skips']} readings missed behind a read still running"
+            if last.get("busy_skips") else "")
     queues = (f"; queues every {last['queue_interval_s']} s, {last.get('queue_ticks')} "
               f"ticks" if last.get("queue_interval_s") else "; queues not sampled")
     out = [f"_Sampling at level {rows[-1].get('level')}: every {last.get('interval_s')} s, "
-           f"{last.get('ticks')} ticks ({last.get('late_ticks')} late, slowest "
+           f"{last.get('ticks')} ticks ({last.get('late_ticks')} skipped, slowest "
            f"{last.get('max_tick_s')} s), {last.get('reads')} reads "
-           f"({last.get('failed_reads')} failed); {last.get('jobs_seen')} plugin-job "
+           f"({last.get('failed_reads')} failed{busy}); {last.get('jobs_seen')} plugin-job "
            f"containers seen for {instances} instances{queues}_", ""]
 
     behind = [str(r.get("level")) for r in rows
               if any((r.get("sampler") or {}).get(key) for key in _SAMPLER_TROUBLE)]
     if behind:
         out += [f"**Sampling fell behind or failed at level(s) {', '.join(behind)}** "
-                f"(late ticks, failed reads or listings, or failed queue reads in "
+                f"(skipped ticks, failed reads or listings, readings missed behind a "
+                f"hung read, or failed queue reads in "
                 f"`levels.jsonl`): their peaks may miss readings.", ""]
     return out
 
@@ -307,9 +312,7 @@ def _environment_section(env: dict) -> list[str]:
 
 
 def _sampler_cell(sampler: dict) -> str:
-    queues = (f", queues every {sampler['queue_interval_s']} s"
-              if sampler.get("queue_interval_s") else "")
-    return f"{sampler.get('method')}: every {sampler.get('interval_s')} s{queues}"
+    return describe_sampler(sampler)
 
 
 def _limits_section(limits: dict) -> list[str]:

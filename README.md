@@ -186,11 +186,16 @@ just lint                 # new issues on this branch, uncommitted changes inclu
 just lint --all           # every issue in the changed files
 just lint-fix             # let Ruff fix new unused imports and f-strings without placeholders
 just lint-fix --unsafe    # ... and unused variables
+just lint-test            # the tests of scripts/lint.py
 ```
 
 It finds nearly all of Codacy's issues but not those of Opengrep (unpinned GitHub
-Actions, a Dockerfile without `USER`), ESLint, ShellCheck, Hadolint or markdownlint.
-Silence a false positive as the code does, e.g. `# nosec B105 - a label, not a password`.
+Actions, a Dockerfile without `USER`), ESLint, ShellCheck, Hadolint, markdownlint, PMD,
+Agentlinter (which reads `CLAUDE.md`), Jackson Linter or Lizard. An advisory of a changed
+lockfile that the merge-base has too is listed with a `?`: Codacy compares with its stored
+analysis of master, which can predate the advisory, so it may still call it new; upgrading the
+package clears it. Silence a false positive as the code does, e.g.
+`# nosec B105 - a label, not a password`.
 
 #### Trying HTTP requests from the CLI
 
@@ -281,6 +286,36 @@ just openapi-split > /dev/null
 
 See https://chrisproject.org/docs/run/helm
 
+### Shared cache: `CACHE_URL` is required
+
+CUBE needs a Redis-protocol server of its own for its shared cache (`core/cache.py`), and
+`config.settings.production` refuses to start without its URL in `CACHE_URL`: the API server,
+the Celery workers and beat all read it. A deployment whose stack has no such server, e.g. one
+with RabbitMQ as the Celery broker, must add one before it runs this version.
+
+- **Its own server.** Not the Celery broker's, whatever the database: one server has one
+  memory limit and one eviction policy, so a full cache would refuse the broker's writes and
+  evicting would drop its queues. CUBE refuses to start on the broker's server.
+- **Evicting and keeping nothing.** Anything in it may vanish. Dragonfly with
+  `--cache_mode=true --dbfilename=` (as `chris-cache` in `docker-compose.yml`), or Redis 7+ or
+  Valkey 8 with a `--maxmemory`, an `allkeys-*` eviction policy and no persistence
+  (`--save '' --appendonly no`).
+- **The URL.** `redis://[[user]:password@]host:6379/<db>`, `rediss://` for TLS, or
+  `unix:///path/to.sock?db=<db>`, with a logical database. TLS options and socket timeouts
+  (above 0, at most 5 s; 0.5 s by default) can go in its query string, retry options cannot.
+  Percent-encode a `/`, `#`, `?` or `@` in the credentials.
+- **Its permissions.** A user the server's ACL limits needs the commands the helpers send
+  (`PING`, `SET`, `DEL`, `ZREM`, `SCRIPT LOAD` and `EVALSHA`) and those their scripts run
+  (`GET`, `DEL`, `TIME`, `PEXPIREAT` and the sorted-set commands), on the keys under CUBE's
+  prefix (`cube:*`).
+
+At start-up CUBE checks the server and refuses to start on a wrong configuration: another
+cache backend, the broker's server, a URL it cannot parse or without a database, retries or a
+timeout out of bounds, a refused password or certificate, TLS against a plain-text server or
+plain text against a TLS-only one, or a server that refuses its scripts. A server that is down,
+or full, only gets a warning: CUBE starts without it, and the helpers go ahead without their
+locks, markers and bounded counters until it answers.
+
 ## GitHub Actions
 
 This repository can also be used as a GitHub Actions step for running _CUBE_ integration tests, e.g.
@@ -331,7 +366,7 @@ See [`benchmarks/README.md`](./benchmarks/README.md) for usage and [`benchmarks/
 
 #### REST API reference
 
-Available [here](https://fnndsc.github.io/ChRIS_ultron_backEnd).
+Available [here](https://harbor-medical-ai.github.io/ChRIS_ultron_backEnd/).
 
 Install Sphinx and the http extension (useful to document the REST API)
 ```

@@ -308,8 +308,10 @@ def resource_rollup(samples: list[ResourceSample]) -> dict:
 def counter_increase(samples: list[ResourceSample], counter: str) -> int:
     """
     How much a counter that runs from the container's start grew over time-ordered
-    ``samples``: the sum of its increases between consecutive readings of one start, so
-    that a restart, which sets it back to zero, is not counted as a fall.
+    ``samples``: the sum of its increases between consecutive readings of one start. A
+    pair across a restart (the sampler inspects the start time again after one) is left
+    out, so that the counter's climb from zero after it is not counted from the value
+    before it; a fall is never counted.
     """
     total = 0.0
 

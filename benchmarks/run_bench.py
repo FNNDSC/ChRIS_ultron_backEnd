@@ -16,7 +16,7 @@ import os
 import statistics
 import time
 from collections import Counter
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 
 from . import classifier, environment, escalation, metrics, report, topologies
@@ -28,7 +28,7 @@ from .pg_stats import (SERVER_START_KEY, PgStatStatements, counter_delta, counte
                        max_deltas, server_counters, server_counters_error)
 from .executor import build_feeds
 from .metrics import MetricSink
-from .models import (BreakingPoint, Classification, LevelResult, PluginRole,
+from .models import (BreakingPoint, Classification, LevelResult, PluginRole, SamplerSummary,
                      ScenarioParams, ScenarioResult, Verdict)
 from .poller import ProgressProbe, poll_to_completion
 from .recovery import recover_after_failure, wait_for_health, wait_for_quiescence
@@ -44,7 +44,8 @@ PLUGIN_NAMES = {PluginRole.FS: "dbg-bigfiles",
 #: the resource sampler's tick, which is also its CPU window: one second, as in Docker's
 #: own figure (a two-second window would average away the 2 s Celery beat's bursts)
 STATS_INTERVAL_S = 1.0
-#: under the beat's period, so that queue samples do not lock onto one phase of it
+#: a quarter of the 2 s Celery beat's period: a queue the beat fills shows within half a
+#: second, at one of four fixed phases of each beat
 QUEUE_INTERVAL_S = 0.5
 SAMPLER_WORKERS = 8
 #: the sampler's own Docker client gives up a call after this rather than docker-py's 60 s:
@@ -329,7 +330,9 @@ class BenchmarkRunner:
         
         # how the resources and queues were sampled: bench-compare cautions when two runs
         # were sampled differently
-        env["sampler"] = sampler_record(STATS_INTERVAL_S, QUEUE_INTERVAL_S, SAMPLER_WORKERS)
+        env["sampler"] = sampler_record(
+            STATS_INTERVAL_S, QUEUE_INTERVAL_S if self.broker.available else None,
+            SAMPLER_WORKERS)
 
         env["attribution"] = {
             "resource_sampling": True if self.sampler_docker.available
@@ -484,23 +487,17 @@ def _larger(a, b):
 
 def _sampler_rollup(reps) -> dict:
     """
-    The repeats' sampler summaries added up (the longest tick is the longest of them);
-    ``{}`` when none has one.
+    The repeats' sampler summaries rolled up as each field says (the counts added up, the
+    longest tick the longest of them); ``{}`` when none has one.
     """
     summaries = [r.sampler for r in reps if r.sampler is not None]
 
     if not summaries:
         return {}
 
-    first = summaries[0]
-    out = {"interval_s": first.interval_s, "queue_interval_s": first.queue_interval_s,
-           "max_tick_s": max(s.max_tick_s for s in summaries)}
-
-    for name in ("ticks", "late_ticks", "reads", "failed_reads", "vanished",
-                 "list_failures", "jobs_seen", "queue_ticks", "queue_late_ticks",
-                 "queue_failures"):
-        out[name] = sum(getattr(s, name) for s in summaries)
-    return out
+    rollups = {"sum": sum, "max": max, "first": lambda values: values[0]}
+    return {f.name: rollups[f.metadata["rollup"]]([getattr(s, f.name) for s in summaries])
+            for f in fields(SamplerSummary)}
 
 
 def _db_counters_rollup(reps) -> dict:

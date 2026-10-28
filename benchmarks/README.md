@@ -94,7 +94,7 @@ levels.jsonl/.csv    # one row per (topology, axis, level): the approach-to-fail
 environment.json     # host hardware, image ids (CUBE, pfcon, Postgres, the broker and the cache), envelope knobs, container limits, Postgres settings, workload plugin versions and images, the pin they were checked against, the resource sampler's settings, noise floor, attribution availability
 api_requests.jsonl   # every measured API call (latency, status, endpoint class)
 status_samples.jsonl # per-instance status timelines (client-observed phase timing)
-docker_stats.jsonl   # every service + job container read every 1 s: CPU over the time since its previous reading, or since a container born in the scenario started (null without a window: a service's first reading, one 0.75 s or less after the previous, as the closing reading can be, a job's first 0.25 s or less after its start, one after a restart), memory with and without the page cache, CPU throttling, cumulative blkio and CPU counters
+docker_stats.jsonl   # every service + job container read every 1 s: CPU over the time since its previous reading, or since a container born in the scenario started (null without a window: a service's first reading, one under 0.75 s after the previous, as the closing reading can be, whose CPU then goes into the next reading's window, a job's first under 0.25 s after its start, one after a restart), memory with and without the page cache, CPU throttling, cumulative blkio and CPU counters
 queue_depths.jsonl   # Celery queue depths (main1/main2/periodic), sampled every 0.5 s
 scenarios/<id>/      # scenario.json with db_counters and the sampler's summary (observer.sampler) (+ pg_stats.json; failure.json + logs/ on hard failures)
 ```
@@ -258,8 +258,9 @@ a stack you can `just nuke` afterwards.
   `pl-simpledsapp` 2.1.5 and `pl-topologicalcopy` 1.0.13 by image digest from
   `benchmarks/chrisomatic/benchmark.yml`, not from the dev stack's `chrisomatic.yml` (which takes
   `pl-topologicalcopy` from the ChRIS store, now a no-op 2.0.0). The harness refuses to start
-  unless CUBE holds exactly those registrations, one version each, and records them, their
-  images and the pin under `workload_plugins` in `environment.json`. The dev and benchmark
+  unless CUBE holds exactly those registrations, one version each, and records them and their
+  images under `workload_plugins` in `environment.json`, and the pin under
+  `workload_plugins_pin`. The dev and benchmark
   stacks share their volumes, so after a dev `just` run `just bench-nuke` (it deletes the dev
   data too) before `just bench-start`; an arm64 laptop needs a pin of its own. `envelope.md`
   § "Pinned workload plugin versions" has the details (STRATEGY.md § Workload Plugins).

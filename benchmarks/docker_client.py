@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import docker
-from docker.errors import ImageNotFound, NotFound
+from docker.errors import APIError, ImageNotFound, NotFound
 
 from .models import ResourceSample
 
@@ -84,7 +84,7 @@ class DockerClient:
             client = docker.from_env(**({"timeout": timeout} if timeout else {}))
             client.ping()
             self._docker = client
-        except Exception as exc:  # noqa: BLE001 - optional dependency
+        except Exception as exc:  # noqa: BLE001 - no engine, or one that does not answer
             self.unavailable_reason = str(exc)
 
     @property
@@ -93,17 +93,22 @@ class DockerClient:
 
     # -- container discovery ---------------------------------------------------------
 
+    def _service_filter(self) -> dict:
+        """
+        The stack's containers: the compose project's, or any compose service's without one.
+        """
+        if self.project:
+            return {"label": f"com.docker.compose.project={self.project}"}
+        return {"label": "com.docker.compose.service"}
+
     def service_containers(self) -> list:
         if not self._docker:
             return []
-        
-        if self.project:
-            flt = {"label": f"com.docker.compose.project={self.project}"}
-        else:
-            flt = {"label": "com.docker.compose.service"}
-        
+
         # a container removed while the listing inspects it is left out, not an error
-        return [c for c in self._docker.containers.list(filters=flt, ignore_removed=True)
+        listed = self._docker.containers.list(filters=self._service_filter(),
+                                              ignore_removed=True)
+        return [c for c in listed
                 if c.labels.get("com.docker.compose.service") not in self.exclude_services]
 
     def job_containers(self, all_states: bool = False) -> list:
@@ -129,6 +134,12 @@ class DockerClient:
             frame = self._docker.api.stats(container_id, stream=False, one_shot=True)
         except NotFound:
             return StatsRead(vanished=True)
+        except APIError as exc:
+            # Podman answers 409 for a container that is no longer running, where Docker
+            # gives a frame with the zero read time
+            if exc.status_code == 409:
+                return StatsRead(vanished=True)
+            return StatsRead(error=str(exc))
         except Exception as exc:                       # noqa: BLE001 - counted, not raised
             return StatsRead(error=str(exc))
 
@@ -146,13 +157,8 @@ class DockerClient:
         if not self._docker:
             return []
 
-        if self.project:
-            services = {"label": f"com.docker.compose.project={self.project}"}
-        else:
-            services = {"label": "com.docker.compose.service"}
-
         refs = {}
-        for listed in (self._docker.api.containers(filters=services),
+        for listed in (self._docker.api.containers(filters=self._service_filter()),
                        self._docker.api.containers(filters={"label": self.job_label})):
             for c in listed:
                 labels = c.get("Labels") or {}
@@ -321,16 +327,19 @@ MIN_START_WINDOW_S = 0.25
 
 
 def resource_sample(ref: ContainerRef, frame: dict, previous: dict | None, *,
-                    since: float | None = None) -> ResourceSample:
+                    since: float | None = None, last: dict | None = None) -> ResourceSample:
     """
     The sample of a one-shot stats ``frame``. A one-shot frame has no usable precpu, so
-    its CPU is over the time since ``previous``, the container's last frame in the same
-    segment. Without one, a container that started after ``since`` (when sampling
+    its CPU is over the time since ``previous``, an earlier frame of the container from
+    the same sampler (the last one whose window gave a figure, so that no CPU goes
+    unreported). Without one, a container that started after ``since`` (when sampling
     began, epoch seconds) gets its CPU since its start, all that a plugin job living a
     second or two gets, and any other container none; nor does a window shorter than
-    ``MIN_CPU_WINDOW_S`` (``MIN_START_WINDOW_S`` since a start).
+    ``MIN_CPU_WINDOW_S`` (``MIN_START_WINDOW_S`` since a start). The throttling is over
+    the time since ``last``, the container's frame just before this one (``previous``
+    when not given), so that two readings never count the same throttling.
     """
-    cpu, window = _cpu_since(frame, previous, ref.started_at, since)
+    cpu, window, _ = _cpu_since(frame, previous, ref.started_at, since)
     mem = frame.get("memory_stats") or {}
     stats = mem.get("stats") or {}
     anon = stats.get("anon", stats.get("rss"))      # cgroup v2, v1
@@ -343,40 +352,60 @@ def resource_sample(ref: ContainerRef, frame: dict, previous: dict | None, *,
         blkio_read_bytes=read, blkio_write_bytes=written,
         pids=int((frame.get("pids_stats") or {}).get("current", 0) or 0),
         cpu_window_s=window, cpu_total_ns=_cpu_total(frame),
-        cpu_throttled_s=_throttled_s(frame, previous),
+        cpu_throttled_s=_throttled_s(frame, last if last is not None else previous),
         mem_anon_bytes=float(anon) if anon is not None else None,
         started_at=ref.started_at)
 
 
-def _cpu_since(frame: dict, previous: dict | None, started_at: float | None,
-               since: float | None) -> tuple[float | None, float | None]:
+def short_window(frame: dict, previous: dict | None, started_at: float | None,
+                 since: float | None) -> bool:
     """
-    CPU % and its window in seconds, as ``resource_sample`` says, or ``(None, None)``.
+    Whether ``frame`` gives no CPU figure only because its window is too short: the
+    reading after it should then be over the same window's start, ``previous``.
+    """
+    return _cpu_since(frame, previous, started_at, since)[2]
+
+
+def counters_went_back(frame: dict, previous: dict) -> bool:
+    """
+    Whether a container's CPU counter fell between two of its frames: it restarted in
+    between, which keeps its id, and its counters started again from zero.
+    """
+    total, total0 = _cpu_total(frame), _cpu_total(previous)
+    return total is not None and total0 is not None and total < total0
+
+
+def _cpu_since(frame: dict, previous: dict | None, started_at: float | None,
+               since: float | None) -> tuple[float | None, float | None, bool]:
+    """
+    CPU % and its window in seconds, as ``resource_sample`` says, or ``(None, None)``;
+    and whether that window was too short for a figure.
     """
     t, total = _rfc3339(frame.get("read")), _cpu_total(frame)
 
     if t is None or total is None:
-        return None, None
+        return None, None, False
 
     if previous is not None:
         t0, total0 = _rfc3339(previous.get("read")), _cpu_total(previous)
 
-        # counters that went backwards: a restart the start time did not show
+        # counters that went backwards: a restart, which the sampler meets by inspecting
+        # the start time again
         if t0 is None or total0 is None or t <= t0 or total < total0:
-            return None, None
+            return None, None, False
         began, used, shortest = t0, total - total0, MIN_CPU_WINDOW_S
     elif started_at is not None and since is not None and since <= started_at < t:
         began, used, shortest = started_at, total, MIN_START_WINDOW_S
     else:
-        return None, None
+        return None, None, False
 
     window = t - began
     if window < shortest:
-        return None, None
+        return None, None, True
 
     # over the daemon's nanosecond clock: Docker's own formula divides by the host's CPU
     # time, which /proc/stat counts in 10 ms ticks, too coarse for a short window
-    return round(used / (window * 1e9) * 100.0, 2), round(window, 3)
+    return round(used / (window * 1e9) * 100.0, 2), round(window, 3), False
 
 
 def _cpu_total(frame: dict) -> int | None:

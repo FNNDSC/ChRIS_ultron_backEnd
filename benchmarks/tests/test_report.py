@@ -294,11 +294,11 @@ def test_render_says_how_each_axis_was_sampled():
     md = render(_summary({"sampler": SAMPLER}),
                 [_level(sampler=LEVEL_SAMPLER, final_status_counts={"finishedSuccessfully": 2})])
 
-    note = ("_Sampling at level 1: every 1.0 s, 12 ticks (0 late, slowest 0.03 s), 60 reads "
-            "(0 failed); 2 plugin-job containers seen for 2 instances; queues every 0.5 s, "
-            "24 ticks_")
+    note = ("_Sampling at level 1: every 1.0 s, 12 ticks (0 skipped, slowest 0.03 s), 60 "
+            "reads (0 failed); 2 plugin-job containers seen for 2 instances; queues every "
+            "0.5 s, 24 ticks_")
     row = ("| Resource sampler | one-shot reads, CPU between consecutive readings: every "
-           "1.0 s, queues every 0.5 s |")
+           "1.0 s, queues every 0.5 s, 8 workers |")
     assert note in md and row in md  # nosec B101 - pytest assertion
     assert "fell behind" not in md  # nosec B101 - pytest assertion
 
@@ -326,14 +326,24 @@ def test_the_sampling_note_describes_the_last_level_of_the_axis():
                                       final_status_counts={"cancelled": 1,
                                                            "finishedSuccessfully": 3})])
 
-    note = ("_Sampling at level 2: every 1.0 s, 30 ticks (0 late, slowest 0.03 s), 60 reads "
-            "(0 failed); 2 plugin-job containers seen for 4 instances; queues not sampled_")
+    note = ("_Sampling at level 2: every 1.0 s, 30 ticks (0 skipped, slowest 0.03 s), 60 "
+            "reads (0 failed); 2 plugin-job containers seen for 4 instances; queues not "
+            "sampled_")
     assert note in md  # nosec B101 - pytest assertion
+
+
+def test_readings_missed_behind_a_hung_read_are_named_and_flagged():
+    md = render(_summary({}), [_level(sampler={**LEVEL_SAMPLER, "failed_reads": 1,
+                                               "busy_skips": 9})])
+
+    missed = "60 reads (1 failed, 9 readings missed behind a read still running)"
+    assert missed in md  # nosec B101 - pytest assertion
+    assert "**Sampling fell behind or failed at level(s) 1**" in md  # nosec B101 - pytest assertion
 
 
 def test_every_kind_of_sampling_trouble_is_flagged():
     for key in ("late_ticks", "failed_reads", "list_failures", "queue_late_ticks",
-                "queue_failures"):
+                "queue_failures", "busy_skips"):
         md = render(_summary({}), [_level(sampler={**LEVEL_SAMPLER, key: 1})])
 
         warning = "**Sampling fell behind or failed at level(s) 1**"

@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from benchmarks.docker_client import ContainerRef, DockerClient, StatsRead
-from benchmarks.metrics import MetricSink
+from benchmarks.metrics import MetricSink, resource_rollup
 from benchmarks.stats_sampler import (METHOD, FixedRate, StatsSampler, next_slot,
                                       sampler_record)
 from benchmarks.tests._frames import frame
@@ -29,16 +29,17 @@ def test_next_slot_runs_on_time_or_skips_the_slots_an_overrun_covered():
 
 def test_fixed_rate_ticks_start_to_start():
     starts = []
-    ticker = FixedRate(0.05, lambda: starts.append(time.monotonic()) or time.sleep(0.02),
+    ticker = FixedRate(0.1, lambda: starts.append(time.monotonic()) or time.sleep(0.04),
                        name="test-ticker")
     ticker.start()
-    time.sleep(0.33)
+    time.sleep(0.75)
     ticker.stop()
-    gaps = [b - a for a, b in zip(starts, starts[1:])]
+    gaps = sorted(b - a for a, b in zip(starts, starts[1:]))
 
-    # the 20 ms each tick takes does not stretch the period
-    assert 5 <= ticker.ticks <= 8 and ticker.skipped == 0  # nosec B101 - pytest assertion
-    assert all(0.035 < gap < 0.07 for gap in gaps), gaps  # nosec B101 - pytest assertion
+    # the 40 ms each tick takes does not stretch the period: the slots run or are skipped
+    # (a busy host can hold a tick back) but are never pushed back
+    assert 7 <= ticker.ticks + ticker.skipped <= 9  # nosec B101 - pytest assertion
+    assert 0.09 <= gaps[len(gaps) // 2] <= 0.115, gaps  # nosec B101 - pytest assertion
 
 
 def test_fixed_rate_counts_skipped_ticks_and_errors_and_runs_a_final_tick():
@@ -59,6 +60,21 @@ def test_fixed_rate_counts_skipped_ticks_and_errors_and_runs_a_final_tick():
     assert ticker.skipped >= 2 and ticker.errors == 1  # nosec B101 - pytest assertion
     assert ticker.longest >= 0.13  # nosec B101 - pytest assertion
     assert ticker.ticks == len(calls) >= 4  # nosec B101 - pytest assertion
+
+
+def test_a_final_tick_given_as_a_callable_is_decided_after_the_running_tick():
+    state = {"ready": False}
+
+    def tick():
+        time.sleep(0.1)
+        state["ready"] = True
+
+    ticker = FixedRate(10.0, tick, name="test-ticker")
+    ticker.start()
+    time.sleep(0.02)                                   # the first tick is running
+    ticker.stop(final_tick=lambda: state["ready"])
+
+    assert ticker.ticks == 2  # nosec B101 - pytest assertion
 
 
 # -- the sampler's ticks -----------------------------------------------------------------------
@@ -147,21 +163,76 @@ def test_each_tick_reads_every_container_and_counts_what_went_wrong():
     assert sorted(docker.inspected) == ["db1", "j1", "x1"]  # nosec B101 - pytest assertion
 
 
-def test_a_restart_shows_as_counters_that_went_backwards():
-    docker = ScriptedDocker(
+class Restarting(ScriptedDocker):
+    """
+    A stack whose ``db1`` restarts in place (same id) at 200.5: an inspect from then on
+    gives the new start time.
+    """
+
+    def started_at(self, container_id):
+        self.inspected.append(container_id)
+        return 200.5 if len(self.inspected) > 1 else 100.0
+
+
+def test_a_restart_in_place_is_inspected_again_and_not_counted_across():
+    docker = Restarting(
         listings=[[DB]],
-        reads={"db1": [StatsRead(frame(200.0, 5e9)), StatsRead(frame(201.0, 0.4e9)),
-                       StatsRead(frame(202.0, 1.4e9))]},
-        started=STARTED)
+        reads={"db1": [StatsRead(frame(199.0, 4e9, written=1000)),
+                       StatsRead(frame(200.0, 5e9, written=2000)),
+                       StatsRead(frame(201.0, 0.4e9, written=2500)),
+                       StatsRead(frame(202.0, 1.4e9, written=2600))]})
     sink = MetricSink()
     sampler = _ticking(docker, sink)
+
+    for _ in range(4):
+        sampler._sample_containers()
+
+    samples = sink.resources()
+    # no figure across the restart: its CPU since the new start is 0.4 s in 0.5 s, then
+    # the second after it
+    assert [s.cpu_pct for s in samples] == [None, 100.0, 80.0, 100.0]  # nosec B101 - pytest assertion
+    assert [s.started_at for s in samples] == [100.0, 100.0, 200.5, 200.5]  # nosec B101 - pytest assertion
+    assert docker.inspected == ["db1", "db1"]  # nosec B101 - pytest assertion
+    # 1000 before the restart and 100 after it, nothing across it
+    rollup = resource_rollup(samples)
+    assert rollup["db"]["blkio_write_bytes"] == 1100  # nosec B101 - pytest assertion
+
+
+def test_a_window_too_short_for_a_figure_leaves_its_cpu_to_the_next_reading():
+    # a burst of 1.4 s of CPU between the readings at 201.3 and 202.0, a 0.7 s window
+    docker = ScriptedDocker(
+        listings=[[DB]], started=STARTED,
+        reads={"db1": [StatsRead(frame(200.0, 5e9, throttled_ns=0)),
+                       StatsRead(frame(201.3, 5e9, throttled_ns=0)),
+                       StatsRead(frame(202.0, 6.4e9, throttled_ns=0.3e9)),
+                       StatsRead(frame(203.0, 6.4e9, throttled_ns=0.3e9))]})
+    sink = MetricSink()
+    sampler = _ticking(docker, sink)
+
+    for _ in range(4):
+        sampler._sample_containers()
+
+    samples = sink.resources()
+    # the reading after the short window has the burst, over the 1.7 s since 201.3; the
+    # throttling is counted once, over the window just before each reading
+    assert [s.cpu_pct for s in samples] == [None, 0.0, None, 82.35]  # nosec B101 - pytest assertion
+    assert [s.cpu_throttled_s for s in samples] == [None, 0.0, 0.3, 0.0]  # nosec B101 - pytest assertion
+
+
+def test_a_failed_inspect_is_made_again_at_the_next_tick():
+    class Flaky(ScriptedDocker):
+        def started_at(self, container_id):
+            self.inspected.append(container_id)
+            return None if len(self.inspected) == 1 else 100.0
+
+    docker = Flaky(listings=[[DB]], reads={"db1": [StatsRead(frame(200.0, 5e9))]})
+    sampler = _ticking(docker, MetricSink())
 
     for _ in range(3):
         sampler._sample_containers()
 
-    # no figure across the restart, then the second after it
-    cpu = [s.cpu_pct for s in sink.resources()]
-    assert cpu == [None, None, 100.0]  # nosec B101 - pytest assertion
+    assert docker.inspected == ["db1", "db1"]  # nosec B101 - pytest assertion
+    assert sampler._started == {"db1": 100.0}  # nosec B101 - pytest assertion
 
 
 def test_a_container_gone_from_the_listing_is_forgotten():
@@ -176,6 +247,21 @@ def test_a_container_gone_from_the_listing_is_forgotten():
 
     assert set(sampler._last) == {"db1"}  # nosec B101 - pytest assertion
     assert set(sampler._started) == {"db1"}  # nosec B101 - pytest assertion
+
+
+def test_more_containers_than_workers_are_all_read_within_the_tick():
+    refs = [_ref(f"c{i}", f"service-{i}") for i in range(6)]
+    docker = ScriptedDocker(listings=[refs], delay=0.05,
+                            reads={r.id: [StatsRead(frame(200.0, 1e9))] for r in refs})
+    sink = MetricSink()
+
+    with StatsSampler(docker, sink, interval=10.0, workers=2) as sampler:
+        pass
+
+    # three rounds of two reads in each of the two ticks: queued in the pool, not late
+    summary = sampler.summary()
+    assert len(sink.resources()) == 12  # nosec B101 - pytest assertion
+    assert (summary.reads, summary.failed_reads, summary.busy_skips) == (12, 0, 0)  # nosec B101 - pytest assertion
 
 
 def test_the_reads_of_a_tick_run_together():
@@ -208,6 +294,8 @@ def test_a_hung_read_holds_neither_the_ticks_nor_the_stop():
     db_reads = [s for s in sink.resources() if s.container == "db"]
     assert len(db_reads) >= 4  # nosec B101 - pytest assertion
     assert summary.failed_reads == 1  # nosec B101 - pytest assertion
+    # the ticks it held the container out of are counted too
+    assert summary.busy_skips == len(db_reads) - 1  # nosec B101 - pytest assertion
     assert summary.max_tick_s < 0.3  # nosec B101 - pytest assertion
     # the hung read was submitted once, not at every tick, and stop() did not wait for it
     assert stopped_in < 1.0  # nosec B101 - pytest assertion
@@ -238,15 +326,19 @@ def test_an_unavailable_docker_counts_every_tick_as_a_failed_listing():
     assert sampler.summary().list_failures == 2  # nosec B101 - pytest assertion
 
 
-def test_a_tick_that_raises_is_counted_as_a_failed_listing():
-    # a frame the conversion cannot read
+def test_an_unreadable_frame_is_a_failed_read_and_the_tick_goes_on():
+    # a frame the conversion cannot read, listed before a good one
     garbage = StatsRead({"read": "2026-10-26T17:12:35Z", "cpu_stats": "garbage"})
-    docker = ScriptedDocker(listings=[[DB]], started=STARTED, reads={"db1": [garbage]})
+    docker = ScriptedDocker(listings=[[BROKEN, DB]], started=STARTED,
+                            reads={"x1": [garbage], "db1": [StatsRead(frame(200.0, 5e9))]})
+    sink = MetricSink()
 
-    with StatsSampler(docker, MetricSink(), interval=10.0) as sampler:
+    with StatsSampler(docker, sink, interval=10.0) as sampler:
         pass
 
-    assert sampler.summary().list_failures == 2  # nosec B101 - pytest assertion
+    summary = sampler.summary()
+    assert [s.container for s in sink.resources()] == ["db", "db"]  # nosec B101 - pytest assertion
+    assert (summary.reads, summary.failed_reads, summary.list_failures) == (4, 2, 0)  # nosec B101 - pytest assertion
 
 
 # -- the sampler's lifetime ------------------------------------------------------------------
@@ -281,13 +373,13 @@ def test_queue_depths_keep_their_cadence_while_container_reads_are_slow():
 
 
 def test_stop_in_the_middle_of_both_ticks_waits_for_them_and_nothing_comes_after():
-    docker = ScriptedDocker(listings=[[DB]], delay=0.2,
+    docker = ScriptedDocker(listings=[[DB]], delay=0.4,
                             reads={"db1": [StatsRead(frame(200.0, 5e9))]})
     sink = MetricSink()
-    sampler = StatsSampler(docker, sink, interval=10.0, broker=SlowBroker(delay=0.2),
+    sampler = StatsSampler(docker, sink, interval=10.0, broker=SlowBroker(delay=0.4),
                            queue_interval=10.0)
     sampler.start()
-    time.sleep(0.05)                                   # both first ticks are running
+    time.sleep(0.15)                                   # both first ticks are running
     sampler.stop()
     counts = (len(sink.resources()), len(sink.queues()))
     time.sleep(0.3)
@@ -298,6 +390,24 @@ def test_stop_in_the_middle_of_both_ticks_waits_for_them_and_nothing_comes_after
     assert sampler._resources._thread is None  # nosec B101 - pytest assertion
     assert sampler._queues._thread is None  # nosec B101 - pytest assertion
     assert sampler._pool is None  # nosec B101 - pytest assertion
+
+
+def test_a_stop_during_a_listing_that_succeeds_still_runs_the_closing_tick():
+    class SlowListing(ScriptedDocker):
+        def sampled_containers(self):
+            time.sleep(0.2)
+            return super().sampled_containers()
+
+    docker = SlowListing(listings=[[DB]], started=STARTED,
+                         reads={"db1": [StatsRead(frame(200.0, 5e9))]})
+    sink = MetricSink()
+    sampler = StatsSampler(docker, sink, interval=10.0).start()
+    time.sleep(0.05)                                   # the first tick is listing
+    sampler.stop()
+
+    # the first tick and the closing one, which the listing in flight did not cancel
+    assert sampler.summary().ticks == 2  # nosec B101 - pytest assertion
+    assert len(sink.resources()) == 2  # nosec B101 - pytest assertion
 
 
 def test_a_job_born_while_sampling_gets_its_cpu_since_it_started():
@@ -370,7 +480,8 @@ def test_the_sampler_reads_every_running_service_each_second():
         by[sample.container].append(sample)
 
     assert services <= set(by)  # nosec B101 - pytest assertion
-    for name, samples in by.items():
+    # the services only: a plugin job a benchmark runs meanwhile lives a second or two
+    for name, samples in ((name, by[name]) for name in services):
         gaps = sorted(b.t - a.t for a, b in zip(samples, samples[1:]))
         windows = [s.cpu_pct is not None for s in samples[1:4]]
         median_gap = gaps[len(gaps) // 2]

@@ -10,7 +10,8 @@ import pytest
 from docker.errors import APIError, ImageNotFound, NotFound
 
 from benchmarks.docker_client import (JOB_LABEL, ContainerRef, DockerClient, _rfc3339,
-                                      image_record, resource_sample)
+                                      counters_went_back, image_record, resource_sample,
+                                      short_window)
 from benchmarks.tests._frames import frame
 
 
@@ -130,11 +131,34 @@ def test_a_window_too_short_gives_no_cpu():
 
 
 def test_counters_that_went_backwards_give_no_cpu_or_throttling():
-    # a restart that the start time did not show
-    sample = resource_sample(SERVICE, frame(201.0, 1e9, throttled_ns=0),
-                             frame(200.0, 5e9, throttled_ns=2e9))
+    # a restart in place, which the sampler meets by inspecting the start time again
+    before, after = frame(200.0, 5e9, throttled_ns=2e9), frame(201.0, 1e9, throttled_ns=0)
+    sample = resource_sample(SERVICE, after, before)
 
     assert (sample.cpu_pct, sample.cpu_throttled_s) == (None, None)  # nosec B101 - pytest assertion
+    assert counters_went_back(after, before)  # nosec B101 - pytest assertion
+    assert not counters_went_back(before, frame(199.0, 4e9))  # nosec B101 - pytest assertion
+
+
+def test_only_a_window_too_short_keeps_its_start_for_the_next_reading():
+    job = ContainerRef("j1", "chris-jid-7", "job", started_at=200.0)
+
+    assert short_window(frame(200.7, 5.7e9), frame(200.0, 5e9), None, None)  # nosec B101 - pytest assertion
+    assert short_window(frame(200.2, 0.2e9), None, job.started_at, 150.0)  # nosec B101 - pytest assertion
+    # a figure, no window of its own, or counters that went backwards
+    assert not short_window(frame(201.0, 6e9), frame(200.0, 5e9), None, None)  # nosec B101 - pytest assertion
+    assert not short_window(frame(201.0, 6e9), None, None, None)  # nosec B101 - pytest assertion
+    assert not short_window(frame(201.0, 1e9), frame(200.0, 5e9), None, None)  # nosec B101 - pytest assertion
+
+
+def test_throttling_is_over_the_window_just_before_the_reading_when_given():
+    # the CPU over the 1.7 s since the reading at 201.3, the throttling since 202.0's
+    sample = resource_sample(SERVICE, frame(203.0, 6.4e9, throttled_ns=0.5e9),
+                             frame(201.3, 5e9, throttled_ns=0.1e9),
+                             last=frame(202.0, 6.4e9, throttled_ns=0.3e9))
+
+    assert (sample.cpu_pct, sample.cpu_window_s) == (82.35, 1.7)  # nosec B101 - pytest assertion
+    assert sample.cpu_throttled_s == 0.2  # nosec B101 - pytest assertion
 
 
 def test_throttling_is_the_time_the_limit_held_the_container_back_in_the_window():
@@ -177,11 +201,14 @@ def test_read_stats_tells_a_vanished_container_from_a_failed_read():
     exited = _stats_client(lambda cid, **kw: {"read": "0001-01-01T00:00:00Z"}).read_stats("c1")
     removed = _stats_client(_failing(NotFound("no such container"))).read_stats("c1")
     failed = _stats_client(_failing(APIError("500 Server Error"))).read_stats("c1")
+    # Podman's answer for a container that is no longer running
+    stopped = _stats_client(_failing(APIError(
+        "409 Conflict", response=SimpleNamespace(status_code=409)))).read_stats("c1")
 
     assert calls == [("c1", {"stream": False, "one_shot": True})]  # nosec B101 - pytest assertion
     assert read.frame is not None and not read.vanished  # nosec B101 - pytest assertion
-    assert exited.vanished and removed.vanished  # nosec B101 - pytest assertion
-    assert (exited.frame, removed.frame) == (None, None)  # nosec B101 - pytest assertion
+    assert exited.vanished and removed.vanished and stopped.vanished  # nosec B101 - pytest assertion
+    assert (exited.frame, removed.frame, stopped.frame) == (None, None, None)  # nosec B101 - pytest assertion
     assert failed.frame is None and not failed.vanished  # nosec B101 - pytest assertion
     assert "500 Server Error" in failed.error  # nosec B101 - pytest assertion
 
@@ -231,6 +258,17 @@ def test_sampled_containers_names_each_once_and_leaves_out_the_excluded():
     filters = [{"label": project}, {"label": JOB_LABEL}]
     assert api.filters == filters  # nosec B101 - pytest assertion
     assert _client(None).sampled_containers() == []  # nosec B101 - pytest assertion
+
+
+def test_sampled_containers_without_a_project_take_every_compose_service():
+    service = "com.docker.compose.service"
+    db = _listed("c1", "other-db-1", {service: "db"})
+    api = ListingApi({service: [db]})
+    client = _client(SimpleNamespace(api=api))
+    client.project, client.job_label, client.exclude_services = None, JOB_LABEL, ()
+
+    assert client.sampled_containers() == [ContainerRef("c1", "db", "service", None)]  # nosec B101 - pytest assertion
+    assert api.filters == [{"label": service}, {"label": JOB_LABEL}]  # nosec B101 - pytest assertion
 
 
 def test_started_at_is_none_when_the_inspect_fails():

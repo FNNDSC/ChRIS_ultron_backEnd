@@ -28,7 +28,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
-from .models import RunData
+from .models import RunData, describe_sampler
 from .report import csv_cell, markdown_table, record_digests
 from .results import default_results_root, load_run, resolve_run
 
@@ -549,10 +549,7 @@ def _sampler_label(sampler: dict | None) -> str:
     if not sampler:
         return "not recorded (the sparse sampler: lower bounds)"
 
-    queues = (f"queues every {sampler['queue_interval_s']} s"
-              if sampler.get("queue_interval_s") else "no queue timer")
-    return (f"{sampler.get('method')}, every {sampler.get('interval_s')} s, {queues}, "
-            f"{sampler.get('workers')} workers")
+    return describe_sampler(sampler)
 
 
 def trend_tables(runs: list[RunData], metric: str) -> list[tuple[tuple, list, list]]:

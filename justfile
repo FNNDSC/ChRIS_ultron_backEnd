@@ -109,25 +109,36 @@ test-unit-coverage: start-ancillary
 # Codacy fails a pull request on any issue its merge-base (git) does not have.
 # `lint` runs the checks behind nearly all of Codacy's findings (Bandit, pyflakes, dodgy,
 # Pylint, and `uv audit` for Trivy) on the files changed since the merge-base with
-# origin/master and lists the issues only the working tree has; `--all` lists the older
-# ones too, `--base` names another branch. See scripts/lint.py.
+# origin/master and lists the issues only the working tree has, with the advisories of a
+# changed lockfile that Codacy may call new all the same (marked ?); `--all` lists the
+# older ones too, `--base` names another branch. See scripts/lint.py.
 #
 # List the issues Codacy would report as new on this branch.
 [group('(3) development')]
 lint *args: (lint-run 'check' args)
 
 # Ruff fixes unused imports and f-strings without placeholders, with `--unsafe` unused
-# variables too, only where `lint` reports them as new.
+# variables too, only where `lint` reports them as new and never on an older issue's line.
 #
 # Fix the new issues Ruff can fix then list what is left.
 [group('(3) development')]
 lint-fix *args: (lint-run 'fix' args)
 
-# Run scripts/lint.py in the dev image with the repository mounted at /w.
-[group('helper function')]
-lint-run command *args:
+# Test scripts/lint.py (scripts/test_lint.py) in the dev image.
+[group('(3) development')]
+lint-test:
     @just storage={{ storage }} docker-compose --profile=cube run --rm --no-deps -T \
         -v '{{ justfile_directory() }}:/w:z' -w /w -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 \
+        chris python -m unittest discover -s scripts -p 'test_*.py'
+
+# Run scripts/lint.py in the dev image with the repository mounted at /w, and the host's
+# global git excludes (core.excludesFile) so that the files they ignore stay ignored.
+[group('helper function')]
+lint-run command *args:
+    @excludes="$(git config --path --get core.excludesFile || echo "${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore")"; \
+    just storage={{ storage }} docker-compose --profile=cube run --rm --no-deps -T \
+        -v '{{ justfile_directory() }}:/w:z' -w /w -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 \
+        $([ -f "$excludes" ] && echo "-v $excludes:/etc/git-excludes:ro -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=core.excludesFile -e GIT_CONFIG_VALUE_0=/etc/git-excludes") \
         chris python scripts/lint.py {{ command }} {{ args }}
 
 # Start dependency services.
@@ -317,7 +328,7 @@ bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
     just bench-compose 'run --rm chris python manage.py migrate --noinput'
     just bench-compose 'up -d --build chris worker-mains worker-periodic celery-scheduler'
     just bench-compose '--profile cube run --rm chrisomatic chrisomatic /etc/chrisomatic-benchmark/{{ pins }}' \
-        || { >&2 echo "[bench] chrisomatic failed. If a dev 'just' ran on these volumes, reset them with 'just bench-nuke' (it deletes the dev stack's data too) and run 'just bench-start' again."; exit 1; }
+        || { >&2 echo "[bench] chrisomatic failed. If a dev 'just' ran on these volumes, reset them with 'just bench-nuke' (it deletes the dev stack's data too) and run 'just bench-start {{ pins }}' again."; exit 1; }
 
 # chrisomatic 1.0.0 cannot pull an image by digest but registers one that is present, so
 # pull what the pin names first. A reference that is present is never pulled again.

@@ -471,7 +471,7 @@ def test_a_trend_of_a_sampled_metric_says_how_each_run_was_sampled(tmp_path):
     assert main([str(old), str(new), "--out", str(out),  # nosec B101 - pytest assertion
                  "--metric", "peak_cpu_pct.db"]) == 0
     note = ("_The runs were sampled differently — A: not recorded (the sparse sampler: "
-            "lower bounds); B: one-shot reads, CPU between consecutive readings, every "
+            "lower bounds); B: one-shot reads, CPU between consecutive readings: every "
             "1.0 s, queues every 0.5 s, 8 workers._")
     assert note in (out / "compare.md").read_text()  # nosec B101 - pytest assertion
 

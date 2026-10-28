@@ -9,16 +9,24 @@ checks the files changed since the merge-base, uncommitted and untracked ones in
 in the working tree and in the merge-base's tree and reports what only the working tree
 has, keyed as Codacy keys an issue: file, rule, source line text and message.
 
+Advisories are the exception: both trees are audited with today's advisories while
+Codacy compares with its stored analysis of master, which can predate some of them. So
+the advisories of a changed lockfile that the merge-base has too are listed as well,
+marked ``?``: Codacy may still call them new.
+
     just lint [--all] [--base REF]
     just lint-fix [--unsafe] [--base REF]
 
 ``fix`` applies Ruff's fixes for the new pyflakes issues (safe ones only unless
-``--unsafe``), then checks again. Exit status: 0 clean, 1 new issues, 2 failure.
+``--unsafe``) but none that would touch an older issue's line, then checks again. Exit
+status: 0 clean, 1 new issues, 2 failure. A git worktree cannot be checked this way: its
+``.git`` file names a path the container does not see.
 """
 
 import argparse
 import io
 import json
+import os
 import re
 import subprocess  # nosec B404 - runs git and the linters with fixed argument lists
 import sys
@@ -28,8 +36,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from dodgy.checks import check_file
 
 
 # Lockfiles and the uv project each belongs to.
@@ -52,6 +58,9 @@ FIX_PASSES = 10
 # moment before the commit object and then git exits 128: try again after these delays.
 GIT_RETRY_DELAYS = (0.5, 1.0)
 
+# The width of the rule column in the report.
+RULE_WIDTH = 14
+
 
 class LintError(Exception):
     def __init__(self, message, status=None):
@@ -73,9 +82,14 @@ def run(cmd, cwd=".", ok=(0, 1), text=True, label=None):
     """
     Run a command and return its stdout; fail on an exit status not in ``ok``.
     """
-    proc = subprocess.run(  # nosec B603 nosemgrep - fixed argument lists, no shell
-        cmd, cwd=cwd, capture_output=True, text=text, check=False
-    )
+    try:
+        proc = subprocess.run(  # nosec B603 nosemgrep - fixed argument lists, no shell
+            cmd, cwd=cwd, capture_output=True, text=text, check=False
+        )
+    except FileNotFoundError:
+        raise LintError(f"{cmd[0]} is not installed: the dev image predates it, "
+                        f"`just build` makes a new one") from None
+
     if proc.returncode not in ok:
         stderr = proc.stderr if text else proc.stderr.decode(errors="replace")
         name = label or " ".join(cmd[:3])
@@ -99,18 +113,21 @@ def git(*args, ok=(0,), text=True):
 
 class Tree:
     """
-    A checkout of the repository: the working tree or an extracted commit.
+    A checkout of the repository: the working tree or an extracted commit. A ``frozen``
+    tree does not change, so each check's results on it are kept.
     """
 
-    def __init__(self, root):
+    def __init__(self, root, frozen=False):
         self.root = Path(root)
+        self.frozen = frozen
         self._lines = {}
+        self._results = {}
 
     def line(self, path, number):
         if path not in self._lines:
             try:
-                self._lines[path] = (self.root / path).read_text(errors="replace"
-                                                                 ).split("\n")
+                text = (self.root / path).read_text(errors="replace")
+                self._lines[path] = text.split("\n")
             except OSError:
                 self._lines[path] = []
 
@@ -120,9 +137,21 @@ class Tree:
     def issue(self, path, number, rule, message, hint=""):
         return Issue(path, rule, self.line(path, number), message, number, hint)
 
+    def results(self, check, files):
+        if not self.frozen:
+            return check(self, files)
+
+        key = (check.__name__, tuple(files))
+
+        if key not in self._results:
+            self._results[key] = check(self, files)
+        return self._results[key]
+
 
 def bandit(tree, files):
-    out = run(["bandit", "-q", "-c", "pyproject.toml", "-f", "json", *files], tree.root)
+    # as Codacy does: the tree's pyproject.toml is Bandit's configuration when it has one
+    config = ["-c", "pyproject.toml"] if (tree.root / "pyproject.toml").is_file() else []
+    out = run(["bandit", "-q", *config, "-f", "json", *files], tree.root)
 
     return [
         tree.issue(
@@ -146,6 +175,12 @@ def pyflakes(tree, files):
 
 
 def dodgy(tree, files):
+    try:
+        from dodgy.checks import check_file
+    except ImportError:
+        raise LintError("dodgy is not installed: the dev image predates it, `just build` "
+                        "makes a new one") from None
+
     return [
         tree.issue(path, number, f"dodgy {key}", message)
         for path in files
@@ -177,11 +212,11 @@ def advisories(tree, lockfiles):
             "audit-command,json-output", "--output-format", "json", "--project", project,
         ]
 
+        # a lockfile not audited is no lockfile without advisories
         try:
             vulns = json.loads(run(cmd, tree.root))["vulnerabilities"]
         except (LintError, ValueError, KeyError) as e:
-            print(f"warning: {lockfile} not audited: {e}", file=sys.stderr)
-            continue
+            raise LintError(f"{lockfile} could not be audited in {tree.root}: {e}") from None
 
         upgrade = (
             "just lock-upgrade {}" if project == "."
@@ -208,8 +243,12 @@ def advisories(tree, lockfiles):
 
 
 def locked_line(tree, lockfile, name):
+    """
+    The line Codacy's Trivy reports a package's advisories on: the first one naming it,
+    often another package's dependency on it rather than its own entry.
+    """
     for number, line in enumerate((tree.root / lockfile).read_text().split("\n"), 1):
-        if line == f'name = "{name}"':
+        if f'name = "{name}"' in line:
             return number
     return 0
 
@@ -220,12 +259,12 @@ def analyse(tree, files):
 
     if python:
         for check in (bandit, pyflakes, dodgy, pylint):
-            issues += check(tree, python)
+            issues += tree.results(check, python)
 
     lockfiles = [f for f in files if f in LOCKFILES]
 
     if lockfiles:
-        issues += advisories(tree, lockfiles)
+        issues += tree.results(advisories, lockfiles)
     return issues
 
 
@@ -246,18 +285,28 @@ class Branch:
             known = git("rev-parse", "-q", "--verify", "origin/master", ok=(0, 1))
             ref = "origin/master" if known else "master"
 
-        base = git("merge-base", "HEAD", ref).strip()
-        changed = git("diff", "--name-only", "--no-renames", "--diff-filter=d", base)
-        untracked = git("ls-files", "--others", "--exclude-standard")
+        try:
+            base = git("merge-base", "HEAD", ref).strip()
+        except LintError as e:
+            if e.status != 1:
+                raise
+            raise LintError(f"HEAD and {ref} share no commit: unrelated histories, or a "
+                            f"shallow clone (`git fetch --unshallow`)") from None
 
-        files = sorted({f for f in (
-            changed + untracked).splitlines() if Path(f).is_file()})
+        # NUL-separated: no quoting of names with unusual characters
+        changed = git("diff", "-z", "--name-only", "--no-renames", "--diff-filter=d", base)
+        untracked = git("ls-files", "-z", "--others", "--exclude-standard")
+        files = sorted({f for f in (changed + untracked).split("\0")
+                        if f and Path(f).is_file()})
 
-        if files:
+        # the archive of a commit without files holds a pax header alone, which tarfile
+        # refuses
+        if files and git("ls-tree", "--name-only", base).strip():
             archive = git("archive", base, text=False)
+
             with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
                 tar.extractall(workdir, filter="data")
-        return cls(ref, base, files, Tree(workdir))
+        return cls(ref, base, files, Tree(workdir, frozen=True))
 
     def in_base(self, files):
         return [f for f in files if (self.base_tree.root / f).is_file()]
@@ -274,20 +323,26 @@ class Branch:
 
 
 def report(branch, issues, new, show_all):
-    marked = set(new) if show_all else set()
+    """
+    List the new issues (with ``show_all`` every issue, the new ones marked ``*``) and
+    the advisories of changed lockfiles that the base has too, marked ``?``.
+    """
+    new_set = set(new)
+    unsure = {i for i in issues if i.rule == "uv audit" and i not in new_set}
+    shown = issues if show_all else [*new, *unsure]
+    width = max([RULE_WIDTH, *(len(i.rule) for i in shown)])
     path = None
 
-    for issue in sorted(issues if show_all else new, key=lambda i: (i.path, i.line,
-                                                                    i.rule)):
+    for issue in sorted(shown, key=lambda i: (i.path, i.line, i.rule)):
         if issue.path != path:
             path = issue.path
             print(f"\n{path}")
 
-        mark = "*" if issue in marked else " "
-        print(f" {mark}{issue.line:>5}  {issue.rule:<14} {issue.message}")
+        mark = "?" if issue in unsure else "*" if show_all and issue in new_set else " "
+        print(f" {mark}{issue.line:>5}  {issue.rule:<{width}} {issue.message}")
 
         if issue.hint:
-            print(f"{'':22}{issue.hint}")
+            print(f"{'':{width + 10}}{issue.hint}")
 
     where = f"{len(branch.files)} files changed since {branch.base[:10]} ({branch.ref})"
     print(f"\n{len(new)} new issues in {where}" if new else f"\nNo new issues in {where}")
@@ -295,14 +350,20 @@ def report(branch, issues, new, show_all):
     if new:
         msg = "Codacy fails a pull request on any new issue"
         print(msg + (" (* above)" if show_all else ""))
-    elif len(issues) and not show_all:
-        print(f"{len(issues)} issues there predate the branch: `just lint --all` "
-              "lists them")
+    elif len(issues) > len(unsure) and not show_all:
+        print(f"{len(issues) - len(unsure)} issues there predate the branch: "
+              "`just lint --all` lists them")
+
+    if unsure:
+        print(f"{len(unsure)} advisories (? above) predate the branch here, but Codacy may "
+              "call them new: its analysis of master can predate them. Upgrading clears "
+              "them")
 
 
 def ruff_fixes(files, unsafe):
     """
-    Ruff's fixes for pyflakes rules, by file, rule and the name or line they concern.
+    Ruff's fixes for pyflakes rules as (row, edits) pairs, by file, rule and the name or
+    line they concern.
     """
     cmd = ["ruff", "check", "--isolated", "--no-cache", "--select=F",
            "--output-format=json"]
@@ -313,8 +374,9 @@ def ruff_fixes(files, unsafe):
 
         if fix and fix["edits"] and (unsafe or fix["applicability"] == "safe"):
             path = str(Path(d["filename"]).relative_to(Path.cwd()))
-            fixes[(path, d["code"], subject(d["message"],
-                                            d["location"]["row"]))] = fix["edits"]
+            row = d["location"]["row"]
+            key = (path, d["code"], subject(d["message"], row))
+            fixes.setdefault(key, []).append((row, fix["edits"]))
     return fixes
 
 
@@ -331,55 +393,82 @@ def span(edit):
         edit["end_location"]["row"], edit["end_location"]["column"])
 
 
+def rows(edit):
+    """
+    The rows an edit changes: an edit that ends at the start of a row leaves that row.
+    """
+    (row, _), (end_row, end_col) = span(edit)
+    return range(row, end_row if end_col == 1 and end_row > row else end_row + 1)
+
+
 def overlaps(edits, others):
-    return any(s < e2 and s2 < e for s, e in map(span,
-                                                 edits) for s2, e2 in map(span, others))
+    return any(s < e2 and s2 < e
+               for s, e in map(span, edits)
+               for s2, e2 in map(span, others))
 
 
 def apply_edits(path, edits):
     """
-    Apply Ruff's edits (1-based rows and columns, end exclusive) to a file.
+    Apply Ruff's edits (1-based rows and columns of code points, end exclusive) to a
+    file. Rows end at \\n, \\r\\n or \\r as Ruff's do, the line ends stay as they are and
+    a byte order mark, which Ruff's columns leave out, stays in front.
     """
-    lines = Path(path).read_text().splitlines(keepends=True)
-    starts = [0]
+    with open(path, encoding="utf-8", newline="") as f:
+        text = f.read()
 
-    for line in lines:
-        starts.append(starts[-1] + len(line))
-
-    text = "".join(lines)
+    bom = "﻿" if text.startswith("﻿") else ""
+    text = text[len(bom):]
+    starts = [0, *(m.end() for m in re.finditer(r"\r\n|\r|\n", text))]
 
     for edit in sorted(edits, key=span, reverse=True):
         (row, col), (end_row, end_col) = span(edit)
         start, end = starts[row - 1] + col - 1, starts[end_row - 1] + end_col - 1
         text = text[:start] + (edit.get("content") or "") + text[end:]
 
-    Path(path).write_text(text)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(bom + text)
 
 
 def fix(branch, unsafe):
     """
-    Apply Ruff's fixes to the new pyflakes issues until it has none left to apply.
+    Apply Ruff's fixes to the new pyflakes issues until it has none left to apply. Each
+    issue takes the fix Ruff gives nearest its line for its name, and no fix that would
+    change the line of an issue the base has too.
     """
     python = [f for f in branch.files if f.endswith(".py")]
+
     if not python:  # flake8 given no files would check the whole tree
+        print("No Python file changed: nothing for Ruff to fix")
         return
 
     in_base = branch.in_base(python)
-    old = set(pyflakes(branch.base_tree, in_base)) if in_base else set()
+    old = set(branch.base_tree.results(pyflakes, in_base)) if in_base else set()
     applied = 0
 
     for _ in range(FIX_PASSES):
-        new = [i for i in pyflakes(Tree("."), python) if i not in old]
+        found = pyflakes(Tree("."), python)
+        new = [i for i in found if i not in old]
+        kept = {(i.path, i.line) for i in found if i in old}
         fixes = ruff_fixes(sorted({i.path for i in new}), unsafe) if new else {}
         chosen = {}
 
         for issue in new:
-            edits = fixes.get((issue.path, issue.rule.split()[1], subject(issue.message,
-                                                                          issue.line)))
+            candidates = fixes.get((issue.path, issue.rule.split()[1],
+                                    subject(issue.message, issue.line)), [])
 
-            if edits and not overlaps(chosen.get(issue.path, []), edits):
-                chosen.setdefault(issue.path, []).extend(edits)
-                applied += 1
+            if not candidates:
+                continue
+
+            nearest = min(candidates, key=lambda c: abs(c[0] - issue.line))
+            candidates.remove(nearest)
+            edits = nearest[1]
+            touched = {(issue.path, r) for edit in edits for r in rows(edit)}
+
+            if touched & kept or overlaps(chosen.get(issue.path, []), edits):
+                continue
+
+            chosen.setdefault(issue.path, []).extend(edits)
+            applied += 1
 
         if not chosen:
             break
@@ -401,6 +490,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     try:
+        # git and the tools take paths from the top of the repository
+        os.chdir(git("rev-parse", "--show-toplevel").strip())
+
         with tempfile.TemporaryDirectory(prefix="lint-base-") as workdir:
             branch = Branch.open(args.base, workdir)
 
@@ -414,7 +506,8 @@ def main(argv=None):
             issues, new = branch.compare()
             report(branch, issues, new, args.all)
             return 1 if new else 0
-    except LintError as e:
+    except (LintError, OSError, ValueError, KeyError, tarfile.TarError) as e:
+        # a tool that crashed or printed something else than its JSON included
         print(f"error: {e}", file=sys.stderr)
         return 2
 

@@ -40,8 +40,10 @@ just openapi > /dev/null        # CI fails on ANY drf-spectacular warning or err
 just openapi-split > /dev/null  # same, with SPECTACULAR_SPLIT_REQUEST=true
 
 just lint [--all] [--base REF]  # issues Codacy would call new: files changed since the merge-base
-                          #   with origin/master, uncommitted included; exit 1 on any (scripts/lint.py)
+                          #   with origin/master, uncommitted included; exit 1 on any, 2 if a tool
+                          #   failed (scripts/lint.py); advisories marked ? may still be new to Codacy
 just lint-fix [--unsafe]  # Ruff's fixes for the new pyflakes issues only, then lint again
+just lint-test            # scripts/test_lint.py, in the dev image (no stack)
 
 just lock                 # re-resolve both uv.lock files after editing a pyproject.toml
 just lock-upgrade <pkg>   # bump one dependency
@@ -136,8 +138,10 @@ Python tools are dev dependencies for `just lint`.
   `CUBE_CACHE_URL` (local and benchmark, default `redis://chris-cache:6379/0`) or
   `CACHE_URL` (production, required); the start-up check refuses, among the mistakes its
   docstring lists, the broker's server (whatever the database), socket timeouts in the URL
-  outside (0, 5] s, a failed TLS handshake or a TLS URL for a plain-text server, and a server
-  that refuses the helpers' two scripts (it runs each once on keys of the helpers' namespace).
+  outside (0, 5] s, a refused certificate, a TLS URL for a plain-text server or a plain-text
+  URL for a TLS-only one, and a server that refuses the helpers' two scripts (it loads and runs
+  each once on keys of the helpers' namespace). A server that does not answer, or closes the
+  TLS handshake as a proxy whose server is down does, only gets a warning.
   The code speaks only the Redis protocol: Redis 7+ and Valkey 8 pass
   `core.tests.test_cache` too; for them, the compose service needs `--maxmemory`, an
   `allkeys-*` policy and no persistence (see the comment on `chris-cache`).
@@ -145,12 +149,14 @@ Python tools are dev dependencies for `just lint`.
   `acquire_lock`/`release_lock` (the release checks the owner's token), `mark_once`/
   `clear_mark`, and `acquire_slot`/`release_slot`, a bounded counter of expiring leases (a
   Lua script on a sorted set). TTLs are seconds, applied in milliseconds.
-- The helpers fail open: when the cache does not answer, an acquire returns a degraded `Lease`
-  and `mark_once` returns true, so what they guard must be safe to run twice. Each process
-  then skips the cache for 5 s, logs one WARNING per outage and one INFO when it answers again,
-  and replays the releases and clears it could not send. An error reply (out of memory, a key
-  of the wrong type) is logged at ERROR and does not count as an outage; the ones redis-py
-  raises as connection errors (authentication, loading, too many clients) do.
+- The helpers fail open: when the cache does not answer or refuses a command, an acquire
+  returns a degraded `Lease` and `mark_once` returns true, so what they guard must be safe to
+  run twice. When it does not answer each process skips it for 5 s, then lets one call try it
+  while the others keep skipping until that call's outcome is known; it logs one WARNING per
+  outage and one INFO when the cache answers again, and replays the releases and clears it
+  could not send. An error reply (out of memory, a key of the wrong type) is logged at ERROR
+  and does not count as an outage (it ends one: the cache answered); the ones redis-py raises
+  as connection errors (authentication, loading, too many clients) do.
 - Django's `RedisCache` builds a new connection pool, and so a new connection, for each request
   of the API (Django ticket #35651); Celery workers keep one per process.
 
@@ -166,7 +172,8 @@ Python tools are dev dependencies for `just lint`.
   instances, poll running ones, and cancel stuck ones.
 - Remote execution goes through pfcon via `plugininstances/services/`: `abstractjobs.
   PluginInstanceJob` handles auth-token refresh and job id prefixing; `PluginInstanceAppJob`,
-  `CopyJob`, `UploadJob`, `DeleteJob` are the concrete flows. `ComputeResource` flags
+  `PluginInstanceCopyJob`, `PluginInstanceUploadJob`, `PluginInstanceDeleteJob` are the
+  concrete flows. `ComputeResource` flags
   (`compute_innetwork`, `compute_requires_copy_job`, `compute_requires_upload_job`) select which
   jobs run. Post-terminal cleanup is tracked separately in `remote_cleanup_status`. Errors are
   logged and stored as `CODEnn` codes on the instance.
@@ -211,8 +218,9 @@ Python tools are dev dependencies for `just lint`.
 - Keep the broker and the cache apart: one Dragonfly has one memory limit and one eviction
   policy for all its logical databases, so a full cache in the broker's server would refuse
   Celery's writes, and `--cache_mode` there would evict Celery queues. The broker `chris-broker`
-  never evicts and snapshots to the `chris_broker_data` volume when it stops (queues survive
-  restarts); `chris-cache` evicts and keeps nothing. `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE`
+  never evicts and snapshots to the `chris_broker_data` volume when it stops, one snapshot
+  (`--dbfilename=dump`) overwritten each time (queues survive restarts); `chris-cache` evicts
+  and keeps nothing (its `/data` is a tmpfs). `CUBE_BROKER_IMAGE` and `CUBE_CACHE_IMAGE`
   replace their images; the command lines are Dragonfly's. `cache.clear()` flushes the cache's
   whole database whatever the key prefix. Dragonfly's Lua scripts may only touch the keys they
   declare.
@@ -233,8 +241,9 @@ Python tools are dev dependencies for `just lint`.
 - Codacy (`gh/HARBOR-Medical-AI`) fails a pull request on any new issue. Its Pylint passes no
   `--rcfile`, so a root `pylintrc`, `.pylintrc`, `setup.cfg` or `[tool.pylint]` would change
   what it reports, and its Bandit reads `pyproject.toml`, which has no `[tool.bandit]`: every
-  test runs, B101 in tests too. Silence a false positive with `# nosec <ID> - <reason>` (pytest
-  asserts in `benchmarks/tests` carry `# nosec B101 - pytest assertion`), or for Opengrep, whose
+  test runs, B101 in tests too. Silence a false positive with `# nosec <ID> - <reason>` (new
+  pytest asserts in `benchmarks/tests` carry `# nosec B101 - pytest assertion`; older ones are
+  issues Codacy already has), or for Opengrep, whose
   ~1,400 rules `just lint` doesn't run, `nosemgrep` in a comment on the reported line.
   `scripts/lint.py` copies Codacy's 80 Pylint rules; keep them in step with its standard.
 - The `README.md` "Documentation" section (Sphinx under `docs/`) is marked outdated upstream; the

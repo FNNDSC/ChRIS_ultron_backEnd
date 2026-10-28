@@ -5,6 +5,7 @@ They share it with a running dev stack so every test uses names of its own, ever
 expires and nothing calls cache.clear() which is FLUSHDB of the whole database.
 """
 
+import datetime
 import logging
 import math
 import os
@@ -12,13 +13,19 @@ import selectors
 import socket
 import ssl
 import struct
+import tempfile
 import threading
 import time
 import uuid
+from pathlib import Path
 from unittest import mock
 from urllib.parse import urlsplit
 
 import redis
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 from django.conf import settings
 from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
@@ -123,16 +130,18 @@ class FakeServer:
     as Dragonfly started with ``--tls`` does, with an error about TLS before it closes the
     connection, and stands for a TLS server too busy to finish a handshake; with
     ``password=True`` it answers every command ``-NOAUTH``, as a server with a password
-    answers a client that sent none.
+    answers a client that sent none; with ``closes=True`` it closes every connection it
+    accepts, as a proxy whose server is down does.
     """
 
     BAD_TLS = b'-ERR Bad TLS header, double check if you enabled TLS for your client.\r\n'
     NOAUTH = b'-NOAUTH Authentication required.\r\n'
 
-    def __init__(self, answers=True, tls_only=False, password=False):
+    def __init__(self, answers=True, tls_only=False, password=False, closes=False):
         self.answers = answers
         self.tls_only = tls_only
         self.password = password
+        self.closes = closes
         self._listener = socket.create_server(('127.0.0.1', 0))
         self.port = self._listener.getsockname()[1]
         self._running = True
@@ -153,6 +162,9 @@ class FakeServer:
                     sock = key.fileobj
                     if sock is self._listener:
                         conn, _ = sock.accept()
+                        if self.closes:
+                            conn.close()
+                            continue
                         buffers[conn] = b''
                         selector.register(conn, selectors.EVENT_READ)
                         continue
@@ -197,6 +209,60 @@ class FakeServer:
                          b'+PONG\r\n' if args[:1] == [b'PING'] else b'+OK\r\n')
             buffer = rest
         return buffer
+
+
+class TlsServer:
+    """
+    A server that speaks only TLS with a certificate nothing trusts: as Redis started with
+    ``--port 0 --tls-port`` it closes a connection that opens in plain text without a
+    word, and it finishes a TLS handshake with a client that trusts its certificate.
+    """
+
+    def __init__(self):
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'cube-test-cache')])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(now).not_valid_after(now + datetime.timedelta(hours=1))
+                .sign(key, hashes.SHA256()))
+
+        with tempfile.TemporaryDirectory() as directory:
+            pem = Path(directory) / 'server.pem'
+            pem.write_bytes(
+                key.private_bytes(serialization.Encoding.PEM,
+                                  serialization.PrivateFormat.PKCS8,
+                                  serialization.NoEncryption())
+                + cert.public_bytes(serialization.Encoding.PEM))
+            self._context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            self._context.load_cert_chain(pem)
+
+        self._listener = socket.create_server(('127.0.0.1', 0))
+        self._listener.settimeout(0.05)
+        self.port = self._listener.getsockname()[1]
+        self._running = True
+        self._thread = threading.Thread(target=self._serve, name='tls-server', daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        self._thread.join(5)
+
+    def _serve(self):
+        while self._running:
+            try:
+                conn, _ = self._listener.accept()
+            except TimeoutError:
+                continue
+            conn.settimeout(2)
+            try:
+                with self._context.wrap_socket(conn, server_side=True) as tls:
+                    tls.recv(1024)
+            except OSError:  # a handshake in plain text, or one the client gave up
+                pass
+            finally:
+                conn.close()
+        self._listener.close()
 
 
 def _name():
@@ -595,7 +661,6 @@ class RefusalTests(CacheTestCase):
         self.assertIn('WRONGTYPE', logs.records[0].getMessage())
         release_lock(lock)
 
-
     def test_refusals_are_rate_limited_per_operation(self):
         name = _name()
         _raw().set(_key('slots', name), 'not a sorted set', px=30000)
@@ -635,6 +700,29 @@ class RefusalTests(CacheTestCase):
         self.assertFalse(core_cache._health.available())
         self.assertEqual([r.levelname for r in logs.records], ['WARNING'])
 
+    def test_a_refusal_after_an_outage_ends_it_since_the_cache_answered(self):
+        def refuse(client):
+            raise redis.exceptions.ResponseError('WRONGTYPE Operation against a key')
+
+        with self.assertLogs('core.cache', 'INFO') as logs:
+            core_cache._health.failed('acquire_lock', redis.ConnectionError('gone'))
+            self.wait_for_retry()
+            reply = core_cache._call('acquire_slot', refuse)
+
+        self.assertIs(reply, core_cache._FAILED)
+        self.assertEqual([r.levelname for r in logs.records], ['WARNING', 'ERROR', 'INFO'])
+        self.assertEqual([core_cache._health.available() for _ in range(2)], [True, True])
+
+    def test_a_refused_replayed_clear_is_named_as_the_live_call_names_it(self):
+        client = mock.Mock()
+        client.delete.side_effect = redis.exceptions.ResponseError('MISCONF')
+        core_cache._health.defer(('mark', _key('mark', _name()), None))
+
+        with self.assertLogs('core.cache', 'ERROR') as logs:
+            core_cache._health.replay(client)
+
+        self.assertIn('refused clear_mark', logs.output[0])
+
 
 class CacheHealthTests(CacheTestCase):
 
@@ -649,21 +737,46 @@ class CacheHealthTests(CacheTestCase):
         self.assertEqual([r.levelname for r in logs.records], ['WARNING'])
         self.assertFalse(health.available())
 
-    def test_a_forked_child_starts_with_the_cache_answering(self):
+    def test_a_forked_child_starts_with_a_state_of_its_own(self):
+        # the cache down, a release kept and the lock held by this thread at the fork
+        health = core_cache._health
         with self.assertLogs('core.cache', 'WARNING'):
-            core_cache._health.failed('acquire_lock', redis.ConnectionError('gone'))
-        self.assertFalse(core_cache._health.available())
+            health.failed('acquire_lock', redis.ConnectionError('gone'))
+        health.defer(('lock', _key('lock', _name()), 1))
+        self.assertFalse(health.available())
         read, write = os.pipe()
 
-        pid = os.fork()
-        if pid == 0:  # the child
-            os.write(write, b'1' if core_cache._health.available() else b'0')
-            os._exit(0)
+        with health._lock:
+            pid = os.fork()
+            if pid == 0:  # the child
+                state = (health.available(), not health._pending,
+                         health._lock.acquire(blocking=False))
+                os.write(write, bytes(b'01'[flag] for flag in state))
+                os._exit(0)
         os.close(write)
         os.waitpid(pid, 0)
 
-        self.assertEqual(os.read(read, 1), b'1')
+        self.assertEqual(os.read(read, 3), b'111')
         os.close(read)
+
+    def test_after_the_pause_one_call_tries_the_cache_and_the_others_wait_for_it(self):
+        health = core_cache._health
+        with self.assertLogs('core.cache', 'WARNING'):
+            health.failed('acquire_lock', redis.ConnectionError('gone'))
+        self.wait_for_retry()
+
+        self.assertEqual([health.available() for _ in range(3)], [True, False, False])
+
+    def test_a_trial_that_never_reports_lets_another_call_try_after_the_pause(self):
+        health = core_cache._health
+        with self.assertLogs('core.cache', 'WARNING'):
+            health.failed('acquire_lock', redis.ConnectionError('gone'))
+        self.wait_for_retry()
+        self.assertTrue(health.available())  # a trial whose caller never reports
+
+        self.assertFalse(health.available())
+        self.wait_for_retry()
+        self.assertTrue(health.available())
 
 
 class DegradedModeTests(ProxiedCacheTestCase):
@@ -705,6 +818,23 @@ class DegradedModeTests(ProxiedCacheTestCase):
         self.assertTrue(slot.degraded)
         self.assertTrue(0.15 <= first_took < 0.6)
         self.assertLess(rest_took, 0.2)  # less than one socket timeout
+
+    def test_after_the_pause_a_hung_cache_costs_one_caller_a_timeout_not_all(self):
+        acquire_lock(_name(), 5)  # a pooled connection
+        self.proxy.pause()
+        with self.assertLogs('core.cache', 'WARNING'):
+            self.assertTrue(acquire_lock(_name(), 5).degraded)
+        self.wait_for_retry()
+
+        def timed(_):
+            started = time.monotonic()
+            self.assertTrue(acquire_lock(_name(), 5).degraded)
+            return time.monotonic() - started
+
+        took = _contend(8, 1, timed)[0]
+
+        # one trial waits out the 0.2 s socket timeout; the seven others skip the cache
+        self.assertEqual(sum(t >= 0.15 for t in took), 1, took)
 
     def test_the_helpers_use_the_cache_again_once_it_answers(self):
         name = _name()
@@ -954,13 +1084,14 @@ class StartupCheckTests(CacheTestCase):
     def host(self):
         return urlsplit(settings.CACHES['default']['LOCATION']).hostname
 
-    def acl_user(self, keys):
+    def acl_user(self, keys, commands=()):
         """
-        The cache's URL for a user of its own whom its ACL limits to the keys ``keys``.
+        The cache's URL for a user of its own whom its ACL limits to the keys ``keys``
+        (and denies the ``commands`` given as ``-name``).
         """
         user, password = _name(), _name()
         _raw().acl_setuser(user, enabled=True, passwords=[f'+{password}'], keys=[keys],
-                           categories=['+@all'])
+                           categories=['+@all'], commands=list(commands))
         self.addCleanup(_raw().acl_deluser, user)
         url = urlsplit(settings.CACHES['default']['LOCATION'])
         return url._replace(
@@ -998,6 +1129,7 @@ class StartupCheckTests(CacheTestCase):
                 (f'redis://{host}:6379', f'\\({host}:6379\\) names no logical database'),
                 (f'redis://{host}:6379/abc', 'names no logical database'),
                 (f'redis://{host}:6379/0?retry_on_timeout=true', 'turns on retries'),
+                (f'redis://{host}:6379/0?retry_on_error=TimeoutError', 'turns on retries'),
                 (f'redis://{host}:6379/0?socket_timeout=0', 'socket_timeout=0.0'),
                 (f'redis://{host}:6379/0?socket_connect_timeout=3600',
                  'socket_connect_timeout=3600.0'),
@@ -1058,6 +1190,69 @@ class StartupCheckTests(CacheTestCase):
                 self.assertLess(time.monotonic() - started, 1.0)
                 self.assertIn('does not answer', logs.output[0])
 
+    def test_a_tls_url_for_a_proxy_whose_server_is_down_only_warns(self):
+        # the proxy accepts and closes each connection, a handshake included
+        server = FakeServer(closes=True)
+        self.addCleanup(server.stop)
+
+        with self.assertLogs('core.cache', 'WARNING') as logs:
+            verify_cache_connection(self.conf(f'rediss://127.0.0.1:{server.port}/0'))
+
+        self.assertIn('does not answer', logs.output[0])
+
+    def test_a_plain_text_url_for_a_server_that_speaks_only_tls_stops_start_up(self):
+        server = TlsServer()
+        self.addCleanup(server.stop)
+
+        with self.assertRaisesRegex(ImproperlyConfigured, 'speaks only TLS'):
+            verify_cache_connection(self.conf(f'redis://127.0.0.1:{server.port}/0'))
+
+    def test_a_plain_text_url_for_a_server_that_is_down_only_warns_quickly(self):
+        # nothing listens on that port, and a server that closes plain text closes TLS too
+        closing = FakeServer(closes=True)
+        self.addCleanup(closing.stop)
+
+        for port in (6390, closing.port):
+            with self.subTest(port=port):
+                started = time.monotonic()
+                with self.assertLogs('core.cache', 'WARNING') as logs:
+                    verify_cache_connection(self.conf(f'redis://127.0.0.1:{port}/0'))
+
+                self.assertLess(time.monotonic() - started, 1.0)
+                self.assertIn('does not answer', logs.output[0])
+
+    def test_a_url_redis_py_cannot_parse_keeps_its_password_out_of_the_error(self):
+        # an unescaped / ends the netloc: redis-py's own error quotes what came before it
+        location = f'redis://:Pa55/w0rd@{self.host}:6379/0'
+
+        with self.assertRaisesRegex(ImproperlyConfigured, 'percent-encoded') as raised:
+            verify_cache_connection(self.conf(location))
+
+        self.assertNotIn('Pa55', str(raised.exception))
+        self.assertIsNone(raised.exception.__cause__)
+        self.assertTrue(raised.exception.__suppress_context__)
+
+    def test_a_socket_path_is_named_and_compared_with_the_brokers(self):
+        path = 'unix:///run/cube-test-cache.sock'
+
+        with self.assertRaisesRegex(ImproperlyConfigured, "the Celery broker's server"):
+            verify_cache_connection(self.conf(f'{path}?db=0'), f'{path}?db=1')
+
+        with self.assertLogs('core.cache', 'WARNING') as logs:
+            verify_cache_connection(self.conf(f'{path}?db=0'))
+        self.assertIn('/run/cube-test-cache.sock/0 does not answer', logs.output[0])
+
+    def test_a_broker_url_redis_py_cannot_parse_is_left_to_celery(self):
+        with self.assertNoLogs('core.cache', 'DEBUG'):
+            verify_cache_connection(settings.CACHES['default'],
+                                    'redis://:no/such@broker:6379/0')
+
+    def test_names_of_one_server_spelt_differently_are_not_resolved(self):
+        # as DNS compares names: localhost and 127.0.0.1 are two servers here
+        with self.assertLogs('core.cache', 'WARNING'):
+            verify_cache_connection(self.conf('redis://localhost:6390/0'),
+                                    'redis://127.0.0.1:6390/1')
+
     def test_a_plain_text_url_that_timed_out_sends_no_plain_text_probe(self):
         # the server answers now, which says nothing about TLS
         server = FakeServer()
@@ -1104,6 +1299,16 @@ class StartupCheckTests(CacheTestCase):
 
     def test_a_user_the_acl_keeps_from_the_helpers_keys_stops_start_up(self):
         location = self.acl_user('elsewhere:*')
+
+        with self.assertRaisesRegex(ImproperlyConfigured, 'refuses the scripts'):
+            verify_cache_connection(self.conf(location))
+
+    def test_a_user_who_may_not_load_scripts_stops_start_up_while_they_are_cached(self):
+        # the server holds both scripts already, so EVALSHA alone would run them until
+        # its next restart empties its script cache
+        release_slot(acquire_slot(_name(), 1, 5))
+        release_lock(acquire_lock(_name(), 5))
+        location = self.acl_user(caches['default'].make_key('*'), commands=['-script'])
 
         with self.assertRaisesRegex(ImproperlyConfigured, 'refuses the scripts'):
             verify_cache_connection(self.conf(location))
@@ -1160,7 +1365,7 @@ class ProxiedStartupCheckTests(ProxiedCacheTestCase):
 
     def test_the_check_disconnects_the_connection_it_opened(self):
         # the client stays referenced here, so only the explicit disconnect closes its socket
-        self.proxy.stop()
+        self.proxy.stop()  # drops the connections earlier tests left
         self.proxy.start()
         made, real = [], core_cache.RedisCacheClient
 
@@ -1168,22 +1373,11 @@ class ProxiedStartupCheckTests(ProxiedCacheTestCase):
             made.append(real(*args, **kwargs))
             return made[-1]
 
-        with mock.patch.object(core_cache, 'RedisCacheClient', side_effect=keep):
+        with mock.patch.object(core_cache, 'RedisCacheClient', side_effect=keep), \
+                self.assertNoLogs('core.cache', 'WARNING'):  # it did reach the cache
             verify_cache_connection(settings.CACHES['default'])
 
         self.assertEqual(len(made), 1)
-        deadline = time.monotonic() + 2
-        while self.proxy.open_connections:
-            self.assertLess(time.monotonic(), deadline)
-            time.sleep(0.02)
-
-    def test_the_check_leaves_no_connection_open(self):
-        self.proxy.stop()  # drops the connections earlier tests left
-        self.proxy.start()
-
-        with self.assertNoLogs('core.cache', 'WARNING'):  # it did reach the cache
-            verify_cache_connection(settings.CACHES['default'])
-
         deadline = time.monotonic() + 2
         while self.proxy.open_connections:
             self.assertLess(time.monotonic(), deadline)
@@ -1206,3 +1400,13 @@ class CacheSettingsTests(SimpleTestCase):
         kwargs = caches['default']._cache.get_client().connection_pool.connection_kwargs
         self.assertEqual(kwargs['socket_connect_timeout'], 0.5)
         self.assertEqual(kwargs['socket_timeout'], 0.5)
+
+    def test_the_helpers_connections_never_retry(self):
+        # a SET NX retried after its reply was lost finds its own key; the start-up check
+        # reads only the URL, so this pins what the settings' OPTIONS make of it
+        pool = caches['default']._cache.get_client(write=True).connection_pool
+        connection = pool.make_connection()
+
+        self.assertEqual(connection.retry.get_retries(), 0)
+        self.assertFalse(connection.retry_on_timeout)
+        self.assertFalse(connection.retry_on_error)

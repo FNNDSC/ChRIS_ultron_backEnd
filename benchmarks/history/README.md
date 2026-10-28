@@ -58,8 +58,10 @@ All runs used the pinned envelope (`envelope.md`), `fslink` storage, on the dedi
 and `dbg-bigfiles` 1.0.0, `pl-simpledsapp` 2.1.5, and `pl-topologicalcopy` 1.0.13. Since the
 committed pin (`benchmarks/chrisomatic/benchmark.yml`, `envelope.md` § "Pinned workload plugin
 versions") `just bench-start` registers those versions and the harness refuses to start against
-any other registration; earlier campaigns used an edited `chrisomatic.yml`, noted with each
-below. Two conventions matter for reproducing them faithfully:
+any other registration; earlier campaigns registered them from `chrisomatic/chrisomatic.yml`,
+edited locally or as committed at the time, as noted with each below (the June runs record no
+plugin versions or images, and the file committed then, 94e585d, took `pl-topologicalcopy` by
+name from the ChRIS store). Two conventions matter for reproducing them faithfully:
 
 - **Clean-stack discipline.** Isolation runs are preceded by a recovery so a prior failure
   can't contaminate them (we saw spurious failures otherwise). A light reset is a service
@@ -224,7 +226,9 @@ is only its network alias.
 The fix for the API's database pools staying exhausted after an overload (REPORT.md § 14). From
 here on the benchmark runs with `DEBUG` off (`CUBE_DEBUG`, see [`../envelope.md`](../envelope.md)),
 so `bench-compare` flags `envelope.CUBE_DEBUG` against every earlier run. The two data-plane runs
-that issue 1 compares against were repeated at the new envelope:
+that issue 1 compares against were repeated at the new envelope. They registered the workload
+plugins from a locally edited `chrisomatic.yml` (911fb6c's takes `pl-topologicalcopy` from the
+ChRIS store), which named `dbg-bigfiles` `localhost/dbg-bigfiles`, a second tag on the same image:
 
 | Run | Command (`just bench-run --tier ...`) | Result |
 |---|---|---|

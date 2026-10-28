@@ -219,7 +219,7 @@ def test_level_row_leaves_out_what_was_not_measured_and_rolls_up_the_sampler():
         "interval_s": 1.0, "queue_interval_s": 0.5, "max_tick_s": 0.4, "ticks": 15,
         "late_ticks": 1, "reads": 40, "failed_reads": 1, "vanished": 0,
         "list_failures": 0, "jobs_seen": 2, "queue_ticks": 30, "queue_late_ticks": 0,
-        "queue_failures": 0}
+        "queue_failures": 0, "busy_skips": 0}
 
 
 def test_level_row_of_scenarios_without_a_sampler_summary_has_an_empty_block():

@@ -59,18 +59,22 @@ recovery check reads (`0` disables them). It is instrumentation and is not recor
 
 **Resource sampling** is instrumentation too, but it is recorded, because it decides what the
 peaks mean. The sampler lists the stack's service and plugin-job containers every 1 s, start to
-start, without inspecting them (a new one is inspected once, for its start time), and reads each
+start, without inspecting them (a new one is inspected for its start time, and again after a
+restart, which keeps its id), and reads each
 with a one-shot stats read, a few milliseconds, 8 at a time. Each container's CPU is over the
 second since its previous reading: the ~1 s window of Docker's own figure, short enough not to
 average away the 2 s beat's bursts. A plugin job's first reading gives its CPU since it started. A
-reading has none without a window of its own: a service's first in a scenario, one 0.75 s or less
-after the previous (the closing reading at the end of a scenario can be), a job's first 0.25 s or
-less after its start, and the first after a restart. A read still running after 0.8 s of its tick
-counts as failed and is not sent again until it answers, so an engine that stops answering cannot
-slow the ticks or hold the end of a scenario. The queue depths have a timer of their own, every
-0.5 s, so that they cannot lock onto one phase of the beat. `environment.json` records the
-settings under `sampler`, each level row how the sampling went (`sampler`: ticks, late ticks, the
-slowest tick, failed and vanished reads, failed listings, plugin-job containers seen), and
+reading has none without a window of its own: a service's first in a scenario, one under 0.75 s
+after the previous (the closing reading at the end of a scenario can be; the next reading's window
+then starts where this one did, so no CPU goes unreported), a job's first under 0.25 s after its
+start, and the first after a restart. A read still running after 0.8 of its tick counts as failed
+and is not sent again until it answers, the ticks it holds the container out of counted too, so a
+read that hangs cannot slow the ticks or hold the end of a scenario; a listing that hangs can, for
+up to the sampler's 10 s Docker timeout. The queue depths have a timer of their own, every 0.5 s,
+four times per period of the 2 s beat. `environment.json` records the settings under `sampler`,
+each level row how the sampling went (`sampler`: ticks, late ticks (slots skipped after a tick
+that overran), the slowest tick, failed and vanished reads, failed listings, readings missed
+behind a read still running (`busy_skips`), plugin-job containers seen), and
 `report.md` flags a level whose sampling fell behind or failed. A run without the `sampler` record
 read each container in turn with a call that blocks 1-2 s, so each container was read about every
 2 s times the number of containers (19.1-19.8 s on the benchmark box), and short scenarios missed
@@ -78,7 +82,7 @@ the containers listed last: its peaks are lower bounds. `bench-compare` reports 
 differently, or one without the record, as a caution, and a trend of a sampled metric (`peak_*`,
 `cpu_throttled_s`) says which runs were sampled which way. On the benchmark box a probe of a
 listing and one read per container each second cost the engine (dockerd, containerd and the shims)
-3.2% of a CPU for the stack's 10 services and 16.9% for 70 containers, outside every container
+3.2% of a CPU for 10 containers and 16.9% for 70, outside every container
 limit.
 
 **The broker and the cache:** Dragonfly runs twice, as the Celery broker (`chris-broker`) and
@@ -334,11 +338,12 @@ the pin's path and sha256. `bench-compare` reports another name or version as a 
 image digests as a caution, and another `dock_image` or pin as information; against a run from
 before the image records it reports `workload_plugins.image` as one caution.
 
-**Earlier runs.** Runs archived before the committed pin were provisioned by an edited
-`chrisomatic.yml` that registered the same plugins under untagged references (`latest`), which on
-the benchmark box are the images the pin names; from 2026-10-07 `dbg-bigfiles` was registered as
-`localhost/dbg-bigfiles`, a second tag on the same image. [history/README.md](history/README.md)
-notes the file each campaign used.
+**Earlier runs.** Runs archived before the committed pin registered the plugins from
+`chrisomatic/chrisomatic.yml`, edited locally or as committed at the time, under untagged
+references (`latest`), which on the benchmark box are the images the pin names; from 2026-10-07
+`dbg-bigfiles` was registered as `localhost/dbg-bigfiles`, a second tag on the same image. The
+June runs record no plugin versions or images. [history/README.md](history/README.md) notes the
+file each campaign used.
 
 ## Manual hardware fields
 
