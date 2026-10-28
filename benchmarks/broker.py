@@ -4,7 +4,7 @@ Celery queue-depth sampling against the Redis-protocol broker (Dragonfly).
 Queue depth is the earliest place backpressure shows: a growing ``main2`` list means
 status checks are produced faster than the worker slots consume them, long before
 CPU graphs make that obvious. Celery queues are plain Redis lists named after the
-queue, so a depth sample is one ``LLEN`` per queue.
+queue so a depth sample is one ``LLEN`` per queue.
 
 Implemented over a raw socket (the RESP protocol is three lines of framing) to avoid
 adding a redis dependency to the harness. Degrades to unavailable — never raises out

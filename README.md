@@ -176,10 +176,10 @@ because `docker-compose.benchmark.yml` builds it with `context: ./benchmarks`.
 #### Check for Codacy issues before pushing
 
 [Codacy](https://app.codacy.com/gh/HARBOR-Medical-AI/ChRIS_ultron_backEnd/dashboard) fails a
-pull request on any issue its merge-base does not have. `just lint` runs the same Python
-checks in the dev image (Bandit, pyflakes, dodgy and Pylint with Codacy's rules, and
-`uv audit` for the lockfiles) on the files changed since the merge-base with
-`origin/master`, and lists only the new issues:
+pull request on any issue its merge-base (`git merge-base HEAD origin/master`) does not have.
+`just lint` runs the same Python checks in the dev image (Bandit, pyflakes, dodgy and Pylint
+with Codacy's rules, and `uv audit` for the lockfiles) on the files changed since the merge-base
+with `origin/master` and lists only the new issues:
 
 ```shell
 just lint                 # new issues on this branch, uncommitted changes included
@@ -188,7 +188,7 @@ just lint-fix             # let Ruff fix new unused imports and f-strings withou
 just lint-fix --unsafe    # ... and unused variables
 ```
 
-It finds nearly all of Codacy's issues, but not those of Opengrep (unpinned GitHub
+It finds nearly all of Codacy's issues but not those of Opengrep (unpinned GitHub
 Actions, a Dockerfile without `USER`), ESLint, ShellCheck, Hadolint or markdownlint.
 Silence a false positive as the code does, e.g. `# nosec B105 - a label, not a password`.
 

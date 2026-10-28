@@ -54,7 +54,7 @@ MAX_TTL = 7 * 24 * 3600
 #: settings set 0.5 s; a query string overrides them)
 MAX_SOCKET_TIMEOUT = 5.0
 
-# The scripts return integers only, and stay within Lua 5.1 (real Redis) as well as the
+# The scripts return integers only and stay within Lua 5.1 (real Redis) as well as the
 # 5.4 that Dragonfly runs. Dragonfly runs a script only on the keys it declares.
 _RELEASE_LOCK = Script(None, b"""
 if redis.call('GET', KEYS[1]) == ARGV[1] then
@@ -95,7 +95,7 @@ class Lease:
     ``degraded`` is true when the cache did not answer the acquire so the caller goes
     ahead without the guarantee. ``token`` is None when the acquire sent nothing, the
     helpers being in their pause after a failure; otherwise the release removes the lease
-    by its token, which also covers a write the server applied after its reply timed out.
+    by its token which also covers a write the server applied after its reply timed out.
     """
     kind: str  # 'lock' or 'slot'
     key: str
@@ -181,7 +181,7 @@ def release_slot(lease):
 
 def verify_cache_connection(cache_settings, broker_url=None):
     """
-    Check ``CACHES['default']`` at start-up, as ``verify_storage_connection`` checks the
+    Check ``CACHES['default']`` at start-up like ``verify_storage_connection`` checks the
     storage.
 
     Raises ``ImproperlyConfigured`` when the configuration is wrong: another backend than
@@ -194,6 +194,7 @@ def verify_cache_connection(cache_settings, broker_url=None):
     refuses the scripts because it is full. Says nothing otherwise.
     """
     backend = cache_settings.get('BACKEND', '')
+
     try:
         backend_class = import_string(backend)
     except ImportError as e:
@@ -253,6 +254,7 @@ def verify_cache_connection(cache_settings, broker_url=None):
     options = cache_settings.get('OPTIONS', {})
     client = RedisCacheClient(servers, **options)
     connection = client.get_client(write=True)
+
     # KEY_PREFIX, VERSION and KEY_FUNCTION make the check's keys as they make the helpers'
     make_key = backend_class(location, cache_settings).make_key
 
@@ -292,7 +294,7 @@ def _check_scripts(client, make_key, where):
     within a second and sit among the helpers' keys: a server that refuses them (an ACL
     without EVALSHA, TIME or the helpers' keys, a provider that blocks scripts) stops
     start-up here rather than leaving every helper to fail open later. A Dragonfly that
-    is full refuses them too, and only warns: it may evict, or empty, by the time the
+    is full refuses them too and only warns: it may evict, or empty, by the time the
     helpers need it. Redis and Valkey run them even when full, since a script that has
     written may go on writing and the first write here only deletes.
     """
@@ -326,8 +328,9 @@ def _out_of_memory(error):
 
 class _CacheHealth:
     """
-    This process's view of the shared cache: whether it answers, the pause after it failed
-    to, and the releases waiting for it to come back.
+    What this process knows about the shared cache. When the cache stops answering the
+    helpers skip it for RETRY_AFTER seconds before they try again. The releases and
+    clears that could not be sent wait here and go out once the cache answers again.
     """
 
     #: seconds the helpers stop trying after the cache failed to answer
@@ -570,7 +573,7 @@ def _answers_without_tls(params, options):
     """
     Whether the server a ``rediss://`` URL names answers a bare PING in plain text: any
     reply shows it speaks no TLS (an authentication error included), except one about
-    TLS, which a server that speaks only TLS sends before it closes the connection.
+    TLS which a server that speaks only TLS sends before it closes the connection.
     """
     if params.get('connection_class') is not redis.connection.SSLConnection:
         return False

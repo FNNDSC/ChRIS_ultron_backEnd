@@ -20,9 +20,10 @@ cube:
       password: pfcon1234
       description: host Description
 
-  # chrisomatic 1.0.0 cannot pull a digest reference (`just bench-start` pulls these first)
-  # and infers a wrong name and repository from one, hence name and public_repo. version is
-  # only what it searches CUBE for: CUBE records the version the image reports.
+  # chrisomatic 1.0.0 cannot pull a digest reference (`just bench-start` pulls these first).
+  # It also infers a wrong name and repository from that reference, hence name and public_repo
+  # are provided. version is only what it searches CUBE for: CUBE records the version the
+  # image reports.
   plugins:
     # 1.0.0, the same image as the 1.0.0 and latest tags; multi-arch
     - name: dbg-bigfiles

@@ -106,20 +106,20 @@ test-unit-coverage: start-ancillary
     @just storage={{ storage }} run coverage run manage.py test --force-color --exclude-tag integration
     @just storage={{ storage }} run coverage xml
 
-# Codacy fails a pull request on any issue its merge-base does not have. `lint` runs the
-# checks behind nearly all of Codacy's findings (Bandit, pyflakes, dodgy, Pylint, and
-# `uv audit` for Trivy) on the files changed since the merge-base with origin/master and
-# lists the issues only the working tree has; `--all` lists the older ones too, `--base`
-# names another branch. See scripts/lint.py.
+# Codacy fails a pull request on any issue its merge-base (git) does not have.
+# `lint` runs the checks behind nearly all of Codacy's findings (Bandit, pyflakes, dodgy,
+# Pylint, and `uv audit` for Trivy) on the files changed since the merge-base with
+# origin/master and lists the issues only the working tree has; `--all` lists the older
+# ones too, `--base` names another branch. See scripts/lint.py.
 #
 # List the issues Codacy would report as new on this branch.
 [group('(3) development')]
 lint *args: (lint-run 'check' args)
 
-# Ruff fixes unused imports and f-strings without placeholders, and with `--unsafe` unused
+# Ruff fixes unused imports and f-strings without placeholders, with `--unsafe` unused
 # variables too, only where `lint` reports them as new.
 #
-# Fix the new issues Ruff can fix, then list what is left.
+# Fix the new issues Ruff can fix then list what is left.
 [group('(3) development')]
 lint-fix *args: (lint-run 'fix' args)
 
@@ -310,7 +310,7 @@ bench-compose +command:
 # database already holds another registration of a pinned version, e.g. from a dev `just`:
 # the two stacks share their volumes.
 #
-# Start the benchmark stack (fslink + uvicorn envelope), migrate, and register the pinned workload plugins.
+# Start the benchmark stack (fslink + uvicorn envelope), migrate and then register the pinned workload plugins.
 [group('(6) benchmarks')]
 bench-start pins='benchmark.yml': check-builder (bench-pull-plugins pins)
     just bench-compose 'up -d --build db chris-broker chris-cache nats pfcon cube-nonroot-user-volume-fix'

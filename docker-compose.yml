@@ -151,12 +151,12 @@ services:
         aliases:
           - chris_dev_db  # hard-coded in chris_backend/config/settings/local.py
 
-  # The Celery broker (logical database 0; 1 is reserved for event streams), a Dragonfly.
+  # The Celery broker (logical database 0; 1 is reserved for event streams) is a Dragonfly.
   # The service name is hard-coded in chris_backend/config/settings/local.py, oxidicom's
   # OXIDICOM_CELERY_BROKER, docker-compose.benchmark.yml (its service of that name and
   # BENCH_BROKER), the justfile's bench-start and the benchmark harness (benchmarks/broker.py,
-  # run_bench.py, environment.py, compare.py). CUBE_BROKER_IMAGE replaces the image; the
-  # command line and memlock are Dragonfly's, so another server needs its own.
+  # run_bench.py, environment.py, compare.py).
+  # The command line and memlock are Dragonfly-specific so a different server needs its own.
   chris-broker:
     image: ${CUBE_BROKER_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}
     # no daily call to version.dragonflydb.io, which also reports deployment details
@@ -176,14 +176,14 @@ services:
     networks:
       local:
 
-  # The shared cache, CACHES['default'] (see chris_backend/core/cache.py), a Dragonfly kept
-  # apart from the broker so that it can evict when full and start empty without touching
-  # the Celery queues. The service name is hard-coded in the local settings
+  # The shared cache, CACHES['default'] (see chris_backend/core/cache.py) is also a
+  # Dragonfly kept apart from the broker so that it can evict when full and start empty
+  # without touching the Celery queues. The service name is hard-coded in the local settings
   # (chris_backend/config/settings/local.py), docker-compose.benchmark.yml (its service of
   # that name and CUBE_CACHE_URL), the justfile's bench-start and the benchmark harness
-  # (benchmarks/environment.py, compare.py). CUBE_CACHE_IMAGE replaces the image; the
-  # command line and memlock are Dragonfly's, so another server needs its own: for Redis or
-  # Valkey, a maxmemory, an allkeys-* eviction policy and no persistence:
+  # (benchmarks/environment.py, compare.py).
+  # The command line and memlock are Dragonfly's so another server needs its own: for Redis
+  # or Valkey, a maxmemory, an allkeys-* eviction policy and no persistence:
   # --maxmemory 256mb --maxmemory-policy allkeys-lru --save '' --appendonly no
   chris-cache:
     image: ${CUBE_CACHE_IMAGE:-ghcr.io/dragonflydb/dragonfly:v2.0.2}

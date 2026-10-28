@@ -241,7 +241,7 @@ package versions (`versions.txt`), which does not recover after 400 users either
 
 ## PostgreSQL configuration — 2026-10-14
 
-The before and after runs of issue 1 ([#150](https://github.com/FNNDSC/HARBOR-planning/issues/150),
+The before and after runs of issue 1 ([#150](https://github.com/HARBOR-Medical-AI/HARBOR-planning/issues/150),
 REPORT.md § 15): `postgres/cube.conf` for both compose stacks and migration `core.0004`. Before =
 8ea010b (the stock configuration, with the harness that records Postgres settings, limits and
 most counters); after = 2d52608 (the configuration, which also adds `wal_init_bytes` and the
@@ -273,7 +273,7 @@ every checkpoint and its cause, are kept on the benchmark box.
 
 ## Shared cache, plugin pin and resource sampling — 2026-10-27
 
-The baselines of issue 1b ([#151](https://github.com/FNNDSC/HARBOR-planning/issues/151),
+The baselines of issue 1b ([#151](https://github.com/HARBOR-Medical-AI/HARBOR-planning/issues/151),
 REPORT.md § 16): the shared cache on `chris-cache`, the broker on Dragonfly v2.0.2 as
 `chris-broker`, the envelope limits of both and of `worker-periodic` and `celery-scheduler`, the
 committed workload-plugin pin, and the resource sampler that reads every container each second.

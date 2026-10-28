@@ -83,12 +83,12 @@ services:
     cpus: ${CUBE_DB_CPUS:-2}
     mem_limit: ${CUBE_DB_MEM_LIMIT:-4g}
 
-  # The broker and the cache are Dragonflies, which run one thread per CPU they are given
+  # The broker and the cache are Dragonflies which run one thread per CPU they are given
   # and keep 80% of their memory limit as their maxmemory; without limits both follow the
   # host. Dragonfly exits when that maxmemory is under 256 MiB per thread, so give each at
   # least 320 MiB of memory per CPU (with 0 CPUs, per host CPU): 2 CPUs with 512m stop it
   # and so do 0 CPUs with the default memory. Redis and Valkey take neither from the
-  # limits: they need --maxmemory below mem_limit, or the kernel kills them when full.
+  # limits: they need --maxmemory below mem_limit or the kernel kills them when full.
   chris-broker:
     cpus: ${CUBE_BROKER_CPUS:-2}
     mem_limit: ${CUBE_BROKER_MEM_LIMIT:-1g}

@@ -2,7 +2,7 @@
 Tests for the shared cache's helpers (core/cache.py) against the stack's cache server.
 
 They share it with a running dev stack so every test uses names of its own, every key
-expires, and nothing calls cache.clear(), which is FLUSHDB of the whole database.
+expires and nothing calls cache.clear() which is FLUSHDB of the whole database.
 """
 
 import logging
