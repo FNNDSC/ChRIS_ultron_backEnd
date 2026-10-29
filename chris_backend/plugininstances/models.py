@@ -43,6 +43,12 @@ class PluginInstance(AsyncDeletableModel):
     MAX_COPY_RETRIES = 3
     MAX_UPLOAD_RETRIES = 3
     MAX_REMOTE_CLEANUP_RETRIES = 4
+    # related objects PluginInstanceSerializer reads from other db tables
+    SERIALIZER_RELATIONS = ('plugin__meta', 'output_folder', 'owner', 'compute_resource',
+                            'workflow__pipeline')
+    # the ones PartialPluginInstanceSerializer reads, which leaves out the workflow
+    PARTIAL_SERIALIZER_RELATIONS = ('plugin__meta', 'output_folder', 'owner',
+                                    'compute_resource')
 
     title = models.CharField(max_length=100, blank=True)
     start_date = models.DateTimeField(auto_now_add=True)
@@ -83,6 +89,45 @@ class PluginInstance(AsyncDeletableModel):
 
     def __str__(self):
         return self.title
+
+    @staticmethod
+    def add_serializer_relations(plg_inst_qs, relations=SERIALIZER_RELATIONS):
+        """
+        Custom static method to fetch in the same query the related objects that the
+        serializers read for every plugin instance in a queryset. Without it every
+        serialized instance costs one extra query per relation.
+        """
+        return plg_inst_qs.select_related(*relations)
+
+    @staticmethod
+    def prefetch_serializer_relations(plg_insts, relations=SERIALIZER_RELATIONS):
+        """
+        Custom static method to fetch the related objects that the serializers read for
+        every plugin instance in a list of instances that is not a queryset (e.g. a
+        page of descendants), with one query per relation for the whole list.
+        """
+        models.prefetch_related_objects(plg_insts, *relations)
+
+    @staticmethod
+    def filter_visible_to_user(plg_inst_qs, user):
+        """
+        Custom static method to filter a queryset down to the plugin instances a user
+        can see: those in public feeds if the user is not authenticated, all of them for
+        the superuser 'chris' and otherwise those in public feeds or in feeds owned by
+        the user or shared with the user or one of the user's groups.
+        """
+        if not user.is_authenticated:
+            return plg_inst_qs.filter(feed__public=True)
+
+        if user.username == 'chris':
+            return plg_inst_qs
+
+        # matching the feed against a subquery, instead of joining the feeds' sharing
+        # tables, does not repeat an instance for every user or group its feed is
+        # shared with
+        lookup = models.Q(public=True) | models.Q(owner=user) | models.Q(
+            shared_users=user) | models.Q(shared_groups__in=user.groups.all())
+        return plg_inst_qs.filter(feed__in=Feed.objects.filter(lookup))
 
     def save(self, *args, **kwargs):
         """
@@ -265,17 +310,12 @@ class PluginInstanceFilter(FilterSet):
         Custom method to return the plugin instances in a queryset with a common root
         plugin instance.
         """
-        filtered_list = []
         root_queryset = queryset.filter(pk=value)
         # check whether the root id value is in the DB
         if not root_queryset.exists():
             return root_queryset
-        queue = [root_queryset[0]]
-        while len(queue) > 0:
-            visited = queue.pop()
-            queue.extend(list(visited.next.all()))
-            filtered_list.append(visited.id)
-        return PluginInstance.objects.filter(pk__in=filtered_list)
+        descendants = root_queryset[0].get_descendant_instances()
+        return queryset.filter(pk__in=[inst.id for inst in descendants])
 
     def filter_by_previous_id(self, queryset, name, value):
         """
@@ -287,7 +327,7 @@ class PluginInstanceFilter(FilterSet):
         if not previous_queryset.exists():
             return previous_queryset
         previous = previous_queryset.first()
-        return previous.next.all()
+        return queryset.filter(previous=previous)
 
     def filter_by_active_status(self, queryset, name, value):
         """

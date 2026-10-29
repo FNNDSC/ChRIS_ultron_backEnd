@@ -1,5 +1,4 @@
 
-from django.db.models import Q
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -115,7 +114,7 @@ class PluginInstanceList(generics.ListCreateAPIView):
         """
         user = self.request.user
         plugin = self.get_object()
-        return plugin.instances.filter(owner=user)
+        return PluginInstance.add_serializer_relations(plugin.instances.filter(owner=user))
 
 
 @extend_schema_view(
@@ -143,22 +142,11 @@ class AllPluginInstanceList(generics.ListAPIView):
     def get_queryset(self):
         """
         Overriden to return a custom queryset that is only comprised by the plugin
-        instances in public feeds if the user is not authenticated. For the superuser
-        'chris' all plugin instances are retuned. For other users all the plugin instances
-        in public feeds or owned by the user or belonging to feeds that have been shared
-        with the user are returned.
+        instances the user can see.
         """
         user = self.request.user
-
-        if not user.is_authenticated:
-            return PluginInstance.objects.filter(feed__public=True)
-
-        if user.username == 'chris':
-            return PluginInstance.objects.all()
-
-        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
-        return PluginInstance.objects.filter(lookup)
+        return PluginInstance.add_serializer_relations(
+            PluginInstance.filter_visible_to_user(PluginInstance.objects.all(), user))
 
 
 class AllPluginInstanceListQuerySearch(generics.ListAPIView):
@@ -172,31 +160,20 @@ class AllPluginInstanceListQuerySearch(generics.ListAPIView):
     def get_queryset(self):
         """
         Overriden to return a custom queryset that is only comprised by the plugin
-        instances in public feeds if the user is not authenticated. For the superuser
-        'chris' all plugin instances are retuned. For other users all the plugin instances
-        in public feeds or owned by the user or belonging to feeds that have been shared
-        with the user are returned.
+        instances the user can see.
         """
         user = self.request.user
+        return PluginInstance.add_serializer_relations(
+            PluginInstance.filter_visible_to_user(PluginInstance.objects.all(), user))
 
-        if not user.is_authenticated:
-            return PluginInstance.objects.filter(feed__public=True)
 
-        if user.username == 'chris':
-            return PluginInstance.objects.all()
-
-        lookup = Q(feed__public=True) | Q(feed__owner=user) | Q(
-            feed__shared_users=user) | Q(feed__shared_groups__in=user.groups.all())
-        return PluginInstance.objects.filter(lookup)
-
-        
 class PluginInstanceDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     A plugin instance view.
     """
     http_method_names = ['get', 'put', 'delete']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
+    queryset = PluginInstance.add_serializer_relations(PluginInstance.objects.all())
     permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,
                           IsNotDeleteFSPluginInstance,)
 
@@ -261,7 +238,7 @@ class PluginInstanceDescendantList(generics.ListAPIView):
     """
     http_method_names = ['get']
     serializer_class = PluginInstanceSerializer
-    queryset = PluginInstance.objects.all()
+    queryset = PluginInstance.add_serializer_relations(PluginInstance.objects.all())
     permission_classes = (IsOwnerOrChrisOrHasFeedPermissionReadOnlyOrPublicFeedReadOnly,)
 
     def list(self, request, *args, **kwargs):
@@ -270,6 +247,17 @@ class PluginInstanceDescendantList(generics.ListAPIView):
         """
         queryset = self.get_descendants_queryset()
         return services.get_list_response(self, queryset)
+
+    def paginate_queryset(self, queryset):
+        """
+        Overriden to fetch, with one query per relation, the related objects the
+        serializer reads for the descendants in the page only. Joining them in the walk
+        that finds the descendants would cost a join at every visited node instead.
+        """
+        page = super(PluginInstanceDescendantList, self).paginate_queryset(queryset)
+        if page is not None:
+            PluginInstance.prefetch_serializer_relations(page)
+        return page
 
     def get_descendants_queryset(self):
         """

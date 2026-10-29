@@ -82,6 +82,11 @@ Python tools are dev dependencies for `just lint`.
   `just set-storage` environment.
 - Test fixtures create users directly with `User.objects.create_user`; the `chris` superuser and
   root folders already exist because `core/apps.py` creates them on `post_migrate`.
+- The plugin-instance and feed list views have a test built on
+  `core.tests.query_counts.QueryCountAssertionsMixin` (`assertQueriesPerListItem`): it fails when
+  a view's query count grows with the rows it serializes (N+1), beyond any per-row cost the test
+  states (the descendant walk's one query per node). Their detail views use `assertNumQueries`.
+  Give the added rows every relation the serializer reads, or a missing join goes unnoticed.
 
 ## Architecture
 
@@ -110,6 +115,12 @@ Python tools are dev dependencies for `just lint`.
   under `DEBUG`).
 - OpenAPI: `get_queryset` methods guard with `if getattr(self, "swagger_fake_view", False)`;
   schema fix-ups live in `*/spectacular_hooks.py` and are listed in `SPECTACULAR_SETTINGS`.
+- The plugin-instance and feed views fetch the related objects their serializer reads for every
+  item in the list query: `PluginInstance.add_serializer_relations` (`select_related` over the
+  model's `SERIALIZER_RELATIONS`, or `PARTIAL_SERIALIZER_RELATIONS` for the partial serializer)
+  and `Feed.add_jobs_status_count`. A list built in Python (the descendants walk) uses
+  `prefetch_serializer_relations` on its page instead. `PluginInstanceSerializer` reads its ids
+  from the FK columns (`ReadOnlyField()` named `<fk>_id`), so they need no join.
 - Auth: DRF token (`/api/v1/auth-token/`), basic, and session. File downloads and WebSockets use
   short-lived `downloadtokens` (JWT signed with a key derived from `SECRET_KEY`, see
   `core/utils.py`) passed as `?token=`. The superuser named `chris` is special-cased everywhere
@@ -165,6 +176,11 @@ Python tools are dev dependencies for `just lint`.
   `previous`), `ts` (topological, multiple parents listed in its `plugininstances` string param).
   `PluginInstance.save` creates the feed and the output `ChrisFolder` at
   `home/<owner>/feeds/feed_<id>/<plugin>_<id>/.../data`; the folder is only null transiently.
+- `PluginInstance.filter_visible_to_user` filters a plugin-instance queryset down to what a user
+  may read (public feed, feed owner, feed shared with the user or one of their groups; `chris`
+  sees all). It matches the feed against a subquery, so a feed shared several times doesn't
+  repeat rows. List views use it rather than re-deriving the lookup; single instances are
+  checked by the permission classes in `plugininstances/permissions.py`.
 - Status state machine in `plugininstances/enums.py` (`created → waiting → copying → scheduled →
   started → uploading → registeringFiles → finishedSuccessfully | finishedWithError |
   cancelled`). `plugininstances.utils.run_if_ready` decides whether a new instance runs now or

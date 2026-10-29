@@ -21,7 +21,9 @@ from core.models import ChrisFolder, ChrisInstance
 from core.celery import app as celery_app
 from core.celery import task_routes
 from core.storage import connect_storage
+from core.tests.query_counts import QueryCountAssertionsMixin
 from userfiles.models import UserFile
+from pipelines.models import Pipeline
 from plugins.models import PluginMeta, Plugin, PluginParameter, ComputeResource
 from plugininstances.models import PluginInstance
 from plugininstances.models import PathParameter, FloatParameter
@@ -29,13 +31,33 @@ from plugininstances.services.pluginjobs import PluginInstanceAppJob
 from plugininstances.services.copyjobs import PluginInstanceCopyJob
 from plugininstances.services.uploadjobs import PluginInstanceUploadJob
 from plugininstances import views
+from workflows.models import Workflow
 
 
 COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
-class ViewTests(TestCase):
+def create_workflow(owner):
+    """
+    Create a workflow of a new pipeline, both owned by owner.
+    """
+    pipeline = Pipeline.objects.create(name='Pipeline1', owner=owner)
+    return Workflow.objects.create(title='Workflow1', pipeline=pipeline, owner=owner)
+
+
+def create_ds_instances(owner, previous, count, workflow=None):
+    """
+    Create count 'mri_convert' plugin instances of owner after the previous instance,
+    in the workflow when one is given, and return them.
+    """
+    plugin = Plugin.objects.get(meta__name='mri_convert')
+    return [PluginInstance.objects.create(
+        plugin=plugin, owner=owner, previous=previous, workflow=workflow, title=f'ds{i}',
+        compute_resource=plugin.compute_resources.all()[0]) for i in range(count)]
+
+
+class ViewTests(QueryCountAssertionsMixin, TestCase):
     
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
@@ -96,7 +118,7 @@ class ViewTests(TestCase):
         logging.disable(logging.NOTSET)
 
 
-class TasksViewTests(TransactionTestCase):
+class TasksViewTests(QueryCountAssertionsMixin, TransactionTestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -738,6 +760,17 @@ class PluginInstanceListViewTests(TasksViewTests):
         response = self.client.get(self.create_read_url)
         self.assertContains(response, "pacspull")
 
+    def test_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance are fetched in
+        # the list query itself; the new instances set every relation
+        self.client.login(username=self.username, password=self.password)
+        user = User.objects.get(username=self.username)
+        workflow = create_workflow(user)
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+        list_url = reverse("plugininstance-list", kwargs={"pk": plugin.id})
+        self.assertQueriesPerListItem(
+            list_url, lambda: create_ds_instances(user, self.pl_inst, 3, workflow))
+
     def test_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.create_read_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -771,6 +804,15 @@ class PluginInstanceDetailViewTests(TasksViewTests):
         #     self.assertEqual(response.data['status'], 'started')
         #     # check that the check_plugin_instance_exec_status task was called with appropriate args
         #     delay_mock.assert_called_with(self.pl_inst.id)
+
+    def test_plugin_instance_detail_fetches_related_objects_with_the_instance(self):
+        user = User.objects.get(username=self.username)
+        (plg_inst,) = create_ds_instances(user, self.pl_inst, 1, create_workflow(user))
+        self.client.login(username=self.username, password=self.password)
+        # two queries authenticate the session and one fetches the instance with the
+        # related objects the serializer and the permission checks read
+        with self.assertNumQueries(3):
+            self.client.get(reverse("plugininstance-detail", kwargs={"pk": plg_inst.id}))
 
     @tag('integration')
     def test_integration_plugin_instance_detail_success(self):
@@ -1081,6 +1123,36 @@ class PluginInstanceListQuerySearchViewTests(ViewTests):
         self.assertEqual(len(response.data['results']), 2)
         self.assertNotContains(response, 'created')
 
+    def test_all_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance are fetched in
+        # the list query itself; the new instances set every relation, the workflow
+        # and its pipeline among them
+        self.client.login(username=self.username, password=self.password)
+        user = User.objects.get(username=self.username)
+        previous = PluginInstance.objects.get(plugin__meta__name="pacspull")
+        workflow = create_workflow(user)
+        self.assertQueriesPerListItem(
+            reverse("allplugininstance-list"),
+            lambda: create_ds_instances(user, previous, 3, workflow))
+
+    def test_plugin_instance_query_search_query_count_does_not_grow_with_instances(self):
+        # searching by root_id walks the tree under the root instance, which costs one
+        # query per instance walked but none to serialize it
+        self.client.login(username=self.username, password=self.password)
+        user = User.objects.get(username=self.username)
+        previous = PluginInstance.objects.get(plugin__meta__name="pacspull")
+        workflow = create_workflow(user)
+        search_url = reverse("allplugininstance-list-query-search")
+
+        for query, queries_per_item in (('?status=created', 0),
+                                        (f'?previous_id={previous.id}', 0),
+                                        (f'?root_id={previous.id}', 1)):
+            with self.subTest(query=query):
+                self.assertQueriesPerListItem(
+                    search_url + query + '&limit=20',
+                    lambda: create_ds_instances(user, previous, 3, workflow),
+                    queries_per_item)
+
     def test_plugin_instance_query_search_list_success_but_empty_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -1133,6 +1205,19 @@ class PluginInstanceDescendantListViewTests(ViewTests):
             compute_resource=plugin.compute_resources.all()[0])
 
         self.list_url = reverse("plugininstance-descendant-list", kwargs={"pk": fs_inst.id})
+
+    def test_plugin_instance_descendant_list_query_count_grows_only_with_the_walk(self):
+        # the walk that finds the descendants costs one query per instance, but the
+        # related objects the serializer reads are fetched once for the whole page; an
+        # instance in a workflow puts every relation in the page before more are added
+        self.client.login(username=self.username, password=self.password)
+        user = User.objects.get(username=self.username)
+        root = PluginInstance.objects.get(plugin__meta__name="pacspull")
+        workflow = create_workflow(user)
+        create_ds_instances(user, root, 1, workflow)
+        self.assertQueriesPerListItem(
+            self.list_url, lambda: create_ds_instances(user, root, 3, workflow),
+            queries_per_item=1)
 
     def test_plugin_instance_descendant_list_success(self):
         self.client.login(username=self.username, password=self.password)

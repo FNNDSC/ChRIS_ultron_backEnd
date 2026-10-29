@@ -54,9 +54,10 @@ class Feed(AsyncDeletableModel):
     def add_jobs_status_count(feed_qs):
         """
         Custom static method to add the number of associated plugin instances per
-        execution status to each element of a Feed queryset.
+        execution status to each element of a Feed queryset. The owner, folder and
+        note the serializer reads for every feed are fetched in the same query.
         """
-        return feed_qs.annotate(
+        return feed_qs.select_related('owner', 'folder', 'note').annotate(
             created_jobs=Count(Case(When(plugin_instances__status='created', then=1),
                                output_field=IntegerField())),
             waiting_jobs=Count(Case(When(plugin_instances__status='waiting', then=1),
