@@ -759,5 +759,5 @@ class FeedPluginInstanceList(generics.ListAPIView):
         Custom method to get the actual plugin instances queryset.
         """
         feed = self.get_object()
-        return self.filter_queryset(
-            PluginInstance.add_serializer_relations(feed.plugin_instances.all()))
+        return self.filter_queryset(PluginInstance.add_serializer_relations(
+            feed.plugin_instances.all(), PluginInstance.PARTIAL_SERIALIZER_RELATIONS))
