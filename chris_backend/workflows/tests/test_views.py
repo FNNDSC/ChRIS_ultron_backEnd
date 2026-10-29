@@ -4,13 +4,12 @@ import logging
 from unittest import mock
 
 from django.conf import settings
-from django.contrib.auth.models import User
-from django.db import connection
+from django.contrib.auth.models import Group, User
 from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 
+from core.tests.query_counts import QueryCountAssertionsMixin
 from pipelines.models import Pipeline, PluginPiping, DEFAULT_PIPING_PARAMETER_MODELS
 from plugininstances.models import PluginInstance
 from plugins.models import ComputeResource
@@ -23,7 +22,7 @@ COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
-class ViewTests(TestCase):
+class ViewTests(QueryCountAssertionsMixin, TestCase):
     
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
@@ -349,49 +348,92 @@ class WorkflowPluginInstanceListViewTests(ViewTests):
         super(WorkflowPluginInstanceListViewTests, self).setUp()
         pipeline = Pipeline.objects.get(name=self.pipeline_name)
         owner = User.objects.get(username=self.username)
-        (workflow, tf) = Workflow.objects.get_or_create(title='Workflow4',
-                                                        pipeline=pipeline, owner=owner)
-        self.list_url = reverse("workflow-plugininstance-list", kwargs={"pk": workflow.id})
+        (self.workflow, tf) = Workflow.objects.get_or_create(title='Workflow4',
+                                                             pipeline=pipeline,
+                                                             owner=owner)
+        self.list_url = reverse("workflow-plugininstance-list",
+                                kwargs={"pk": self.workflow.id})
+
+        # the workflow's plugin instances run after an 'fs' plugin instance, in a
+        # private feed of the owner
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        self.root = PluginInstance.objects.create(
+            plugin=plugin_fs, owner=owner, title='root',
+            compute_resource=plugin_fs.compute_resources.all()[0])
+        self.create_workflow_instances(2)
+
+    def create_workflow_instances(self, count):
+        """
+        Custom method to create count 'ds' plugin instances of the workflow after the
+        root plugin instance.
+        """
+        owner = User.objects.get(username=self.username)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        for i in range(count):
+            PluginInstance.objects.create(
+                plugin=plugin_ds, owner=owner, previous=self.root, workflow=self.workflow,
+                title=f'ds{i}', compute_resource=plugin_ds.compute_resources.all()[0])
 
     def test_workflow_plugin_instance_list_success(self):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)
 
     def test_workflow_plugin_instance_list_query_count_does_not_grow_with_instances(self):
-        # the related objects the serializer reads for every instance, the workflow
-        # and its pipeline among them, are fetched in the list query itself, so a
-        # bigger workflow must not mean more queries; all the instances fit in one
-        # page (PAGE_SIZE is 10)
-        workflow = Workflow.objects.get(title='Workflow4')
-        owner = User.objects.get(username=self.username)
-        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
-        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
-        root = PluginInstance.objects.create(
-            plugin=plugin_fs, owner=owner, title='root',
-            compute_resource=plugin_fs.compute_resources.all()[0])
-
-        def instances_create(count, prefix):
-            for i in range(count):
-                PluginInstance.objects.create(
-                    plugin=plugin_ds, owner=owner, previous=root, workflow=workflow,
-                    title=f'{prefix}{i}',
-                    compute_resource=plugin_ds.compute_resources.all()[0])
-
-        instances_create(2, 'first')
+        # the related objects the serializer reads for every instance, the workflow's
+        # pipeline among them, are fetched in the list query itself
         self.client.login(username=self.username, password=self.password)
-        self.client.get(self.list_url)  # a first request fills any one-time cache
-
-        with CaptureQueriesContext(connection) as before:
-            response = self.client.get(self.list_url)
-        self.assertEqual(len(response.data['results']), 2)
+        response = self.assertQueriesPerListItem(
+            self.list_url, lambda: self.create_workflow_instances(3))
         self.assertEqual(response.data['results'][0]['pipeline_name'], self.pipeline_name)
 
-        instances_create(3, 'more')
-        with CaptureQueriesContext(connection) as after:
-            response = self.client.get(self.list_url)
-        self.assertEqual(len(response.data['results']), 5)
-        self.assertEqual(len(after), len(before))
+    def test_workflow_plugin_instance_list_success_chris_user_lists_all(self):
+        self.client.login(username=self.chris_username, password=self.chris_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_workflow_plugin_instance_list_success_hides_instances_of_unshared_feed(self):
+        # any authenticated user can read the workflow, but not the plugin instances
+        # in a feed that is neither public nor shared with the user
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'], [])
+
+    def test_workflow_plugin_instance_list_success_shared_feed(self):
+        other_user = User.objects.get(username=self.other_username)
+        self.root.feed.grant_user_permission(other_user)
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_workflow_plugin_instance_list_success_public_feed(self):
+        self.root.feed.public = True
+        self.root.feed.save()
+        self.client.login(username=self.other_username, password=self.other_password)
+        response = self.client.get(self.list_url)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_workflow_plugin_instance_list_lists_once_an_instance_shared_many_times(self):
+        other_user = User.objects.get(username=self.other_username)
+        group = Group.objects.create(name='lab')
+        other_user.groups.add(group)
+        third_user = User.objects.create_user(username='third',
+                                              password=self.other_password)
+        feed = self.root.feed
+        feed.grant_user_permission(other_user)
+        feed.grant_user_permission(third_user)
+        feed.grant_group_permission(group)
+
+        for (username, password) in ((self.username, self.password),
+                                     (self.other_username, self.other_password)):
+            with self.subTest(username=username):
+                self.client.login(username=username, password=password)
+                response = self.client.get(self.list_url)
+                ids = [plg_inst['id'] for plg_inst in response.data['results']]
+                self.assertEqual(len(ids), 2)
+                self.assertEqual(len(set(ids)), 2)
 
     def test_workflow_plugin_instance_list_failure_unauthenticated(self):
         response = self.client.get(self.list_url)

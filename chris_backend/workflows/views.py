@@ -271,17 +271,20 @@ class WorkflowPluginInstanceList(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Overriden to return a list with all the plugin instances that are part of
-        the queried workflow.
+        Overriden to return a list with the plugin instances that are part of the
+        queried workflow and that the user can see.
         """
         queryset = self.get_plugin_instances_queryset()
         return services.get_list_response(self, queryset)
 
     def get_plugin_instances_queryset(self):
         """
-        Custom method to get a queryset with all the plugin instances that are part of
-        the queried workflow.
+        Custom method to get a queryset with the plugin instances that are part of the
+        queried workflow and that the user can see. Any authenticated user can read a
+        workflow, but its plugin instances belong to a feed that may not be shared with
+        the user.
         """
         workflow = self.get_object()
-        return self.filter_queryset(
-            PluginInstance.add_serializer_relations(workflow.plugin_instances.all()))
+        plg_inst_qs = PluginInstance.filter_visible_to_user(
+            workflow.plugin_instances.all(), self.request.user)
+        return self.filter_queryset(PluginInstance.add_serializer_relations(plg_inst_qs))
