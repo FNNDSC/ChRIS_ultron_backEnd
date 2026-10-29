@@ -14,6 +14,7 @@ from rest_framework import status
 from celery.contrib.testing.worker import start_worker
 from core.celery import app as celery_app
 from core.celery import task_routes
+from core.tests.query_counts import QueryCountAssertionsMixin
 
 from plugins.models import PluginMeta, Plugin, ComputeResource
 from plugininstances.models import PluginInstance
@@ -26,8 +27,8 @@ COMPUTE_RESOURCE_URL = settings.COMPUTE_RESOURCE_URL
 CHRIS_SUPERUSER_PASSWORD = settings.CHRIS_SUPERUSER_PASSWORD
 
 
-class ViewTests(TestCase):
-    
+class ViewTests(QueryCountAssertionsMixin, TestCase):
+
     def setUp(self):
         # avoid cluttered console output (for instance logging all the http requests)
         logging.disable(logging.WARNING)
@@ -87,6 +88,26 @@ class ViewTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+    def create_feeds(self, count, public=False):
+        """
+        Custom method to create count feeds owned by the user, each by creating a "fs"
+        plugin instance, and return them. Their names contain self.feedname.
+        """
+        plugin = Plugin.objects.get(meta__name="pacspull")
+        user = User.objects.get(username=self.username)
+
+        feeds = []
+        for i in range(count):
+            pl_inst = PluginInstance.objects.create(
+                plugin=plugin, owner=user, title=f'{self.feedname}-{i}',
+                compute_resource=plugin.compute_resources.all()[0])
+
+            pl_inst.feed.public = public
+            pl_inst.feed.save()
+
+            feeds.append(pl_inst.feed)
+        return feeds
 
 
 class TasksViewTests(TransactionTestCase):
@@ -270,6 +291,12 @@ class FeedListViewTests(ViewTests):
         self.assertContains(response, "Feed1")
         self.assertContains(response, "Feed2")
 
+    def test_feed_list_query_count_does_not_grow_with_feeds(self):
+        # the owner, folder and note the serializer reads for every feed are fetched in
+        # the list query itself
+        self.client.login(username=self.username, password=self.password)
+        self.assertQueriesPerListItem(self.list_url, lambda: self.create_feeds(3))
+
     def test_feed_list_success_chris_user_lists_all_users_feeds(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.list_url)
@@ -312,6 +339,10 @@ class FeedListQuerySearchViewTests(ViewTests):
         self.assertContains(response, self.feedname)
         self.assertNotContains(response, "Feed2")
 
+    def test_feed_list_query_search_query_count_does_not_grow_with_feeds(self):
+        self.client.login(username=self.username, password=self.password)
+        self.assertQueriesPerListItem(self.list_url, lambda: self.create_feeds(3))
+
     def test_feed_list_query_search_success_chris_user_lists_all_matching_feeds(self):
         self.client.login(username=self.chris_username, password=self.chris_password)
         response = self.client.get(self.list_url)
@@ -347,6 +378,13 @@ class FeedDetailViewTests(TasksViewTests):
         self.client.login(username=self.username, password=self.password)
         response = self.client.get(self.read_update_delete_url)
         self.assertContains(response, self.feedname)
+
+    def test_feed_detail_fetches_related_objects_with_the_feed(self):
+        self.client.login(username=self.username, password=self.password)
+        # two queries authenticate the session and one fetches the feed with its job
+        # counts and the owner, folder and note the serializer reads
+        with self.assertNumQueries(3):
+            self.client.get(self.read_update_delete_url)
 
     def test_feed_detail_failure_unauthenticated(self):
         response = self.client.get(self.read_update_delete_url)
@@ -407,6 +445,46 @@ class FeedDetailViewTests(TasksViewTests):
         self.client.login(username=self.other_username, password=self.other_password)
         response = self.client.delete(self.read_update_delete_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PublicFeedListViewTests(ViewTests):
+    """
+    Test the publicfeed-list view.
+    """
+
+    def setUp(self):
+        super(PublicFeedListViewTests, self).setUp()
+        self.list_url = reverse("publicfeed-list")
+        self.create_feeds(1, public=True)
+
+    def test_public_feed_list_success(self):
+        response = self.client.get(self.list_url)
+        names = [feed['name'] for feed in response.data['results']]
+        self.assertEqual(names, [f'{self.feedname}-0'])  # the private feed is not listed
+
+    def test_public_feed_list_query_count_does_not_grow_with_feeds(self):
+        self.assertQueriesPerListItem(self.list_url,
+                                      lambda: self.create_feeds(3, public=True))
+
+
+class PublicFeedListQuerySearchViewTests(ViewTests):
+    """
+    Test the publicfeed-list-query-search view.
+    """
+
+    def setUp(self):
+        super(PublicFeedListQuerySearchViewTests, self).setUp()
+        self.list_url = reverse("publicfeed-list-query-search") + '?name=' + self.feedname
+        self.create_feeds(1, public=True)
+
+    def test_public_feed_list_query_search_success(self):
+        response = self.client.get(self.list_url)
+        names = [feed['name'] for feed in response.data['results']]
+        self.assertEqual(names, [f'{self.feedname}-0'])  # the private feed is not listed
+
+    def test_public_feed_list_query_search_query_count_does_not_grow_with_feeds(self):
+        self.assertQueriesPerListItem(self.list_url,
+                                      lambda: self.create_feeds(3, public=True))
 
 
 class FeedGroupPermissionListViewTests(ViewTests):
@@ -1117,6 +1195,16 @@ class TagFeedListViewTests(ViewTests):
         self.assertContains(response, self.feedname)
         self.assertNotContains(response, "new")  # feed list is tag-specific
 
+    def test_tag_feed_list_query_count_does_not_grow_with_feeds(self):
+        self.client.login(username=self.username, password=self.password)
+        tag = Tag.objects.get(name="Tag2")
+
+        def add_tagged_feeds():
+            for feed in self.create_feeds(3):
+                Tagging.objects.create(tag=tag, feed=feed)
+
+        self.assertQueriesPerListItem(self.list_url, add_tagged_feeds)
+
     def test_tag_feed_list_success_unauthenticated(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -1328,6 +1416,22 @@ class FeedPluginInstanceListViewTests(ViewTests):
         # it shows all the plugin instances associated to the feed
         self.assertContains(response, "test")
         self.assertContains(response, "test1")
+
+    def test_feed_plugin_instance_list_query_count_does_not_grow_with_instances(self):
+        # the related objects the serializer reads for every instance are fetched in
+        # the list query itself
+        self.client.login(username=self.username, password=self.password)
+        plg_inst = PluginInstance.objects.get(title='test')
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name="mri_convert")
+
+        def add_instances():
+            for i in range(3):
+                PluginInstance.objects.create(
+                    plugin=plugin, owner=user, previous=plg_inst, title=f'more{i}',
+                    compute_resource=plugin.compute_resources.all()[0])
+
+        self.assertQueriesPerListItem(self.list_url, add_instances)
 
     def test_feed_plugin_instance_list_failure_not_related_feed_owner(self):
         self.client.login(username=self.other_username, password=self.other_password)

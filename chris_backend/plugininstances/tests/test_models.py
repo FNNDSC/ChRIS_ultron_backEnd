@@ -3,8 +3,10 @@ import logging
 import os
 from unittest import mock
 
+from django.db import connection
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.test.utils import CaptureQueriesContext
+from django.contrib.auth.models import AnonymousUser, Group, User
 from django.conf import settings
 
 from core.models import ChrisFolder
@@ -87,6 +89,24 @@ class ModelTests(TestCase):
     def tearDown(self):
         # re-enable logging
         logging.disable(logging.NOTSET)
+
+    def create_instance_tree(self):
+        """
+        Custom method to create a root 'fs' plugin instance with two 'ds' children, the
+        first of which has a 'ds' child, and return the four instances.
+        """
+        user = User.objects.get(username=self.username)
+        plugin_fs = Plugin.objects.get(meta__name=self.plugin_fs_name)
+        plugin_ds = Plugin.objects.get(meta__name=self.plugin_ds_name)
+        root = PluginInstance.objects.create(plugin=plugin_fs, owner=user,
+                                             compute_resource=self.compute_resource)
+        (child1, child2) = [PluginInstance.objects.create(
+            plugin=plugin_ds, owner=user, previous=root,
+            compute_resource=self.compute_resource) for _ in range(2)]
+        grandchild = PluginInstance.objects.create(plugin=plugin_ds, owner=user,
+                                                   previous=child1,
+                                                   compute_resource=self.compute_resource)
+        return root, child1, child2, grandchild
 
 
 class PluginInstanceModelTests(ModelTests):
@@ -184,6 +204,20 @@ class PluginInstanceModelTests(ModelTests):
         self.assertEqual(decend_instances[0], plg_inst_root)
         self.assertEqual(decend_instances[1], plg_inst1)
         self.assertEqual(decend_instances[2], plg_inst2)
+
+    def test_get_descendant_instances_runs_one_plain_query_per_instance(self):
+        """
+        Test whether custom get_descendant_instances method runs one query per visited
+        plugin instance that fetches no related objects, so walking a big tree stays
+        cheap for the callers that only need the instances' ids or status.
+        """
+        (root, child1, child2, grandchild) = self.create_instance_tree()
+        with CaptureQueriesContext(connection) as walk:
+            descendants = root.get_descendant_instances()
+        self.assertCountEqual(descendants, [root, child1, child2, grandchild])
+        self.assertEqual(len(walk), len(descendants))
+        for query in walk.captured_queries:
+            self.assertNotIn('JOIN', query['sql'])
 
     def test_get_parameter_instances(self):
         """
@@ -302,3 +336,89 @@ class PluginInstanceFilterModelTests(ModelTests):
         self.assertEqual(len(filtered_queryset), 2)
         self.assertIn(filtered_queryset[0], [plg_inst1, plg_inst2])
         self.assertIn(filtered_queryset[1], [plg_inst1, plg_inst2])
+
+    def test_filter_by_root_id_narrows_the_given_queryset(self):
+        """
+        Test whether custom filter_by_root_id method only returns plugin instances of
+        the queryset it is given, so that the filters applied before it are kept.
+        """
+        (root, child1, child2, grandchild) = self.create_instance_tree()
+        queryset = PluginInstance.objects.exclude(pk=grandchild.id)
+        filtered_queryset = PluginInstanceFilter().filter_by_root_id(queryset, "",
+                                                                     root.id)
+        self.assertCountEqual(filtered_queryset, [root, child1, child2])
+
+    def test_filter_by_previous_id_narrows_the_given_queryset(self):
+        """
+        Test whether custom filter_by_previous_id method only returns plugin instances
+        of the queryset it is given, so that the filters applied before it are kept.
+        """
+        (root, child1, child2, grandchild) = self.create_instance_tree()
+        queryset = PluginInstance.objects.exclude(pk=child2.id)
+        filtered_queryset = PluginInstanceFilter().filter_by_previous_id(queryset, "",
+                                                                         root.id)
+        self.assertCountEqual(filtered_queryset, [child1])
+
+
+class PluginInstanceVisibilityModelTests(ModelTests):
+    """
+    Test the custom filter_visible_to_user static method.
+    """
+
+    def setUp(self):
+        super(PluginInstanceVisibilityModelTests, self).setUp()
+        self.other_user = User.objects.create_user(username='boo', password=self.password)
+        user = User.objects.get(username=self.username)
+        plugin = Plugin.objects.get(meta__name=self.plugin_fs_name)
+
+        # create two 'fs' plugin instances, one in a private and one in a public feed
+        (self.private_inst, self.public_inst) = [PluginInstance.objects.create(
+            plugin=plugin, owner=user, compute_resource=self.compute_resource)
+            for _ in range(2)]
+        self.public_inst.feed.public = True
+        self.public_inst.feed.save()
+
+    def visible_to(self, user):
+        return PluginInstance.filter_visible_to_user(PluginInstance.objects.all(), user)
+
+    def test_filter_visible_to_user_unauthenticated_sees_public_feeds_only(self):
+        self.assertCountEqual(self.visible_to(AnonymousUser()), [self.public_inst])
+
+    def test_filter_visible_to_user_chris_sees_every_feed(self):
+        chris = User.objects.get(username=self.chris_username)
+        self.assertCountEqual(self.visible_to(chris), [self.private_inst,
+                                                       self.public_inst])
+
+    def test_filter_visible_to_user_owner_sees_own_feeds(self):
+        owner = User.objects.get(username=self.username)
+        self.assertCountEqual(self.visible_to(owner), [self.private_inst,
+                                                       self.public_inst])
+
+    def test_filter_visible_to_user_other_user_sees_public_feeds_only(self):
+        self.assertCountEqual(self.visible_to(self.other_user), [self.public_inst])
+
+    def test_filter_visible_to_user_sees_feeds_shared_with_the_user(self):
+        self.private_inst.feed.grant_user_permission(self.other_user)
+        self.assertCountEqual(self.visible_to(self.other_user), [self.private_inst,
+                                                                 self.public_inst])
+
+    def test_filter_visible_to_user_sees_feeds_shared_with_a_group_of_the_user(self):
+        group = Group.objects.create(name='lab')
+        self.other_user.groups.add(group)
+        self.private_inst.feed.grant_group_permission(group)
+        self.assertCountEqual(self.visible_to(self.other_user), [self.private_inst,
+                                                                 self.public_inst])
+
+    def test_filter_visible_to_user_lists_once_an_instance_shared_many_times(self):
+        group = Group.objects.create(name='lab')
+        self.other_user.groups.add(group)
+        third_user = User.objects.create_user(username='third', password=self.password)
+        feed = self.private_inst.feed
+        feed.grant_user_permission(self.other_user)
+        feed.grant_user_permission(third_user)
+        feed.grant_group_permission(group)
+
+        for user in (User.objects.get(username=self.username), self.other_user):
+            with self.subTest(user=user.username):
+                self.assertCountEqual(self.visible_to(user), [self.private_inst,
+                                                              self.public_inst])
